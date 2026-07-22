@@ -44,6 +44,42 @@ export async function guardarCampania(input: GuardarInput) {
   return { ok: true };
 }
 
+/** Encola una campaña: crea los Envío para los contactos elegibles y la pone ENVIANDO. */
+export async function enviarCampania(id: string) {
+  const cuenta = await getCuentaActiva();
+  const campania = await prisma.campania.findFirst({ where: { id, cuentaId: cuenta.id } });
+  if (!campania) return { ok: false, error: "Campaña no encontrada" };
+  if (!campania.asunto) return { ok: false, error: "Falta el asunto" };
+  if (!campania.listaId) return { ok: false, error: "Falta la lista destino" };
+  if (campania.estado === "ENVIANDO" || campania.estado === "ENVIADA")
+    return { ok: false, error: "La campaña ya fue enviada" };
+
+  // Elegibles: en la lista, activos y que aceptan marketing (consentimiento).
+  const contactos = await prisma.contacto.findMany({
+    where: {
+      cuentaId: cuenta.id,
+      estado: "ACTIVO",
+      tnAcceptsMkt: true,
+      listas: { some: { listaId: campania.listaId } },
+    },
+    select: { id: true },
+  });
+  if (contactos.length === 0) return { ok: false, error: "No hay contactos elegibles" };
+
+  // Crear los envíos en lote (idempotente por campaña+contacto).
+  const CHUNK = 1000;
+  for (let i = 0; i < contactos.length; i += CHUNK) {
+    await prisma.envio.createMany({
+      data: contactos.slice(i, i + CHUNK).map((c) => ({ campaniaId: id, contactoId: c.id })),
+      skipDuplicates: true,
+    });
+  }
+  await prisma.campania.update({ where: { id }, data: { estado: "ENVIANDO" } });
+
+  const total = await prisma.envio.count({ where: { campaniaId: id } });
+  return { ok: true, total };
+}
+
 export async function enviarPrueba(id: string, emailDestino: string) {
   const cuenta = await getCuentaActiva();
   const campania = await prisma.campania.findFirst({

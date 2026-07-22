@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server';
 const PUBLIC_PREFIXES = [
   '/api/tn/', // callback OAuth + webhooks LGPD (los llama Tiendanube)
   '/api/health',
+  '/api/track/', // pixel de apertura + redirect de clicks (los abren los destinatarios)
+  '/api/ses/', // notificaciones SNS de rebotes/quejas (las llama AWS)
   '/baja', // desuscripción: la abren destinatarios sin login
 ];
 

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { renderEmailHtml, type Bloque, type ContenidoCampania } from "@/lib/email/render";
-import { guardarCampania, enviarPrueba } from "@/app/campanias/actions";
+import { guardarCampania, enviarPrueba, enviarCampania } from "@/app/campanias/actions";
 
 interface Lista {
   id: string;
@@ -22,6 +22,7 @@ interface Props {
   };
   listas: Lista[];
   emailPrueba: string;
+  estado: string;
 }
 
 const nuevoBloque = (tipo: Bloque["tipo"]): Bloque => {
@@ -34,7 +35,7 @@ const nuevoBloque = (tipo: Bloque["tipo"]): Bloque => {
   }
 };
 
-export function CampaniaEditor({ id, nombreCuenta, initial, listas, emailPrueba }: Props) {
+export function CampaniaEditor({ id, nombreCuenta, initial, listas, emailPrueba, estado }: Props) {
   const [nombre, setNombre] = useState(initial.nombre);
   const [asunto, setAsunto] = useState(initial.asunto);
   const [preheader, setPreheader] = useState(initial.preheader);
@@ -78,6 +79,30 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, emailPrueba 
       setMsg(r.ok ? `Prueba enviada a ${pruebaEmail} ✓` : `Error: ${r.error}`);
       setTimeout(() => setMsg(null), 5000);
     });
+
+  const [enviado, setEnviado] = useState(estado === "ENVIADA" || estado === "ENVIANDO");
+  const [progreso, setProgreso] = useState<string | null>(null);
+
+  const enviarTodo = async () => {
+    if (!listaId) { setMsg("Elegí una lista destino primero"); return; }
+    if (!confirm("¿Enviar esta campaña a toda la lista (contactos que aceptan marketing)?")) return;
+    setEnviado(true);
+    await guardarCampania({ id, nombre, asunto, preheader, listaId: listaId || null, contenido: { bloques } });
+    const r = await enviarCampania(id);
+    if (!r.ok) { setProgreso(`Error: ${r.error}`); setEnviado(false); return; }
+    let enviadosAcum = 0;
+    const total = r.total ?? 0;
+    setProgreso(`Encolados ${total} envíos…`);
+    // Procesar lotes hasta terminar
+    for (let i = 0; i < 100000; i++) {
+      const res = await fetch(`/api/campanias/${id}/procesar`, { method: "POST" });
+      const data = await res.json();
+      enviadosAcum += data.enviados ?? 0;
+      setProgreso(`Enviados ${enviadosAcum}/${total} · restantes ${data.restantes}${data.fallidos ? ` · fallidos ${data.fallidos}` : ""}`);
+      if (data.restantes === 0) { setProgreso(`✅ Campaña enviada (${enviadosAcum}/${total})`); break; }
+      if (data.throttled) await new Promise((r) => setTimeout(r, 1000));
+    }
+  };
 
   const input = "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200";
 
@@ -158,6 +183,22 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, emailPrueba 
             {sending ? "Enviando…" : "Enviar prueba"}
           </button>
           {msg && <span className="text-sm text-neutral-600">{msg}</span>}
+        </div>
+
+        {/* Envío a la lista */}
+        <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+          <div className="text-sm font-medium text-neutral-700">Enviar a la lista</div>
+          <p className="text-xs text-neutral-500">
+            Se envía solo a los contactos de la lista que <b>aceptan marketing</b> y están activos.
+          </p>
+          <button
+            onClick={enviarTodo}
+            disabled={enviado}
+            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+          >
+            {enviado ? "Enviada / en curso" : "Enviar a la lista"}
+          </button>
+          {progreso && <div className="text-sm text-neutral-700">{progreso}</div>}
         </div>
       </div>
 
