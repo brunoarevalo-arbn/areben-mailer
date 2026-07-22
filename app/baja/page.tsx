@@ -4,9 +4,9 @@ import { prisma } from "@/lib/prisma";
 export default async function BajaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ e?: string; token?: string }>;
+  searchParams: Promise<{ e?: string; c?: string; token?: string }>;
 }) {
-  const { e } = await searchParams;
+  const { e, c } = await searchParams;
   let ok = false;
 
   if (e) {
@@ -20,6 +20,13 @@ export default async function BajaPage({
         ]);
         ok = true;
       }
+    } catch {
+      /* noop */
+    }
+  } else if (c) {
+    try {
+      await prisma.contacto.update({ where: { id: c }, data: { estado: "BAJA" } });
+      ok = true;
     } catch {
       /* noop */
     }

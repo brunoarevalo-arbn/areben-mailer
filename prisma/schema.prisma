@@ -35,6 +35,7 @@ model Cuenta {
   intereses    Interes[]
   campanias    Campania[]
   plantillas   Plantilla[]
+  automations  Automation[]
 }
 
 model Plantilla {
@@ -46,6 +47,64 @@ model Plantilla {
   createdAt DateTime @default(now())
 
   @@index([cuentaId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Automations (flujos disparados por eventos de Tiendanube)
+// ─────────────────────────────────────────────────────────────
+
+enum TriggerTipo {
+  NUEVO_CLIENTE      // customer/created → bienvenida
+  COMPRA             // order/paid → post-compra
+  CARRITO_ABANDONADO // checkout/created + condición (no compró)
+}
+
+enum EstadoAutomation {
+  ACTIVO
+  PAUSADO
+}
+
+model Automation {
+  id          String           @id @default(cuid())
+  cuentaId    String
+  cuenta      Cuenta           @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  nombre      String
+  trigger     TriggerTipo
+  estado      EstadoAutomation @default(PAUSADO)
+  esperaHoras Int              @default(1) // delay antes de enviar
+  capDias     Int              @default(30) // no re-disparar al mismo contacto en N días
+  asunto      String?
+  preheader   String?
+  contenido   Json             @default("{}")
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  runs AutomationRun[]
+
+  @@index([cuentaId, trigger, estado])
+}
+
+enum EstadoRun {
+  PENDIENTE
+  ENVIADO
+  SALTADO // p.ej. carrito recuperado, o cap
+  FALLIDO
+}
+
+model AutomationRun {
+  id           String     @id @default(cuid())
+  automationId String
+  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  contactoId   String
+  contacto     Contacto   @relation(fields: [contactoId], references: [id], onDelete: Cascade)
+  estado       EstadoRun  @default(PENDIENTE)
+  proximoAt    DateTime // cuándo procesar (trigger + esperaHoras)
+  triggerData  Json       @default("{}") // datos del evento (checkout id, etc.)
+  sesMessageId String?
+  createdAt    DateTime   @default(now())
+
+  @@index([estado, proximoAt])
+  @@index([automationId, contactoId, createdAt])
 }
 
 enum RolUsuario {
@@ -147,6 +206,7 @@ model Contacto {
   listas    ContactoLista[]
   intereses ContactoInteres[]
   envios    Envio[]
+  runs      AutomationRun[]
 
   @@unique([cuentaId, email])
   @@index([cuentaId, estado])

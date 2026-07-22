@@ -53,6 +53,34 @@ export async function tnGet<T = unknown>(
   return { data: (await res.json()) as T, res };
 }
 
+/** POST a la API de una tienda. */
+export async function tnPost<T = unknown>(
+  storeId: string,
+  token: string,
+  path: string,
+  body: unknown,
+): Promise<T> {
+  const res = await fetch(`${API_BASE}/${storeId}/${path}`, {
+    method: "POST",
+    headers: {
+      Authentication: `bearer ${token}`,
+      "User-Agent": USER_AGENT,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`TN POST ${path} → ${res.status}: ${await res.text()}`);
+  return (await res.json()) as T;
+}
+
+/** DELETE a la API de una tienda. */
+export async function tnDelete(storeId: string, token: string, path: string): Promise<void> {
+  await fetch(`${API_BASE}/${storeId}/${path}`, {
+    method: "DELETE",
+    headers: { Authentication: `bearer ${token}`, "User-Agent": USER_AGENT },
+  });
+}
+
 /** Itera todas las páginas de un recurso (customers, orders, products…). */
 export async function* tnPaginate<T = unknown>(
   storeId: string,

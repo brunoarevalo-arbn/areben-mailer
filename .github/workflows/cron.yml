@@ -1,0 +1,15 @@
+name: Procesar automations
+on:
+  schedule:
+    - cron: "*/15 * * * *" # cada 15 minutos
+  workflow_dispatch: {}
+
+jobs:
+  procesar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping procesador
+        run: |
+          curl -sS --max-time 60 \
+            "https://areben-mailer.vercel.app/api/automations/procesar?secret=${{ secrets.CRON_SECRET }}" \
+            && echo "" || echo "fallo (se reintenta en el próximo ciclo)"
