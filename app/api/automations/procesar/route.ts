@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
+import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania, type ProductoEmail } from "@/lib/email/render";
 import { sendEmail } from "@/lib/ses/client";
+import { tnGet } from "@/lib/tn/client";
 
 export const maxDuration = 60;
 const BATCH = 30;
@@ -31,13 +32,36 @@ export async function GET(req: Request) {
       continue;
     }
 
+    const td = run.triggerData as { checkoutId?: string; abandonedUrl?: string; productos?: ProductoEmail[] };
+    const esCarrito = automation.trigger === "CARRITO_ABANDONADO";
+
+    // Carrito abandonado: si ya completó la compra, no enviamos.
+    if (esCarrito && td.checkoutId && automation.cuenta.tnStoreId && automation.cuenta.tnToken) {
+      try {
+        const { data } = await tnGet<{ completed_at?: string | null }>(
+          automation.cuenta.tnStoreId, automation.cuenta.tnToken, `checkouts/${td.checkoutId}`,
+        );
+        if (data.completed_at) {
+          await prisma.automationRun.update({ where: { id: run.id }, data: { estado: "SALTADO" } });
+          saltados++;
+          continue;
+        }
+      } catch { /* si no se puede verificar, seguimos con el envío */ }
+    }
+
+    const contenido = automation.contenido as unknown as ContenidoCampania;
+    const bloques = [...(contenido?.bloques ?? [])];
+    // Carrito: sumar los productos que dejó como bloque
+    if (esCarrito && td.productos?.length) bloques.push({ tipo: "productos", items: td.productos });
+
     const unsubUrl = `${appUrl}/baja?c=${contacto.id}`;
-    let html = renderEmailHtml(automation.contenido as unknown as ContenidoCampania, {
+    let html = renderEmailHtml({ bloques }, {
       preheader: automation.preheader ?? undefined,
       unsubscribeUrl: unsubUrl,
       nombreCuenta: automation.cuenta.nombre,
     });
     html = aplicarMergeTags(html, contacto);
+    if (esCarrito) html = html.replaceAll("${cart.url}", td.abandonedUrl ?? "#");
 
     if (sandbox) {
       // No enviamos de verdad hasta salir del sandbox; marcamos el flujo como OK.

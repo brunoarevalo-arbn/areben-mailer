@@ -51,6 +51,11 @@ function renderCard(p: ProductoEmail): string {
   </td>`;
 }
 
+/** Render de una grilla de productos, reutilizable (ej. email de carrito abandonado). */
+export function renderProductosHtml(items: ProductoEmail[]): string {
+  return renderProductos(items);
+}
+
 function renderProductos(items: ProductoEmail[]): string {
   if (items.length === 0) return "";
   const filas: string[] = [];

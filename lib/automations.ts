@@ -1,4 +1,4 @@
-export type Trigger = "NUEVO_CLIENTE" | "COMPRA";
+export type Trigger = "NUEVO_CLIENTE" | "COMPRA" | "CARRITO_ABANDONADO";
 
 export const PRESETS: Record<Trigger, { nombre: string; esperaHoras: number; asunto: string; bloques: object[] }> = {
   NUEVO_CLIENTE: {
@@ -18,6 +18,16 @@ export const PRESETS: Record<Trigger, { nombre: string; esperaHoras: number; asu
     bloques: [
       { tipo: "titulo", texto: "¡Gracias ${contacto.nombre}!" },
       { tipo: "texto", texto: "Ya estamos preparando tu pedido. Cualquier duda, escribinos." },
+    ],
+  },
+  CARRITO_ABANDONADO: {
+    nombre: "Carrito abandonado",
+    esperaHoras: 3,
+    asunto: "¿Te olvidaste de algo? 🛒",
+    bloques: [
+      { tipo: "titulo", texto: "Todavía estás a tiempo, ${contacto.nombre}" },
+      { tipo: "texto", texto: "Dejaste esto en tu carrito. Completá tu compra antes de que se agote." },
+      { tipo: "boton", texto: "Completar mi compra", url: "${cart.url}" },
     ],
   },
 };

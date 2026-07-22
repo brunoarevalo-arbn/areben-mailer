@@ -34,7 +34,7 @@ export default async function AutomationsPage() {
       />
 
       {/* Presets */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <div className="font-medium text-neutral-800">👋 Bienvenida</div>
           <p className="mt-1 text-sm text-neutral-500">Se envía cuando un cliente nuevo se registra en tu tienda.</p>
@@ -46,6 +46,13 @@ export default async function AutomationsPage() {
           <div className="font-medium text-neutral-800">🛍️ Post-compra</div>
           <p className="mt-1 text-sm text-neutral-500">Se envía cuando se paga un pedido (agradecimiento).</p>
           <form action={crearAutomation.bind(null, "COMPRA")} className="mt-3">
+            <button className="rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-600">Crear</button>
+          </form>
+        </Card>
+        <Card>
+          <div className="font-medium text-neutral-800">🛒 Carrito abandonado</div>
+          <p className="mt-1 text-sm text-neutral-500">Recupera ventas: incluye el link al carrito y los productos que dejó.</p>
+          <form action={crearAutomation.bind(null, "CARRITO_ABANDONADO")} className="mt-3">
             <button className="rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-600">Crear</button>
           </form>
         </Card>

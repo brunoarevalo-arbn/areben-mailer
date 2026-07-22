@@ -7,26 +7,53 @@ interface Persona {
   email?: string | null;
   name?: string | null;
   id?: number;
+  accepts_marketing?: boolean;
 }
 
-// Resuelve email/nombre/tnId del contacto según el evento.
-async function resolver(
-  event: string,
-  recursoId: string,
-  storeId: string,
-  token: string,
-): Promise<{ email: string; nombre: string | null; tnCustomerId: string | null; triggerData: object } | null> {
+interface Resuelto {
+  email: string;
+  nombre: string | null;
+  tnCustomerId: string | null;
+  acceptsMkt: boolean;
+  triggerData: object;
+}
+
+// Resuelve datos del contacto según el evento.
+async function resolver(event: string, recursoId: string, storeId: string, token: string): Promise<Resuelto | null> {
   try {
     if (event === "customer/created") {
       const { data } = await tnGet<Persona>(storeId, token, `customers/${recursoId}`);
       if (!data.email) return null;
-      return { email: data.email.toLowerCase(), nombre: data.name ?? null, tnCustomerId: data.id?.toString() ?? null, triggerData: {} };
+      return { email: data.email.toLowerCase(), nombre: data.name ?? null, tnCustomerId: data.id?.toString() ?? null, acceptsMkt: data.accepts_marketing === true, triggerData: {} };
     }
     if (event === "order/paid") {
       const { data } = await tnGet<{ customer?: Persona }>(storeId, token, `orders/${recursoId}`);
       const c = data.customer;
       if (!c?.email) return null;
-      return { email: c.email.toLowerCase(), nombre: c.name ?? null, tnCustomerId: c.id?.toString() ?? null, triggerData: { orderId: recursoId } };
+      return { email: c.email.toLowerCase(), nombre: c.name ?? null, tnCustomerId: c.id?.toString() ?? null, acceptsMkt: c.accepts_marketing === true, triggerData: { orderId: recursoId } };
+    }
+    if (event === "checkout/created") {
+      const { data } = await tnGet<{
+        contact_email?: string; contact_name?: string; customer?: Persona;
+        abandoned_checkout_url?: string; contact_accepts_marketing?: boolean;
+        products?: { name?: string; price?: string; compare_at_price?: string; image?: string | { src?: string }; quantity?: number }[];
+      }>(storeId, token, `checkouts/${recursoId}`);
+      const email = data.contact_email?.toLowerCase();
+      if (!email) return null;
+      const productos = (data.products ?? []).slice(0, 4).map((p) => ({
+        nombre: p.name ?? "",
+        precio: p.compare_at_price && p.compare_at_price !== p.price ? p.compare_at_price : p.price ?? "",
+        precioPromo: p.compare_at_price && p.compare_at_price !== p.price ? p.price : undefined,
+        imagen: typeof p.image === "string" ? p.image : p.image?.src ?? "",
+        url: data.abandoned_checkout_url ?? "#",
+      }));
+      return {
+        email,
+        nombre: data.contact_name ?? null,
+        tnCustomerId: data.customer?.id?.toString() ?? null,
+        acceptsMkt: data.contact_accepts_marketing === true,
+        triggerData: { checkoutId: recursoId, abandonedUrl: data.abandoned_checkout_url ?? "", productos },
+      };
     }
   } catch {
     return null;
@@ -61,7 +88,7 @@ export async function POST(req: Request) {
   const contacto = await prisma.contacto.upsert({
     where: { cuentaId_email: { cuentaId: cuenta.id, email: persona.email } },
     update: { tnCustomerId: persona.tnCustomerId ?? undefined, nombre: persona.nombre ?? undefined },
-    create: { cuentaId: cuenta.id, email: persona.email, nombre: persona.nombre, tnCustomerId: persona.tnCustomerId, source: "tiendanube", tnAcceptsMkt: true },
+    create: { cuentaId: cuenta.id, email: persona.email, nombre: persona.nombre, tnCustomerId: persona.tnCustomerId, source: "tiendanube", tnAcceptsMkt: persona.acceptsMkt },
   });
 
   const now = Date.now();
