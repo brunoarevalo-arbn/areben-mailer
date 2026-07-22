@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
+import { crearLista, eliminarLista } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,12 @@ export default async function ListasPage() {
         eyebrow="Audiencia"
         title="Listas"
         subtitle={`${listas.length} listas`}
+        actions={
+          <form action={crearLista} className="flex gap-2">
+            <input name="nombre" placeholder="Nueva lista" className="rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200" />
+            <button type="submit" className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600">Crear</button>
+          </form>
+        }
       />
 
       {listas.length === 0 ? (
@@ -43,9 +50,16 @@ export default async function ListasPage() {
               {l.descripcion && (
                 <div className="mt-1 text-sm text-neutral-500">{l.descripcion}</div>
               )}
-              <div className="mt-3 text-2xl font-semibold tabular-nums">
-                {l._count.contactos.toLocaleString("es-AR")}
-                <span className="ml-1 text-sm font-normal text-neutral-400">contactos</span>
+              <div className="mt-3 flex items-end justify-between">
+                <div className="text-2xl font-semibold tabular-nums">
+                  {l._count.contactos.toLocaleString("es-AR")}
+                  <span className="ml-1 text-sm font-normal text-neutral-400">contactos</span>
+                </div>
+                {l.tipo === "MANUAL" && (
+                  <form action={eliminarLista.bind(null, l.id)}>
+                    <button className="text-xs text-neutral-400 hover:text-red-500">Eliminar</button>
+                  </form>
+                )}
               </div>
             </Card>
           ))}

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
+import { ContactosAcciones } from "@/components/ContactosAcciones";
 import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ export default async function ContactosPage({
       : {}),
   };
 
-  const [total, contactos] = await Promise.all([
+  const [total, contactos, listas] = await Promise.all([
     prisma.contacto.count({ where }),
     prisma.contacto.findMany({
       where,
@@ -46,6 +47,7 @@ export default async function ContactosPage({
       take: PER_PAGE,
       skip: (page - 1) * PER_PAGE,
     }),
+    prisma.lista.findMany({ where: { cuentaId: cuenta.id }, orderBy: { createdAt: "asc" }, select: { id: true, nombre: true } }),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
@@ -65,6 +67,8 @@ export default async function ContactosPage({
         title="Contactos"
         subtitle={`${total.toLocaleString("es-AR")} ${q ? "resultados" : "contactos"}`}
       />
+
+      <ContactosAcciones listas={listas} />
 
       <form method="get" className="flex gap-2">
         <input
