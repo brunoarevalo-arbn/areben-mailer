@@ -10,6 +10,11 @@ interface Lista {
   _count: { contactos: number };
 }
 
+interface Segmento {
+  id: string;
+  nombre: string;
+}
+
 interface Props {
   id: string;
   nombreCuenta: string;
@@ -17,10 +22,11 @@ interface Props {
     nombre: string;
     asunto: string;
     preheader: string;
-    listaId: string | null;
+    destino: string; // "lista:<id>" | "seg:<id>" | ""
     contenido: ContenidoCampania;
   };
   listas: Lista[];
+  segmentos: Segmento[];
   emailPrueba: string;
   estado: string;
 }
@@ -35,11 +41,11 @@ const nuevoBloque = (tipo: Bloque["tipo"]): Bloque => {
   }
 };
 
-export function CampaniaEditor({ id, nombreCuenta, initial, listas, emailPrueba, estado }: Props) {
+export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, emailPrueba, estado }: Props) {
   const [nombre, setNombre] = useState(initial.nombre);
   const [asunto, setAsunto] = useState(initial.asunto);
   const [preheader, setPreheader] = useState(initial.preheader);
-  const [listaId, setListaId] = useState(initial.listaId ?? "");
+  const [destino, setDestino] = useState(initial.destino ?? "");
   const [bloques, setBloques] = useState<Bloque[]>(initial.contenido?.bloques ?? []);
   const [pruebaEmail, setPruebaEmail] = useState(emailPrueba);
   const [msg, setMsg] = useState<string | null>(null);
@@ -67,14 +73,14 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, emailPrueba,
 
   const guardar = () =>
     startSave(async () => {
-      await guardarCampania({ id, nombre, asunto, preheader, listaId: listaId || null, contenido: { bloques } });
+      await guardarCampania({ id, nombre, asunto, preheader, destino, contenido: { bloques } });
       setMsg("Guardado ✓");
       setTimeout(() => setMsg(null), 2000);
     });
 
   const prueba = () =>
     startSend(async () => {
-      await guardarCampania({ id, nombre, asunto, preheader, listaId: listaId || null, contenido: { bloques } });
+      await guardarCampania({ id, nombre, asunto, preheader, destino, contenido: { bloques } });
       const r = await enviarPrueba(id, pruebaEmail);
       setMsg(r.ok ? `Prueba enviada a ${pruebaEmail} ✓` : `Error: ${r.error}`);
       setTimeout(() => setMsg(null), 5000);
@@ -84,10 +90,10 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, emailPrueba,
   const [progreso, setProgreso] = useState<string | null>(null);
 
   const enviarTodo = async () => {
-    if (!listaId) { setMsg("Elegí una lista destino primero"); return; }
+    if (!destino) { setMsg("Elegí un destino primero"); return; }
     if (!confirm("¿Enviar esta campaña a toda la lista (contactos que aceptan marketing)?")) return;
     setEnviado(true);
-    await guardarCampania({ id, nombre, asunto, preheader, listaId: listaId || null, contenido: { bloques } });
+    await guardarCampania({ id, nombre, asunto, preheader, destino, contenido: { bloques } });
     const r = await enviarCampania(id);
     if (!r.ok) { setProgreso(`Error: ${r.error}`); setEnviado(false); return; }
     let enviadosAcum = 0;
@@ -124,14 +130,23 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, emailPrueba,
             <input className={input} value={preheader} onChange={(e) => setPreheader(e.target.value)} placeholder="Texto de vista previa" />
           </label>
           <label className="block text-sm">
-            <span className="text-neutral-500">Lista destino</span>
-            <select className={input} value={listaId} onChange={(e) => setListaId(e.target.value)}>
-              <option value="">— elegí una lista —</option>
-              {listas.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.nombre} ({l._count.contactos.toLocaleString("es-AR")})
-                </option>
-              ))}
+            <span className="text-neutral-500">Destino</span>
+            <select className={input} value={destino} onChange={(e) => setDestino(e.target.value)}>
+              <option value="">— elegí lista o segmento —</option>
+              <optgroup label="Listas">
+                {listas.map((l) => (
+                  <option key={l.id} value={`lista:${l.id}`}>
+                    {l.nombre} ({l._count.contactos.toLocaleString("es-AR")})
+                  </option>
+                ))}
+              </optgroup>
+              {segmentos.length > 0 && (
+                <optgroup label="Segmentos">
+                  {segmentos.map((s) => (
+                    <option key={s.id} value={`seg:${s.id}`}>🎯 {s.nombre}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </label>
         </div>

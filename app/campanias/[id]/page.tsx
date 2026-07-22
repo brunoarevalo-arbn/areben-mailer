@@ -16,16 +16,27 @@ export default async function CampaniaEditorPage({
   const { id } = await params;
   const cuenta = await getCuentaActiva();
 
-  const [campania, listas] = await Promise.all([
+  const [campania, listas, segmentos] = await Promise.all([
     prisma.campania.findFirst({ where: { id, cuentaId: cuenta.id } }),
     prisma.lista.findMany({
       where: { cuentaId: cuenta.id },
       orderBy: { createdAt: "asc" },
       include: { _count: { select: { contactos: true } } },
     }),
+    prisma.segmento.findMany({
+      where: { cuentaId: cuenta.id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, nombre: true },
+    }),
   ]);
 
   if (!campania) notFound();
+
+  const destinoInicial = campania.listaId
+    ? `lista:${campania.listaId}`
+    : campania.segmentoId
+      ? `seg:${campania.segmentoId}`
+      : "";
 
   const [enviados, aperturas, clicks, rebotes, bajas] = await Promise.all([
     prisma.envio.count({ where: { campaniaId: id, estado: { in: ["ENVIADO", "ABIERTO", "CLICK", "BAJA"] } } }),
@@ -68,10 +79,11 @@ export default async function CampaniaEditorPage({
           nombre: campania.nombre,
           asunto: campania.asunto ?? "",
           preheader: campania.preheader ?? "",
-          listaId: campania.listaId,
+          destino: destinoInicial,
           contenido: (campania.contenido as unknown as ContenidoCampania) ?? { bloques: [] },
         }}
         listas={listas}
+        segmentos={segmentos}
         emailPrueba="brunoarevalo@arebensrl.com"
         estado={campania.estado}
       />

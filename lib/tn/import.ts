@@ -83,6 +83,57 @@ export async function importCustomers(
   return result;
 }
 
+interface TnOrder {
+  id: number;
+  customer?: { id?: number } | null;
+  created_at?: string | null;
+}
+
+export interface OrdersResult {
+  pedidos: number;
+  clientesActualizados: number;
+}
+
+/** Trae los pedidos de TN y setea tnUltimaCompra (recencia) por contacto. */
+export async function importOrders(
+  cuentaId: string,
+  storeId: string,
+  token: string,
+  onProgress?: (pedidos: number) => void,
+): Promise<OrdersResult> {
+  const result: OrdersResult = { pedidos: 0, clientesActualizados: 0 };
+
+  // Fecha máxima de compra por tnCustomerId
+  const ultima = new Map<string, string>();
+  for await (const page of tnPaginate<TnOrder>(storeId, token, "orders", { fields: "id,customer,created_at" })) {
+    for (const o of page) {
+      result.pedidos += 1;
+      const cid = o.customer?.id?.toString();
+      const fecha = o.created_at;
+      if (!cid || !fecha) continue;
+      const prev = ultima.get(cid);
+      if (!prev || fecha > prev) ultima.set(cid, fecha);
+    }
+    onProgress?.(result.pedidos);
+  }
+
+  // Update en bloque por chunks (UPDATE ... FROM VALUES)
+  const rows = [...ultima.entries()];
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const values = chunk.map(([cid, fecha]) => Prisma.sql`(${cid}, ${fecha}::timestamptz)`);
+    const n = await prisma.$executeRaw`
+      UPDATE "Contacto" AS c
+      SET "tnUltimaCompra" = v.fecha
+      FROM (VALUES ${Prisma.join(values)}) AS v(tnid, fecha)
+      WHERE c."tnCustomerId" = v.tnid AND c."cuentaId" = ${cuentaId}
+    `;
+    result.clientesActualizados += Number(n);
+  }
+
+  return result;
+}
+
 async function ensureListaTodos(cuentaId: string) {
   const existing = await prisma.lista.findFirst({
     where: { cuentaId, tipo: 'SISTEMA', nombre: 'Todos los contactos' },

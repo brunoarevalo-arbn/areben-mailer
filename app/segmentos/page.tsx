@@ -1,0 +1,65 @@
+import Link from "next/link";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { prisma } from "@/lib/prisma";
+import { getCuentaActiva } from "@/lib/cuenta";
+import { reglasToWhere, type Reglas } from "@/lib/segmentos";
+import { crearSegmento } from "./actions";
+
+export const dynamic = "force-dynamic";
+
+export default async function SegmentosPage() {
+  const cuenta = await getCuentaActiva();
+  const segmentos = await prisma.segmento.findMany({
+    where: { cuentaId: cuenta.id },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const conCount = await Promise.all(
+    segmentos.map(async (s) => ({
+      ...s,
+      count: await prisma.contacto.count({
+        where: { cuentaId: cuenta.id, estado: "ACTIVO", ...reglasToWhere(s.reglas as unknown as Reglas) },
+      }),
+    })),
+  );
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Audiencia"
+        title="Segmentos"
+        subtitle={`${segmentos.length} segmentos`}
+        actions={
+          <form action={crearSegmento}>
+            <button type="submit" className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600">
+              + Crear segmento
+            </button>
+          </form>
+        }
+      />
+
+      {conCount.length === 0 ? (
+        <EmptyState
+          title="Sin segmentos"
+          message="Creá segmentos dinámicos por reglas (gastó, recencia, comprador…) y usalos como destino de campaña."
+        />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {conCount.map((s) => (
+            <Link key={s.id} href={`/segmentos/${s.id}`} className="block">
+              <Card className="hover:border-amber-300 transition-colors">
+                <div className="font-medium text-neutral-800">{s.nombre}</div>
+                <div className="mt-3 text-2xl font-semibold tabular-nums">
+                  {s.count.toLocaleString("es-AR")}
+                  <span className="ml-1 text-sm font-normal text-neutral-400">contactos</span>
+                </div>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

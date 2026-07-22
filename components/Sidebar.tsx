@@ -7,6 +7,7 @@ const NAV = [
   { href: '/', label: 'Inicio', icon: '🏠' },
   { href: '/contactos', label: 'Contactos', icon: '👥' },
   { href: '/listas', label: 'Listas', icon: '🏷️' },
+  { href: '/segmentos', label: 'Segmentos', icon: '🎯' },
   { href: '/campanias', label: 'Campañas', icon: '✉️' },
   { href: '/automations', label: 'Automations', icon: '⚡' },
 ];
