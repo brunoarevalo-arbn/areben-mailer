@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { renderEmailHtml, type Bloque, type ContenidoCampania } from "@/lib/email/render";
-import { guardarCampania, enviarPrueba, enviarCampania } from "@/app/campanias/actions";
+import { guardarCampania, enviarPrueba, enviarCampania, guardarComoPlantilla } from "@/app/campanias/actions";
 import { ProductosBlock } from "@/components/ProductosBlock";
 
 interface Lista {
@@ -39,6 +39,9 @@ const nuevoBloque = (tipo: Bloque["tipo"]): Bloque => {
     case "boton": return { tipo, texto: "Ver más", url: "https://bdiaccesorios.com.ar" };
     case "imagen": return { tipo, url: "", alt: "" };
     case "productos": return { tipo, items: [] };
+    case "columnas": return { tipo, izq: { imagen: "", url: "" }, der: { imagen: "", url: "" } };
+    case "video": return { tipo, imagen: "", url: "" };
+    case "redes": return { tipo, links: [{ red: "Instagram", url: "" }] };
     case "divisor": return { tipo };
   }
 };
@@ -181,11 +184,39 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
               {b.tipo === "productos" && (
                 <ProductosBlock items={b.items} onChange={(items) => setBloque(i, { items })} />
               )}
+              {b.tipo === "columnas" && (
+                <div className="grid grid-cols-2 gap-2">
+                  {(["izq", "der"] as const).map((lado) => (
+                    <div key={lado} className="space-y-1">
+                      <input className={input} value={b[lado].imagen} placeholder="URL imagen" onChange={(e) => setBloque(i, { [lado]: { ...b[lado], imagen: e.target.value } } as Partial<Bloque>)} />
+                      <input className={input} value={b[lado].url} placeholder="Link" onChange={(e) => setBloque(i, { [lado]: { ...b[lado], url: e.target.value } } as Partial<Bloque>)} />
+                    </div>
+                  ))}
+                </div>
+              )}
+              {b.tipo === "video" && (
+                <div className="space-y-2">
+                  <input className={input} value={b.imagen} placeholder="URL de la miniatura (imagen)" onChange={(e) => setBloque(i, { imagen: e.target.value })} />
+                  <input className={input} value={b.url} placeholder="URL del video (YouTube, etc.)" onChange={(e) => setBloque(i, { url: e.target.value })} />
+                </div>
+              )}
+              {b.tipo === "redes" && (
+                <div className="space-y-2">
+                  {b.links.map((l, k) => (
+                    <div key={k} className="flex gap-2">
+                      <input className={`${input} w-32`} value={l.red} placeholder="Red" onChange={(e) => setBloque(i, { links: b.links.map((x, j) => (j === k ? { ...x, red: e.target.value } : x)) })} />
+                      <input className={`${input} flex-1`} value={l.url} placeholder="URL" onChange={(e) => setBloque(i, { links: b.links.map((x, j) => (j === k ? { ...x, url: e.target.value } : x)) })} />
+                      <button onClick={() => setBloque(i, { links: b.links.filter((_, j) => j !== k) })} className="px-2 text-red-500">✕</button>
+                    </div>
+                  ))}
+                  <button onClick={() => setBloque(i, { links: [...b.links, { red: "", url: "" }] })} className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs text-neutral-600 hover:bg-neutral-50">+ red</button>
+                </div>
+              )}
               {b.tipo === "divisor" && <div className="text-xs text-neutral-400">— línea divisoria —</div>}
             </div>
           ))}
           <div className="flex flex-wrap gap-2 pt-1">
-            {(["titulo", "texto", "boton", "imagen", "productos", "divisor"] as const).map((t) => (
+            {(["titulo", "texto", "boton", "imagen", "productos", "columnas", "video", "redes", "divisor"] as const).map((t) => (
               <button key={t} onClick={() => addBloque(t)} className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs text-neutral-600 hover:bg-neutral-50">
                 + {t}
               </button>
@@ -197,6 +228,18 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-neutral-200 bg-white p-4">
           <button onClick={guardar} disabled={saving} className="rounded-lg bg-neutral-800 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-900 disabled:opacity-50">
             {saving ? "Guardando…" : "Guardar"}
+          </button>
+          <button
+            onClick={async () => {
+              const n = prompt("Nombre de la plantilla:", nombre);
+              if (n === null) return;
+              await guardarComoPlantilla(n, { bloques });
+              setMsg("Plantilla guardada ✓");
+              setTimeout(() => setMsg(null), 2000);
+            }}
+            className="rounded-lg border border-neutral-300 px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
+          >
+            Guardar como plantilla
           </button>
           <input className={`${input} max-w-56`} value={pruebaEmail} onChange={(e) => setPruebaEmail(e.target.value)} placeholder="email de prueba" />
           <button onClick={prueba} disabled={sending} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50">

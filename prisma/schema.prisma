@@ -34,6 +34,18 @@ model Cuenta {
   segmentos    Segmento[]
   intereses    Interes[]
   campanias    Campania[]
+  plantillas   Plantilla[]
+}
+
+model Plantilla {
+  id        String   @id @default(cuid())
+  cuentaId  String
+  cuenta    Cuenta   @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  nombre    String
+  contenido Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([cuentaId])
 }
 
 enum RolUsuario {

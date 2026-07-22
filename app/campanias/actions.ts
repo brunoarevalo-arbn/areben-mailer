@@ -101,6 +101,14 @@ export async function enviarCampania(id: string) {
   return { ok: true, total };
 }
 
+export async function guardarComoPlantilla(nombre: string, contenido: ContenidoCampania) {
+  const cuenta = await getCuentaActiva();
+  await prisma.plantilla.create({
+    data: { cuentaId: cuenta.id, nombre: nombre || "Plantilla", contenido: contenido as object },
+  });
+  return { ok: true };
+}
+
 export async function enviarPrueba(id: string, emailDestino: string) {
   const cuenta = await getCuentaActiva();
   const campania = await prisma.campania.findFirst({

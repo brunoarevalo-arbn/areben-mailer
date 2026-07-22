@@ -9,12 +9,20 @@ export interface ProductoEmail {
   url: string;
 }
 
+export interface Columna {
+  imagen: string;
+  url: string;
+}
+
 export type Bloque =
   | { tipo: "titulo"; texto: string }
   | { tipo: "texto"; texto: string }
   | { tipo: "boton"; texto: string; url: string }
   | { tipo: "imagen"; url: string; alt?: string }
   | { tipo: "productos"; items: ProductoEmail[] }
+  | { tipo: "columnas"; izq: Columna; der: Columna }
+  | { tipo: "video"; imagen: string; url: string }
+  | { tipo: "redes"; links: { red: string; url: string }[] }
   | { tipo: "divisor" };
 
 export interface ContenidoCampania {
@@ -68,6 +76,22 @@ function renderBloque(b: Bloque): string {
       return `<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" style="max-width:100%;height:auto;border-radius:8px;margin:0 0 16px;display:block" />`;
     case "productos":
       return renderProductos(b.items ?? []);
+    case "columnas": {
+      const cell = (c: Columna) =>
+        c.imagen
+          ? `<td width="50%" valign="top" style="padding:6px"><a href="${esc(c.url || "#")}"><img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:8px;display:block" alt="" /></a></td>`
+          : `<td width="50%"></td>`;
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px"><tr>${cell(b.izq)}${cell(b.der)}</tr></table>`;
+    }
+    case "video":
+      return b.imagen
+        ? `<a href="${esc(b.url || "#")}" style="display:block;position:relative;margin:0 0 16px"><img src="${esc(b.imagen)}" width="100%" style="max-width:100%;border-radius:8px;display:block" alt="Ver video" /><span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:48px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.5)">▶</span></a>`
+        : "";
+    case "redes":
+      return `<div style="text-align:center;margin:16px 0">${(b.links ?? [])
+        .filter((l) => l.url)
+        .map((l) => `<a href="${esc(l.url)}" style="display:inline-block;margin:0 8px;color:#404040;font-size:14px;text-decoration:none">${esc(l.red)}</a>`)
+        .join("")}</div>`;
     case "divisor":
       return `<hr style="border:0;border-top:1px solid #e5e5e5;margin:24px 0" />`;
     default:
