@@ -14,10 +14,10 @@ interface EmptyStateProps {
 // los `<p text-stone-400 italic>Sin ...</p>` sueltos repartidos por la app.
 export function EmptyState({ icon, title, message, action, className = '' }: EmptyStateProps) {
   return (
-    <div className={`bg-white rounded-2xl border border-dashed border-stone-300 px-6 py-12 text-center ${className}`}>
-      {icon && <div className="text-4xl mb-3">{icon}</div>}
-      {title && <h3 className="text-base font-semibold text-stone-700 mb-1">{title}</h3>}
-      {message && <p className="text-stone-500 text-sm max-w-md mx-auto">{message}</p>}
+    <div className={`bg-surface rounded-2xl border border-dashed border-border-strong px-6 py-12 text-center ${className}`}>
+      {icon && <div className="mb-3 flex justify-center text-subtle [&>svg]:h-9 [&>svg]:w-9 text-4xl">{icon}</div>}
+      {title && <h3 className="text-base font-semibold text-foreground mb-1">{title}</h3>}
+      {message && <p className="text-muted text-sm max-w-md mx-auto">{message}</p>}
       {action && <div className="mt-4 flex justify-center">{action}</div>}
     </div>
   );

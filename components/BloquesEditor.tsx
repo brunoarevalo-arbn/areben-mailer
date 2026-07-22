@@ -2,8 +2,9 @@
 
 import { renderEmailHtml, type Bloque } from "@/lib/email/render";
 import { ProductosBlock } from "@/components/ProductosBlock";
+import { ChevronUp, ChevronDown, X } from "lucide-react";
 
-const input = "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200";
+const input = "w-full rounded-lg border border-border-strong bg-background text-foreground placeholder:text-subtle px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-ring/30";
 
 const nuevoBloque = (tipo: Bloque["tipo"]): Bloque => {
   switch (tipo) {
@@ -46,16 +47,16 @@ export function BloquesEditor({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="space-y-2 rounded-xl border border-neutral-200 bg-white p-4">
-        <div className="text-sm font-medium text-neutral-700">Contenido</div>
+      <div className="space-y-2 rounded-xl border border-border bg-surface p-4 shadow-sm">
+        <div className="text-sm font-medium text-foreground">Contenido</div>
         {bloques.map((b, i) => (
-          <div key={i} className="rounded-lg border border-neutral-200 p-3">
+          <div key={i} className="rounded-lg border border-border bg-surface-muted p-3">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-medium uppercase tracking-wide text-neutral-400">{b.tipo}</span>
-              <div className="flex gap-1 text-xs text-neutral-500">
-                <button onClick={() => moveBloque(i, -1)} className="px-1 hover:text-neutral-900">↑</button>
-                <button onClick={() => moveBloque(i, 1)} className="px-1 hover:text-neutral-900">↓</button>
-                <button onClick={() => delBloque(i)} className="px-1 text-red-500 hover:text-red-700">✕</button>
+              <span className="text-xs font-medium uppercase tracking-wide text-subtle">{b.tipo}</span>
+              <div className="flex gap-1 text-muted">
+                <button onClick={() => moveBloque(i, -1)} className="px-1 hover:text-foreground"><ChevronUp className="h-4 w-4" aria-hidden /></button>
+                <button onClick={() => moveBloque(i, 1)} className="px-1 hover:text-foreground"><ChevronDown className="h-4 w-4" aria-hidden /></button>
+                <button onClick={() => delBloque(i)} className="px-1 text-danger-foreground hover:opacity-70"><X className="h-4 w-4" aria-hidden /></button>
               </div>
             </div>
             {(b.tipo === "titulo" || b.tipo === "texto") && (
@@ -93,25 +94,25 @@ export function BloquesEditor({
                   <div key={k} className="flex gap-2">
                     <input className={`${input} w-32`} value={l.red} placeholder="Red" onChange={(e) => setBloque(i, { links: b.links.map((x, j) => (j === k ? { ...x, red: e.target.value } : x)) })} />
                     <input className={`${input} flex-1`} value={l.url} placeholder="URL" onChange={(e) => setBloque(i, { links: b.links.map((x, j) => (j === k ? { ...x, url: e.target.value } : x)) })} />
-                    <button onClick={() => setBloque(i, { links: b.links.filter((_, j) => j !== k) })} className="px-2 text-red-500">✕</button>
+                    <button onClick={() => setBloque(i, { links: b.links.filter((_, j) => j !== k) })} className="px-2 text-danger-foreground hover:opacity-70"><X className="h-4 w-4" aria-hidden /></button>
                   </div>
                 ))}
-                <button onClick={() => setBloque(i, { links: [...b.links, { red: "", url: "" }] })} className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs text-neutral-600 hover:bg-neutral-50">+ red</button>
+                <button onClick={() => setBloque(i, { links: [...b.links, { red: "", url: "" }] })} className="rounded-lg border border-border-strong px-2.5 py-1 text-xs text-muted hover:bg-surface-muted">+ red</button>
               </div>
             )}
-            {b.tipo === "divisor" && <div className="text-xs text-neutral-400">— línea divisoria —</div>}
+            {b.tipo === "divisor" && <div className="text-xs text-subtle">— línea divisoria —</div>}
           </div>
         ))}
         <div className="flex flex-wrap gap-2 pt-1">
           {(["titulo", "texto", "boton", "imagen", "productos", "columnas", "video", "redes", "divisor"] as const).map((t) => (
-            <button key={t} onClick={() => addBloque(t)} className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs text-neutral-600 hover:bg-neutral-50">+ {t}</button>
+            <button key={t} onClick={() => addBloque(t)} className="rounded-lg border border-border-strong px-2.5 py-1 text-xs text-muted hover:bg-surface-muted">+ {t}</button>
           ))}
         </div>
       </div>
 
       <div className="lg:sticky lg:top-6 h-fit">
-        <div className="mb-2 text-sm text-neutral-500">Vista previa</div>
-        <iframe title="preview" srcDoc={previewHtml} className="h-[60vh] w-full rounded-xl border border-neutral-200 bg-white" />
+        <div className="mb-2 text-sm text-muted">Vista previa</div>
+        <iframe title="preview" srcDoc={previewHtml} className="h-[60vh] w-full rounded-xl border border-border bg-white" />
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { CheckCircle2, MailX } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 
 // Página pública de desuscripción. ?e=<envioId> identifica al contacto.
@@ -33,13 +34,30 @@ export default async function BajaPage({
   }
 
   return (
-    <div style={{ maxWidth: 480, margin: "80px auto", textAlign: "center", fontFamily: "system-ui", padding: 24 }}>
-      <h1 style={{ fontSize: 22 }}>Desuscripción</h1>
-      <p style={{ color: "#666", lineHeight: 1.5 }}>
-        {ok
-          ? "Listo, te desuscribiste. No vas a recibir más emails nuestros."
-          : "Tu pedido de baja fue registrado."}
-      </p>
+    <div className="w-full max-w-md">
+      <div className="bg-surface border border-border rounded-2xl shadow-md px-8 py-10 text-center">
+        <div
+          className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl ${
+            ok
+              ? "bg-success text-success-foreground"
+              : "bg-surface-muted text-muted"
+          }`}
+        >
+          {ok ? (
+            <CheckCircle2 className="h-6 w-6" aria-hidden />
+          ) : (
+            <MailX className="h-6 w-6" aria-hidden />
+          )}
+        </div>
+        <h1 className="mt-4 text-xl font-bold tracking-tight text-foreground">
+          Desuscripción
+        </h1>
+        <p className="mt-2 text-sm text-muted leading-relaxed">
+          {ok
+            ? "Listo, te desuscribiste. No vas a recibir más emails nuestros."
+            : "Tu pedido de baja fue registrado."}
+        </p>
+      </div>
     </div>
   );
 }

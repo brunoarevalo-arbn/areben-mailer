@@ -34,16 +34,16 @@ export default async function PlantillasPage() {
             const nBloques = ((p.contenido as unknown as ContenidoCampania)?.bloques ?? []).length;
             return (
               <Card key={p.id}>
-                <div className="font-medium text-neutral-800">{p.nombre}</div>
-                <div className="mt-1 text-sm text-neutral-400">{nBloques} bloques</div>
+                <div className="font-medium text-foreground">{p.nombre}</div>
+                <div className="mt-1 text-sm text-subtle">{nBloques} bloques</div>
                 <div className="mt-3 flex items-center gap-2">
                   <form action={usarPlantilla.bind(null, p.id)}>
-                    <button className="rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-600">
+                    <button className="rounded-xl bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover">
                       Usar
                     </button>
                   </form>
                   <form action={eliminarPlantilla.bind(null, p.id)}>
-                    <button className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-50">
+                    <button className="rounded-xl border border-border px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface-muted hover:border-border-strong">
                       Eliminar
                     </button>
                   </form>

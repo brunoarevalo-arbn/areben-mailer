@@ -20,15 +20,15 @@ export function Textarea({
   const reactId = React.useId();
   const fieldId = id ?? reactId;
   const descId = error ? `${reactId}-err` : hint ? `${reactId}-hint` : undefined;
-  const baseClasses = 'border rounded-xl px-3 py-2.5 text-sm text-stone-900 placeholder-stone-400 transition-colors focus:outline-none disabled:bg-stone-50 disabled:cursor-not-allowed';
+  const baseClasses = 'border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-subtle transition-colors focus:outline-none disabled:bg-surface-muted disabled:cursor-not-allowed';
   const stateClasses = error
     ? 'border-red-300 focus:border-red-400 focus:ring-2 focus:ring-red-400/30'
-    : 'border-stone-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30';
+    : 'border-border focus:border-accent focus:ring-2 focus:ring-ring/30';
 
   return (
     <div className={fullWidth ? 'w-full' : ''}>
       {label && (
-        <label htmlFor={fieldId} className="block text-xs font-semibold text-stone-600 mb-1.5">
+        <label htmlFor={fieldId} className="block text-xs font-semibold text-muted mb-1.5">
           {label}
         </label>
       )}
@@ -43,7 +43,7 @@ export function Textarea({
         <p id={`${reactId}-err`} className="text-xs text-red-600 mt-1">{error}</p>
       )}
       {hint && !error && (
-        <p id={`${reactId}-hint`} className="text-xs text-stone-500 mt-1">{hint}</p>
+        <p id={`${reactId}-hint`} className="text-xs text-muted mt-1">{hint}</p>
       )}
     </div>
   );

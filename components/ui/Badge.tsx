@@ -8,16 +8,16 @@ interface BadgeProps {
 }
 
 const variants = {
-  default: 'bg-stone-100 text-stone-700',
-  success: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-  warning: 'bg-orange-50 text-orange-700 border border-orange-200',
-  danger: 'bg-red-50 text-red-700 border border-red-200',
-  info: 'bg-sky-50 text-sky-700 border border-sky-200',
+  default: 'bg-surface-muted text-muted',
+  success: 'bg-success text-success-foreground border border-success-border',
+  warning: 'bg-warning text-warning-foreground border border-warning-border',
+  danger: 'bg-danger text-danger-foreground border border-danger-border',
+  info: 'bg-info text-info-foreground border border-info-border',
   // Colores adicionales para estados con identidad propia (no se colapsan).
-  amber: 'bg-amber-100 text-amber-700',
-  blue: 'bg-blue-100 text-blue-700',
-  violet: 'bg-violet-100 text-violet-700',
-  pink: 'bg-pink-100 text-pink-700',
+  amber: 'bg-accent-subtle text-accent-subtle-foreground',
+  blue: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+  violet: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+  pink: 'bg-pink-100 text-pink-700 dark:bg-pink-500/15 dark:text-pink-300',
 };
 
 const sizes = {

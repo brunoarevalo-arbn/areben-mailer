@@ -5,6 +5,8 @@ interface CardProps {
   className?: string;
   padding?: 'none' | 'compact' | 'default' | 'loose';
   noBorder?: boolean;
+  /** Sombra más marcada para tarjetas destacadas (KPIs, paneles). */
+  elevated?: boolean;
 }
 
 export function Card({
@@ -12,6 +14,7 @@ export function Card({
   className = '',
   padding = 'default',
   noBorder = false,
+  elevated = false,
 }: CardProps) {
   const paddings = {
     none: '',
@@ -20,11 +23,12 @@ export function Card({
     loose: 'px-8 py-6',
   };
 
-  const border = noBorder ? '' : 'border border-stone-200';
+  const border = noBorder ? '' : 'border border-border';
+  const shadow = elevated ? 'shadow-md' : 'shadow-sm';
 
   return (
     <div
-      className={`bg-white rounded-2xl ${border} ${paddings[padding]} ${className}`}
+      className={`bg-surface rounded-2xl ${border} ${shadow} ${paddings[padding]} ${className}`}
     >
       {children}
     </div>

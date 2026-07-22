@@ -1,0 +1,30 @@
+import { Sidebar } from "@/components/Sidebar";
+import { getCuentaActiva } from "@/lib/cuenta";
+import { getSessionUser } from "@/lib/dal";
+
+// Layout de la app autenticada. getSessionUser() (vía verifySession) redirige
+// a /login si no hay sesión, así que este layout protege todas las rutas (app).
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [cuenta, usuario] = await Promise.all([
+    getCuentaActiva(),
+    getSessionUser(),
+  ]);
+
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar
+        cuentaNombre={cuenta.nombre}
+        usuario={
+          usuario ? { nombre: usuario.nombre, email: usuario.email } : null
+        }
+      />
+      <main className="flex-1 min-w-0 overflow-auto">
+        <div className="mx-auto max-w-6xl px-8 py-8">{children}</div>
+      </main>
+    </div>
+  );
+}

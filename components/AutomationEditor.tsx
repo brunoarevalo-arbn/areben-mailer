@@ -3,9 +3,11 @@
 import { useState, useTransition } from "react";
 import type { Bloque, ContenidoCampania } from "@/lib/email/render";
 import { BloquesEditor } from "@/components/BloquesEditor";
-import { guardarAutomation, enviarPruebaAutomation, toggleAutomation } from "@/app/automations/actions";
+import { guardarAutomation, enviarPruebaAutomation, toggleAutomation } from "@/app/(app)/automations/actions";
+import { Button } from "@/components/ui/Button";
+import { Pause, Play } from "lucide-react";
 
-const input = "rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200";
+const input = "rounded-lg border border-border-strong bg-background text-foreground placeholder:text-subtle px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-ring/30";
 
 export function AutomationEditor({
   id,
@@ -41,51 +43,58 @@ export function AutomationEditor({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
-        <div className="text-sm">
-          <span className="text-neutral-500">Disparador:</span> <b>{triggerLabel}</b>
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-accent-subtle-foreground/30 bg-accent-subtle p-4">
+        <div className="text-sm text-foreground">
+          <span className="text-muted">Disparador:</span> <b>{triggerLabel}</b>
         </div>
-        <label className="flex items-center gap-1 text-sm">
-          <span className="text-neutral-500">esperar</span>
+        <label className="flex items-center gap-1 text-sm text-foreground">
+          <span className="text-muted">esperar</span>
           <input type="number" className={`${input} w-16`} value={esperaHoras} onChange={(e) => setEsperaHoras(Number(e.target.value))} />
-          <span className="text-neutral-500">horas</span>
+          <span className="text-muted">horas</span>
         </label>
-        <label className="flex items-center gap-1 text-sm">
-          <span className="text-neutral-500">no repetir por</span>
+        <label className="flex items-center gap-1 text-sm text-foreground">
+          <span className="text-muted">no repetir por</span>
           <input type="number" className={`${input} w-16`} value={capDias} onChange={(e) => setCapDias(Number(e.target.value))} />
-          <span className="text-neutral-500">días</span>
+          <span className="text-muted">días</span>
         </label>
-        <button onClick={toggle} disabled={toggling} className={`ml-auto rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${estado === "ACTIVO" ? "bg-neutral-500 hover:bg-neutral-600" : "bg-green-600 hover:bg-green-700"}`}>
-          {estado === "ACTIVO" ? "⏸ Pausar" : "▶ Activar"}
-        </button>
+        <Button
+          variant={estado === "ACTIVO" ? "secondary" : "primary"}
+          onClick={toggle}
+          disabled={toggling}
+          className="ml-auto"
+        >
+          {estado === "ACTIVO"
+            ? <><Pause className="mr-1.5 h-4 w-4" aria-hidden /> Pausar</>
+            : <><Play className="mr-1.5 h-4 w-4" aria-hidden /> Activar</>}
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <label className="block text-sm">
-          <span className="text-neutral-500">Nombre</span>
+          <span className="text-muted">Nombre</span>
           <input className={`${input} w-full`} value={nombre} onChange={(e) => setNombre(e.target.value)} />
         </label>
         <label className="block text-sm sm:col-span-2">
-          <span className="text-neutral-500">Asunto</span>
+          <span className="text-muted">Asunto</span>
           <input className={`${input} w-full`} value={asunto} onChange={(e) => setAsunto(e.target.value)} />
         </label>
       </div>
       <label className="block text-sm">
-        <span className="text-neutral-500">Preheader</span>
+        <span className="text-muted">Preheader</span>
         <input className={`${input} w-full`} value={preheader} onChange={(e) => setPreheader(e.target.value)} />
       </label>
 
       <BloquesEditor bloques={bloques} onChange={setBloques} nombreCuenta={nombreCuenta} preheader={preheader} />
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-neutral-200 bg-white p-4">
-        <button onClick={guardar} disabled={saving} className="rounded-lg bg-neutral-800 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-900 disabled:opacity-50">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface p-4 shadow-sm">
+        <Button variant="primary" onClick={guardar} disabled={saving}>
           {saving ? "Guardando…" : "Guardar"}
-        </button>
+        </Button>
         <input className={`${input} max-w-56`} value={pruebaEmail} onChange={(e) => setPruebaEmail(e.target.value)} />
-        <button onClick={prueba} disabled={sending} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50">
+        <Button variant="accent" onClick={prueba} disabled={sending}>
           {sending ? "Enviando…" : "Enviar prueba"}
-        </button>
-        {msg && <span className="text-sm text-neutral-600">{msg}</span>}
+        </Button>
+        {msg && <span className="text-sm text-muted">{msg}</span>}
       </div>
     </div>
   );

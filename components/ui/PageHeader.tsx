@@ -17,10 +17,10 @@ export function PageHeader({ eyebrow, title, subtitle, actions, className = '' }
     <div className={`mb-8 flex items-start justify-between gap-4 ${className}`}>
       <div className="min-w-0">
         {eyebrow && (
-          <span className="text-xs font-bold uppercase tracking-widest text-amber-500">{eyebrow}</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-accent">{eyebrow}</span>
         )}
-        <h1 className="text-2xl font-bold text-stone-900 mt-1">{title}</h1>
-        {subtitle && <p className="text-stone-500 text-sm mt-1">{subtitle}</p>}
+        <h1 className="text-2xl font-bold tracking-tight text-foreground mt-1">{title}</h1>
+        {subtitle && <p className="text-muted text-sm mt-1">{subtitle}</p>}
       </div>
       {actions && <div className="shrink-0 flex items-center gap-2">{actions}</div>}
     </div>

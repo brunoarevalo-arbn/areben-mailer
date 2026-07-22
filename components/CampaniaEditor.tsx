@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { renderEmailHtml, type Bloque, type ContenidoCampania } from "@/lib/email/render";
-import { guardarCampania, enviarPrueba, enviarCampania, guardarComoPlantilla } from "@/app/campanias/actions";
+import { guardarCampania, enviarPrueba, enviarCampania, guardarComoPlantilla } from "@/app/(app)/campanias/actions";
 import { ProductosBlock } from "@/components/ProductosBlock";
+import { Button } from "@/components/ui/Button";
+import { ChevronUp, ChevronDown, X } from "lucide-react";
 
 interface Lista {
   id: string;
@@ -115,27 +117,27 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
     }
   };
 
-  const input = "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200";
+  const input = "w-full rounded-lg border border-border-strong bg-background text-foreground placeholder:text-subtle px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-ring/30";
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Columna editor */}
       <div className="space-y-4">
-        <div className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4">
+        <div className="space-y-3 rounded-xl border border-border bg-surface p-4 shadow-sm">
           <label className="block text-sm">
-            <span className="text-neutral-500">Nombre interno</span>
+            <span className="text-muted">Nombre interno</span>
             <input className={input} value={nombre} onChange={(e) => setNombre(e.target.value)} />
           </label>
           <label className="block text-sm">
-            <span className="text-neutral-500">Asunto</span>
+            <span className="text-muted">Asunto</span>
             <input className={input} value={asunto} onChange={(e) => setAsunto(e.target.value)} placeholder="Asunto del email" />
           </label>
           <label className="block text-sm">
-            <span className="text-neutral-500">Preheader</span>
+            <span className="text-muted">Preheader</span>
             <input className={input} value={preheader} onChange={(e) => setPreheader(e.target.value)} placeholder="Texto de vista previa" />
           </label>
           <label className="block text-sm">
-            <span className="text-neutral-500">Destino</span>
+            <span className="text-muted">Destino</span>
             <select className={input} value={destino} onChange={(e) => setDestino(e.target.value)}>
               <option value="">— elegí lista o segmento —</option>
               <optgroup label="Listas">
@@ -157,16 +159,16 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
         </div>
 
         {/* Bloques */}
-        <div className="space-y-2 rounded-xl border border-neutral-200 bg-white p-4">
-          <div className="text-sm font-medium text-neutral-700">Contenido</div>
+        <div className="space-y-2 rounded-xl border border-border bg-surface p-4 shadow-sm">
+          <div className="text-sm font-medium text-foreground">Contenido</div>
           {bloques.map((b, i) => (
-            <div key={i} className="rounded-lg border border-neutral-200 p-3">
+            <div key={i} className="rounded-lg border border-border bg-surface-muted p-3">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-medium uppercase tracking-wide text-neutral-400">{b.tipo}</span>
-                <div className="flex gap-1 text-xs text-neutral-500">
-                  <button onClick={() => moveBloque(i, -1)} className="px-1 hover:text-neutral-900">↑</button>
-                  <button onClick={() => moveBloque(i, 1)} className="px-1 hover:text-neutral-900">↓</button>
-                  <button onClick={() => delBloque(i)} className="px-1 text-red-500 hover:text-red-700">✕</button>
+                <span className="text-xs font-medium uppercase tracking-wide text-subtle">{b.tipo}</span>
+                <div className="flex gap-1 text-muted">
+                  <button onClick={() => moveBloque(i, -1)} className="px-1 hover:text-foreground"><ChevronUp className="h-4 w-4" aria-hidden /></button>
+                  <button onClick={() => moveBloque(i, 1)} className="px-1 hover:text-foreground"><ChevronDown className="h-4 w-4" aria-hidden /></button>
+                  <button onClick={() => delBloque(i)} className="px-1 text-danger-foreground hover:opacity-70"><X className="h-4 w-4" aria-hidden /></button>
                 </div>
               </div>
               {(b.tipo === "titulo" || b.tipo === "texto") && (
@@ -206,18 +208,18 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
                     <div key={k} className="flex gap-2">
                       <input className={`${input} w-32`} value={l.red} placeholder="Red" onChange={(e) => setBloque(i, { links: b.links.map((x, j) => (j === k ? { ...x, red: e.target.value } : x)) })} />
                       <input className={`${input} flex-1`} value={l.url} placeholder="URL" onChange={(e) => setBloque(i, { links: b.links.map((x, j) => (j === k ? { ...x, url: e.target.value } : x)) })} />
-                      <button onClick={() => setBloque(i, { links: b.links.filter((_, j) => j !== k) })} className="px-2 text-red-500">✕</button>
+                      <button onClick={() => setBloque(i, { links: b.links.filter((_, j) => j !== k) })} className="px-2 text-danger-foreground hover:opacity-70"><X className="h-4 w-4" aria-hidden /></button>
                     </div>
                   ))}
-                  <button onClick={() => setBloque(i, { links: [...b.links, { red: "", url: "" }] })} className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs text-neutral-600 hover:bg-neutral-50">+ red</button>
+                  <button onClick={() => setBloque(i, { links: [...b.links, { red: "", url: "" }] })} className="rounded-lg border border-border-strong px-2.5 py-1 text-xs text-muted hover:bg-surface-muted">+ red</button>
                 </div>
               )}
-              {b.tipo === "divisor" && <div className="text-xs text-neutral-400">— línea divisoria —</div>}
+              {b.tipo === "divisor" && <div className="text-xs text-subtle">— línea divisoria —</div>}
             </div>
           ))}
           <div className="flex flex-wrap gap-2 pt-1">
             {(["titulo", "texto", "boton", "imagen", "productos", "columnas", "video", "redes", "divisor"] as const).map((t) => (
-              <button key={t} onClick={() => addBloque(t)} className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs text-neutral-600 hover:bg-neutral-50">
+              <button key={t} onClick={() => addBloque(t)} className="rounded-lg border border-border-strong px-2.5 py-1 text-xs text-muted hover:bg-surface-muted">
                 + {t}
               </button>
             ))}
@@ -225,11 +227,12 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
         </div>
 
         {/* Acciones */}
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-neutral-200 bg-white p-4">
-          <button onClick={guardar} disabled={saving} className="rounded-lg bg-neutral-800 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-900 disabled:opacity-50">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface p-4 shadow-sm">
+          <Button variant="primary" onClick={guardar} disabled={saving}>
             {saving ? "Guardando…" : "Guardar"}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
             onClick={async () => {
               const n = prompt("Nombre de la plantilla:", nombre);
               if (n === null) return;
@@ -237,38 +240,33 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
               setMsg("Plantilla guardada ✓");
               setTimeout(() => setMsg(null), 2000);
             }}
-            className="rounded-lg border border-neutral-300 px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
           >
             Guardar como plantilla
-          </button>
+          </Button>
           <input className={`${input} max-w-56`} value={pruebaEmail} onChange={(e) => setPruebaEmail(e.target.value)} placeholder="email de prueba" />
-          <button onClick={prueba} disabled={sending} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50">
+          <Button variant="accent" onClick={prueba} disabled={sending}>
             {sending ? "Enviando…" : "Enviar prueba"}
-          </button>
-          {msg && <span className="text-sm text-neutral-600">{msg}</span>}
+          </Button>
+          {msg && <span className="text-sm text-muted">{msg}</span>}
         </div>
 
         {/* Envío a la lista */}
-        <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
-          <div className="text-sm font-medium text-neutral-700">Enviar a la lista</div>
-          <p className="text-xs text-neutral-500">
+        <div className="space-y-2 rounded-xl border border-accent-subtle-foreground/30 bg-accent-subtle p-4">
+          <div className="text-sm font-medium text-accent-subtle-foreground">Enviar a la lista</div>
+          <p className="text-xs text-muted">
             Se envía solo a los contactos de la lista que <b>aceptan marketing</b> y están activos.
           </p>
-          <button
-            onClick={enviarTodo}
-            disabled={enviado}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
-          >
+          <Button variant="accent" onClick={enviarTodo} disabled={enviado}>
             {enviado ? "Enviada / en curso" : "Enviar a la lista"}
-          </button>
-          {progreso && <div className="text-sm text-neutral-700">{progreso}</div>}
+          </Button>
+          {progreso && <div className="text-sm text-foreground">{progreso}</div>}
         </div>
       </div>
 
       {/* Columna preview */}
       <div className="lg:sticky lg:top-6 h-fit">
-        <div className="mb-2 text-sm text-neutral-500">Vista previa</div>
-        <iframe title="preview" srcDoc={previewHtml} className="h-[70vh] w-full rounded-xl border border-neutral-200 bg-white" />
+        <div className="mb-2 text-sm text-muted">Vista previa</div>
+        <iframe title="preview" srcDoc={previewHtml} className="h-[70vh] w-full rounded-xl border border-border bg-white" />
       </div>
     </div>
   );

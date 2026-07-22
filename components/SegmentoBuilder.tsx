@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { CAMPOS, type Reglas, type Condicion, type CondCampo } from "@/lib/segmentos";
-import { guardarSegmento, contarSegmento } from "@/app/segmentos/actions";
+import { guardarSegmento, contarSegmento } from "@/app/(app)/segmentos/actions";
+import { Button } from "@/components/ui/Button";
+import { X } from "lucide-react";
 
-const input = "rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200";
+const input = "rounded-lg border border-border-strong bg-background text-foreground placeholder:text-subtle px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-ring/30";
 
 function campoDef(campo: CondCampo) {
   return CAMPOS.find((c) => c.campo === campo)!;
@@ -55,16 +57,16 @@ export function SegmentoBuilder({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-neutral-200 bg-white p-4">
+      <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
         <label className="block text-sm">
-          <span className="text-neutral-500">Nombre del segmento</span>
+          <span className="text-muted">Nombre del segmento</span>
           <input className={`${input} mt-1 w-full`} value={nombre} onChange={(e) => setNombre(e.target.value)} />
         </label>
       </div>
 
-      <div className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4">
+      <div className="space-y-3 rounded-xl border border-border bg-surface p-4 shadow-sm">
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-neutral-500">Cumplir</span>
+          <span className="text-muted">Cumplir</span>
           <select className={input} value={op} onChange={(e) => setOp(e.target.value as "AND" | "OR")}>
             <option value="AND">TODAS las condiciones</option>
             <option value="OR">CUALQUIER condición</option>
@@ -102,24 +104,24 @@ export function SegmentoBuilder({
                   {["ACTIVO", "BAJA", "REBOTADO", "SPAM"].map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               )}
-              <button onClick={() => setConds((cs) => cs.filter((_, j) => j !== i))} className="px-2 text-red-500 hover:text-red-700">✕</button>
+              <button onClick={() => setConds((cs) => cs.filter((_, j) => j !== i))} className="px-2 text-danger-foreground hover:opacity-70"><X className="h-4 w-4" aria-hidden /></button>
             </div>
           );
         })}
 
-        <button onClick={() => setConds((cs) => [...cs, nuevaCondicion()])} className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-50">
+        <button onClick={() => setConds((cs) => [...cs, nuevaCondicion()])} className="rounded-lg border border-border-strong px-3 py-1.5 text-sm text-muted hover:bg-surface-muted">
           + Agregar condición
         </button>
       </div>
 
-      <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
-        <div className="text-sm text-neutral-600">Contactos que matchean:</div>
-        <div className="text-2xl font-semibold tabular-nums">{count === null ? "…" : count.toLocaleString("es-AR")}</div>
+      <div className="flex items-center gap-3 rounded-xl border border-accent-subtle-foreground/30 bg-accent-subtle p-4">
+        <div className="text-sm text-muted">Contactos que matchean:</div>
+        <div className="text-2xl font-semibold tabular-nums text-foreground">{count === null ? "…" : count.toLocaleString("es-AR")}</div>
         <div className="ml-auto flex items-center gap-2">
-          {msg && <span className="text-sm text-neutral-600">{msg}</span>}
-          <button onClick={guardar} disabled={saving} className="rounded-lg bg-neutral-800 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-900 disabled:opacity-50">
+          {msg && <span className="text-sm text-muted">{msg}</span>}
+          <Button variant="primary" onClick={guardar} disabled={saving}>
             {saving ? "Guardando…" : "Guardar"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

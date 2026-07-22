@@ -16,7 +16,7 @@ export default async function SegmentoPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="space-y-6">
-      <Link href="/segmentos" className="text-sm text-amber-600 hover:text-amber-700">← Segmentos</Link>
+      <Link href="/segmentos" className="text-sm text-accent transition-colors hover:text-accent-hover">← Segmentos</Link>
       <PageHeader eyebrow="Segmento" title={seg.nombre} />
       <SegmentoBuilder
         id={seg.id}

@@ -22,7 +22,7 @@ export default async function AutomationPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="space-y-6">
-      <Link href="/automations" className="text-sm text-amber-600 hover:text-amber-700">← Automations</Link>
+      <Link href="/automations" className="text-sm text-accent transition-colors hover:text-accent-hover">← Automations</Link>
       <PageHeader eyebrow="Automation" title={a.nombre} />
       <AutomationEditor
         id={a.id}

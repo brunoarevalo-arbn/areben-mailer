@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { cookies } from "next/headers";
 import "./globals.css";
-import { Sidebar } from "@/components/Sidebar";
-import { getCuentaActiva } from "@/lib/cuenta";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,19 +23,18 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cuenta = await getCuentaActiva();
+  // Tema desde cookie (SSR) → sin flash. El toggle actualiza cookie + clase.
+  const isDark = (await cookies()).get("theme")?.value === "dark";
 
   return (
     <html
       lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased ${
+        isDark ? "dark" : ""
+      }`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex text-neutral-900 bg-white">
-        <Sidebar cuentaNombre={cuenta.nombre} />
-        <main className="flex-1 min-w-0 overflow-auto">
-          <div className="mx-auto max-w-6xl px-8 py-8">{children}</div>
-        </main>
-      </body>
+      <body className="min-h-full bg-background text-foreground">{children}</body>
     </html>
   );
 }

@@ -31,8 +31,8 @@ export default async function ListasPage() {
         subtitle={`${listas.length} listas`}
         actions={
           <form action={crearLista} className="flex gap-2">
-            <input name="nombre" placeholder="Nueva lista" className="rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200" />
-            <button type="submit" className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600">Crear</button>
+            <input name="nombre" placeholder="Nueva lista" className="rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-foreground placeholder:text-subtle outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-ring/30" />
+            <button type="submit" className="rounded-xl bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover">Crear</button>
           </form>
         }
       />
@@ -44,20 +44,20 @@ export default async function ListasPage() {
           {listas.map((l) => (
             <Card key={l.id}>
               <div className="flex items-start justify-between gap-2">
-                <div className="font-medium text-neutral-800">{l.nombre}</div>
+                <div className="font-medium text-foreground">{l.nombre}</div>
                 <Badge variant={tipoBadge[l.tipo] ?? "default"}>{l.tipo}</Badge>
               </div>
               {l.descripcion && (
-                <div className="mt-1 text-sm text-neutral-500">{l.descripcion}</div>
+                <div className="mt-1 text-sm text-muted">{l.descripcion}</div>
               )}
               <div className="mt-3 flex items-end justify-between">
-                <div className="text-2xl font-semibold tabular-nums">
+                <div className="text-2xl font-semibold tabular-nums text-foreground">
                   {l._count.contactos.toLocaleString("es-AR")}
-                  <span className="ml-1 text-sm font-normal text-neutral-400">contactos</span>
+                  <span className="ml-1 text-sm font-normal text-subtle">contactos</span>
                 </div>
                 {l.tipo === "MANUAL" && (
                   <form action={eliminarLista.bind(null, l.id)}>
-                    <button className="text-xs text-neutral-400 hover:text-red-500">Eliminar</button>
+                    <button className="text-xs text-subtle transition-colors hover:text-danger-foreground">Eliminar</button>
                   </form>
                 )}
               </div>

@@ -117,10 +117,11 @@ model Usuario {
   id        String     @id @default(cuid())
   cuentaId  String
   cuenta    Cuenta     @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
-  email     String
-  nombre    String?
-  rol       RolUsuario @default(ADMIN)
-  createdAt DateTime   @default(now())
+  email        String
+  nombre       String?
+  rol          RolUsuario @default(ADMIN)
+  passwordHash String?    // scrypt "salt:hash"; nullable hasta setear contraseña
+  createdAt    DateTime   @default(now())
 
   @@unique([cuentaId, email])
   @@index([cuentaId])

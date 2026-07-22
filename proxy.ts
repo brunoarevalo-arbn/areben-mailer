@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { decrypt } from '@/lib/jwt';
 
-// Barrera de acceso interina (HTTP Basic Auth) para proteger la app online,
-// que muestra PII (contactos). En Fase 1 se reemplaza por login con sesión.
-// Se excluyen los endpoints que llaman TN y SES sin credenciales.
+// Autenticación por sesión (cookie firmada). Chequeo optimista: solo lee/verifica
+// el JWT de la cookie, sin tocar la DB (el proxy corre en cada request/prefetch).
+// La seguridad real vive en el DAL (verifySession) de cada page/action.
 
 const PUBLIC_PREFIXES = [
+  '/login', // pantalla de ingreso
   '/api/tn/', // callback OAuth + webhooks LGPD (los llama Tiendanube)
   '/api/health',
   '/api/track/', // pixel de apertura + redirect de clicks (los abren los destinatarios)
@@ -13,28 +15,26 @@ const PUBLIC_PREFIXES = [
   '/baja', // desuscripción: la abren destinatarios sin login
 ];
 
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
 
-  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next();
+  const token = req.cookies.get('session')?.value;
+  const session = await decrypt(token);
+
+  // Ya logueado y yendo a /login → a la app.
+  if (session?.userId && pathname === '/login') {
+    return NextResponse.redirect(new URL('/', req.url));
   }
 
-  const user = process.env.APP_USER;
-  const pass = process.env.APP_PASSWORD;
-  // Si no hay credenciales configuradas, no bloqueamos (dev local).
-  if (!user || !pass) return NextResponse.next();
+  if (isPublic) return NextResponse.next();
 
-  const auth = req.headers.get('authorization');
-  if (auth?.startsWith('Basic ')) {
-    const [u, p] = atob(auth.slice(6)).split(':');
-    if (u === user && p === pass) return NextResponse.next();
+  // Ruta protegida sin sesión → login.
+  if (!session?.userId) {
+    return NextResponse.redirect(new URL('/login', req.url));
   }
 
-  return new NextResponse('Autenticación requerida', {
-    status: 401,
-    headers: { 'WWW-Authenticate': 'Basic realm="Areben Mailer"' },
-  });
+  return NextResponse.next();
 }
 
 export const config = {

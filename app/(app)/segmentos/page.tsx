@@ -33,7 +33,7 @@ export default async function SegmentosPage() {
         subtitle={`${segmentos.length} segmentos`}
         actions={
           <form action={crearSegmento}>
-            <button type="submit" className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600">
+            <button type="submit" className="rounded-xl bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover">
               + Crear segmento
             </button>
           </form>
@@ -49,11 +49,11 @@ export default async function SegmentosPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {conCount.map((s) => (
             <Link key={s.id} href={`/segmentos/${s.id}`} className="block">
-              <Card className="hover:border-amber-300 transition-colors">
-                <div className="font-medium text-neutral-800">{s.nombre}</div>
-                <div className="mt-3 text-2xl font-semibold tabular-nums">
+              <Card className="hover:border-accent transition-colors">
+                <div className="font-medium text-foreground">{s.nombre}</div>
+                <div className="mt-3 text-2xl font-semibold tabular-nums text-foreground">
                   {s.count.toLocaleString("es-AR")}
-                  <span className="ml-1 text-sm font-normal text-neutral-400">contactos</span>
+                  <span className="ml-1 text-sm font-normal text-subtle">contactos</span>
                 </div>
               </Card>
             </Link>

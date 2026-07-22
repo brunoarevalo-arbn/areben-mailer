@@ -76,11 +76,11 @@ export default async function ContactosPage({
           name="q"
           defaultValue={q ?? ""}
           placeholder="Buscar por email o nombre…"
-          className="w-full max-w-md rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+          className="w-full max-w-md rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-foreground placeholder:text-subtle outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-ring/30"
         />
         <button
           type="submit"
-          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600"
+          className="rounded-xl bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
         >
           Buscar
         </button>
@@ -96,7 +96,7 @@ export default async function ContactosPage({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-neutral-200 text-left text-neutral-500">
+                <tr className="border-b border-border bg-surface-muted text-left text-muted">
                   <th className="px-4 py-3 font-medium">Email</th>
                   <th className="px-4 py-3 font-medium">Nombre</th>
                   <th className="px-4 py-3 font-medium">Estado</th>
@@ -106,9 +106,9 @@ export default async function ContactosPage({
               </thead>
               <tbody>
                 {contactos.map((c) => (
-                  <tr key={c.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
-                    <td className="px-4 py-2.5 font-medium text-neutral-800">{c.email}</td>
-                    <td className="px-4 py-2.5 text-neutral-600">{c.nombre ?? "—"}</td>
+                  <tr key={c.id} className="border-b border-border last:border-0 hover:bg-surface-muted">
+                    <td className="px-4 py-2.5 font-medium text-foreground">{c.email}</td>
+                    <td className="px-4 py-2.5 text-muted">{c.nombre ?? "—"}</td>
                     <td className="px-4 py-2.5">
                       <Badge variant={estadoBadge[c.estado] ?? "default"}>{c.estado}</Badge>
                     </td>
@@ -119,7 +119,7 @@ export default async function ContactosPage({
                         <Badge variant="default">no</Badge>
                       )}
                     </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-neutral-600">
+                    <td className="px-4 py-2.5 text-right tabular-nums text-muted">
                       {c.tnTotalGastado ? `$${Number(c.tnTotalGastado).toLocaleString("es-AR")}` : "—"}
                     </td>
                   </tr>
@@ -131,7 +131,7 @@ export default async function ContactosPage({
       )}
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm text-neutral-500">
+        <div className="flex items-center justify-between text-sm text-muted">
           <span>
             Página {page} de {totalPages}
           </span>
@@ -139,8 +139,8 @@ export default async function ContactosPage({
             <a
               href={linkPage(page - 1)}
               aria-disabled={page <= 1}
-              className={`rounded-lg border border-neutral-300 px-3 py-1.5 ${
-                page <= 1 ? "pointer-events-none opacity-40" : "hover:bg-neutral-50"
+              className={`rounded-xl border border-border px-3 py-1.5 text-foreground transition-colors ${
+                page <= 1 ? "pointer-events-none opacity-40" : "hover:bg-surface-muted hover:border-border-strong"
               }`}
             >
               Anterior
@@ -148,8 +148,8 @@ export default async function ContactosPage({
             <a
               href={linkPage(page + 1)}
               aria-disabled={page >= totalPages}
-              className={`rounded-lg border border-neutral-300 px-3 py-1.5 ${
-                page >= totalPages ? "pointer-events-none opacity-40" : "hover:bg-neutral-50"
+              className={`rounded-xl border border-border px-3 py-1.5 text-foreground transition-colors ${
+                page >= totalPages ? "pointer-events-none opacity-40" : "hover:bg-surface-muted hover:border-border-strong"
               }`}
             >
               Siguiente

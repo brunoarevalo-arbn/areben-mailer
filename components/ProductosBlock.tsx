@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import type { ProductoEmail } from "@/lib/email/render";
+import { X } from "lucide-react";
 
-const input = "rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200";
+const input = "rounded-lg border border-border-strong bg-background text-foreground placeholder:text-subtle px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-ring/30";
 
 export function ProductosBlock({
   items,
@@ -39,10 +40,10 @@ export function ProductosBlock({
       {items.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {items.map((p, i) => (
-            <div key={i} className="flex items-center gap-2 rounded-lg border border-neutral-200 p-1.5 pr-2">
+            <div key={i} className="flex items-center gap-2 rounded-lg border border-border bg-surface-muted p-1.5 pr-2">
               {p.imagen && <img src={p.imagen} alt="" className="h-8 w-8 rounded object-cover" />}
-              <span className="max-w-32 truncate text-xs text-neutral-700">{p.nombre}</span>
-              <button onClick={() => quitar(i)} className="text-red-500 hover:text-red-700">✕</button>
+              <span className="max-w-32 truncate text-xs text-foreground">{p.nombre}</span>
+              <button onClick={() => quitar(i)} className="text-danger-foreground hover:opacity-70"><X className="h-4 w-4" aria-hidden /></button>
             </div>
           ))}
         </div>
@@ -57,19 +58,19 @@ export function ProductosBlock({
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), buscar())}
         />
-        <button onClick={buscar} disabled={buscando} className="rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 disabled:opacity-50">
+        <button onClick={buscar} disabled={buscando} className="rounded-lg border border-border-strong px-3 py-2 text-sm text-muted hover:bg-surface-muted disabled:opacity-50">
           {buscando ? "…" : "Buscar"}
         </button>
       </div>
 
       {/* Resultados */}
       {resultados.length > 0 && (
-        <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto rounded-lg border border-neutral-200 p-2">
+        <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto rounded-lg border border-border p-2">
           {resultados.map((p) => (
-            <button key={p.url} onClick={() => agregar(p)} className="rounded-lg border border-neutral-200 p-1.5 text-left hover:border-amber-300">
+            <button key={p.url} onClick={() => agregar(p)} className="rounded-lg border border-border p-1.5 text-left hover:border-accent">
               {p.imagen && <img src={p.imagen} alt="" className="mb-1 aspect-square w-full rounded object-cover" />}
-              <div className="truncate text-xs text-neutral-700">{p.nombre}</div>
-              <div className="text-xs text-neutral-500">${Number(p.precioPromo || p.precio).toLocaleString("es-AR")}</div>
+              <div className="truncate text-xs text-foreground">{p.nombre}</div>
+              <div className="text-xs text-muted">${Number(p.precioPromo || p.precio).toLocaleString("es-AR")}</div>
             </button>
           ))}
         </div>

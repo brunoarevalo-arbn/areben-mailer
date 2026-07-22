@@ -58,16 +58,16 @@ export default async function CampaniaEditorPage({
 
   return (
     <div className="space-y-6">
-      <Link href="/campanias" className="text-sm text-amber-600 hover:text-amber-700">
+      <Link href="/campanias" className="text-sm text-accent transition-colors hover:text-accent-hover">
         ← Campañas
       </Link>
       <PageHeader eyebrow="Campaña" title={campania.nombre} />
       {stats.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {stats.map((s) => (
-            <div key={s.label} className="rounded-xl border border-neutral-200 bg-white p-3">
-              <div className="text-xs text-neutral-500">{s.label}</div>
-              <div className="mt-0.5 text-lg font-semibold tabular-nums">{s.value}</div>
+            <div key={s.label} className="rounded-xl border border-border bg-surface p-3 shadow-sm">
+              <div className="text-xs text-muted">{s.label}</div>
+              <div className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">{s.value}</div>
             </div>
           ))}
         </div>
