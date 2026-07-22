@@ -11,11 +11,11 @@ async function main() {
   }
 
   console.log(`Importando contactos de la tienda ${cuenta.tnStoreId}...`);
-  const r = await importCustomers(cuenta.id, cuenta.tnStoreId, cuenta.tnToken, (p) => {
-    process.stdout.write(`\r  leídos:${p.leidos} importados:${p.importados} sin-email:${p.sinEmail} aceptan-mkt:${p.aceptanMkt}`);
+  const r = await importCustomers(cuenta.id, cuenta.tnStoreId, cuenta.tnToken, (leidos) => {
+    console.log(`  leídos de TN: ${leidos}`);
   });
   console.log(
-    `\n✅ Import OK — leídos:${r.leidos} importados:${r.importados} sin-email:${r.sinEmail} aceptan-marketing:${r.aceptanMkt}`,
+    `✅ Import OK — leídos:${r.leidos} nuevos:${r.importados} sin-email:${r.sinEmail} duplicados:${r.duplicados} aceptan-marketing:${r.aceptanMkt}`,
   );
 }
 

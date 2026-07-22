@@ -1,5 +1,6 @@
 import { prisma } from '../prisma';
 import { tnPaginate } from './client';
+import { Prisma } from '@prisma/client';
 
 interface TnCustomer {
   id: number;
@@ -7,30 +8,29 @@ interface TnCustomer {
   email?: string | null;
   total_spent?: string | null;
   accepts_marketing?: boolean | null;
-  last_order_id?: number | null;
-  created_at?: string | null;
-  updated_at?: string | null;
 }
 
 export interface ImportResult {
   leidos: number;
   importados: number;
   sinEmail: number;
+  duplicados: number;
   aceptanMkt: number;
 }
 
-/** Importa/actualiza los clientes de una tienda TN como Contactos. */
+const CHUNK = 1000;
+
+/** Importa/actualiza los clientes de una tienda TN como Contactos (bulk). */
 export async function importCustomers(
   cuentaId: string,
   storeId: string,
   token: string,
-  onProgress?: (r: ImportResult) => void,
+  onProgress?: (leidos: number) => void,
 ): Promise<ImportResult> {
-  const result: ImportResult = { leidos: 0, importados: 0, sinEmail: 0, aceptanMkt: 0 };
+  const result: ImportResult = { leidos: 0, importados: 0, sinEmail: 0, duplicados: 0, aceptanMkt: 0 };
 
-  // Lista de sistema "Todos los contactos"
-  const listaTodos = await ensureListaTodos(cuentaId);
-
+  // 1) Traer todos los clientes de TN a memoria (deduplicados por email).
+  const porEmail = new Map<string, TnCustomer>();
   for await (const page of tnPaginate<TnCustomer>(storeId, token, 'customers')) {
     for (const c of page) {
       result.leidos += 1;
@@ -39,38 +39,45 @@ export async function importCustomers(
         result.sinEmail += 1;
         continue;
       }
-      const aceptaMkt = c.accepts_marketing === true;
-      if (aceptaMkt) result.aceptanMkt += 1;
-
-      const contacto = await prisma.contacto.upsert({
-        where: { cuentaId_email: { cuentaId, email } },
-        update: {
-          nombre: c.name ?? undefined,
-          tnCustomerId: c.id.toString(),
-          tnTotalGastado: c.total_spent ? Number(c.total_spent) : undefined,
-          tnAcceptsMkt: aceptaMkt,
-          source: 'tiendanube',
-        },
-        create: {
-          cuentaId,
-          email,
-          nombre: c.name ?? null,
-          tnCustomerId: c.id.toString(),
-          tnTotalGastado: c.total_spent ? Number(c.total_spent) : null,
-          tnAcceptsMkt: aceptaMkt,
-          source: 'tiendanube',
-        },
-      });
-
-      await prisma.contactoLista.upsert({
-        where: { contactoId_listaId: { contactoId: contacto.id, listaId: listaTodos.id } },
-        update: {},
-        create: { contactoId: contacto.id, listaId: listaTodos.id },
-      });
-
-      result.importados += 1;
+      if (porEmail.has(email)) result.duplicados += 1;
+      porEmail.set(email, c);
     }
-    onProgress?.({ ...result });
+    onProgress?.(result.leidos);
+  }
+
+  const rows = [...porEmail.entries()].map(([email, c]) => {
+    if (c.accepts_marketing === true) result.aceptanMkt += 1;
+    return {
+      cuentaId,
+      email,
+      nombre: c.name ?? null,
+      tnCustomerId: c.id.toString(),
+      tnTotalGastado: c.total_spent ? new Prisma.Decimal(c.total_spent) : null,
+      tnAcceptsMkt: c.accepts_marketing === true,
+      source: 'tiendanube',
+    };
+  });
+
+  // 2) Insertar contactos por lotes (ignora los que ya existen).
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const res = await prisma.contacto.createMany({
+      data: rows.slice(i, i + CHUNK),
+      skipDuplicates: true,
+    });
+    result.importados += res.count;
+  }
+
+  // 3) Asignar todos a la lista de sistema "Todos los contactos" (bulk).
+  const listaTodos = await ensureListaTodos(cuentaId);
+  const contactos = await prisma.contacto.findMany({
+    where: { cuentaId },
+    select: { id: true },
+  });
+  for (let i = 0; i < contactos.length; i += CHUNK) {
+    await prisma.contactoLista.createMany({
+      data: contactos.slice(i, i + CHUNK).map((c) => ({ contactoId: c.id, listaId: listaTodos.id })),
+      skipDuplicates: true,
+    });
   }
 
   return result;
