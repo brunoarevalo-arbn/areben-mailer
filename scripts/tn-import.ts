@@ -1,11 +1,12 @@
 // Importa los contactos de la tienda TN conectada.
-// Uso:  node --env-file=.env scripts/tn-import.ts
+// Uso:  node --env-file=.env scripts/tn-import.ts [slug-marca]   (default: bdi)
 import { importCustomers } from '../lib/tn/import.ts';
 import { prisma } from '../lib/prisma.ts';
-import { getCuentaActiva } from '../lib/cuenta.ts';
+import { getCuentaBySlug } from '../lib/cuenta.ts';
 
 async function main() {
-  const cuenta = await getCuentaActiva();
+  const slug = process.argv[2] ?? 'bdi';
+  const cuenta = await getCuentaBySlug(slug);
   if (!cuenta.tnStoreId || !cuenta.tnToken) {
     throw new Error('La cuenta no tiene TN conectada. Corré scripts/tn-connect.ts primero.');
   }

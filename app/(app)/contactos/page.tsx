@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
 import { ContactosAcciones } from "@/components/ContactosAcciones";
+import { authorizeUrl } from "@/lib/tn/client";
 import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -68,7 +69,12 @@ export default async function ContactosPage({
         subtitle={`${total.toLocaleString("es-AR")} ${q ? "resultados" : "contactos"}`}
       />
 
-      <ContactosAcciones listas={listas} />
+      <ContactosAcciones
+        listas={listas}
+        tnConectado={!!cuenta.tnToken}
+        tnAuthUrl={authorizeUrl()}
+        marca={cuenta.nombre}
+      />
 
       <form method="get" className="flex gap-2">
         <input

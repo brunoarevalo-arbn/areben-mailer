@@ -15,7 +15,14 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
+import { BrandSwitcher } from './BrandSwitcher';
 import { logout } from '@/app/(public)/login/actions';
+
+interface Marca {
+  id: string;
+  nombre: string;
+  slug: string;
+}
 
 const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/', label: 'Inicio', icon: LayoutDashboard },
@@ -29,27 +36,29 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
 ];
 
 export function Sidebar({
-  cuentaNombre,
+  cuentas,
+  cuentaActivaId,
   usuario,
 }: {
-  cuentaNombre: string;
+  cuentas: Marca[];
+  cuentaActivaId: string;
   usuario: { nombre: string | null; email: string } | null;
 }) {
   const pathname = usePathname();
 
   return (
     <aside className="sticky top-0 h-screen w-60 shrink-0 border-r border-border bg-surface flex flex-col">
-      {/* Marca */}
-      <div className="flex items-center gap-3 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-accent-foreground shadow-sm">
-          <Send className="h-5 w-5" aria-hidden />
-        </div>
-        <div className="min-w-0">
+      {/* Marca + selector */}
+      <div className="px-3 pt-4 pb-2">
+        <div className="flex items-center gap-2.5 px-2 mb-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-accent-foreground shadow-sm">
+            <Send className="h-5 w-5" aria-hidden />
+          </div>
           <div className="text-sm font-semibold text-foreground leading-tight">
             Areben Mailer
           </div>
-          <div className="text-xs text-muted truncate">{cuentaNombre}</div>
         </div>
+        <BrandSwitcher cuentas={cuentas} activaId={cuentaActivaId} />
       </div>
 
       {/* Navegación */}

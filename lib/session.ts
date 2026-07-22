@@ -1,6 +1,6 @@
 import 'server-only';
 import { cookies } from 'next/headers';
-import { encrypt } from './jwt';
+import { encrypt, decrypt } from './jwt';
 
 export type { SessionPayload } from './jwt';
 export { encrypt, decrypt } from './jwt';
@@ -31,4 +31,21 @@ export async function createSession(
 export async function deleteSession(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE);
+}
+
+/** Cambia la marca activa: re-emite la cookie manteniendo usuario y rol. */
+export async function setActiveCuenta(cuentaId: string): Promise<boolean> {
+  const cookieStore = await cookies();
+  const current = await decrypt(cookieStore.get(SESSION_COOKIE)?.value);
+  if (!current?.userId) return false;
+  const expiresAt = new Date(Date.now() + MAX_AGE_MS);
+  const session = await encrypt({ userId: current.userId, cuentaId, rol: current.rol });
+  cookieStore.set(SESSION_COOKIE, session, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    expires: expiresAt,
+    sameSite: 'lax',
+    path: '/',
+  });
+  return true;
 }

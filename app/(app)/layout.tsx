@@ -1,5 +1,5 @@
 import { Sidebar } from "@/components/Sidebar";
-import { getCuentaActiva } from "@/lib/cuenta";
+import { getCuentaActiva, getCuentas } from "@/lib/cuenta";
 import { getSessionUser } from "@/lib/dal";
 
 // Layout de la app autenticada. getSessionUser() (vía verifySession) redirige
@@ -9,15 +9,17 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [cuenta, usuario] = await Promise.all([
+  const [cuenta, cuentas, usuario] = await Promise.all([
     getCuentaActiva(),
+    getCuentas(),
     getSessionUser(),
   ]);
 
   return (
     <div className="flex min-h-screen">
       <Sidebar
-        cuentaNombre={cuenta.nombre}
+        cuentas={cuentas}
+        cuentaActivaId={cuenta.id}
         usuario={
           usuario ? { nombre: usuario.nombre, email: usuario.email } : null
         }

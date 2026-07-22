@@ -3,14 +3,15 @@
 // El <code> sale de la URL a la que TN te redirige tras autorizar la app.
 import { exchangeCode } from '../lib/tn/client.ts';
 import { prisma } from '../lib/prisma.ts';
-import { getCuentaActiva } from '../lib/cuenta.ts';
+import { getCuentaBySlug } from '../lib/cuenta.ts';
 
 async function main() {
   const code = process.argv[2];
-  if (!code) throw new Error('Pasá el code: node --env-file=.env scripts/tn-connect.ts <code>');
+  const slug = process.argv[3] ?? 'bdi';
+  if (!code) throw new Error('Pasá el code: node --env-file=.env scripts/tn-connect.ts <code> [slug-marca]');
 
   const token = await exchangeCode(code);
-  const cuenta = await getCuentaActiva();
+  const cuenta = await getCuentaBySlug(slug);
   await prisma.cuenta.update({
     where: { id: cuenta.id },
     data: { tnStoreId: token.user_id.toString(), tnToken: token.access_token },
