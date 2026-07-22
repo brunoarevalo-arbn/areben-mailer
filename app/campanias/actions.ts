@@ -54,6 +54,11 @@ export async function enviarCampania(id: string) {
   if (campania.estado === "ENVIANDO" || campania.estado === "ENVIADA")
     return { ok: false, error: "La campaña ya fue enviada" };
 
+  // Guard: mientras SES esté en sandbox, no dejamos enviar a la lista real
+  // (los destinos no verificados fallarían y perjudicarían la salida del sandbox).
+  if (process.env.SES_SANDBOX !== "false")
+    return { ok: false, error: "SES en sandbox: usá 'Enviar prueba'. El envío a la lista se habilita al aprobar producción." };
+
   // Elegibles: en la lista, activos y que aceptan marketing (consentimiento).
   const contactos = await prisma.contacto.findMany({
     where: {
