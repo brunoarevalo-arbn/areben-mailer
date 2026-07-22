@@ -1,0 +1,315 @@
+// areben-mailer — modelo de datos
+// Multi-tenant desde el día 1: TODO cuelga de `cuentaId`.
+// Arrancamos con una marca (BDI), pero el modelo ya soporta N marcas.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// Cuenta (tenant) + usuarios
+// ─────────────────────────────────────────────────────────────
+
+model Cuenta {
+  id        String   @id @default(cuid())
+  nombre    String // "BDI Accesorios"
+  slug      String   @unique // "bdi"
+  // Integración Tiendanube
+  tnStoreId String?  @unique
+  tnToken   String? // token OAuth de la tienda
+  // Config libre (branding, etc.)
+  config    Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usuarios     Usuario[]
+  remitentes   Remitente[]
+  camposCustom CampoCustom[]
+  contactos    Contacto[]
+  listas       Lista[]
+  segmentos    Segmento[]
+  intereses    Interes[]
+  campanias    Campania[]
+}
+
+enum RolUsuario {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model Usuario {
+  id        String     @id @default(cuid())
+  cuentaId  String
+  cuenta    Cuenta     @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  email     String
+  nombre    String?
+  rol       RolUsuario @default(ADMIN)
+  createdAt DateTime   @default(now())
+
+  @@unique([cuentaId, email])
+  @@index([cuentaId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Remitentes (sender + autenticación de dominio)
+// ─────────────────────────────────────────────────────────────
+
+enum EstadoRemitente {
+  PENDIENTE // registrado, falta verificar dominio
+  AUTENTICADO // DKIM/SPF ok en SES
+  RECHAZADO
+}
+
+model Remitente {
+  id          String          @id @default(cuid())
+  cuentaId    String
+  cuenta      Cuenta          @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  nombre      String // "BDI Accesorios"
+  email       String // "info@bdiaccesorios.com.ar"
+  responderA  String?
+  dominio     String // "bdiaccesorios.com.ar"
+  estado      EstadoRemitente @default(PENDIENTE)
+  esPrincipal Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+
+  campanias Campania[]
+
+  @@unique([cuentaId, email])
+  @@index([cuentaId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Modelo de datos del contacto (campos custom tipados)
+// ─────────────────────────────────────────────────────────────
+
+enum TipoCampo {
+  TEXTO
+  FECHA
+  NUMERO
+}
+
+model CampoCustom {
+  id              String    @id @default(cuid())
+  cuentaId        String
+  cuenta          Cuenta    @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  nombre          String // "tn_total_gastado"
+  tipo            TipoCampo @default(TEXTO)
+  codigoReemplazo String // "${contact.tntotalgastado}"
+  createdAt       DateTime  @default(now())
+
+  @@unique([cuentaId, nombre])
+  @@index([cuentaId])
+}
+
+enum EstadoContacto {
+  ACTIVO
+  BAJA // se desuscribió
+  REBOTADO // hard bounce
+  SPAM // marcó como spam
+}
+
+model Contacto {
+  id             String         @id @default(cuid())
+  cuentaId       String
+  cuenta         Cuenta         @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  email          String
+  nombre         String?
+  apellido       String?
+  estado         EstadoContacto @default(ACTIVO)
+  source         String? // "tiendanube" | "import_csv" | "formulario"
+  // Enlace con Tiendanube + datos derivados
+  tnCustomerId   String?
+  tnUltimaCompra DateTime?
+  tnTotalGastado Decimal?       @db.Decimal(12, 2)
+  tnAcceptsMkt   Boolean        @default(false)
+  // Valores de campos custom (clave = CampoCustom.nombre)
+  custom         Json           @default("{}")
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  listas    ContactoLista[]
+  intereses ContactoInteres[]
+  envios    Envio[]
+
+  @@unique([cuentaId, email])
+  @@index([cuentaId, estado])
+  @@index([cuentaId, tnCustomerId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Listas y segmentos
+// ─────────────────────────────────────────────────────────────
+
+enum TipoLista {
+  MANUAL
+  TN_SYNC // sincronizada de Tiendanube
+  SISTEMA // ej. "todos los contactos"
+}
+
+model Lista {
+  id          String    @id @default(cuid())
+  cuentaId    String
+  cuenta      Cuenta    @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  nombre      String
+  descripcion String?
+  tipo        TipoLista @default(MANUAL)
+  createdAt   DateTime  @default(now())
+
+  contactos ContactoLista[]
+  campanias Campania[]
+
+  @@index([cuentaId])
+}
+
+model ContactoLista {
+  contactoId String
+  contacto   Contacto @relation(fields: [contactoId], references: [id], onDelete: Cascade)
+  listaId    String
+  lista      Lista    @relation(fields: [listaId], references: [id], onDelete: Cascade)
+  addedAt    DateTime @default(now())
+
+  @@id([contactoId, listaId])
+  @@index([listaId])
+}
+
+// Segmento = filtro dinámico por reglas (motor recién Fase 2; tabla ya lista)
+model Segmento {
+  id          String   @id @default(cuid())
+  cuentaId    String
+  cuenta      Cuenta   @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  nombre      String
+  descripcion String?
+  reglas      Json     @default("{}") // { op: "AND", condiciones: [...] }
+  createdAt   DateTime @default(now())
+
+  campanias Campania[]
+
+  @@index([cuentaId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Intereses (tags de comportamiento)
+// ─────────────────────────────────────────────────────────────
+
+model Interes {
+  id           String   @id @default(cuid())
+  cuentaId     String
+  cuenta       Cuenta   @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  nombre       String
+  expiraEnDias Int? // null = nunca expira
+  createdAt    DateTime @default(now())
+
+  contactos ContactoInteres[]
+
+  @@unique([cuentaId, nombre])
+  @@index([cuentaId])
+}
+
+model ContactoInteres {
+  contactoId String
+  contacto   Contacto  @relation(fields: [contactoId], references: [id], onDelete: Cascade)
+  interesId  String
+  interes    Interes   @relation(fields: [interesId], references: [id], onDelete: Cascade)
+  addedAt    DateTime  @default(now())
+  expiraAt   DateTime?
+
+  @@id([contactoId, interesId])
+  @@index([interesId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Campañas + envíos + eventos de tracking
+// ─────────────────────────────────────────────────────────────
+
+enum EstadoCampania {
+  BORRADOR
+  PROGRAMADA
+  ENVIANDO
+  ENVIADA
+  CANCELADA
+}
+
+model Campania {
+  id           String         @id @default(cuid())
+  cuentaId     String
+  cuenta       Cuenta         @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  nombre       String
+  asunto       String?
+  preheader    String?
+  remitenteId  String?
+  remitente    Remitente?     @relation(fields: [remitenteId], references: [id])
+  // Contenido: árbol de bloques del editor (JSON) + HTML compilado para enviar
+  contenido    Json           @default("{}")
+  html         String?
+  estado       EstadoCampania @default(BORRADOR)
+  // Destino (lista o segmento)
+  listaId      String?
+  lista        Lista?         @relation(fields: [listaId], references: [id])
+  segmentoId   String?
+  segmento     Segmento?      @relation(fields: [segmentoId], references: [id])
+  programadaAt DateTime?
+  enviadaAt    DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  envios Envio[]
+
+  @@index([cuentaId, estado])
+}
+
+enum EstadoEnvio {
+  ENCOLADO
+  ENVIADO
+  ENTREGADO
+  ABIERTO
+  CLICK
+  REBOTE
+  BAJA
+  SPAM
+  FALLIDO
+}
+
+model Envio {
+  id           String      @id @default(cuid())
+  campaniaId   String
+  campania     Campania    @relation(fields: [campaniaId], references: [id], onDelete: Cascade)
+  contactoId   String
+  contacto     Contacto    @relation(fields: [contactoId], references: [id], onDelete: Cascade)
+  estado       EstadoEnvio @default(ENCOLADO)
+  sesMessageId String? // Message-ID que devuelve SES
+  enviadoAt    DateTime?
+  abiertoAt    DateTime?
+  clickAt      DateTime?
+  createdAt    DateTime    @default(now())
+
+  eventos Evento[]
+
+  @@unique([campaniaId, contactoId])
+  @@index([campaniaId, estado])
+  @@index([sesMessageId])
+}
+
+enum TipoEvento {
+  OPEN
+  CLICK
+  BOUNCE
+  COMPLAINT
+  DELIVERY
+}
+
+model Evento {
+  id        String     @id @default(cuid())
+  envioId   String
+  envio     Envio      @relation(fields: [envioId], references: [id], onDelete: Cascade)
+  tipo      TipoEvento
+  url       String? // para CLICK
+  meta      Json       @default("{}")
+  createdAt DateTime   @default(now())
+
+  @@index([envioId, tipo])
+}
