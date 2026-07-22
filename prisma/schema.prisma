@@ -36,6 +36,7 @@ model Cuenta {
   campanias    Campania[]
   plantillas   Plantilla[]
   automations  Automation[]
+  formularios  Formulario[]
 }
 
 model Plantilla {
@@ -235,6 +236,7 @@ model Lista {
 
   contactos ContactoLista[]
   campanias Campania[]
+  formularios Formulario[]
 
   @@index([cuentaId])
 }
@@ -385,4 +387,31 @@ model Evento {
   createdAt DateTime   @default(now())
 
   @@index([envioId, tipo])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Formularios de captura (single opt-in)
+// La tabla se crea por SQL crudo (scripts/create-formulario-table.ts):
+// ⛔ NO usar `prisma db push` en esta base (la comparte areben-popups).
+// ─────────────────────────────────────────────────────────────
+model Formulario {
+  id           String   @id @default(cuid())
+  cuentaId     String
+  cuenta       Cuenta   @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  nombre       String // nombre interno
+  slug         String // para la URL pública /f/<slug>
+  titulo       String   @default("Suscribite a nuestro newsletter")
+  descripcion  String?
+  botonTexto   String   @default("Suscribirme")
+  exitoMensaje String   @default("¡Listo! Gracias por suscribirte.")
+  pedirNombre  Boolean  @default(true)
+  listaId      String? // lista destino
+  lista        Lista?   @relation(fields: [listaId], references: [id])
+  activo       Boolean  @default(true)
+  submits      Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([cuentaId, slug])
+  @@index([cuentaId])
 }

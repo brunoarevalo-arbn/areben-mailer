@@ -9,6 +9,7 @@ import {
   Target,
   Send,
   FileText,
+  ClipboardList,
   Zap,
   LogOut,
   type LucideIcon,
@@ -23,6 +24,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/segmentos', label: 'Segmentos', icon: Target },
   { href: '/campanias', label: 'Campañas', icon: Send },
   { href: '/plantillas', label: 'Plantillas', icon: FileText },
+  { href: '/formularios', label: 'Formularios', icon: ClipboardList },
   { href: '/automations', label: 'Automations', icon: Zap },
 ];
 
