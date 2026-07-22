@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const PUBLIC_PREFIXES = [
   '/api/tn/', // callback OAuth + webhooks LGPD (los llama Tiendanube)
   '/api/health',
+  '/baja', // desuscripción: la abren destinatarios sin login
 ];
 
 export function proxy(req: NextRequest) {
