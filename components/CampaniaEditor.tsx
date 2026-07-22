@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { renderEmailHtml, type Bloque, type ContenidoCampania } from "@/lib/email/render";
 import { guardarCampania, enviarPrueba, enviarCampania } from "@/app/campanias/actions";
+import { ProductosBlock } from "@/components/ProductosBlock";
 
 interface Lista {
   id: string;
@@ -37,6 +38,7 @@ const nuevoBloque = (tipo: Bloque["tipo"]): Bloque => {
     case "texto": return { tipo, texto: "Escribí tu mensaje acá. Podés usar ${contacto.nombre}." };
     case "boton": return { tipo, texto: "Ver más", url: "https://bdiaccesorios.com.ar" };
     case "imagen": return { tipo, url: "", alt: "" };
+    case "productos": return { tipo, items: [] };
     case "divisor": return { tipo };
   }
 };
@@ -176,11 +178,14 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
               {b.tipo === "imagen" && (
                 <input className={input} value={b.url} placeholder="URL de la imagen (https://…)" onChange={(e) => setBloque(i, { url: e.target.value })} />
               )}
+              {b.tipo === "productos" && (
+                <ProductosBlock items={b.items} onChange={(items) => setBloque(i, { items })} />
+              )}
               {b.tipo === "divisor" && <div className="text-xs text-neutral-400">— línea divisoria —</div>}
             </div>
           ))}
           <div className="flex flex-wrap gap-2 pt-1">
-            {(["titulo", "texto", "boton", "imagen", "divisor"] as const).map((t) => (
+            {(["titulo", "texto", "boton", "imagen", "productos", "divisor"] as const).map((t) => (
               <button key={t} onClick={() => addBloque(t)} className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs text-neutral-600 hover:bg-neutral-50">
                 + {t}
               </button>

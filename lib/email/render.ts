@@ -1,11 +1,20 @@
 // Convierte el contenido de una campaña (bloques) en HTML de email.
 // Los bloques son un JSON simple; más adelante se suma un editor drag-and-drop.
 
+export interface ProductoEmail {
+  nombre: string;
+  precio: string;
+  precioPromo?: string;
+  imagen: string;
+  url: string;
+}
+
 export type Bloque =
   | { tipo: "titulo"; texto: string }
   | { tipo: "texto"; texto: string }
   | { tipo: "boton"; texto: string; url: string }
   | { tipo: "imagen"; url: string; alt?: string }
+  | { tipo: "productos"; items: ProductoEmail[] }
   | { tipo: "divisor" };
 
 export interface ContenidoCampania {
@@ -14,6 +23,36 @@ export interface ContenidoCampania {
 
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function fmtPrecio(v: string): string {
+  const n = Number(v);
+  if (Number.isNaN(n)) return v;
+  return "$" + n.toLocaleString("es-AR");
+}
+
+function renderCard(p: ProductoEmail): string {
+  const precio = p.precioPromo
+    ? `<span style="color:#a3a3a3;text-decoration:line-through;font-size:13px">${fmtPrecio(p.precio)}</span> <span style="color:#171717;font-weight:600">${fmtPrecio(p.precioPromo)}</span>`
+    : `<span style="color:#171717;font-weight:600">${fmtPrecio(p.precio)}</span>`;
+  return `<td width="50%" valign="top" style="padding:8px">
+    <a href="${esc(p.url)}" style="text-decoration:none;color:inherit">
+      <img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:8px;display:block" />
+      <div style="margin-top:8px;font-size:14px;color:#404040">${esc(p.nombre)}</div>
+      <div style="margin-top:2px;font-size:14px">${precio}</div>
+    </a>
+  </td>`;
+}
+
+function renderProductos(items: ProductoEmail[]): string {
+  if (items.length === 0) return "";
+  const filas: string[] = [];
+  for (let i = 0; i < items.length; i += 2) {
+    const a = renderCard(items[i]);
+    const b = items[i + 1] ? renderCard(items[i + 1]) : `<td width="50%"></td>`;
+    filas.push(`<tr>${a}${b}</tr>`);
+  }
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px">${filas.join("")}</table>`;
+}
 
 function renderBloque(b: Bloque): string {
   switch (b.tipo) {
@@ -27,6 +66,8 @@ function renderBloque(b: Bloque): string {
       </td></tr></table>`;
     case "imagen":
       return `<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" style="max-width:100%;height:auto;border-radius:8px;margin:0 0 16px;display:block" />`;
+    case "productos":
+      return renderProductos(b.items ?? []);
     case "divisor":
       return `<hr style="border:0;border-top:1px solid #e5e5e5;margin:24px 0" />`;
     default:
