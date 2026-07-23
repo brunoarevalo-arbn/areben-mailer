@@ -29,6 +29,21 @@ export interface ContenidoCampania {
   bloques: Bloque[];
 }
 
+/** Bloque inicial por tipo, compartido por todos los editores de contenido. */
+export function nuevoBloque(tipo: Bloque["tipo"]): Bloque {
+  switch (tipo) {
+    case "titulo": return { tipo, texto: "Título" };
+    case "texto": return { tipo, texto: "Escribí tu mensaje. Podés usar ${contacto.nombre}." };
+    case "boton": return { tipo, texto: "Ver más", url: "https://bdiaccesorios.com.ar" };
+    case "imagen": return { tipo, url: "", alt: "" };
+    case "productos": return { tipo, items: [] };
+    case "columnas": return { tipo, izq: { imagen: "", url: "" }, der: { imagen: "", url: "" } };
+    case "video": return { tipo, imagen: "", url: "" };
+    case "redes": return { tipo, links: [{ red: "Instagram", url: "" }] };
+    case "divisor": return { tipo };
+  }
+}
+
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
