@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { inyectarTracking } from "@/lib/email/tracking";
 import { sendEmail } from "@/lib/ses/client";
+import { getRemitenteEnvio } from "@/lib/remitentes";
 
 export const maxDuration = 60;
 
@@ -14,6 +15,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const appUrl = process.env.APP_URL ?? "";
   const contenido = campania.contenido as unknown as ContenidoCampania;
+  const rem = await getRemitenteEnvio(campania.cuentaId);
 
   const envios = await prisma.envio.findMany({
     where: { campaniaId: id, estado: "ENCOLADO" },
@@ -41,6 +43,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
         subject: campania.asunto!,
         html,
         unsubscribeUrl: unsubUrl,
+        fromEmail: rem?.email,
+        fromName: rem?.nombre,
+        replyTo: rem?.responderA ?? undefined,
       });
       await prisma.envio.update({
         where: { id: envio.id },

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania, type ProductoEmail } from "@/lib/email/render";
 import { sendEmail } from "@/lib/ses/client";
+import { getRemitenteEnvio } from "@/lib/remitentes";
 import { tnGet } from "@/lib/tn/client";
 
 export const maxDuration = 60;
@@ -70,8 +71,17 @@ export async function GET(req: Request) {
       continue;
     }
 
+    const rem = await getRemitenteEnvio(automation.cuentaId);
     try {
-      const res = await sendEmail({ to: contacto.email, subject: automation.asunto, html, unsubscribeUrl: unsubUrl });
+      const res = await sendEmail({
+        to: contacto.email,
+        subject: automation.asunto,
+        html,
+        unsubscribeUrl: unsubUrl,
+        fromEmail: rem?.email,
+        fromName: rem?.nombre,
+        replyTo: rem?.responderA ?? undefined,
+      });
       await prisma.automationRun.update({ where: { id: run.id }, data: { estado: "ENVIADO", sesMessageId: res.messageId } });
       enviados++;
     } catch {

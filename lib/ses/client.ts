@@ -1,4 +1,8 @@
-import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import {
+  SESv2Client,
+  SendEmailCommand,
+  GetEmailIdentityCommand,
+} from '@aws-sdk/client-sesv2';
 
 const ses = new SESv2Client({
   region: process.env.AWS_REGION,
@@ -17,18 +21,20 @@ export interface SendArgs {
   unsubscribeUrl?: string;
   /** Dirección Reply-To opcional. */
   replyTo?: string;
+  /** Remitente de la marca (fallback a SES_FROM_EMAIL si no se pasa). */
+  fromEmail?: string;
+  fromName?: string;
 }
 
 export interface SendResult {
   messageId: string;
 }
 
-const fromEmail = () => process.env.SES_FROM_EMAIL!;
-const fromName = () => process.env.SES_FROM_NAME ?? '';
-
 /** Envía un email por SES. Devuelve el Message-ID. */
 export async function sendEmail(args: SendArgs): Promise<SendResult> {
-  const from = fromName() ? `${fromName()} <${fromEmail()}>` : fromEmail();
+  const email = args.fromEmail ?? process.env.SES_FROM_EMAIL!;
+  const name = args.fromName ?? process.env.SES_FROM_NAME ?? '';
+  const from = name ? `${name} <${email}>` : email;
 
   const headers = args.unsubscribeUrl
     ? [
@@ -56,4 +62,21 @@ export async function sendEmail(args: SendArgs): Promise<SendResult> {
 
   const res = await ses.send(cmd);
   return { messageId: res.MessageId ?? '' };
+}
+
+/** Consulta en SES si una identidad (dominio o email) está verificada para enviar. */
+export async function getIdentityStatus(
+  identity: string
+): Promise<'AUTENTICADO' | 'PENDIENTE' | 'RECHAZADO'> {
+  try {
+    const res = await ses.send(
+      new GetEmailIdentityCommand({ EmailIdentity: identity })
+    );
+    if (res.VerifiedForSendingStatus) return 'AUTENTICADO';
+    if (res.DkimAttributes?.Status === 'FAILED') return 'RECHAZADO';
+    return 'PENDIENTE';
+  } catch {
+    // La identidad todavía no existe en SES.
+    return 'PENDIENTE';
+  }
 }

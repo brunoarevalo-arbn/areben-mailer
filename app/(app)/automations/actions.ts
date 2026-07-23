@@ -5,6 +5,7 @@ import { getCuentaActiva } from "@/lib/cuenta";
 import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { sendEmail } from "@/lib/ses/client";
+import { getRemitenteEnvio } from "@/lib/remitentes";
 import { PRESETS, type Trigger } from "@/lib/automations";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -79,8 +80,16 @@ export async function enviarPruebaAutomation(id: string, email: string) {
     }),
     { nombre: "Bruno", email },
   );
+  const rem = await getRemitenteEnvio(cuenta.id);
   try {
-    const res = await sendEmail({ to: email, subject: `[PRUEBA] ${a.asunto}`, html });
+    const res = await sendEmail({
+      to: email,
+      subject: `[PRUEBA] ${a.asunto}`,
+      html,
+      fromEmail: rem?.email,
+      fromName: rem?.nombre,
+      replyTo: rem?.responderA ?? undefined,
+    });
     return { ok: true, messageId: res.messageId };
   } catch (e) {
     return { ok: false, error: (e as Error).message };

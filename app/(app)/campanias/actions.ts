@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { sendEmail } from "@/lib/ses/client";
+import { getRemitenteEnvio } from "@/lib/remitentes";
 import { reglasToWhere, type Reglas } from "@/lib/segmentos";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -124,12 +125,16 @@ export async function enviarPrueba(id: string, emailDestino: string) {
   });
   const htmlFinal = aplicarMergeTags(html, { nombre: "Bruno", email: emailDestino });
 
+  const rem = await getRemitenteEnvio(cuenta.id);
   try {
     const res = await sendEmail({
       to: emailDestino,
       subject: `[PRUEBA] ${campania.asunto}`,
       html: htmlFinal,
       unsubscribeUrl: `${process.env.APP_URL}/baja?token=preview`,
+      fromEmail: rem?.email,
+      fromName: rem?.nombre,
+      replyTo: rem?.responderA ?? undefined,
     });
     return { ok: true, messageId: res.messageId };
   } catch (e) {

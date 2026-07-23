@@ -11,6 +11,7 @@ import {
   FileText,
   ClipboardList,
   Zap,
+  AtSign,
   LogOut,
   type LucideIcon,
 } from 'lucide-react';
@@ -33,6 +34,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/plantillas', label: 'Plantillas', icon: FileText },
   { href: '/formularios', label: 'Formularios', icon: ClipboardList },
   { href: '/automations', label: 'Automations', icon: Zap },
+  { href: '/remitentes', label: 'Remitentes', icon: AtSign },
 ];
 
 export function Sidebar({
