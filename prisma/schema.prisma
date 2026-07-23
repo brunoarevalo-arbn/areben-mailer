@@ -316,6 +316,11 @@ model Campania {
   nombre       String
   asunto       String?
   preheader    String?
+  // A/B de asunto (ganador manual). asuntoB null = sin A/B.
+  asuntoB      String?
+  abTestPct    Int? // % del total que recibe el test (10/20/30/50); null = sin A/B
+  abGanador    String? // "A" | "B" — variante promovida al resto
+  abResueltoAt DateTime?
   remitenteId  String?
   remitente    Remitente?     @relation(fields: [remitenteId], references: [id])
   // Contenido: árbol de bloques del editor (JSON) + HTML compilado para enviar
@@ -356,6 +361,7 @@ model Envio {
   contactoId   String
   contacto     Contacto    @relation(fields: [contactoId], references: [id], onDelete: Cascade)
   estado       EstadoEnvio @default(ENCOLADO)
+  variante     String? // A/B: "A" | "B" (test o ganador promovido); null = envío normal
   sesMessageId String? // Message-ID que devuelve SES
   enviadoAt    DateTime?
   abiertoAt    DateTime?

@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { CampaniaEditor } from "@/components/CampaniaEditor";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
+import { contactosElegibles } from "@/lib/campanias";
 import type { ContenidoCampania } from "@/lib/email/render";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +46,38 @@ export default async function CampaniaEditorPage({
     prisma.envio.count({ where: { campaniaId: id, estado: "REBOTE" } }),
     prisma.envio.count({ where: { campaniaId: id, estado: "BAJA" } }),
   ]);
+  // Info de A/B (si aplica): stats por variante + holdout pendiente.
+  let abInfo:
+    | {
+        ganador: string | null;
+        testPct: number;
+        a: { enviados: number; aperturas: number };
+        b: { enviados: number; aperturas: number };
+        holdout: number;
+      }
+    | undefined;
+  if (campania.abTestPct != null) {
+    const [envA, envB, abrA, abrB] = await Promise.all([
+      prisma.envio.count({ where: { campaniaId: id, variante: "A", enviadoAt: { not: null } } }),
+      prisma.envio.count({ where: { campaniaId: id, variante: "B", enviadoAt: { not: null } } }),
+      prisma.envio.count({ where: { campaniaId: id, variante: "A", abiertoAt: { not: null } } }),
+      prisma.envio.count({ where: { campaniaId: id, variante: "B", abiertoAt: { not: null } } }),
+    ]);
+    let holdout = 0;
+    if (!campania.abGanador) {
+      const elig = await contactosElegibles(cuenta.id, campania);
+      const testSent = await prisma.envio.count({ where: { campaniaId: id } });
+      holdout = Math.max(0, (elig?.length ?? 0) - testSent);
+    }
+    abInfo = {
+      ganador: campania.abGanador,
+      testPct: campania.abTestPct,
+      a: { enviados: envA, aperturas: abrA },
+      b: { enviados: envB, aperturas: abrB },
+      holdout,
+    };
+  }
+
   const pct = (n: number) => (enviados ? `${Math.round((n / enviados) * 100)}%` : "0%");
   const stats = enviados > 0
     ? [
@@ -81,11 +114,14 @@ export default async function CampaniaEditorPage({
           preheader: campania.preheader ?? "",
           destino: destinoInicial,
           contenido: (campania.contenido as unknown as ContenidoCampania) ?? { bloques: [] },
+          asuntoB: campania.asuntoB ?? "",
+          abTestPct: campania.abTestPct ?? null,
         }}
         listas={listas}
         segmentos={segmentos}
         emailPrueba="brunoarevalo@arebensrl.com"
         estado={campania.estado}
+        abInfo={abInfo}
       />
     </div>
   );

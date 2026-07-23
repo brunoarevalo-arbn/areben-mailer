@@ -37,10 +37,12 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     html = aplicarMergeTags(html, envio.contacto);
     html = inyectarTracking(html, envio.id, appUrl);
 
+    const asuntoEnvio =
+      envio.variante === "B" ? campania.asuntoB ?? campania.asunto! : campania.asunto!;
     try {
       const res = await sendEmail({
         to: envio.contacto.email,
-        subject: campania.asunto!,
+        subject: asuntoEnvio,
         html,
         unsubscribeUrl: unsubUrl,
         fromEmail: rem?.email,
@@ -66,10 +68,15 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const restantes = await prisma.envio.count({ where: { campaniaId: id, estado: "ENCOLADO" } });
   if (restantes === 0 && !throttled) {
-    await prisma.campania.update({
-      where: { id },
-      data: { estado: "ENVIADA", enviadaAt: new Date() },
-    });
+    // En A/B, tras enviar el test la campaña queda ENVIANDO esperando que se
+    // promueva el ganador — no se marca ENVIADA hasta que se manda el resto.
+    const esperandoGanador = campania.abTestPct != null && campania.abGanador == null;
+    if (!esperandoGanador) {
+      await prisma.campania.update({
+        where: { id },
+        data: { estado: "ENVIADA", enviadaAt: new Date() },
+      });
+    }
   }
 
   return Response.json({ enviados, fallidos, restantes, throttled });
