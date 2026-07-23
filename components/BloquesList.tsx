@@ -2,6 +2,7 @@
 
 import { nuevoBloque, type Bloque } from "@/lib/email/render";
 import { ProductosBlock } from "@/components/ProductosBlock";
+import { AISoonButton } from "@/components/ui/AISoonButton";
 import { inputClass } from "@/lib/ui";
 import { ChevronUp, ChevronDown, X } from "lucide-react";
 
@@ -33,7 +34,10 @@ export function BloquesList({
 
   return (
     <div className="space-y-2 rounded-xl border border-border bg-surface p-4 shadow-sm">
-      <div className="text-sm font-medium text-foreground">Contenido</div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-foreground">Contenido</span>
+        <AISoonButton label="Redactar con IA" />
+      </div>
       {bloques.map((b, i) => (
         <div key={i} className="rounded-lg border border-border bg-surface-muted p-3">
           <div className="mb-2 flex items-center justify-between">

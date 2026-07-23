@@ -5,6 +5,7 @@ import { renderEmailHtml, type ContenidoCampania } from "@/lib/email/render";
 import { guardarCampania, enviarPrueba, enviarCampania, guardarComoPlantilla } from "@/app/(app)/campanias/actions";
 import { BloquesList } from "@/components/BloquesList";
 import { Button } from "@/components/ui/Button";
+import { AISoonButton } from "@/components/ui/AISoonButton";
 import { inputClass } from "@/lib/ui";
 
 interface Lista {
@@ -100,7 +101,10 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
             <input className={inputClass} value={nombre} onChange={(e) => setNombre(e.target.value)} />
           </label>
           <label className="block text-sm">
-            <span className="text-muted">Asunto</span>
+            <span className="flex items-center justify-between gap-2 text-muted">
+              Asunto
+              <AISoonButton label="Sugerir asunto" />
+            </span>
             <input className={inputClass} value={asunto} onChange={(e) => setAsunto(e.target.value)} placeholder="Asunto del email" />
           </label>
           <label className="block text-sm">
