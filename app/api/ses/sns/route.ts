@@ -11,6 +11,14 @@ export async function POST(req: Request) {
     return new Response("bad json", { status: 400 });
   }
 
+  // Guard: si está seteado SES_SNS_TOPIC_ARN, solo aceptamos mensajes de ese
+  // topic (evita que alguien postee rebotes/quejas falsos y queme contactos).
+  // Sin la env var, es permisivo (útil durante el setup inicial).
+  const expectedTopic = process.env.SES_SNS_TOPIC_ARN;
+  if (expectedTopic && body.TopicArn !== expectedTopic) {
+    return new Response("ignored", { status: 200 });
+  }
+
   // 1) Confirmación de suscripción del topic SNS: pegarle a la SubscribeURL.
   if (body.Type === "SubscriptionConfirmation" && typeof body.SubscribeURL === "string") {
     try {
