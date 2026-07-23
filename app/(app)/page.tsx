@@ -10,6 +10,7 @@ import {
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { EnviosChart, type PuntoSerie } from "@/components/EnviosChart";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
 
@@ -37,6 +38,15 @@ export default async function Home() {
   const d30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const scope = { campania: { cuentaId: cid } };
 
+  // Serie temporal: 30 días (UTC) para envíos/aperturas/clicks.
+  const dias: string[] = [];
+  const hoy = new Date();
+  for (let k = 29; k >= 0; k--) {
+    const dt = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate() - k));
+    dias.push(dt.toISOString().slice(0, 10));
+  }
+  const desde = new Date(`${dias[0]}T00:00:00.000Z`);
+
   const [
     contactosByEstado,
     listas,
@@ -47,6 +57,7 @@ export default async function Home() {
     clicks,
     enviados30,
     ultimas,
+    serieRaw,
   ] = await Promise.all([
     prisma.contacto.groupBy({
       by: ["estado"],
@@ -66,7 +77,33 @@ export default async function Home() {
       take: 6,
       select: { id: true, nombre: true, asunto: true, estado: true },
     }),
+    prisma.$queryRaw<{ dia: string; metric: string; n: number }[]>`
+      SELECT d AS dia, m AS metric, COUNT(*)::int AS n FROM (
+        SELECT to_char(date_trunc('day', e."enviadoAt"), 'YYYY-MM-DD') AS d, 'env' AS m
+          FROM "Envio" e JOIN "Campania" c ON c.id = e."campaniaId"
+          WHERE c."cuentaId" = ${cid} AND e."enviadoAt" >= ${desde}
+        UNION ALL
+        SELECT to_char(date_trunc('day', e."abiertoAt"), 'YYYY-MM-DD'), 'abr'
+          FROM "Envio" e JOIN "Campania" c ON c.id = e."campaniaId"
+          WHERE c."cuentaId" = ${cid} AND e."abiertoAt" >= ${desde}
+        UNION ALL
+        SELECT to_char(date_trunc('day', e."clickAt"), 'YYYY-MM-DD'), 'clk'
+          FROM "Envio" e JOIN "Campania" c ON c.id = e."campaniaId"
+          WHERE c."cuentaId" = ${cid} AND e."clickAt" >= ${desde}
+      ) t GROUP BY d, m
+    `,
   ]);
+
+  const serieKey = (m: string, dia: string) => `${m}:${dia}`;
+  const serieCnt = new Map<string, number>();
+  for (const r of serieRaw) serieCnt.set(serieKey(r.metric, r.dia), Number(r.n));
+  const serie: PuntoSerie[] = dias.map((dia) => ({
+    dia,
+    env: serieCnt.get(serieKey("env", dia)) ?? 0,
+    abr: serieCnt.get(serieKey("abr", dia)) ?? 0,
+    clk: serieCnt.get(serieKey("clk", dia)) ?? 0,
+  }));
+  const sumaEnvSerie = serie.reduce((s, p) => s + p.env, 0);
 
   const porEstado = Object.fromEntries(
     contactosByEstado.map((r) => [r.estado, r._count])
@@ -163,6 +200,14 @@ export default async function Home() {
           );
         })}
       </div>
+
+      {/* Serie temporal de actividad */}
+      {sumaEnvSerie > 0 && (
+        <Card>
+          <div className="mb-1 text-sm font-medium text-foreground">Actividad</div>
+          <EnviosChart data={serie} />
+        </Card>
+      )}
 
       {/* Salud de la audiencia + automations */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

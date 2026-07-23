@@ -58,6 +58,11 @@
   --info: #f0f9ff;
   --info-foreground: #0369a1;
   --info-border: #bae6fd;
+
+  /* Series de gráficos (validadas dataviz, light) */
+  --chart-env: #f59e0b;
+  --chart-abr: #0284c7;
+  --chart-clk: #059669;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -100,6 +105,9 @@
   --info: rgba(56, 189, 248, 0.12);
   --info-foreground: #7dd3fc;
   --info-border: rgba(56, 189, 248, 0.3);
+
+  /* Series de gráficos (validadas dataviz, dark: el ámbar se oscurece) */
+  --chart-env: #d97706;
 }
 
 /* ─────────────────────────────────────────────────────────────
