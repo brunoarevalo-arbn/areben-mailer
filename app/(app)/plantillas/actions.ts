@@ -2,8 +2,24 @@
 
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
+import { getPreset } from "@/lib/plantillas/presets";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+
+/** Crea una campaña nueva a partir de una plantilla PREARMADA (de código). */
+export async function usarPreset(presetId: string) {
+  const cuenta = await getCuentaActiva();
+  const preset = getPreset(presetId);
+  if (!preset) return;
+  const campania = await prisma.campania.create({
+    data: {
+      cuentaId: cuenta.id,
+      nombre: preset.nombre,
+      contenido: { bloques: preset.bloques } as object,
+    },
+  });
+  redirect(`/campanias/${campania.id}`);
+}
 
 /** Crea una campaña nueva a partir de una plantilla y abre el editor. */
 export async function usarPlantilla(plantillaId: string) {
