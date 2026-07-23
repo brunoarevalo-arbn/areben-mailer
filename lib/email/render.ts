@@ -15,15 +15,19 @@ export interface Columna {
 }
 
 export type Bloque =
-  | { tipo: "titulo"; texto: string }
-  | { tipo: "texto"; texto: string }
-  | { tipo: "boton"; texto: string; url: string }
+  | { tipo: "titulo"; texto: string; align?: "left" | "center" }
+  | { tipo: "texto"; texto: string; align?: "left" | "center" }
+  | { tipo: "boton"; texto: string; url: string; align?: "left" | "center"; full?: boolean }
   | { tipo: "imagen"; url: string; alt?: string }
   | { tipo: "productos"; items: ProductoEmail[] }
   | { tipo: "columnas"; izq: Columna; der: Columna }
   | { tipo: "video"; imagen: string; url: string }
   | { tipo: "redes"; links: { red: string; url: string }[] }
-  | { tipo: "divisor" };
+  | { tipo: "divisor" }
+  // Bloques "ricos"
+  | { tipo: "hero"; imagen: string; titulo: string; subtitulo: string; botonTexto: string; botonUrl: string; bg: string }
+  | { tipo: "seccion"; bg: string; titulo: string; texto: string; botonTexto: string; botonUrl: string }
+  | { tipo: "cupon"; texto: string; codigo: string; botonTexto: string; botonUrl: string };
 
 export interface ContenidoCampania {
   bloques: Bloque[];
@@ -32,20 +36,34 @@ export interface ContenidoCampania {
 /** Bloque inicial por tipo, compartido por todos los editores de contenido. */
 export function nuevoBloque(tipo: Bloque["tipo"]): Bloque {
   switch (tipo) {
-    case "titulo": return { tipo, texto: "Título" };
-    case "texto": return { tipo, texto: "Escribí tu mensaje. Podés usar ${contacto.nombre}." };
-    case "boton": return { tipo, texto: "Ver más", url: "https://bdiaccesorios.com.ar" };
+    case "titulo": return { tipo, texto: "Título", align: "left" };
+    case "texto": return { tipo, texto: "Escribí tu mensaje. Podés usar ${contacto.nombre}.", align: "left" };
+    case "boton": return { tipo, texto: "Ver más", url: "", align: "left", full: false };
     case "imagen": return { tipo, url: "", alt: "" };
     case "productos": return { tipo, items: [] };
     case "columnas": return { tipo, izq: { imagen: "", url: "" }, der: { imagen: "", url: "" } };
     case "video": return { tipo, imagen: "", url: "" };
     case "redes": return { tipo, links: [{ red: "Instagram", url: "" }] };
     case "divisor": return { tipo };
+    case "hero": return { tipo, imagen: "", titulo: "Título principal", subtitulo: "Un subtítulo que acompaña", botonTexto: "Ver más", botonUrl: "", bg: "#ffffff" };
+    case "seccion": return { tipo, bg: "#faf7f0", titulo: "Título de sección", texto: "Texto de la sección.", botonTexto: "", botonUrl: "" };
+    case "cupon": return { tipo, texto: "Usá este código en el checkout", codigo: "DESCUENTO10", botonTexto: "Comprar", botonUrl: "" };
   }
 }
 
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+const nl = (s: string) => esc(s).replace(/\n/g, "<br>");
+
+/** Contenedor con padding horizontal para los bloques "de texto". */
+const pad = (inner: string) => `<div style="padding:0 32px">${inner}</div>`;
+
+/** Ancla de botón (relleno ámbar). */
+function botonAnchor(texto: string, url: string, full = false): string {
+  const w = full ? ";width:100%;box-sizing:border-box;text-align:center" : "";
+  return `<a href="${esc(url || "#")}" style="display:inline-block;padding:14px 32px;font-size:16px;font-weight:600;color:#ffffff;background:#f59e0b;border-radius:8px;text-decoration:none${w}">${esc(texto)}</a>`;
+}
 
 function fmtPrecio(v: string): string {
   const n = Number(v);
@@ -85,35 +103,53 @@ function renderProductos(items: ProductoEmail[]): string {
 function renderBloque(b: Bloque): string {
   switch (b.tipo) {
     case "titulo":
-      return `<h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:#171717">${esc(b.texto)}</h1>`;
+      return pad(`<h1 style="margin:16px 0;font-size:26px;line-height:1.25;color:#171717;text-align:${b.align ?? "left"}">${esc(b.texto)}</h1>`);
     case "texto":
-      return `<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#404040">${esc(b.texto).replace(/\n/g, "<br>")}</p>`;
+      return pad(`<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#404040;text-align:${b.align ?? "left"}">${nl(b.texto)}</p>`);
     case "boton":
-      return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 20px"><tr><td style="border-radius:8px;background:#f59e0b">
-        <a href="${esc(b.url)}" style="display:inline-block;padding:12px 24px;font-size:16px;font-weight:600;color:#fff;text-decoration:none">${esc(b.texto)}</a>
-      </td></tr></table>`;
+      return pad(`<div style="text-align:${b.align ?? "left"};margin:8px 0 20px">${botonAnchor(b.texto, b.url, b.full)}</div>`);
     case "imagen":
-      return `<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" style="max-width:100%;height:auto;border-radius:8px;margin:0 0 16px;display:block" />`;
+      return pad(`<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" style="max-width:100%;height:auto;border-radius:8px;margin:8px 0 16px;display:block" />`);
     case "productos":
-      return renderProductos(b.items ?? []);
+      return pad(renderProductos(b.items ?? []));
     case "columnas": {
       const cell = (c: Columna) =>
         c.imagen
           ? `<td width="50%" valign="top" style="padding:6px"><a href="${esc(c.url || "#")}"><img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:8px;display:block" alt="" /></a></td>`
           : `<td width="50%"></td>`;
-      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px"><tr>${cell(b.izq)}${cell(b.der)}</tr></table>`;
+      return pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px"><tr>${cell(b.izq)}${cell(b.der)}</tr></table>`);
     }
     case "video":
       return b.imagen
-        ? `<a href="${esc(b.url || "#")}" style="display:block;position:relative;margin:0 0 16px"><img src="${esc(b.imagen)}" width="100%" style="max-width:100%;border-radius:8px;display:block" alt="Ver video" /><span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:48px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.5)">▶</span></a>`
+        ? pad(`<a href="${esc(b.url || "#")}" style="display:block;position:relative;margin:8px 0 16px"><img src="${esc(b.imagen)}" width="100%" style="max-width:100%;border-radius:8px;display:block" alt="Ver video" /><span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:48px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.5)">▶</span></a>`)
         : "";
     case "redes":
-      return `<div style="text-align:center;margin:16px 0">${(b.links ?? [])
+      return pad(`<div style="text-align:center;margin:16px 0">${(b.links ?? [])
         .filter((l) => l.url)
-        .map((l) => `<a href="${esc(l.url)}" style="display:inline-block;margin:0 8px;color:#404040;font-size:14px;text-decoration:none">${esc(l.red)}</a>`)
-        .join("")}</div>`;
+        .map((l) => `<a href="${esc(l.url)}" style="display:inline-block;margin:0 8px;color:#525252;font-size:14px;text-decoration:none">${esc(l.red)}</a>`)
+        .join("")}</div>`);
     case "divisor":
-      return `<hr style="border:0;border-top:1px solid #e5e5e5;margin:24px 0" />`;
+      return pad(`<hr style="border:0;border-top:1px solid #e5e5e5;margin:24px 0" />`);
+    case "hero": {
+      const img = b.imagen ? `<img src="${esc(b.imagen)}" alt="" style="width:100%;display:block;margin:0" />` : "";
+      const t = b.titulo ? `<h1 style="margin:0 0 10px;font-size:30px;line-height:1.2;color:#171717">${esc(b.titulo)}</h1>` : "";
+      const s = b.subtitulo ? `<p style="margin:0 0 20px;font-size:17px;line-height:1.5;color:#525252">${esc(b.subtitulo)}</p>` : "";
+      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl) : "";
+      const caja = t || s || btn ? `<div style="background:${esc(b.bg || "#ffffff")};padding:36px 32px;text-align:center">${t}${s}${btn}</div>` : "";
+      return `${img}${caja}`;
+    }
+    case "seccion": {
+      const t = b.titulo ? `<h2 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:#171717">${esc(b.titulo)}</h2>` : "";
+      const tx = b.texto ? `<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#525252">${nl(b.texto)}</p>` : "";
+      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl) : "";
+      return `<div style="background:${esc(b.bg || "#faf7f0")};padding:32px;text-align:center">${t}${tx}${btn}</div>`;
+    }
+    case "cupon": {
+      const t = b.texto ? `<div style="font-size:16px;color:#404040;margin-bottom:8px">${esc(b.texto)}</div>` : "";
+      const cod = b.codigo ? `<div style="font-size:26px;font-weight:700;letter-spacing:3px;color:#b45309;margin-bottom:14px">${esc(b.codigo)}</div>` : "";
+      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl) : "";
+      return pad(`<div style="border:2px dashed #f59e0b;border-radius:12px;background:#fffbeb;padding:24px;text-align:center;margin:8px 0 16px">${t}${cod}${btn}</div>`);
+    }
     default:
       return "";
   }
@@ -135,13 +171,22 @@ export function renderEmailHtml(contenido: ContenidoCampania, opts: RenderOpts):
 
   return `<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif">
+<body style="margin:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif">
   ${preheader}
   <div style="max-width:600px;margin:0 auto;padding:24px 16px">
-    <div style="background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:32px">
-      ${cuerpo}
+    <!-- Encabezado de marca -->
+    <div style="text-align:center;padding:8px 0 16px">
+      <span style="font-size:18px;font-weight:700;letter-spacing:1px;color:#171717">${esc(opts.nombreCuenta.toUpperCase())}</span>
+      <div style="width:40px;height:3px;background:#f59e0b;margin:10px auto 0;border-radius:2px"></div>
     </div>
-    <div style="text-align:center;color:#a3a3a3;font-size:12px;line-height:1.5;margin-top:16px">
+    <!-- Cuerpo -->
+    <div style="background:#ffffff;border:1px solid #ececec;border-radius:12px;overflow:hidden">
+      <div style="height:12px"></div>
+      ${cuerpo}
+      <div style="height:16px"></div>
+    </div>
+    <!-- Footer -->
+    <div style="text-align:center;color:#a3a3a3;font-size:12px;line-height:1.6;margin-top:20px">
       ${esc(opts.nombreCuenta)}${opts.direccionPostal ? " · " + esc(opts.direccionPostal) : ""}<br>
       <a href="${esc(opts.unsubscribeUrl)}" style="color:#a3a3a3">Desuscribirme</a>
     </div>

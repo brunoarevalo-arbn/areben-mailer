@@ -6,7 +6,22 @@ import { AISoonButton } from "@/components/ui/AISoonButton";
 import { inputClass } from "@/lib/ui";
 import { ChevronUp, ChevronDown, X } from "lucide-react";
 
-const TIPOS = ["titulo", "texto", "boton", "imagen", "productos", "columnas", "video", "redes", "divisor"] as const;
+const TIPOS = ["hero", "seccion", "cupon", "titulo", "texto", "boton", "imagen", "productos", "columnas", "video", "redes", "divisor"] as const;
+
+const selectClass = `${inputClass} py-1.5`;
+const alignSelect = (value: "left" | "center", onChange: (v: "left" | "center") => void) => (
+  <select className={`${selectClass} max-w-40`} value={value} onChange={(e) => onChange(e.target.value as "left" | "center")}>
+    <option value="left">Alinear: izquierda</option>
+    <option value="center">Alinear: centro</option>
+  </select>
+);
+const colorInput = (value: string, onChange: (v: string) => void, label: string) => (
+  <label className="flex items-center gap-2 text-xs text-muted">
+    {label}
+    <input type="color" value={value || "#ffffff"} onChange={(e) => onChange(e.target.value)} className="h-8 w-12 cursor-pointer rounded border border-border-strong bg-background" />
+    <span className="tabular-nums">{value}</span>
+  </label>
+);
 
 /**
  * Card editable de bloques de contenido (sin preview): lista de bloques con
@@ -49,12 +64,55 @@ export function BloquesList({
             </div>
           </div>
           {(b.tipo === "titulo" || b.tipo === "texto") && (
-            <textarea className={inputClass} rows={b.tipo === "texto" ? 3 : 1} value={b.texto} onChange={(e) => setBloque(i, { texto: e.target.value })} />
+            <div className="space-y-2">
+              <textarea className={inputClass} rows={b.tipo === "texto" ? 3 : 1} value={b.texto} onChange={(e) => setBloque(i, { texto: e.target.value })} />
+              {alignSelect(b.align ?? "left", (align) => setBloque(i, { align }))}
+            </div>
           )}
           {b.tipo === "boton" && (
             <div className="space-y-2">
               <input className={inputClass} value={b.texto} placeholder="Texto del botón" onChange={(e) => setBloque(i, { texto: e.target.value })} />
               <input className={inputClass} value={b.url} placeholder="https://…" onChange={(e) => setBloque(i, { url: e.target.value })} />
+              <div className="flex flex-wrap items-center gap-3">
+                {alignSelect(b.align ?? "left", (align) => setBloque(i, { align }))}
+                <label className="flex items-center gap-1.5 text-xs text-muted">
+                  <input type="checkbox" checked={!!b.full} onChange={(e) => setBloque(i, { full: e.target.checked })} />
+                  Ancho completo
+                </label>
+              </div>
+            </div>
+          )}
+          {b.tipo === "hero" && (
+            <div className="space-y-2">
+              <input className={inputClass} value={b.imagen} placeholder="URL de la imagen (banner)" onChange={(e) => setBloque(i, { imagen: e.target.value })} />
+              <input className={inputClass} value={b.titulo} placeholder="Título principal" onChange={(e) => setBloque(i, { titulo: e.target.value })} />
+              <input className={inputClass} value={b.subtitulo} placeholder="Subtítulo" onChange={(e) => setBloque(i, { subtitulo: e.target.value })} />
+              <div className="flex gap-2">
+                <input className={inputClass} value={b.botonTexto} placeholder="Texto del botón" onChange={(e) => setBloque(i, { botonTexto: e.target.value })} />
+                <input className={inputClass} value={b.botonUrl} placeholder="Link del botón" onChange={(e) => setBloque(i, { botonUrl: e.target.value })} />
+              </div>
+              {colorInput(b.bg, (bg) => setBloque(i, { bg }), "Fondo del texto")}
+            </div>
+          )}
+          {b.tipo === "seccion" && (
+            <div className="space-y-2">
+              <input className={inputClass} value={b.titulo} placeholder="Título de la sección" onChange={(e) => setBloque(i, { titulo: e.target.value })} />
+              <textarea className={inputClass} rows={2} value={b.texto} placeholder="Texto" onChange={(e) => setBloque(i, { texto: e.target.value })} />
+              <div className="flex gap-2">
+                <input className={inputClass} value={b.botonTexto} placeholder="Texto del botón (opcional)" onChange={(e) => setBloque(i, { botonTexto: e.target.value })} />
+                <input className={inputClass} value={b.botonUrl} placeholder="Link del botón" onChange={(e) => setBloque(i, { botonUrl: e.target.value })} />
+              </div>
+              {colorInput(b.bg, (bg) => setBloque(i, { bg }), "Fondo de la sección")}
+            </div>
+          )}
+          {b.tipo === "cupon" && (
+            <div className="space-y-2">
+              <input className={inputClass} value={b.texto} placeholder="Texto (ej. Usá este código en el checkout)" onChange={(e) => setBloque(i, { texto: e.target.value })} />
+              <input className={inputClass} value={b.codigo} placeholder="Código (ej. DESCUENTO10)" onChange={(e) => setBloque(i, { codigo: e.target.value })} />
+              <div className="flex gap-2">
+                <input className={inputClass} value={b.botonTexto} placeholder="Texto del botón (opcional)" onChange={(e) => setBloque(i, { botonTexto: e.target.value })} />
+                <input className={inputClass} value={b.botonUrl} placeholder="Link del botón" onChange={(e) => setBloque(i, { botonUrl: e.target.value })} />
+              </div>
             </div>
           )}
           {b.tipo === "imagen" && (
