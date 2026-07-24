@@ -1,6 +1,6 @@
 // Envía un email de prueba por SES.
 // Uso:  node --import tsx --env-file=.env scripts/ses-test.ts [destino]
-import { sendEmail } from '../lib/ses/client.ts';
+import { sendEmail } from '../lib/email/enviar.ts';
 
 const to = process.argv[2] ?? 'brunoarevalo@arebensrl.com';
 

@@ -3,7 +3,7 @@
 // Correr:  node --env-file=.env scripts/set-remitente.ts <slug> <email> "<nombre>" [responderA]
 //   ej:    node --env-file=.env scripts/set-remitente.ts zattia info@zattia.com.ar "Zattia"
 import { prisma } from '../lib/prisma.ts';
-import { getIdentityStatus } from '../lib/ses/client.ts';
+import { getIdentityStatus } from '../lib/email/proveedores/ses.ts';
 
 async function main() {
   const [slug, email, nombre, responderA] = process.argv.slice(2);

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { inyectarTracking } from "@/lib/email/tracking";
-import { sendEmail } from "@/lib/ses/client";
+import { sendEmail, esThrottle } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 
 export const maxDuration = 60;
@@ -55,8 +55,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       });
       enviados++;
     } catch (e) {
-      const name = (e as Error).name || "";
-      if (/throttl|TooManyRequests|Limit/i.test(name)) {
+      if (esThrottle(e)) {
         // rate limit: dejamos el envío ENCOLADO para el próximo lote
         throttled = true;
         break;

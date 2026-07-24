@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
 import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
-import { sendEmail } from "@/lib/ses/client";
+import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { PRESETS, type Trigger } from "@/lib/automations";
 import { revalidatePath } from "next/cache";

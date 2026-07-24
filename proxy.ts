@@ -11,6 +11,7 @@ const PUBLIC_PREFIXES = [
   '/api/health',
   '/api/track/', // pixel de apertura + redirect de clicks (los abren los destinatarios)
   '/api/ses/', // notificaciones SNS de rebotes/quejas (las llama AWS)
+  '/api/webhooks/', // rebotes/quejas de Resend y SendGrid (los llaman ellos)
   '/api/automations/procesar', // lo llama el cron (protegido por CRON_SECRET)
   '/baja', // desuscripción: la abren destinatarios sin login
   '/f/', // formularios de captura públicos (single opt-in)

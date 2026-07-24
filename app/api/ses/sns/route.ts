@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { aplicarSupresion } from "@/lib/email/supresion";
 
 // Recibe notificaciones SNS de SES (rebotes y quejas) y limpia la lista.
 // Config en AWS: Configuration Set → Event destination (SNS) → esta URL.
@@ -41,33 +41,23 @@ export async function POST(req: Request) {
     const tipo = ev.notificationType || ev.eventType;
     const messageId = (ev.mail as { messageId?: string })?.messageId;
 
-    let emails: string[] = [];
-    let nuevoEstado: "REBOTADO" | "SPAM" | null = null;
-
     if (tipo === "Bounce") {
       const bounce = ev.bounce as { bounceType?: string; bouncedRecipients?: { emailAddress: string }[] };
       // Solo rebotes permanentes queman el contacto.
       if (bounce?.bounceType === "Permanent") {
-        emails = (bounce.bouncedRecipients ?? []).map((r) => r.emailAddress.toLowerCase());
-        nuevoEstado = "REBOTADO";
+        await aplicarSupresion({
+          tipo: "REBOTE_PERMANENTE",
+          emails: (bounce.bouncedRecipients ?? []).map((r) => r.emailAddress),
+          messageId,
+        });
       }
     } else if (tipo === "Complaint") {
       const complaint = ev.complaint as { complainedRecipients?: { emailAddress: string }[] };
-      emails = (complaint?.complainedRecipients ?? []).map((r) => r.emailAddress.toLowerCase());
-      nuevoEstado = "SPAM";
-    }
-
-    if (nuevoEstado && emails.length) {
-      await prisma.contacto.updateMany({
-        where: { email: { in: emails } },
-        data: { estado: nuevoEstado },
+      await aplicarSupresion({
+        tipo: "QUEJA",
+        emails: (complaint?.complainedRecipients ?? []).map((r) => r.emailAddress),
+        messageId,
       });
-      if (messageId) {
-        await prisma.envio.updateMany({
-          where: { sesMessageId: messageId },
-          data: { estado: nuevoEstado === "REBOTADO" ? "REBOTE" : "SPAM" },
-        });
-      }
     }
   }
 

@@ -3,6 +3,14 @@ import {
   SendEmailCommand,
   GetEmailIdentityCommand,
 } from '@aws-sdk/client-sesv2';
+import {
+  armarFrom,
+  headersUnsubscribe,
+  EmailError,
+  type Proveedor,
+  type SendArgs,
+  type SendResult,
+} from '../proveedor';
 
 const ses = new SESv2Client({
   region: process.env.AWS_REGION,
@@ -12,35 +20,13 @@ const ses = new SESv2Client({
   },
 });
 
-export interface SendArgs {
-  to: string;
-  subject: string;
-  html: string;
-  text?: string;
-  /** URL de baja para el header List-Unsubscribe (one-click). */
-  unsubscribeUrl?: string;
-  /** Dirección Reply-To opcional. */
-  replyTo?: string;
-  /** Remitente de la marca (fallback a SES_FROM_EMAIL si no se pasa). */
-  fromEmail?: string;
-  fromName?: string;
-}
+async function enviar(args: SendArgs): Promise<SendResult> {
+  const { email, nombre } = armarFrom(args);
+  const from = nombre ? `${nombre} <${email}>` : email;
 
-export interface SendResult {
-  messageId: string;
-}
-
-/** Envía un email por SES. Devuelve el Message-ID. */
-export async function sendEmail(args: SendArgs): Promise<SendResult> {
-  const email = args.fromEmail ?? process.env.SES_FROM_EMAIL!;
-  const name = args.fromName ?? process.env.SES_FROM_NAME ?? '';
-  const from = name ? `${name} <${email}>` : email;
-
-  const headers = args.unsubscribeUrl
-    ? [
-        { Name: 'List-Unsubscribe', Value: `<${args.unsubscribeUrl}>` },
-        { Name: 'List-Unsubscribe-Post', Value: 'List-Unsubscribe=One-Click' },
-      ]
+  const hs = headersUnsubscribe(args);
+  const headers = Object.keys(hs).length
+    ? Object.entries(hs).map(([Name, Value]) => ({ Name, Value }))
     : undefined;
 
   const cmd = new SendEmailCommand({
@@ -60,11 +46,24 @@ export async function sendEmail(args: SendArgs): Promise<SendResult> {
     },
   });
 
-  const res = await ses.send(cmd);
-  return { messageId: res.MessageId ?? '' };
+  try {
+    const res = await ses.send(cmd);
+    return { messageId: res.MessageId ?? '' };
+  } catch (e) {
+    const name = (e as Error).name || '';
+    throw new EmailError((e as Error).message || 'fallo SES', {
+      esThrottle: /throttl|TooManyRequests|Limit/i.test(name),
+      cause: e,
+    });
+  }
 }
 
-/** Consulta en SES si una identidad (dominio o email) está verificada para enviar. */
+export const sesProvider: Proveedor = { nombre: 'ses', enviar };
+
+/**
+ * Consulta en SES si una identidad (dominio o email) está verificada para enviar.
+ * Es específico de SES: la sección /remitentes lo usa para el estado de DKIM.
+ */
 export async function getIdentityStatus(
   identity: string
 ): Promise<'AUTENTICADO' | 'PENDIENTE' | 'RECHAZADO'> {

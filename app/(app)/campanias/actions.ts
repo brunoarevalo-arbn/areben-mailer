@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
-import { sendEmail } from "@/lib/ses/client";
+import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { contactosElegibles } from "@/lib/campanias";
 import { revalidatePath } from "next/cache";

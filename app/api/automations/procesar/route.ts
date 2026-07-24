@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania, type ProductoEmail } from "@/lib/email/render";
-import { sendEmail } from "@/lib/ses/client";
+import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { tnGet } from "@/lib/tn/client";
 

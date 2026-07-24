@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
-import { getIdentityStatus } from "@/lib/ses/client";
+import { getIdentityStatus } from "@/lib/email/proveedores/ses";
 
 export async function crearRemitente(input: {
   nombre: string;
