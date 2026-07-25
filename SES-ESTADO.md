@@ -145,9 +145,13 @@ La app **ya está preparada** para cambiar de proveedor — no es un refactor, e
 3. Setear `EMAIL_PROVIDER` + la API key en Vercel y en `.env`.
 4. Generalizar el gate `SES_SANDBOX` (ver 4).
 
-**Costo:** SES es lejos lo más barato (~US$0,10 cada 1.000 mails). Resend ronda US$20/mes
-por 50.000 envíos. La ventaja de Resend es que aprueba casos de marketing sin el vía crucis
-de AWS.
+**Costo:** SES es lejos lo más barato. Ojo con el número: la cuenta está en el plan
+**Essentials**, que son **US$0,16 cada 1.000** — los US$0,10 son el plan *à la carte*, al que
+se puede volver desde la consola. Resend son US$20/mes por 50.000 envíos y US$35 por 100.000
+(a los ~95.000/mes de BDI + Zattia, el plan que aplica es el de US$35). La ventaja de Resend
+es que aprueba casos de marketing sin el vía crucis de AWS.
+
+📊 El análisis completo de costos y modelo de negocio está en **`MODELO-DE-NEGOCIO.md`**.
 
 ---
 

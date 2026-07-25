@@ -98,6 +98,9 @@ app).
 
 ---
 
+> 📊 Los costos, la economía unitaria y el análisis de competencia de publicar esto están en
+> **`MODELO-DE-NEGOCIO.md`**.
+
 ## 4. Preguntas abiertas para Tiendanube
 
 Ninguna de las dos la responde la documentación:
