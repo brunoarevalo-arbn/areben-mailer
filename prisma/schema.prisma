@@ -122,6 +122,7 @@ model Usuario {
   nombre       String?
   rol          RolUsuario @default(ADMIN)
   passwordHash String?    // scrypt "salt:hash"; nullable hasta setear contraseña
+  interno      Boolean    @default(false) // equipo Areben: puede cambiar de marca
   createdAt    DateTime   @default(now())
 
   @@unique([cuentaId, email])

@@ -1,5 +1,7 @@
 import { exchangeCode, tnGet } from '@/lib/tn/client';
 import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
+import { createSession, decrypt } from '@/lib/session';
 
 // TN redirige acá tras la instalación con ?code=... Canjeamos el token y lo guardamos.
 //
@@ -19,6 +21,35 @@ async function nombreDeTienda(storeId: string, token: string): Promise<string | 
   } catch {
     return null; // si falla, seguimos con un nombre genérico
   }
+}
+
+/** Email del dueño de la tienda según TN (para dar de alta su usuario). */
+async function emailDeTienda(storeId: string, token: string): Promise<string | null> {
+  try {
+    const { data } = await tnGet<{ email?: string }>(storeId, token, 'store');
+    return data?.email?.trim().toLowerCase() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Deja al comerciante adentro: asegura su usuario y abre la sesión.
+ *
+ * Sin esto, instalar la app dejaba la cuenta creada pero a nadie con quien entrar
+ * (no hay registro ni invitación). Si ya hay una sesión válida —Bruno conectando
+ * una marca con `?state=`— no se toca.
+ */
+async function entrarComoComerciante(cuentaId: string, storeId: string, token: string) {
+  const sesionActual = await decrypt((await cookies()).get('session')?.value);
+  if (sesionActual?.userId) return;
+
+  const email = (await emailDeTienda(storeId, token)) ?? `tienda-${storeId}@tiendanube.local`;
+  const usuario =
+    (await prisma.usuario.findFirst({ where: { cuentaId, email } })) ??
+    (await prisma.usuario.create({ data: { cuentaId, email, rol: 'ADMIN', interno: false } }));
+
+  await createSession(usuario.id, cuentaId, usuario.rol);
 }
 
 /** Slug libre a partir del nombre; si choca, cae al id de tienda. */
@@ -51,6 +82,7 @@ export async function GET(req: Request) {
     const yaVinculada = await prisma.cuenta.findUnique({ where: { tnStoreId: storeId } });
     if (yaVinculada) {
       await prisma.cuenta.update({ where: { id: yaVinculada.id }, data: { tnToken: token.access_token } });
+      await entrarComoComerciante(yaVinculada.id, storeId, token.access_token);
       destino.search = '?tn=conectado';
       return Response.redirect(destino);
     }
@@ -65,6 +97,7 @@ export async function GET(req: Request) {
           where: { id: cuenta.id },
           data: { tnStoreId: storeId, tnToken: token.access_token },
         });
+        await entrarComoComerciante(cuenta.id, storeId, token.access_token);
         destino.search = '?tn=conectado';
         return Response.redirect(destino);
       }
@@ -75,6 +108,7 @@ export async function GET(req: Request) {
     const cuenta = await prisma.cuenta.create({
       data: { nombre, slug: await slugLibre(nombre, storeId), tnStoreId: storeId, tnToken: token.access_token },
     });
+    await entrarComoComerciante(cuenta.id, storeId, token.access_token);
     destino.search = `?tn=conectado&cuenta=${cuenta.slug}`;
     return Response.redirect(destino);
   } catch (e) {

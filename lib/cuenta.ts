@@ -13,14 +13,9 @@ export async function getCuentaBySlug(slug: string) {
   return cuenta;
 }
 
-/** Cuenta por defecto cuando no hay sesión válida (bootstrap / fallback). */
-async function cuentaFallback() {
-  const cuenta =
-    (await prisma.cuenta.findUnique({ where: { slug: 'bdi' } })) ??
-    (await prisma.cuenta.findFirst({ orderBy: { createdAt: 'asc' } }));
-  if (!cuenta) throw new Error('No hay ninguna cuenta creada. Corré scripts/seed.ts');
-  return cuenta;
-}
+// ⛔ Ya no hay "cuenta por defecto": antes, sin sesión válida se caía a la cuenta
+// con slug "bdi". Con comerciantes usando la app eso es una fuga de datos —
+// cualquier camino sin sesión mostraría los de BDI. Sin sesión no hay cuenta.
 
 /**
  * Cuenta activa según la sesión (marca seleccionada). Memoizada por request.
@@ -36,7 +31,9 @@ export const getCuentaActiva = cache(async () => {
     const cuenta = await prisma.cuenta.findUnique({ where: { id: session.cuentaId } });
     if (cuenta) return cuenta;
   }
-  return cuentaFallback();
+  // El proxy ya redirige a /login sin sesión; si llegamos acá, algo se saltó el
+  // guard: fallamos en vez de servir datos de otra cuenta.
+  throw new Error('Sesión sin cuenta válida.');
 });
 
 /** Todas las cuentas/marcas (para el selector). Memoizada por request. */

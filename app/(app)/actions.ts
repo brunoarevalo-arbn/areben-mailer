@@ -9,9 +9,15 @@ import { setActiveCuenta } from "@/lib/session";
 /** Cambia la marca activa (selector del sidebar). */
 export async function cambiarCuenta(cuentaId: string) {
   const session = await verifySession();
-  // Single-operador: el admin puede operar cualquier marca. (Si en el futuro hay
-  // usuarios por marca, acá va el chequeo de membresía.)
   if (session.rol !== "ADMIN") return;
+
+  // Solo el equipo de Areben opera varias marcas. Un usuario de comerciante que
+  // llame a esta action no puede saltar a la cuenta de otra tienda.
+  const usuario = await prisma.usuario.findUnique({
+    where: { id: session.userId as string },
+    select: { interno: true },
+  });
+  if (!usuario?.interno) return;
 
   const existe = await prisma.cuenta.findUnique({
     where: { id: cuentaId },

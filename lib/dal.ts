@@ -30,7 +30,7 @@ export const getSessionUser = cache(async () => {
   try {
     return await prisma.usuario.findUnique({
       where: { id: session.userId },
-      select: { id: true, nombre: true, email: true, rol: true },
+      select: { id: true, nombre: true, email: true, rol: true, interno: true },
     });
   } catch {
     return null;

@@ -18,7 +18,10 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-screen">
       <Sidebar
-        cuentas={cuentas}
+        // El selector de marcas es solo para el equipo de Areben. Un comerciante
+        // recibe únicamente su tienda, así el switcher muestra el nombre sin
+        // ofrecerle saltar a otra cuenta.
+        cuentas={usuario?.interno ? cuentas : cuentas.filter((c) => c.id === cuenta.id)}
         cuentaActivaId={cuenta.id}
         usuario={
           usuario ? { nombre: usuario.nombre, email: usuario.email } : null
