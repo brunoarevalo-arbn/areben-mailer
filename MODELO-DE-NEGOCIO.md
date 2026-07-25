@@ -360,7 +360,7 @@ chica **antes** de construir encima.
 |---|---|---|
 | **Reputación compartida entre inquilinos** | Un comerciante con lista comprada quema la cuenta SES entera — y con ella los mails de BDI y Zattia | *Tenants* de SES (hasta 10.000), doble opt-in obligatorio, límite de rebote por cuenta con suspensión automática, IP dedicada con volumen |
 | **Base de datos compartida con Resorty, que está en vivo** | Neon Free = 512 MB; 43 MB/mes de filas `Envio`. Si se llena, se cae Resorty también | Neon a plan pago **antes** del primer blast; retención/purga de `Envio` y `Evento` |
-| **La cola de envío vive en el navegador** | `CampaniaEditor.tsx:112` manda de a 20 por request: ~1h20m de pestaña abierta para los 16.825 de BDI. Inviable multi-inquilino | Mover la cola al servidor (cron por minuto, o QStash/Inngest) |
+| ~~**La cola de envío vive en el navegador**~~ ✅ **RESUELTO 25-jul-2026** | Antes `CampaniaEditor.tsx` mandaba de a 20 por request: ~1h20m de pestaña abierta para los 16.825 de BDI | Ya está en el servidor (`lib/email/cola.ts`): worker con lease + auto-encadenamiento, y el cron de GitHub como perro guardián. El editor solo mira el progreso |
 | **Vercel Hobby prohíbe uso comercial** | Riesgo de ToS desde el primer peso cobrado | Pro, USD 20/mes |
 | **Cómo se cobra una app paga en Tiendanube está sin documentar** | Puede exigir cobro fuera de plataforma (fricción) o quedarse un % | Preguntar a socios@tiendanube.com — ya está en la consulta pendiente |
 | **Soporte de onboarding de dominio** | Cada comerciante que no sabe cargar DKIM es un ticket. Es el costo oculto grande del SaaS, y no aparece en ninguna tabla de arriba | Asistente guiado por proveedor de DNS; detección automática de registros |
