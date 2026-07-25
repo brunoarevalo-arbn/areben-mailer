@@ -20,11 +20,19 @@ const APP_URL = (urlArg || (envUrl && !/localhost|127\.0\.0\.1/.test(envUrl) ? e
 const API = 'https://api.tiendanube.com/v1';
 const UA = 'Areben Mailer (brunoarevalo@arebensrl.com)';
 
+// Solo estos se pueden dar de alta por API (`POST /webhooks`).
 const EVENTOS = {
+  'app/uninstalled': `${APP_URL}/api/tn/webhooks/app-uninstalled`,
+};
+
+// Los 3 de LGPD NO son creables por API: devuelven 422 "The selected event is
+// invalid". Según la documentación, Tiendanube los envía a los partners por su
+// cuenta. Queda por confirmar con socios@tiendanube.com a qué URL los manda y
+// dónde se declara — nuestros endpoints ya están listos y esperando:
+const AUTOMATICOS = {
   'store/redact': `${APP_URL}/api/tn/webhooks/store-redact`,
   'customers/redact': `${APP_URL}/api/tn/webhooks/customers-redact`,
   'customers/data_request': `${APP_URL}/api/tn/webhooks/customers-data-request`,
-  'app/uninstalled': `${APP_URL}/api/tn/webhooks/app-uninstalled`,
 };
 
 const tn = (storeId, token, path, init = {}) =>
@@ -81,3 +89,8 @@ for (const cuenta of cuentas) {
     console.log(alta.ok ? `   ✅ creado: ${evento}` : `   ❌ ${evento}: HTTP ${alta.status} ${await alta.text()}`);
   }
 }
+
+console.log('\nLos 3 webhooks de LGPD no se dan de alta por API: Tiendanube los envía');
+console.log('por su cuenta. Nuestros endpoints ya están publicados y verifican firma:');
+for (const [evento, url] of Object.entries(AUTOMATICOS)) console.log(`   ${evento.padEnd(24)} → ${url}`);
+console.log('\nPendiente: confirmar con socios@tiendanube.com a qué URL los envían.');
