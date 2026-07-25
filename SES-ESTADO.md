@@ -90,19 +90,33 @@ Falta entero: (a) conectar su Tiendanube + importar contactos; (b) correr
 `node --env-file=.env scripts/ses-verify-domain.ts <dominio-stunned>` y cargar los CNAME +
 DMARC en el DNS (DNS-only); (c) `scripts/set-remitente.ts stunned info@<dominio> "Stunned"`.
 
-### 3.3 Sin probar por el sandbox — pero una SÍ se puede probar ya
+### 3.3 ✅ Rebotes y quejas: VERIFICADO E2E el 25-jul-2026 (runId `250726-2020`)
 
-El camino **Bounce → `REBOTADO`** y **Complaint → `SPAM`** nunca se ejercitó con un envío real.
+El camino **Bounce → `REBOTADO`** y **Complaint → `SPAM`** **ya está probado de punta a
+punta**, con la cuenta todavía en sandbox, usando el *mailbox simulator* de SES (funciona en
+sandbox, no consume cuota diaria y no ensucia la reputación).
 
-👉 **Esto NO necesita esperar a AWS.** El *mailbox simulator* de SES funciona **dentro del
-sandbox** y no ensucia la reputación:
+Resultado: los dos contactos quedaron en `REBOTADO`/`SPAM` y los dos `Envio` en
+`REBOTE`/`SPAM`. Que el `Envio` cambie de estado **solo puede pasar** por el `updateMany` que
+casa el `sesMessageId`, así que quedó probado el eslabón completo
+SES → SNS → `/api/ses/sns` → `aplicarSupresion` → base.
 
-- `bounce@simulator.amazonses.com` → dispara un hard bounce
-- `complaint@simulator.amazonses.com` → dispara una queja
+**Cómo repetirlo** (los datos van a una cuenta descartable `qa-ses`, nunca a BDI/Zattia/Stunned;
+no toca `SES_SANDBOX`):
 
-Mandando una prueba a esas direcciones se valida de punta a punta que el SNS llega, que
-`aplicarSupresion` corre y que el contacto queda en `REBOTADO`/`SPAM`. **Es la tarea de
-mayor valor disponible hoy sin depender de nadie.**
+```
+APP_URL=https://areben-mailer.vercel.app \
+  node --import tsx --env-file=.env scripts/ses-e2e-supresion.ts
+node --import tsx --env-file=.env scripts/ses-e2e-supresion.ts --verificar <runId>
+node --import tsx --env-file=.env scripts/ses-e2e-supresion.ts --limpiar
+```
+
+⚠️ **Hay que deployar antes de correrlo**: la suscripción SNS apunta a prod, así que el
+evento lo recibe el deploy, no el localhost.
+
+El receptor SNS ahora emite una línea JSON por evento (`ev: "ses-sns"`, filtrable en los logs
+de Vercel) con `contactos`/`envios` marcados y `ms`. Antes no tenía ningún log: un evento que
+llegaba y no matcheaba nada era indistinguible de uno que nunca llegó.
 
 ---
 
