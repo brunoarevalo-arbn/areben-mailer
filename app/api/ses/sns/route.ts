@@ -1,4 +1,5 @@
 import { aplicarSupresion } from "@/lib/email/supresion";
+import { verificarFirmaSns } from "@/lib/email/sns-firma";
 
 // Recibe notificaciones SNS de SES (rebotes y quejas) y limpia la lista.
 // Config en AWS: Configuration Set → Event destination (SNS) → esta URL.
@@ -33,9 +34,18 @@ export async function POST(req: Request) {
     return new Response("bad json", { status: 400 });
   }
 
+  // Autenticación real: la firma RSA de Amazon. El TopicArn de abajo viaja en el
+  // body y lo escribe cualquiera, así que solo sirve como filtro, no como prueba
+  // de origen. Falla cerrado: sin firma válida no se toca la base.
+  const firma = await verificarFirmaSns(body);
+  if (!firma.valida) {
+    log({ rechazado: "firma", motivo: firma.motivo, topicRecibido: body.TopicArn });
+    return new Response("invalid signature", { status: 403 });
+  }
+
   // Guard: si está seteado SES_SNS_TOPIC_ARN, solo aceptamos mensajes de ese
-  // topic (evita que alguien postee rebotes/quejas falsos y queme contactos).
-  // Sin la env var, es permisivo (útil durante el setup inicial).
+  // topic. Ya con la firma verificada esto es defensa en profundidad: descarta
+  // mensajes legítimos de AWS que vengan de un topic que no es el nuestro.
   const expectedTopic = process.env.SES_SNS_TOPIC_ARN;
   if (expectedTopic && body.TopicArn !== expectedTopic) {
     log({ ignorado: "topic", topicRecibido: body.TopicArn });
