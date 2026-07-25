@@ -22,3 +22,18 @@ export async function contactosElegibles(
     select: { id: true },
   });
 }
+
+/** Crea envíos ENCOLADO para una lista de contactos con una variante dada. */
+export async function crearEnvios(
+  campaniaId: string,
+  contactos: { id: string }[],
+  variante: string | null,
+) {
+  const CHUNK = 1000;
+  for (let i = 0; i < contactos.length; i += CHUNK) {
+    await prisma.envio.createMany({
+      data: contactos.slice(i, i + CHUNK).map((c) => ({ campaniaId, contactoId: c.id, variante })),
+      skipDuplicates: true,
+    });
+  }
+}

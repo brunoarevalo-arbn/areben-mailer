@@ -5,7 +5,7 @@ import { getCuentaActiva } from "@/lib/cuenta";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
-import { contactosElegibles } from "@/lib/campanias";
+import { contactosElegibles, crearEnvios } from "@/lib/campanias";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -70,17 +70,6 @@ function shuffle<T>(arr: T[]): T[] {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
-}
-
-/** Crea envíos ENCOLADO para una lista de contactos con una variante dada. */
-async function crearEnvios(campaniaId: string, contactos: { id: string }[], variante: string | null) {
-  const CHUNK = 1000;
-  for (let i = 0; i < contactos.length; i += CHUNK) {
-    await prisma.envio.createMany({
-      data: contactos.slice(i, i + CHUNK).map((c) => ({ campaniaId, contactoId: c.id, variante })),
-      skipDuplicates: true,
-    });
-  }
 }
 
 /** Encola una campaña: crea los Envío para los contactos elegibles y la pone ENVIANDO. */
