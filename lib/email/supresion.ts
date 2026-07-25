@@ -11,13 +11,23 @@ export interface EventoSupresion {
   messageId?: string;
 }
 
+export interface ResultadoSupresion {
+  /** Contactos marcados REBOTADO/SPAM. */
+  contactos: number;
+  /** Envíos marcados REBOTE/SPAM (casados por messageId). */
+  envios: number;
+  /** Ids de esos envíos, para que el llamador pueda loguear o auditar. */
+  envioIds: string[];
+}
+
 /**
  * Quema los contactos que rebotaron duro o se quejaron por spam: es lo que
  * cuida la reputación del dominio. Los rebotes transitorios NO llegan acá.
  */
-export async function aplicarSupresion(ev: EventoSupresion): Promise<number> {
+export async function aplicarSupresion(ev: EventoSupresion): Promise<ResultadoSupresion> {
+  const vacio: ResultadoSupresion = { contactos: 0, envios: 0, envioIds: [] };
   const emails = ev.emails.map((e) => e.toLowerCase()).filter(Boolean);
-  if (!emails.length) return 0;
+  if (!emails.length) return vacio;
 
   const estadoContacto = ev.tipo === 'QUEJA' ? 'SPAM' : 'REBOTADO';
   const estadoEnvio = ev.tipo === 'QUEJA' ? 'SPAM' : 'REBOTE';
@@ -27,12 +37,22 @@ export async function aplicarSupresion(ev: EventoSupresion): Promise<number> {
     data: { estado: estadoContacto },
   });
 
+  // Los ids se resuelven ANTES del update: después de marcarlos ya no se
+  // distinguen de los que estaban en ese estado de antes.
+  let envioIds: string[] = [];
   if (ev.messageId) {
-    await prisma.envio.updateMany({
+    const envios = await prisma.envio.findMany({
       where: { sesMessageId: ev.messageId },
-      data: { estado: estadoEnvio },
+      select: { id: true },
     });
+    envioIds = envios.map((e) => e.id);
+    if (envioIds.length) {
+      await prisma.envio.updateMany({
+        where: { id: { in: envioIds } },
+        data: { estado: estadoEnvio },
+      });
+    }
   }
 
-  return res.count;
+  return { contactos: res.count, envios: envioIds.length, envioIds };
 }
