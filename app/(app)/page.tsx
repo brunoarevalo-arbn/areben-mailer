@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/Badge";
 import { EnviosChart, type PuntoSerie } from "@/components/EnviosChart";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
+import { authorizeUrl } from "@/lib/tn/client";
+import { PrimerosPasos } from "@/components/PrimerosPasos";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,35 @@ function pct(part: number, total: number): string {
 export default async function Home() {
   const cuenta = await getCuentaActiva();
   const cid = cuenta.id;
+
+  // Cuenta sin estrenar (recién instalada): en vez del dashboard con todo en
+  // cero, mostramos la guía de primeros pasos. Con datos, sigue el de siempre.
+  const [nContactos, nCampanias] = await Promise.all([
+    prisma.contacto.count({ where: { cuentaId: cid } }),
+    prisma.campania.count({ where: { cuentaId: cid } }),
+  ]);
+  if (nContactos === 0 && nCampanias === 0) {
+    const remitenteOk = await prisma.remitente.count({
+      where: { cuentaId: cid, estado: "AUTENTICADO" },
+    });
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow="Inicio"
+          title={cuenta.nombre}
+          subtitle="Configurá tu cuenta para empezar a enviar."
+        />
+        <PrimerosPasos
+          nombreTienda={cuenta.nombre}
+          tiendaConectada={!!(cuenta.tnStoreId && cuenta.tnToken)}
+          tieneContactos={false}
+          tieneRemitente={remitenteOk > 0}
+          tieneCampania={false}
+          urlConectar={authorizeUrl(cid)}
+        />
+      </div>
+    );
+  }
   const d30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const scope = { campania: { cuentaId: cid } };
 
