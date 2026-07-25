@@ -118,6 +118,16 @@ El receptor SNS ahora emite una línea JSON por evento (`ev: "ses-sns"`, filtrab
 de Vercel) con `contactos`/`envios` marcados y `ms`. Antes no tenía ningún log: un evento que
 llegaba y no matcheaba nada era indistinguible de uno que nunca llegó.
 
+**🔒 La ruta verifica la firma RSA de Amazon** (`lib/email/sns-firma.ts`) antes de tocar la
+base, y responde **403** si no valida. Antes alcanzaba con conocer el ARN del topic para
+postear rebotes falsos y quemar contactos: se comprobó con un `curl` desde afuera, que la
+ruta procesaba con 200. Verificado el 25-jul-2026 por los dos lados — el `curl` forjado ahora
+da 403, y el E2E con mensajes reales de AWS sigue en verde (runId `250726-2029`).
+
+> Nota para diagnosticar: el `curl` sintético contra `/api/ses/sns` ya **no** sirve para
+> simular un evento — devuelve 403. Sigue sirviendo para confirmar que el deploy tomó y que
+> la ruta está viva; para ejercitar el camino completo hay que usar el script del simulador.
+
 ---
 
 ## 4. El gate en el código
