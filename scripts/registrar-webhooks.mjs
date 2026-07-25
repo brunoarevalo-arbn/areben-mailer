@@ -11,7 +11,12 @@ import 'dotenv/config';
 import pg from 'pg';
 
 const APLICAR = process.argv.includes('--aplicar');
-const APP_URL = (process.env.APP_URL || 'https://areben-mailer.vercel.app').replace(/\/$/, '');
+const PROD = 'https://areben-mailer.vercel.app';
+// El .env local apunta a localhost: Tiendanube tiene que poder llegar, así que
+// se usa la URL pública salvo que se pase otra con --url=...
+const urlArg = process.argv.find((a) => a.startsWith('--url='))?.slice(6);
+const envUrl = process.env.APP_URL;
+const APP_URL = (urlArg || (envUrl && !/localhost|127\.0\.0\.1/.test(envUrl) ? envUrl : PROD)).replace(/\/$/, '');
 const API = 'https://api.tiendanube.com/v1';
 const UA = 'Areben Mailer (brunoarevalo@arebensrl.com)';
 
