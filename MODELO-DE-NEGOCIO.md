@@ -245,8 +245,11 @@ oportunidad no es el producto: es el canal.**
   consecuencia estratégica es que **el que entra primero en cada tienda se queda con esa
   tienda**, y por eso la velocidad de instalación importa más que la completitud del producto.
 - **Dogfooding**: se usa en tres tiendas propias antes de vendérselo a nadie.
-- **Resorty ya está en la App Store**, con instalación real en tiendas. Es un canal de
-  distribución que un competidor nuevo no tiene.
+- **Resorty como canal — pero todavía es una apuesta, no un activo.** ⚠️ Al 25-jul-2026
+  Resorty **no está publicado en la App Store**: está en vivo en Zattia (tienda propia)
+  instalado por GTM, y no tiene clientes externos. El argumento de "canal de distribución
+  propio" vale **cuando** Resorty esté publicado e instalado en tiendas ajenas; hoy es el
+  plan, no el punto de partida. Ver §7.6, que es donde está el problema.
 - **El combo captura + envío** (pop-up que capta el mail y mailer que lo trabaja) es un
   producto más difícil de copiar que un mailer suelto, y ninguno de los incumbentes locales
   lo ofrece integrado.
@@ -260,21 +263,51 @@ conocido justamente porque muchos ya lo hicieron. La versión defendible de esta
 es "otro email marketing barato", sino **el paquete Resorty + mailer vendido dentro de
 Tiendanube a comerciantes que ya confían en la primera app**.
 
-### 7.6 Lo que eso implica para el orden de trabajo
+### 7.6 El canal está bloqueado por Tiendanube, no por falta de desarrollo
 
-Si la apuesta es el combo y no el mailer suelto, **la prioridad no la marca el mailer**:
+Si la apuesta es el combo y no el mailer suelto, **la prioridad no la marca el mailer** — y
+acá aparece el problema de fondo, que no es de código:
 
-- **Resorty tiene fecha límite dura**: NubeSDK bloquea las instalaciones nuevas el
-  **30-ago-2026** y arranca la desinstalación progresiva el **30-oct-2026**
-  (`project_tiendanube_nubesdk`). Si Resorty se cae de la App Store, se cae el canal de
-  distribución sobre el que se apoya todo el argumento comercial del mailer.
+- **NubeSDK es obligatorio en homologación desde el 5-jun-2026**: sin él no se aprueba
+  ninguna app nueva de storefront. Esa fecha ya pasó, así que Resorty **hoy no se puede
+  publicar** sin migrar.
+- **Pero NubeSDK no se puede usar en los temas actuales.** La documentación oficial dice que
+  los slots solo están soportados en el tema **Patagonia**, y Patagonia **ya no está
+  disponible para instalaciones nuevas** — la tienda demo creada desde el Portal de Partners
+  vino con Morelia. O sea: el camino obligatorio está cerrado por el otro extremo.
+- Después vienen las fechas de corte para las apps que **ya están publicadas**: 30-ago-2026
+  se bloquean las instalaciones nuevas sin SDK, 30-oct-2026 empieza la desinstalación
+  progresiva (`project_tiendanube_nubesdk`).
 - **El mailer no tiene ninguna fecha límite** — no inyecta nada en el storefront, así que
-  NubeSDK no lo toca (ver `TIENDANUBE-PUBLICACION.md` §1).
-- Y como el costo de cambio favorece al que entra primero (§7.4), llegar tarde a una tienda
-  cuesta más que llegar incompleto.
+  NubeSDK no lo toca (`TIENDANUBE-PUBLICACION.md` §1).
 
-**Traducción:** el mailer puede esperar; Resorty no. Y el mailer, cuando salga, conviene que
-salga apoyado en Resorty y no al revés.
+**La consecuencia estratégica:** el cuello de botella del negocio no es tiempo de desarrollo
+ni plata de infraestructura, es **una respuesta de Tiendanube que todavía no llegó**. Las
+preguntas 1, 2, 3 y 5 de `areben-popups/CONSULTA-TIENDANUBE.md` — el mail a
+socios@tiendanube.com que está redactado y **sin enviar** — determinan si el canal existe,
+cuándo, y si se puede cobrar por él. **Enviarlo es la acción de mayor palanca de todo este
+documento, y no cuesta nada.**
+
+### 7.7 Plan D — vender fuera de la App Store
+
+La pregunta 3 de esa consulta abre una salida que no depende de la homologación: si un script
+que **el propio comerciante** pega en *Códigos externos* o inyecta por GTM **no** cae bajo el
+bloqueo de NubeSDK, entonces el combo Resorty + mailer se puede vender **directo**, sin App
+Store, sin homologación y sin fechas de corte. Es exactamente como está instalado Resorty en
+Zattia hoy (GTM-P5B8T7QV).
+
+| | App Store | Venta directa (GTM) |
+|---|---|---|
+| Homologación | Obligatoria, hoy bloqueada | No aplica |
+| Descubrimiento | El comerciante te encuentra solo | Hay que salir a buscarlo |
+| Fricción de instalación | Un clic | El comerciante pega un script |
+| Cobro | Sin documentar (pregunta 5) | Facturación propia, control total |
+| Riesgo de plataforma | Alto: cambian las reglas y te caés | Bajo |
+
+No es tan bueno como la App Store para adquirir, pero **no depende de que Tiendanube
+conteste** y sirve para conseguir los primeros comerciantes mientras el canal oficial se
+destraba. Con el costo de cambio de §7.4 jugando a favor, cinco tiendas conseguidas a mano
+hoy valen más que cincuenta dentro de un año.
 
 ---
 
