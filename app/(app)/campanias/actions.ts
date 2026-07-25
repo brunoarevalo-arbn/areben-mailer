@@ -6,6 +6,7 @@ import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib
 import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { contactosElegibles, crearEnvios } from "@/lib/campanias";
+import { arrancarCola } from "@/lib/email/cola";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -105,6 +106,7 @@ export async function enviarCampania(id: string) {
     await crearEnvios(id, muestra.slice(mitad), "B");
     await prisma.campania.update({ where: { id }, data: { estado: "ENVIANDO" } });
     const total = await prisma.envio.count({ where: { campaniaId: id } });
+    arrancarCola();
     return { ok: true, total, esTest: true };
   }
 
@@ -112,6 +114,7 @@ export async function enviarCampania(id: string) {
   await crearEnvios(id, contactos, null);
   await prisma.campania.update({ where: { id }, data: { estado: "ENVIANDO" } });
   const total = await prisma.envio.count({ where: { campaniaId: id } });
+  arrancarCola();
   return { ok: true, total };
 }
 
@@ -140,8 +143,9 @@ export async function promoverGanador(id: string, ganador: "A" | "B") {
   await crearEnvios(id, resto, ganador);
   await prisma.campania.update({
     where: { id },
-    data: { abGanador: ganador, abResueltoAt: new Date() },
+    data: { abGanador: ganador, abResueltoAt: new Date(), estado: "ENVIANDO" },
   });
+  arrancarCola();
   revalidatePath(`/campanias/${id}`);
   return { ok: true, total: resto.length };
 }

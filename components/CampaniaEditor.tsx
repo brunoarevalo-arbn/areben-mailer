@@ -104,20 +104,21 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
   const [progreso, setProgreso] = useState<string | null>(null);
   const [promoviendo, setPromoviendo] = useState(false);
 
-  // Loop que procesa lotes hasta terminar (test o holdout).
-  const loopProcesar = async (total: number, prefix: string) => {
-    let acum = 0;
-    setProgreso(`Encolados ${total} envíos…`);
+  // El envío lo maneja la cola del servidor: acá solo se mira el progreso, así
+  // que cerrar la pestaña ya no corta nada.
+  const seguirProgreso = async (total: number, prefix: string) => {
+    setProgreso(`Encolados ${total} envíos… el envío sigue aunque cierres esta página.`);
     for (let i = 0; i < 100000; i++) {
-      const res = await fetch(`/api/campanias/${id}/procesar`, { method: "POST" });
-      const data = await res.json();
-      acum += data.enviados ?? 0;
-      setProgreso(`${prefix} ${acum}/${total} · restantes ${data.restantes}${data.fallidos ? ` · fallidos ${data.fallidos}` : ""}`);
-      if (data.restantes === 0) {
-        setProgreso(`✅ ${prefix} (${acum}/${total})`);
+      await sleep(2000);
+      const res = await fetch(`/api/campanias/${id}/progreso`);
+      if (!res.ok) continue;
+      const d = await res.json();
+      const detalle = d.fallidos ? ` · fallidos ${d.fallidos}` : "";
+      if (d.encolados === 0) {
+        setProgreso(`✅ ${prefix} (${d.enviados}/${d.total})${detalle}`);
         break;
       }
-      if (data.throttled) await sleep(1000);
+      setProgreso(`${prefix} ${d.enviados}/${d.total} · restantes ${d.encolados}${detalle}${d.activo ? "" : " · esperando al worker…"}`);
     }
   };
 
@@ -132,7 +133,7 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
     await guardarCampania(campData());
     const r = await enviarCampania(id);
     if (!r.ok) { setProgreso(`Error: ${r.error}`); setEnviado(false); return; }
-    await loopProcesar(r.total ?? 0, abActivo ? "Test enviado" : "Enviados");
+    await seguirProgreso(r.total ?? 0, abActivo ? "Test enviado" : "Enviados");
     router.refresh();
   };
 
@@ -141,7 +142,7 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
     setPromoviendo(true);
     const r = await promoverGanador(id, letra);
     if (!r.ok) { setProgreso(`Error: ${r.error}`); setPromoviendo(false); return; }
-    await loopProcesar(r.total ?? 0, `Ganador ${letra} enviado`);
+    await seguirProgreso(r.total ?? 0, `Ganador ${letra} enviado`);
     router.refresh();
   };
 

@@ -1,4 +1,4 @@
-name: Procesar automations
+name: Procesar automations y cola de envío
 on:
   schedule:
     - cron: "*/15 * * * *" # cada 15 minutos
@@ -8,8 +8,17 @@ jobs:
   procesar:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping procesador
+      - name: Ping procesador de automations
         run: |
           curl -sS --max-time 60 \
             "https://areben-mailer.vercel.app/api/automations/procesar?secret=${{ secrets.CRON_SECRET }}" \
+            && echo "" || echo "fallo (se reintenta en el próximo ciclo)"
+
+      # Perro guardián de la cola de envío. En condiciones normales no hace nada
+      # (las campañas se mandan solas por auto-encadenamiento); su razón de ser
+      # es retomar una cadena que se haya cortado a la mitad.
+      - name: Ping cola de envío
+        run: |
+          curl -sS --max-time 60 \
+            "https://areben-mailer.vercel.app/api/campanias/procesar-cola?secret=${{ secrets.CRON_SECRET }}" \
             && echo "" || echo "fallo (se reintenta en el próximo ciclo)"

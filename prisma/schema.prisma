@@ -335,12 +335,16 @@ model Campania {
   segmento     Segmento?      @relation(fields: [segmentoId], references: [id])
   programadaAt DateTime?
   enviadaAt    DateTime?
+  // Lease de la cola del servidor: mientras esté en el futuro, un worker está
+  // mandando esta campaña y nadie más debe tocarla. Vence solo (ver lib/email/cola.ts).
+  procesandoHasta DateTime?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
   envios Envio[]
 
   @@index([cuentaId, estado])
+  @@index([estado, procesandoHasta])
 }
 
 enum EstadoEnvio {

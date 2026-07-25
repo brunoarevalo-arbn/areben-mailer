@@ -128,6 +128,36 @@ async function enviar(campaniaId: string) {
   }
 }
 
+/**
+ * Modo --cola: en vez de mandar desde acá, deja la campaña ENVIANDO y le pide al
+ * worker de producción que la levante. Ejercita el lease, el auto-encadenamiento
+ * y el camino real de la cola del servidor.
+ */
+async function enviarPorLaCola(campaniaId: string) {
+  await prisma.campania.update({ where: { id: campaniaId }, data: { estado: 'ENVIANDO' } });
+
+  const appUrl = process.env.APP_URL;
+  const secret = process.env.CRON_SECRET;
+  if (!appUrl || !secret) throw new Error('Faltan APP_URL o CRON_SECRET para usar --cola');
+
+  const res = await fetch(`${appUrl}/api/campanias/procesar-cola?secret=${encodeURIComponent(secret)}`, { method: 'POST' });
+  const cuerpo = await res.text();
+  console.log(`   worker respondió ${res.status}: ${cuerpo}`);
+  if (!res.ok) throw new Error('El worker de la cola falló');
+
+  // El worker puede haber encadenado; esperamos a que no queden encolados.
+  for (let i = 0; i < 60; i++) {
+    const encolados = await prisma.envio.count({ where: { campaniaId, estado: 'ENCOLADO' } });
+    if (encolados === 0) {
+      const c = await prisma.campania.findUnique({ where: { id: campaniaId }, select: { estado: true } });
+      console.log(`   cola vacía · campaña quedó ${c?.estado}`);
+      return;
+    }
+    await sleep(2000);
+  }
+  throw new Error('La cola no terminó en 2 minutos');
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface Fila {
@@ -208,8 +238,9 @@ async function main() {
     return;
   }
 
+  const viaCola = flag === '--cola';
   const runId = nuevoRunId();
-  console.log(`\n🧪 E2E de supresión — runId ${runId}`);
+  console.log(`\n🧪 E2E de supresión — runId ${runId}${viaCola ? ' (por la cola del servidor)' : ''}`);
   console.log(`   provider=${process.env.EMAIL_PROVIDER ?? 'ses'} · configSet=${process.env.SES_CONFIGURATION_SET} · appUrl=${process.env.APP_URL}\n`);
 
   console.log('1. Preparando datos de prueba…');
@@ -221,8 +252,9 @@ async function main() {
   const total = await verificarGuardas(cuenta.id, campania.id);
   console.log(`   ✅ ${total} envíos, todos a @${DOMINIO_SIMULADOR}\n`);
 
-  console.log('3. Enviando por SES…');
-  await enviar(campania.id);
+  console.log(viaCola ? '3. Enviando por la COLA DEL SERVIDOR…' : '3. Enviando por SES…');
+  if (viaCola) await enviarPorLaCola(campania.id);
+  else await enviar(campania.id);
 
   const envios = await prisma.envio.findMany({
     where: { campaniaId: campania.id },
