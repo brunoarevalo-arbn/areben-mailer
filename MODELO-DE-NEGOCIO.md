@@ -188,6 +188,14 @@ Referencia de mercado: Doppler arranca en USD 10 con 2.500 contactos y envíos i
 
 ## 7. Competencia y viabilidad comercial
 
+### 7.0 Que sea fácil de construir no es una ventaja
+
+Es la trampa central de este análisis, y conviene tenerla escrita antes que cualquier número:
+**armar un email marketing es simple, y eso lo cumplen también los otros veinte que lo
+pensaron.** Cuando un negocio se ve fácil de construir y con margen visible, lo que falta no
+suele ser la idea sino la barrera que impide que te copien. La pregunta útil no es "¿puedo
+hacerlo?" sino "¿por qué el comerciante me elegiría a mí y por qué se quedaría?".
+
 ### 7.1 Lo que hay hoy
 
 El email marketing para e-commerce es una categoría **madura y muy poblada a nivel global**
@@ -231,6 +239,11 @@ oportunidad no es el producto: es el canal.**
 
 ### 7.4 Las ventajas propias que sí son reales
 
+- **Los costos de cambio son altos, y esa es la única barrera estructural del rubro.** Una
+  vez que el comerciante tiene adentro su lista, sus plantillas y sus automatizaciones, no se
+  muda: es de los pocos SaaS donde la retención no depende de seguir gustando mes a mes. La
+  consecuencia estratégica es que **el que entra primero en cada tienda se queda con esa
+  tienda**, y por eso la velocidad de instalación importa más que la completitud del producto.
 - **Dogfooding**: se usa en tres tiendas propias antes de vendérselo a nadie.
 - **Resorty ya está en la App Store**, con instalación real en tiendas. Es un canal de
   distribución que un competidor nuevo no tiene.
@@ -246,6 +259,22 @@ Es posible, pero **no por ser simple ni por el margen**. El modelo de negocio es
 conocido justamente porque muchos ya lo hicieron. La versión defendible de esta apuesta no
 es "otro email marketing barato", sino **el paquete Resorty + mailer vendido dentro de
 Tiendanube a comerciantes que ya confían en la primera app**.
+
+### 7.6 Lo que eso implica para el orden de trabajo
+
+Si la apuesta es el combo y no el mailer suelto, **la prioridad no la marca el mailer**:
+
+- **Resorty tiene fecha límite dura**: NubeSDK bloquea las instalaciones nuevas el
+  **30-ago-2026** y arranca la desinstalación progresiva el **30-oct-2026**
+  (`project_tiendanube_nubesdk`). Si Resorty se cae de la App Store, se cae el canal de
+  distribución sobre el que se apoya todo el argumento comercial del mailer.
+- **El mailer no tiene ninguna fecha límite** — no inyecta nada en el storefront, así que
+  NubeSDK no lo toca (ver `TIENDANUBE-PUBLICACION.md` §1).
+- Y como el costo de cambio favorece al que entra primero (§7.4), llegar tarde a una tienda
+  cuesta más que llegar incompleto.
+
+**Traducción:** el mailer puede esperar; Resorty no. Y el mailer, cuando salga, conviene que
+salga apoyado en Resorty y no al revés.
 
 ---
 
