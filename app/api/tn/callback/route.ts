@@ -1,20 +1,82 @@
-import { exchangeCode } from '@/lib/tn/client';
+import { exchangeCode, tnGet } from '@/lib/tn/client';
 import { prisma } from '@/lib/prisma';
-import { getCuentaActiva } from '@/lib/cuenta';
 
 // TN redirige acá tras la instalación con ?code=... Canjeamos el token y lo guardamos.
+//
+// ⚠️ La cuenta destino se resuelve por el `user_id` que devuelve Tiendanube (= id de
+// la tienda), NUNCA por la cuenta activa del panel. Antes se usaba `getCuentaActiva()`
+// y el 25-jul-2026 eso le pisó el tnStoreId y el token a BDI al instalar la app en la
+// tienda demo (la cuenta activa cae por defecto en el slug "bdi" cuando no hay sesión).
+// Una instalación jamás debe tocar la cuenta de otra tienda.
+
+/** Nombre de la tienda según TN (`name` puede venir multiidioma). */
+async function nombreDeTienda(storeId: string, token: string): Promise<string | null> {
+  try {
+    const { data } = await tnGet<{ name?: string | Record<string, string> }>(storeId, token, 'store');
+    const n = data?.name;
+    const nombre = typeof n === 'string' ? n : n ? Object.values(n)[0] : null;
+    return nombre?.trim() || null;
+  } catch {
+    return null; // si falla, seguimos con un nombre genérico
+  }
+}
+
+/** Slug libre a partir del nombre; si choca, cae al id de tienda. */
+async function slugLibre(nombre: string, storeId: string): Promise<string> {
+  const base =
+    nombre
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 24) || `tienda-${storeId}`;
+  if (!(await prisma.cuenta.findUnique({ where: { slug: base } }))) return base;
+  const conId = `${base}-${storeId}`.slice(0, 40);
+  if (!(await prisma.cuenta.findUnique({ where: { slug: conId } }))) return conId;
+  return `tienda-${storeId}`;
+}
+
 export async function GET(req: Request) {
-  const code = new URL(req.url).searchParams.get('code');
+  const url = new URL(req.url);
+  const code = url.searchParams.get('code');
   if (!code) return new Response('falta code', { status: 400 });
 
   try {
     const token = await exchangeCode(code);
-    const cuenta = await getCuentaActiva();
-    await prisma.cuenta.update({
-      where: { id: cuenta.id },
-      data: { tnStoreId: token.user_id.toString(), tnToken: token.access_token },
+    const storeId = String(token.user_id);
+    const destino = new URL(process.env.APP_URL ?? req.url);
+
+    // 1) La tienda ya está vinculada a una cuenta → solo refrescamos su token.
+    const yaVinculada = await prisma.cuenta.findUnique({ where: { tnStoreId: storeId } });
+    if (yaVinculada) {
+      await prisma.cuenta.update({ where: { id: yaVinculada.id }, data: { tnToken: token.access_token } });
+      destino.search = '?tn=conectado';
+      return Response.redirect(destino);
+    }
+
+    // 2) Vinculación pedida desde el panel (?state=<cuentaId>): solo si esa cuenta
+    //    todavía no tiene tienda, para no robarle la suya a nadie.
+    const state = url.searchParams.get('state');
+    if (state) {
+      const cuenta = await prisma.cuenta.findUnique({ where: { id: state } });
+      if (cuenta && !cuenta.tnStoreId) {
+        await prisma.cuenta.update({
+          where: { id: cuenta.id },
+          data: { tnStoreId: storeId, tnToken: token.access_token },
+        });
+        destino.search = '?tn=conectado';
+        return Response.redirect(destino);
+      }
+    }
+
+    // 3) Instalación de una tienda que no conocíamos → cuenta nueva para ella.
+    const nombre = (await nombreDeTienda(storeId, token.access_token)) ?? `Tienda ${storeId}`;
+    const cuenta = await prisma.cuenta.create({
+      data: { nombre, slug: await slugLibre(nombre, storeId), tnStoreId: storeId, tnToken: token.access_token },
     });
-    return Response.redirect(new URL('/?tn=conectado', process.env.APP_URL ?? req.url));
+    destino.search = `?tn=conectado&cuenta=${cuenta.slug}`;
+    return Response.redirect(destino);
   } catch (e) {
     return new Response(`Error conectando Tiendanube: ${(e as Error).message}`, { status: 500 });
   }

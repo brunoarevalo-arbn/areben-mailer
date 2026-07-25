@@ -103,7 +103,12 @@ export async function* tnPaginate<T = unknown>(
   }
 }
 
-/** URL de instalación/autorización para que el dueño de la tienda conecte la app. */
-export function authorizeUrl(): string {
-  return `https://www.tiendanube.com/apps/${process.env.TN_CLIENT_ID}/authorize`;
+/**
+ * URL de instalación/autorización para que el dueño de la tienda conecte la app.
+ * `cuentaId` viaja en `state` para vincular la tienda a una cuenta que todavía no
+ * tiene ninguna (ver `app/api/tn/callback`). Sin él, la instalación crea su cuenta.
+ */
+export function authorizeUrl(cuentaId?: string): string {
+  const base = `https://www.tiendanube.com/apps/${process.env.TN_CLIENT_ID}/authorize`;
+  return cuentaId ? `${base}?state=${encodeURIComponent(cuentaId)}` : base;
 }

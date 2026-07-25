@@ -72,7 +72,7 @@ export default async function ContactosPage({
       <ContactosAcciones
         listas={listas}
         tnConectado={!!cuenta.tnToken}
-        tnAuthUrl={authorizeUrl()}
+        tnAuthUrl={authorizeUrl(cuenta.id)}
         marca={cuenta.nombre}
       />
 
