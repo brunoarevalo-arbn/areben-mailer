@@ -178,6 +178,31 @@ node --import tsx --env-file=.env scripts/ensayo-motor.ts --limpiar
 
 ⚠️ Hay que deployar antes: el worker que levanta la campaña corre en prod.
 
+#### ✅ Corrido el 26-jul-2026 — y encontró dos bugs reales
+
+**400 destinatarios, 400/400 enviados en 84s, 0 fallidos, campaña `ENVIADA`.** Pero recién
+después de arreglar lo que el propio ensayo destapó:
+
+1. **La cola nunca se encadenaba.** `arrancarCola()` hacía `void fetch(...)`, y en serverless
+   la función muere al devolver la respuesta y se lleva puesta la request en vuelo. La
+   invocación devolvía `continuar: true` y después no pasaba nada: **364 envíos quedaron
+   colgados** y la campaña trabada en `ENVIANDO`. Ahora la llamada va por `after()` de
+   `next/server`, que extiende la vida de la invocación más allá de la respuesta. No se
+   espera a que el worker siguiente *termine* (eso anidaría las invocaciones y la cadena
+   entera moriría junta contra el `maxDuration`), solo a que acuse recibo.
+2. **El throttle tiraba el presupuesto.** Al primer freno del proveedor se cortaba la
+   invocación entera; con el sandbox limitando a 1 mail/seg el throttle llega siempre, así
+   que la campaña avanzaba de a **36 envíos por invocación**. Ahora espera el segundo que
+   pide el rate y sigue: la primera invocación pasó de 36 a **288**.
+
+> Ninguno de los dos se ve con una campaña chica: los 60 del primer ensayo entraron en una
+> sola invocación y dieron verde. Aparecen recién cuando el trabajo no entra en un pase —
+> o sea, el día del primer envío real.
+
+**Ritmo medido: ~4,8 envíos/seg** contra el simulador. A ese ritmo los 16.825 de BDI son
+**~1 hora**. Ojo que el simulador no consume la cuota diaria: con la cuenta ya en producción
+el techo real lo pone la cuota que apruebe AWS, no el motor.
+
 **Cuando llegue la aprobación:** poner `ENVIO_REAL=true` en Vercel prod y en `.env`,
 redeployar (`vercel deploy --prod --yes`, no hay autodeploy de GitHub) y recién ahí hacer
 el E2E real del envío, incluido el A/B.
