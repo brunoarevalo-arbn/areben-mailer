@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
-import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
+import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { contactosElegibles, crearEnvios } from "@/lib/campanias";
@@ -180,12 +180,17 @@ export async function enviarPrueba(id: string, emailDestino: string) {
   if (!campania) return { ok: false, error: "Campaña no encontrada" };
   if (!campania.asunto) return { ok: false, error: "Falta el asunto" };
 
-  const html = renderEmailHtml(campania.contenido as unknown as ContenidoCampania, {
+  const contenido = campania.contenido as unknown as ContenidoCampania;
+  const opts = {
     preheader: campania.preheader ?? undefined,
     unsubscribeUrl: `${process.env.APP_URL}/baja?token=preview`,
     nombreCuenta: cuenta.nombre,
-  });
-  const htmlFinal = aplicarMergeTags(html, { nombre: "Bruno", email: emailDestino });
+  };
+  const destinatario = { nombre: "Bruno", email: emailDestino };
+  const htmlFinal = aplicarMergeTags(renderEmailHtml(contenido, opts), destinatario);
+  // La prueba tiene que salir igual que el envío real, parte de texto incluida:
+  // si no, no sirve para juzgar cómo la va a clasificar el filtro de spam.
+  const textoFinal = aplicarMergeTags(renderEmailTexto(contenido, opts), destinatario);
 
   const rem = await getRemitenteEnvio(cuenta.id);
   try {
@@ -193,6 +198,7 @@ export async function enviarPrueba(id: string, emailDestino: string) {
       to: emailDestino,
       subject: `[PRUEBA] ${campania.asunto}`,
       html: htmlFinal,
+      text: textoFinal,
       unsubscribeUrl: `${process.env.APP_URL}/baja?token=preview`,
       fromEmail: rem?.email,
       fromName: rem?.nombre,

@@ -51,6 +51,7 @@ function bloques() {
 }
 
 async function preparar(slug: string, destinos: string[]) {
+  const sello = new Date().toISOString().slice(11, 16); // HH:MM
   const cuenta = await prisma.cuenta.findUnique({ where: { slug } });
   if (!cuenta) throw new Error(`No existe la cuenta "${slug}"`);
 
@@ -81,8 +82,11 @@ async function preparar(slug: string, destinos: string[]) {
   const campania = await prisma.campania.create({
     data: {
       cuentaId: cuenta.id,
-      nombre: `Ensayo interno · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
-      asunto: 'Ensayo del motor de envío — ¿se ve bien?',
+      nombre: `Ensayo interno · ${sello}`,
+      // El sello va en el asunto a propósito: con el asunto repetido, Gmail mete
+      // el mail en la misma conversación y colapsa el cuerpo idéntico detrás del
+      // "···" — se ve como si hubiera llegado en blanco. Pasó el 26-jul.
+      asunto: `Ensayo del motor de envío — ¿se ve bien? (${sello})`,
       preheader: 'Si estás leyendo esto en tu buzón, el camino completo funciona.',
       listaId: lista.id,
       contenido: { bloques: bloques() },

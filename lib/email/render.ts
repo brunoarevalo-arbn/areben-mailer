@@ -194,6 +194,68 @@ export function renderEmailHtml(contenido: ContenidoCampania, opts: RenderOpts):
 </body></html>`;
 }
 
+/** Un bloque, en texto. `null` = no aporta nada legible (imágenes sueltas, etc.). */
+function bloqueATexto(b: Bloque): string | null {
+  const link = (texto: string, url?: string) => (url ? `${texto}: ${url}` : texto);
+  switch (b.tipo) {
+    case "titulo":
+      return b.texto;
+    case "texto":
+      return b.texto;
+    case "boton":
+      return b.url ? link(b.texto, b.url) : b.texto;
+    case "imagen":
+      return b.alt ? `[${b.alt}]` : null;
+    case "productos":
+      return (b.items ?? []).map((p) => link(`· ${p.nombre}${p.precio ? ` — ${p.precio}` : ""}`, p.url)).join("\n") || null;
+    case "columnas":
+      return [b.izq?.url, b.der?.url].filter(Boolean).join("\n") || null;
+    case "video":
+      return b.url ? `Ver el video: ${b.url}` : null;
+    case "redes":
+      return (b.links ?? []).filter((l) => l.url).map((l) => link(l.red, l.url)).join("\n") || null;
+    case "divisor":
+      return "—";
+    case "hero":
+      return [b.titulo, b.subtitulo, b.botonTexto ? link(b.botonTexto, b.botonUrl) : null].filter(Boolean).join("\n") || null;
+    case "seccion":
+      return [b.titulo, b.texto, b.botonTexto ? link(b.botonTexto, b.botonUrl) : null].filter(Boolean).join("\n") || null;
+    case "cupon":
+      return [b.texto, b.codigo, b.botonTexto ? link(b.botonTexto, b.botonUrl) : null].filter(Boolean).join("\n") || null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Versión en texto plano del mismo contenido.
+ *
+ * No es un adorno: un mail **solo HTML**, sin parte `text/plain`, es una señal de
+ * spam clásica —así se ve un bot— y pesa sobre todo en Outlook/Hotmail. Además es
+ * lo que leen los lectores de pantalla, los relojes y quien tenga el cliente en
+ * modo texto.
+ *
+ * Ojo: el HTML lleva el tracking inyectado y este texto NO. Es a propósito — las
+ * URLs de redirección en texto plano se ven horribles y espantan más de lo que
+ * miden. El costo es que un click desde la versión texto no queda registrado.
+ */
+export function renderEmailTexto(contenido: ContenidoCampania, opts: RenderOpts): string {
+  const cuerpo = (contenido.bloques ?? [])
+    .map(bloqueATexto)
+    .filter((t): t is string => !!t && t.trim() !== "")
+    .join("\n\n");
+
+  return [
+    opts.nombreCuenta.toUpperCase(),
+    "",
+    cuerpo,
+    "",
+    "—",
+    opts.direccionPostal ? `${opts.nombreCuenta} · ${opts.direccionPostal}` : opts.nombreCuenta,
+    `Para no recibir más estos correos: ${opts.unsubscribeUrl}`,
+  ].join("\n");
+}
+
 /** Reemplaza merge tags (${contacto.nombre}, etc.) con datos del contacto. */
 export function aplicarMergeTags(
   html: string,

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
+import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { inyectarTracking } from "@/lib/email/tracking";
 import { sendEmail, esThrottle } from "@/lib/email/enviar";
 import { destinatarioPermitido, modoEnvio } from "@/lib/email/proveedor";
@@ -62,13 +62,16 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
     }
 
     const unsubUrl = `${appUrl}/baja?e=${envio.id}`;
-    let html = renderEmailHtml(contenido, {
+    const opts = {
       preheader: campania.preheader ?? undefined,
       unsubscribeUrl: unsubUrl,
       nombreCuenta: campania.cuenta.nombre,
-    });
+    };
+    let html = renderEmailHtml(contenido, opts);
     html = aplicarMergeTags(html, envio.contacto);
     html = inyectarTracking(html, envio.id, appUrl);
+    // Parte text/plain: un mail solo-HTML es señal de spam, sobre todo en Outlook.
+    const texto = aplicarMergeTags(renderEmailTexto(contenido, opts), envio.contacto);
 
     const asuntoEnvio =
       envio.variante === "B" ? campania.asuntoB ?? campania.asunto! : campania.asunto!;
@@ -77,6 +80,7 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
         to: envio.contacto.email,
         subject: asuntoEnvio,
         html,
+        text: texto,
         unsubscribeUrl: unsubUrl,
         fromEmail: rem?.email,
         fromName: rem?.nombre,

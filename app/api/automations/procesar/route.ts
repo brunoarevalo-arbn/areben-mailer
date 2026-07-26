@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania, type ProductoEmail } from "@/lib/email/render";
+import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania, type ProductoEmail } from "@/lib/email/render";
 import { sendEmail } from "@/lib/email/enviar";
 import { destinatarioPermitido } from "@/lib/email/proveedor";
 import { getRemitenteEnvio } from "@/lib/remitentes";
@@ -56,13 +56,17 @@ export async function GET(req: Request) {
     if (esCarrito && td.productos?.length) bloques.push({ tipo: "productos", items: td.productos });
 
     const unsubUrl = `${appUrl}/baja?c=${contacto.id}`;
-    let html = renderEmailHtml({ bloques }, {
+    const opts = {
       preheader: automation.preheader ?? undefined,
       unsubscribeUrl: unsubUrl,
       nombreCuenta: automation.cuenta.nombre,
-    });
+    };
+    let html = renderEmailHtml({ bloques }, opts);
     html = aplicarMergeTags(html, contacto);
     if (esCarrito) html = html.replaceAll("${cart.url}", td.abandonedUrl ?? "#");
+    // Parte text/plain: un mail solo-HTML es señal de spam, sobre todo en Outlook.
+    let texto = aplicarMergeTags(renderEmailTexto({ bloques }, opts), contacto);
+    if (esCarrito) texto = texto.replaceAll("${cart.url}", td.abandonedUrl ?? "#");
 
     // Con el gate cerrado —o en ensayo, si este contacto no está habilitado— no
     // mandamos nada de verdad, pero dejamos correr el flujo igual: así se ve que
@@ -79,6 +83,7 @@ export async function GET(req: Request) {
         to: contacto.email,
         subject: automation.asunto,
         html,
+        text: texto,
         unsubscribeUrl: unsubUrl,
         fromEmail: rem?.email,
         fromName: rem?.nombre,
