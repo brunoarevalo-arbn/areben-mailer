@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { procesarCola, arrancarCola } from "@/lib/email/cola";
 
 export const maxDuration = 60;
@@ -13,8 +14,10 @@ export async function POST(req: Request) {
 
   const r = await procesarCola();
 
-  // Mientras quede trabajo, la invocación se pasa la posta a la siguiente.
-  if (r.continuar) arrancarCola();
+  // Mientras quede trabajo, la invocación se pasa la posta a la siguiente. Va por
+  // `after` a propósito: extiende la vida de la función más allá de la respuesta,
+  // que es lo único que hace que la request salga de verdad en serverless.
+  if (r.continuar) after(() => arrancarCola());
 
   console.log(JSON.stringify({ ev: "cola", ...r }));
   return Response.json(r);

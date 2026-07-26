@@ -22,6 +22,7 @@
 // ⛔ Cuenta descartable propia (`qa-motor`): BDI/Zattia/Stunned quedan intactas
 // por construcción, no por acordarse de filtrar.
 import { prisma } from '../lib/prisma.ts';
+import { crearEnvios } from '../lib/campanias.ts';
 import { DOMINIO_SIMULADOR } from '../lib/email/proveedor.ts';
 
 const SLUG_QA = 'qa-motor';
@@ -199,10 +200,10 @@ async function limpiar() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-const args = process.argv.slice(2);
-if (args.includes('--limpiar')) {
-  await limpiar();
-} else {
+async function main() {
+  const args = process.argv.slice(2);
+  if (args.includes('--limpiar')) return limpiar();
+
   const cuantos = Number(args.find((a) => a.startsWith('--contactos='))?.split('=')[1] ?? POR_DEFECTO);
   if (!Number.isInteger(cuantos) || cuantos < 1 || cuantos > 5000) throw new Error('--contactos tiene que ser un entero entre 1 y 5000');
 
@@ -212,7 +213,6 @@ if (args.includes('--limpiar')) {
   const { cuenta, campania, total } = await preparar(runId, cuantos);
   console.log(`   cuenta ${cuenta.slug} · campaña ${campania.id} · ${total} contacto(s)`);
 
-  const { crearEnvios } = await import('../lib/campanias.ts');
   const contactos = await prisma.contacto.findMany({
     where: { cuentaId: cuenta.id, email: { startsWith: `success+motor-${runId}-` } },
     select: { id: true },
@@ -231,6 +231,12 @@ if (args.includes('--limpiar')) {
       ? '\n✅ El motor aguantó. Limpiar con: node --import tsx --env-file=.env scripts/ensayo-motor.ts --limpiar\n'
       : '\n❌ Algo no cerró — mirar arriba antes de limpiar.\n',
   );
+  if (!ok) process.exitCode = 1;
 }
 
-await prisma.$disconnect();
+main()
+  .catch((e) => {
+    console.error(`\n❌ ${e instanceof Error ? e.message : e}\n`);
+    process.exitCode = 1;
+  })
+  .finally(() => prisma.$disconnect());

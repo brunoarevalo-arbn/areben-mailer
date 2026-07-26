@@ -22,6 +22,8 @@ const PRESUPUESTO_MS = 45_000;
 const LEASE_MS = 120_000;
 /** Corte de seguridad por si algo devuelve siempre restantes > 0. */
 const MAX_LOTES = 500;
+/** Pausa tras un throttle: el rate del sandbox es 1 mail/seg. */
+const ESPERA_THROTTLE_MS = 1_100;
 
 export interface ResultadoCola {
   campaniaId: string | null;
@@ -118,15 +120,17 @@ export async function procesarCola(): Promise<ResultadoCola> {
         motivo = "terminada";
         break;
       }
-      if (r.throttled) {
-        // El proveedor pidió frenar: cortamos la invocación y que siga la próxima,
-        // en vez de quemar el presupuesto durmiendo.
-        motivo = "throttled";
+      if (Date.now() - t0 > PRESUPUESTO_MS) {
+        motivo = r.throttled ? "throttled" : "sin-tiempo";
         break;
       }
-      if (Date.now() - t0 > PRESUPUESTO_MS) {
-        motivo = "sin-tiempo";
-        break;
+      if (r.throttled) {
+        // El proveedor pidió frenar. Antes cortábamos la invocación entera acá, y
+        // eso tiraba los 45s de presupuesto que quedaban: en el sandbox, que
+        // limita a 1 mail/seg, el throttle llega siempre y la campaña avanzaba de
+        // a 36 envíos por invocación. Ahora esperamos el segundo que pide el rate
+        // y seguimos con el presupuesto que quede.
+        await new Promise((r) => setTimeout(r, ESPERA_THROTTLE_MS));
       }
       // Lote largo: renovamos para que el lease no venza mientras seguimos.
       if (lotes % 10 === 0) await renovarLease(campaniaId);
@@ -140,19 +144,35 @@ export async function procesarCola(): Promise<ResultadoCola> {
   return { campaniaId, enviados, fallidos, restantes, lotes, continuar: restantes > 0, motivo };
 }
 
+/** Cuánto esperamos a que el worker siguiente ACUSE la request (no que termine). */
+const DISPATCH_MS = 3_000;
+
 /**
- * Dispara una invocación del worker sin esperarla: la request se abandona a
- * propósito, solo importa que quede disparada. Si se pierde, la retoma el cron.
+ * Dispara una invocación del worker.
+ *
+ * ⚠️ Hay que esperar esta promesa (o pasarla por `after()` de next/server). El
+ * `void fetch(...)` que había acá no funcionaba: en serverless la función muere
+ * cuando devuelve la respuesta y se lleva puesta la request en vuelo, así que la
+ * cadena nunca arrancaba. Se vio en un ensayo de 400 envíos: la invocación
+ * devolvía `continuar: true` y después no pasaba nada más.
+ *
+ * Tampoco esperamos a que el worker TERMINE: sería anidar invocaciones —cada
+ * eslabón vivo hasta que termine el siguiente— y toda la cadena moriría junta al
+ * llegar al `maxDuration`. Cortamos a los 3s, con la request ya despachada y
+ * corriendo del otro lado; el abort es del lado del cliente y no la cancela.
  */
-export function arrancarCola(): void {
+export async function arrancarCola(): Promise<void> {
   const appUrl = process.env.APP_URL;
   const secret = process.env.CRON_SECRET;
   if (!appUrl || !secret) return; // sin config, el cron es el único motor
 
-  void fetch(`${appUrl}/api/campanias/procesar-cola?secret=${encodeURIComponent(secret)}`, {
-    method: "POST",
-    headers: { "x-encadenado": "1" },
-  }).catch(() => {
-    /* si la cadena se corta, la retoma el cron */
-  });
+  try {
+    await fetch(`${appUrl}/api/campanias/procesar-cola?secret=${encodeURIComponent(secret)}`, {
+      method: "POST",
+      headers: { "x-encadenado": "1" },
+      signal: AbortSignal.timeout(DISPATCH_MS),
+    });
+  } catch {
+    /* abort esperado, o cadena cortada: en los dos casos la retoma el cron */
+  }
 }
