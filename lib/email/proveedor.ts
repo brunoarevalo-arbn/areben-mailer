@@ -2,6 +2,29 @@
 // La app entera habla ESTE lenguaje; los detalles de cada API viven en
 // lib/email/proveedores/*. Cambiar de proveedor = cambiar la env EMAIL_PROVIDER.
 
+/**
+ * ¿Está habilitado el envío masivo a la lista real?
+ *
+ * El default es **bloqueado**: si la env falta, está vacía o mal escrita, no
+ * sale nada. Preferimos quedarnos mudos a mandarle de más a 16.000 personas.
+ *
+ * El nombre es neutro a propósito. Antes esto se llamaba `SES_SANDBOX`, y ese
+ * nombre mentía: frenaba el envío con CUALQUIER proveedor, así que migrar a
+ * Resend habría dejado la app sin enviar nada y sin ninguna pista de por qué.
+ * Mientras `ENVIO_REAL` no esté definida se respeta la env vieja, para que el
+ * deploy que hoy corre en Vercel siga comportándose igual.
+ */
+export function envioRealHabilitado(): boolean {
+  const flag = process.env.ENVIO_REAL;
+  if (flag !== undefined) return flag === 'true';
+  // Compat: se puede borrar en cuanto ENVIO_REAL esté cargada en Vercel y .env.
+  return process.env.SES_SANDBOX === 'false';
+}
+
+/** Motivo único para rechazar un envío masivo cuando el gate está cerrado. */
+export const MSG_ENVIO_BLOQUEADO =
+  'El envío a la lista está desactivado: se habilita con ENVIO_REAL="true", cuando el proveedor apruebe el envío a producción.';
+
 export interface SendArgs {
   to: string;
   subject: string;

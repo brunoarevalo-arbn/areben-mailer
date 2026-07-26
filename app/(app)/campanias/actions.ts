@@ -7,6 +7,7 @@ import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { contactosElegibles, crearEnvios } from "@/lib/campanias";
 import { arrancarCola } from "@/lib/email/cola";
+import { envioRealHabilitado, MSG_ENVIO_BLOQUEADO } from "@/lib/email/proveedor";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -83,10 +84,10 @@ export async function enviarCampania(id: string) {
   if (campania.estado === "ENVIANDO" || campania.estado === "ENVIADA")
     return { ok: false, error: "La campaña ya fue enviada" };
 
-  // Guard: mientras SES esté en sandbox, no dejamos enviar a la lista real
-  // (los destinos no verificados fallarían y perjudicarían la salida del sandbox).
-  if (process.env.SES_SANDBOX !== "false")
-    return { ok: false, error: "SES en sandbox: usá 'Enviar prueba'. El envío a la lista se habilita al aprobar producción." };
+  // Guard: mientras el proveedor no esté aprobado para producción no dejamos
+  // enviar a la lista real (los destinos no verificados rebotarían en masa).
+  if (!envioRealHabilitado())
+    return { ok: false, error: `${MSG_ENVIO_BLOQUEADO} Mientras tanto usá "Enviar prueba".` };
 
   const esAB = campania.abTestPct != null;
   if (esAB && !campania.asuntoB) return { ok: false, error: "Falta el asunto B" };
@@ -126,8 +127,7 @@ export async function promoverGanador(id: string, ganador: "A" | "B") {
   if (campania.abTestPct == null) return { ok: false, error: "La campaña no es A/B" };
   if (campania.abGanador) return { ok: false, error: "El ganador ya fue promovido" };
   if (ganador !== "A" && ganador !== "B") return { ok: false, error: "Ganador inválido" };
-  if (process.env.SES_SANDBOX !== "false")
-    return { ok: false, error: "SES en sandbox: el envío a la lista se habilita al aprobar producción." };
+  if (!envioRealHabilitado()) return { ok: false, error: MSG_ENVIO_BLOQUEADO };
 
   const contactos = await contactosElegibles(cuenta.id, campania);
   if (contactos === null) return { ok: false, error: "Segmento no encontrado" };

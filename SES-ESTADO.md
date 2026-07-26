@@ -132,20 +132,28 @@ da 403, y el E2E con mensajes reales de AWS sigue en verde (runId `250726-2029`)
 
 ## 4. El gate en el código
 
-`SES_SANDBOX="true"` (en `.env`, línea 27, y en Vercel) bloquea el envío a la lista real en
-tres lugares:
+La decisión vive en **un solo lugar**: `envioRealHabilitado()` en
+`lib/email/proveedor.ts`. Devuelve `true` únicamente con `ENVIO_REAL="true"`; la env
+ausente, vacía o mal escrita deja el envío **bloqueado** (default seguro).
 
-- `app/(app)/campanias/actions.ts:98` — `enviarCampania`
-- `app/(app)/campanias/actions.ts:137` — `promoverGanador`
-- `app/api/automations/procesar/route.ts:17` — el cron de automations
+Lo llaman los tres puntos de entrada del envío masivo:
 
-**Cuando llegue la aprobación:** poner `SES_SANDBOX=false` en Vercel prod y en `.env`,
+- `app/(app)/campanias/actions.ts` — `enviarCampania`
+- `app/(app)/campanias/actions.ts` — `promoverGanador`
+- `app/api/automations/procesar/route.ts` — el cron de automations (con el gate cerrado
+  igual corre el flujo y marca el run como `ENVIADO` con `sesMessageId: "dry-run"`, así se
+  ve que la automation dispara sin mandar nada)
+
+**Cuando llegue la aprobación:** poner `ENVIO_REAL=true` en Vercel prod y en `.env`,
 redeployar (`vercel deploy --prod --yes`, no hay autodeploy de GitHub) y recién ahí hacer
 el E2E real del envío, incluido el A/B.
 
-⚠️ **Detalle a corregir si se cambia de proveedor:** el flag se llama `SES_SANDBOX` pero
-en la práctica bloquea el envío **con cualquier proveedor**. Si se migra a Resend o
-SendGrid hay que generalizarlo o el envío va a seguir trabado sin motivo.
+> **Por qué se renombró (26-jul-2026):** el flag se llamaba `SES_SANDBOX`, y ese nombre
+> mentía — bloqueaba el envío **con cualquier proveedor**. Migrar a Resend habría dejado la
+> app sin mandar un solo mail, sin ninguna pista de por qué. `ENVIO_REAL` es neutro.
+> Mientras `ENVIO_REAL` no esté definida se sigue respetando `SES_SANDBOX`, así que el
+> deploy actual no cambia de comportamiento; la compat se puede borrar en cuanto la env
+> nueva esté cargada.
 
 ---
 

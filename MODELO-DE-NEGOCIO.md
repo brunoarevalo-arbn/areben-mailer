@@ -330,9 +330,8 @@ rebotes con verificación de firma ya existen (`lib/email/proveedores/resend.ts`
 
 - **Costo:** ~USD 56/mes en vez de ~USD 40. Sigue ahorrando >USD 95/mes.
 - **Trabajo real:** re-verificar los dos dominios en Resend (otro juego de DKIM en
-  Cloudflare), dar de alta el webhook, y **generalizar el gate `SES_SANDBOX`** — hoy bloquea
-  el envío con cualquier proveedor (`campanias/actions.ts:98` y `:137`,
-  `automations/procesar/route.ts:17`).
+  Cloudflare) y dar de alta el webhook. ~~Generalizar el gate `SES_SANDBOX`~~ **ya está
+  hecho** (26-jul-2026): el gate es `ENVIO_REAL` y no menciona a ningún proveedor.
 - **El SaaS queda en pausa:** a $0,90/1k no cierra con precio plano.
 
 ### Plan C — SES no llega y aun así queremos el SaaS

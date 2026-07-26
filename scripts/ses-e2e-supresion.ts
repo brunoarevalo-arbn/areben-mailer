@@ -15,7 +15,7 @@
 // esto. El script escribe en la misma base que lee prod, por eso puede verificar
 // desde acá.
 //
-// ⛔ NO toca SES_SANDBOX: la campaña de prueba se encola por debajo del gate, que
+// ⛔ NO toca ENVIO_REAL: la campaña de prueba se encola por debajo del gate, que
 // sigue protegiendo el envío a las listas reales.
 import { prisma } from '../lib/prisma.ts';
 import { crearEnvios } from '../lib/campanias.ts';
