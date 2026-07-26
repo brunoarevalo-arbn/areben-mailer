@@ -84,25 +84,43 @@ nueva de AWS ni novedad de ningún tipo.
 3. **No se puede publicar en la App Store de Tiendanube**: una app de email marketing no
    se homologa entregando solo a direcciones verificadas.
 
-### 3.1-bis Custom MAIL FROM — ⏳ configurado en SES, falta el DNS (26-jul-2026)
+### 3.1-bis Entregabilidad en Outlook — ✅ autenticación PERFECTA, queda reputación (26-jul-2026)
 
-**El síntoma:** en el primer ensayo real (26-jul), Gmail aceptó el mail sin problema y
-**Outlook/Hotmail lo mandó a "no deseado"**.
+> **Conclusión, para no volver a investigarlo:** la autenticación está impecable y verificada
+> contra los headers reales de Microsoft. Si un mail cae en "no deseado", **no es
+> configuración** — es que el dominio todavía no tiene reputación con Outlook. Eso se gana
+> mandando, no tocando registros.
 
-**La causa, y no es el contenido:** sin Custom MAIL FROM el remitente del *sobre* —el que
-mira SPF— es `amazonses.com`, no el dominio propio. SPF **pasa pero no alinea** con el
-`From:`, así que DMARC queda sostenido por una sola pata, el DKIM. A Gmail le alcanza;
-Outlook es más estricto. Verificado por las dos puntas: SES no tenía MAIL FROM en ninguno de
-los dos dominios, y el SPF de `bdiaccesorios.com.ar` es `v=spf1 include:zohomail.com ~all`
-—solo Zoho, nada de Amazon—.
+Header de un mail recibido en Hotmail, después de los arreglos:
 
-**Ya hecho:** `scripts/ses-mail-from.ts <dominio> --aplicar` corrido para los dos dominios.
-Los dos quedaron en `MailFromDomainStatus: PENDING`, con `BehaviorOnMxFailure:
-USE_DEFAULT_VALUE` — mientras falte el DNS, SES vuelve solo al remitente de siempre y **no
-se corta ningún envío**.
+```
+spf=pass (sender IP is 54.240.48.115) smtp.mailfrom=mail.bdiaccesorios.com.ar;
+dkim=pass (signature was verified) header.d=bdiaccesorios.com.ar;
+dmarc=pass action=none header.from=bdiaccesorios.com.ar;
+compauth=pass reason=100
+```
 
-**Falta:** cargar 4 registros en Cloudflare (nube GRIS / DNS-only). Van en un **subdominio
-nuevo**; el SPF de Zoho de los dominios raíz **no se toca**.
+`compauth=pass reason=100` es el mejor resultado posible: Microsoft dice que el remitente es
+quien dice ser. Y `smtp.mailfrom=mail.bdiaccesorios.com.ar` (antes era `amazonses.com`)
+confirma que el Custom MAIL FROM quedó activo.
+
+**Lo que mueve la aguja ahora** (ninguna es técnica): que el destinatario marque "No es
+correo no deseado"; mandar contenido real en vez de mails que dicen "esto es una prueba"
+(un mail corto con un solo link y la palabra "ensayo" es el perfil que los filtros aprendieron
+a bloquear); y volumen sostenido a gente que abre. **Una IP dedicada NO conviene**: ~US$25/mes
+más semanas de calentamiento, y a 95.000 mails/mes no se justifica.
+
+#### Los dos arreglos que salieron de acá (los dos afectaban al envío real)
+
+1. **Custom MAIL FROM** (`mail.<dominio>`): sin él, el remitente del *sobre* —el que mira
+   SPF— era `amazonses.com`, así que SPF pasaba pero **no alineaba** con el `From:` y DMARC
+   se sostenía solo con DKIM. Configurado con `scripts/ses-mail-from.ts --aplicar` en los dos
+   dominios; DNS cargado en Cloudflare; **los dos en `SUCCESS`**.
+2. **Parte `text/plain`**: los tres caminos de envío mandaban **solo HTML**. El proveedor ya
+   soportaba `args.text`, nadie se lo pasaba. Un mail sin parte de texto es señal de spam
+   clásica. Lo arma `renderEmailTexto()` en `lib/email/render.ts`.
+
+#### DNS que quedó cargado (Cloudflare, DNS-only)
 
 | Tipo | Name | Value | Prioridad |
 |---|---|---|---|
@@ -111,12 +129,19 @@ nuevo**; el SPF de Zoho de los dominios raíz **no se toca**.
 | MX | `mail.zattia.com.ar` | `feedback-smtp.us-east-1.amazonses.com` | 10 |
 | TXT | `mail.zattia.com.ar` | `v=spf1 include:amazonses.com ~all` | — |
 
-Después: `node --env-file=.env --import tsx scripts/ses-mail-from.ts <dominio>` hasta ver
-`SUCCESS`, y reenviar el ensayo para confirmar que Outlook lo acepta.
+⚠️ El SPF de los dominios **raíz** es de Zoho (`include:zohomail.com`) y **no se toca**: es
+el correo normal de las marcas.
 
 > 📌 De costado: el DMARC de `bdiaccesorios.com.ar` es un CNAME a
 > `bdiaccesorios.dmarc.myperfit.net` — está **delegado a Perfit**, la herramienta que se está
 > reemplazando. Hoy no rompe nada (`p=none`), pero se cae el día que se dé de baja Perfit.
+
+#### Falso positivo que costó un susto
+
+Un ensayo "llegó en blanco" a Gmail. No era el mailer: el HTML de los dos envíos era
+**byte por byte idéntico** (2774 chars). Con el asunto repetido, Gmail agrupa el mail en la
+misma conversación y colapsa el cuerpo repetido detrás del "···". `ensayo-campania.ts` ahora
+pone la hora en el asunto.
 
 ### 3.2 Marca Stunned — pendiente aparte (no depende de AWS)
 
