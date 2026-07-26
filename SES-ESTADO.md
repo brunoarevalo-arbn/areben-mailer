@@ -84,6 +84,40 @@ nueva de AWS ni novedad de ningún tipo.
 3. **No se puede publicar en la App Store de Tiendanube**: una app de email marketing no
    se homologa entregando solo a direcciones verificadas.
 
+### 3.1-bis Custom MAIL FROM — ⏳ configurado en SES, falta el DNS (26-jul-2026)
+
+**El síntoma:** en el primer ensayo real (26-jul), Gmail aceptó el mail sin problema y
+**Outlook/Hotmail lo mandó a "no deseado"**.
+
+**La causa, y no es el contenido:** sin Custom MAIL FROM el remitente del *sobre* —el que
+mira SPF— es `amazonses.com`, no el dominio propio. SPF **pasa pero no alinea** con el
+`From:`, así que DMARC queda sostenido por una sola pata, el DKIM. A Gmail le alcanza;
+Outlook es más estricto. Verificado por las dos puntas: SES no tenía MAIL FROM en ninguno de
+los dos dominios, y el SPF de `bdiaccesorios.com.ar` es `v=spf1 include:zohomail.com ~all`
+—solo Zoho, nada de Amazon—.
+
+**Ya hecho:** `scripts/ses-mail-from.ts <dominio> --aplicar` corrido para los dos dominios.
+Los dos quedaron en `MailFromDomainStatus: PENDING`, con `BehaviorOnMxFailure:
+USE_DEFAULT_VALUE` — mientras falte el DNS, SES vuelve solo al remitente de siempre y **no
+se corta ningún envío**.
+
+**Falta:** cargar 4 registros en Cloudflare (nube GRIS / DNS-only). Van en un **subdominio
+nuevo**; el SPF de Zoho de los dominios raíz **no se toca**.
+
+| Tipo | Name | Value | Prioridad |
+|---|---|---|---|
+| MX | `mail.bdiaccesorios.com.ar` | `feedback-smtp.us-east-1.amazonses.com` | 10 |
+| TXT | `mail.bdiaccesorios.com.ar` | `v=spf1 include:amazonses.com ~all` | — |
+| MX | `mail.zattia.com.ar` | `feedback-smtp.us-east-1.amazonses.com` | 10 |
+| TXT | `mail.zattia.com.ar` | `v=spf1 include:amazonses.com ~all` | — |
+
+Después: `node --env-file=.env --import tsx scripts/ses-mail-from.ts <dominio>` hasta ver
+`SUCCESS`, y reenviar el ensayo para confirmar que Outlook lo acepta.
+
+> 📌 De costado: el DMARC de `bdiaccesorios.com.ar` es un CNAME a
+> `bdiaccesorios.dmarc.myperfit.net` — está **delegado a Perfit**, la herramienta que se está
+> reemplazando. Hoy no rompe nada (`p=none`), pero se cae el día que se dé de baja Perfit.
+
 ### 3.2 Marca Stunned — pendiente aparte (no depende de AWS)
 
 Falta entero: (a) conectar su Tiendanube + importar contactos; (b) correr
