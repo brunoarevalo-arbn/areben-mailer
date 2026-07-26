@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { inyectarTracking } from "@/lib/email/tracking";
 import { sendEmail, esThrottle } from "@/lib/email/enviar";
+import { destinatarioPermitido, modoEnvio } from "@/lib/email/proveedor";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 
 const BATCH = 20;
@@ -41,6 +42,25 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
   let throttled = false;
 
   for (const envio of envios) {
+    // Red de seguridad del modo ensayo. Va acá, pegado al envío, y no solo al
+    // encolar: si un `Envio` llegó hasta este punto apuntando a alguien que no
+    // está habilitado, se corta acá. Queda FALLIDO (que es la verdad: no se
+    // mandó) y con estado terminal, para que la cola no gire para siempre
+    // esperando que baje `restantes`.
+    if (!destinatarioPermitido(envio.contacto.email)) {
+      console.log(
+        JSON.stringify({
+          ev: "envio-bloqueado",
+          modo: modoEnvio(),
+          envioId: envio.id,
+          campaniaId,
+        }),
+      );
+      await prisma.envio.update({ where: { id: envio.id }, data: { estado: "FALLIDO" } });
+      fallidos++;
+      continue;
+    }
+
     const unsubUrl = `${appUrl}/baja?e=${envio.id}`;
     let html = renderEmailHtml(contenido, {
       preheader: campania.preheader ?? undefined,

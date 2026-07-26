@@ -7,7 +7,7 @@ import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { contactosElegibles, crearEnvios } from "@/lib/campanias";
 import { arrancarCola } from "@/lib/email/cola";
-import { envioRealHabilitado, MSG_ENVIO_BLOQUEADO } from "@/lib/email/proveedor";
+import { destinatarioPermitido, modoEnvio, MSG_ENVIO_BLOQUEADO } from "@/lib/email/proveedor";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -86,15 +86,26 @@ export async function enviarCampania(id: string) {
 
   // Guard: mientras el proveedor no esté aprobado para producción no dejamos
   // enviar a la lista real (los destinos no verificados rebotarían en masa).
-  if (!envioRealHabilitado())
+  const modo = modoEnvio();
+  if (modo === "bloqueado")
     return { ok: false, error: `${MSG_ENVIO_BLOQUEADO} Mientras tanto usá "Enviar prueba".` };
 
   const esAB = campania.abTestPct != null;
   if (esAB && !campania.asuntoB) return { ok: false, error: "Falta el asunto B" };
 
-  const contactos = await contactosElegibles(cuenta.id, campania);
-  if (contactos === null) return { ok: false, error: "Segmento no encontrado" };
-  if (contactos.length === 0) return { ok: false, error: "No hay contactos elegibles" };
+  const todos = await contactosElegibles(cuenta.id, campania);
+  if (todos === null) return { ok: false, error: "Segmento no encontrado" };
+  if (todos.length === 0) return { ok: false, error: "No hay contactos elegibles" };
+
+  // En ensayo recortamos acá para no crear miles de Envío que nacen condenados.
+  // El corte que de verdad protege está en procesarLote, pegado al envío.
+  const contactos = modo === "ensayo" ? todos.filter((c) => destinatarioPermitido(c.email)) : todos;
+  const omitidos = todos.length - contactos.length;
+  if (contactos.length === 0)
+    return {
+      ok: false,
+      error: `Modo ensayo: ninguno de los ${todos.length} contactos elegibles está en ENVIO_ENSAYO.`,
+    };
 
   if (esAB) {
     // Test A/B: mandar A y B a una muestra; el resto espera al ganador.
@@ -108,7 +119,7 @@ export async function enviarCampania(id: string) {
     await prisma.campania.update({ where: { id }, data: { estado: "ENVIANDO" } });
     const total = await prisma.envio.count({ where: { campaniaId: id } });
     arrancarCola();
-    return { ok: true, total, esTest: true };
+    return { ok: true, total, esTest: true, modo, omitidos };
   }
 
   // Envío normal (sin A/B).
@@ -116,7 +127,7 @@ export async function enviarCampania(id: string) {
   await prisma.campania.update({ where: { id }, data: { estado: "ENVIANDO" } });
   const total = await prisma.envio.count({ where: { campaniaId: id } });
   arrancarCola();
-  return { ok: true, total };
+  return { ok: true, total, modo, omitidos };
 }
 
 /** Promueve el asunto ganador al resto de la lista (holdout). Manual. */
@@ -127,10 +138,12 @@ export async function promoverGanador(id: string, ganador: "A" | "B") {
   if (campania.abTestPct == null) return { ok: false, error: "La campaña no es A/B" };
   if (campania.abGanador) return { ok: false, error: "El ganador ya fue promovido" };
   if (ganador !== "A" && ganador !== "B") return { ok: false, error: "Ganador inválido" };
-  if (!envioRealHabilitado()) return { ok: false, error: MSG_ENVIO_BLOQUEADO };
+  const modo = modoEnvio();
+  if (modo === "bloqueado") return { ok: false, error: MSG_ENVIO_BLOQUEADO };
 
-  const contactos = await contactosElegibles(cuenta.id, campania);
-  if (contactos === null) return { ok: false, error: "Segmento no encontrado" };
+  const todos = await contactosElegibles(cuenta.id, campania);
+  if (todos === null) return { ok: false, error: "Segmento no encontrado" };
+  const contactos = modo === "ensayo" ? todos.filter((c) => destinatarioPermitido(c.email)) : todos;
 
   // Excluir a los que ya recibieron el test.
   const yaEnviados = await prisma.envio.findMany({

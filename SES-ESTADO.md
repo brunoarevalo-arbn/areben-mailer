@@ -132,17 +132,51 @@ da 403, y el E2E con mensajes reales de AWS sigue en verde (runId `250726-2029`)
 
 ## 4. El gate en el código
 
-La decisión vive en **un solo lugar**: `envioRealHabilitado()` en
-`lib/email/proveedor.ts`. Devuelve `true` únicamente con `ENVIO_REAL="true"`; la env
-ausente, vacía o mal escrita deja el envío **bloqueado** (default seguro).
+La decisión vive en **un solo lugar**: `lib/email/proveedor.ts`. Hay **tres** estados, no
+dos, y el del medio es el que permite probar el motor sin arriesgar la lista real:
 
-Lo llaman los tres puntos de entrada del envío masivo:
+| Modo | Cómo se activa | Qué hace |
+|---|---|---|
+| `bloqueado` | ninguna env (**es prod hoy**) | No sale nada. Default seguro: env ausente, vacía o mal escrita = bloqueado. |
+| `ensayo` | `ENVIO_ENSAYO="@zattia.com.ar, qa@bdiaccesorios.com.ar"` | Corre el camino real completo —cola, lease, tracking, estados— pero **solo** a esos destinatarios. El resto se omite. |
+| `real` | `ENVIO_REAL="true"` | Sale todo. Le gana a `ENVIO_ENSAYO` si están las dos. |
+
+En `ENVIO_ENSAYO`, una entrada que arranca con `@` habilita el dominio entero. Sirve
+porque en el sandbox de SES un dominio verificado habilita todas sus casillas: hoy
+`@bdiaccesorios.com.ar` y `@zattia.com.ar` ya reciben, sin verificar nada nuevo.
+
+⚠️ **El mailbox simulator (`@simulator.amazonses.com`) está permitido siempre**, en
+cualquier modo. Es un agujero negro por construcción — no llega a ninguna persona, no
+consume la cuota diaria, no toca la reputación — y los scripts de QA dependen de eso para
+poder correr con el gate cerrado.
+
+El corte que de verdad protege está en `procesarLote`, **pegado al envío**, no solo al
+encolar: los `Envio` también nacen por otros caminos (una campaña encolada antes de cambiar
+la lista, los scripts de QA) y a esos el filtro de la entrada no los ve. Lo que se corta ahí
+queda `FALLIDO` con una línea de log `ev: "envio-bloqueado"`.
+
+Los tres puntos de entrada del envío masivo:
 
 - `app/(app)/campanias/actions.ts` — `enviarCampania`
 - `app/(app)/campanias/actions.ts` — `promoverGanador`
-- `app/api/automations/procesar/route.ts` — el cron de automations (con el gate cerrado
-  igual corre el flujo y marca el run como `ENVIADO` con `sesMessageId: "dry-run"`, así se
-  ve que la automation dispara sin mandar nada)
+- `app/api/automations/procesar/route.ts` — el cron de automations (a quien no esté
+  habilitado igual le corre el flujo y marca el run como `ENVIADO` con
+  `sesMessageId: "dry-run"`, así se ve que la automation dispara sin mandar nada)
+
+### Ensayo del motor a volumen
+
+`scripts/ensayo-motor.ts` arma una cuenta descartable (`qa-motor`) con N destinatarios del
+simulador y empuja la campaña por la cola **de producción**, sin volver a empujar: ejercita
+el lease, el auto-encadenamiento, el camino de throttle (en sandbox SES entrega 1 mail/seg,
+así que un lote de 20 lo toca sí o sí) y los estados finales.
+
+```
+APP_URL=https://areben-mailer.vercel.app \
+  node --import tsx --env-file=.env scripts/ensayo-motor.ts [--contactos=60]
+node --import tsx --env-file=.env scripts/ensayo-motor.ts --limpiar
+```
+
+⚠️ Hay que deployar antes: el worker que levanta la campaña corre en prod.
 
 **Cuando llegue la aprobación:** poner `ENVIO_REAL=true` en Vercel prod y en `.env`,
 redeployar (`vercel deploy --prod --yes`, no hay autodeploy de GitHub) y recién ahí hacer

@@ -8,7 +8,7 @@ import { reglasToWhere, type Reglas } from "@/lib/segmentos";
 export async function contactosElegibles(
   cuentaId: string,
   campania: { listaId: string | null; segmentoId: string | null }
-): Promise<{ id: string }[] | null> {
+): Promise<{ id: string; email: string }[] | null> {
   let destinoWhere;
   if (campania.listaId) {
     destinoWhere = { listas: { some: { listaId: campania.listaId } } };
@@ -19,7 +19,7 @@ export async function contactosElegibles(
   }
   return prisma.contacto.findMany({
     where: { cuentaId, estado: "ACTIVO", tnAcceptsMkt: true, ...destinoWhere },
-    select: { id: true },
+    select: { id: true, email: true },
   });
 }
 

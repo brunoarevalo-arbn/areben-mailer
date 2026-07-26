@@ -133,6 +133,9 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
     await guardarCampania(campData());
     const r = await enviarCampania(id);
     if (!r.ok) { setProgreso(`Error: ${r.error}`); setEnviado(false); return; }
+    // En ensayo el destino real fue mucho más chico que la lista: decirlo, o el
+    // "Enviados 4/4" se lee como si la campaña hubiera salido entera.
+    if (r.modo === "ensayo") setMsg(`Modo ensayo: salió a ${r.total} casilla${r.total === 1 ? "" : "s"} habilitada${r.total === 1 ? "" : "s"}; se omitieron ${r.omitidos}.`);
     await seguirProgreso(r.total ?? 0, abActivo ? "Test enviado" : "Enviados");
     router.refresh();
   };

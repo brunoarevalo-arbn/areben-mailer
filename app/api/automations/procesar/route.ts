@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania, type ProductoEmail } from "@/lib/email/render";
 import { sendEmail } from "@/lib/email/enviar";
-import { envioRealHabilitado } from "@/lib/email/proveedor";
+import { destinatarioPermitido } from "@/lib/email/proveedor";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { tnGet } from "@/lib/tn/client";
 
@@ -15,7 +15,6 @@ export async function GET(req: Request) {
   }
 
   const appUrl = process.env.APP_URL ?? "";
-  const dryRun = !envioRealHabilitado();
 
   const runs = await prisma.automationRun.findMany({
     where: { estado: "PENDIENTE", proximoAt: { lte: new Date() } },
@@ -65,9 +64,10 @@ export async function GET(req: Request) {
     html = aplicarMergeTags(html, contacto);
     if (esCarrito) html = html.replaceAll("${cart.url}", td.abandonedUrl ?? "#");
 
-    if (dryRun) {
-      // Con el gate cerrado no mandamos nada de verdad, pero dejamos correr el
-      // flujo para poder ver que la automation dispara cuando tiene que disparar.
+    // Con el gate cerrado —o en ensayo, si este contacto no está habilitado— no
+    // mandamos nada de verdad, pero dejamos correr el flujo igual: así se ve que
+    // la automation dispara cuando tiene que disparar, sin molestar a nadie.
+    if (!destinatarioPermitido(contacto.email)) {
       await prisma.automationRun.update({ where: { id: run.id }, data: { estado: "ENVIADO", sesMessageId: "dry-run" } });
       enviados++;
       continue;
