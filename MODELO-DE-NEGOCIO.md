@@ -7,6 +7,9 @@
 > Este archivo existe para **no volver a hacer el análisis desde cero**. Si algo acá está
 > desactualizado, corregilo en vez de rehacerlo. Complementa a `SES-ESTADO.md` (estado del
 > envío) y `TIENDANUBE-PUBLICACION.md` (requisitos de la App Store).
+>
+> **Actualizado el 27-jul-2026** con la respuesta de Tiendanube a las 6 consultas: §6.5
+> (cómo se cobra), §7.6 (NubeSDK y los temas) y §7.7 (Plan D confirmado).
 
 ---
 
@@ -14,12 +17,15 @@
 
 - **Uso propio: lanzalo.** Cuesta ~USD 40/mes contra los >USD 150/mes que se pagan hoy.
   Ahorro ≥ USD 1.300/año, y el 97% del costo marginal es el proveedor de email.
-- **SaaS en la App Store: la economía cierra** (equilibrio en 5 comerciantes, ~57% de margen
-  a 50), **pero tres cimientos no están**: SES en sandbox, la cola de envío corre en el
-  navegador, y la base productiva está en el plan gratuito de Neon compartida con Resorty,
-  que está en vivo.
+- **SaaS: la economía cierra** (equilibrio en 5 comerciantes, ~57% de margen a 50 — **9 y 32%
+  si cobra Tiendanube y retiene el 30%**, §6.5), **pero tres cimientos no están**: SES en
+  sandbox, la cola de envío corre en el navegador, y la base productiva está en el plan
+  gratuito de Neon compartida con Resorty, que está en vivo.
 - El costo que importa no es la infraestructura: es **la reputación de envío compartida
   entre inquilinos** y **el soporte de onboarding de dominio**.
+- **El canal ya no está bloqueado** (27-jul): Tiendanube confirmó que los scripts que instala
+  el propio comerciante por GTM o Códigos externos **no caen bajo NubeSDK**. Se puede vender
+  directo, con el 100% del ingreso y sin homologación → §7.7.
 
 ---
 
@@ -184,6 +190,37 @@ que se pasa sin castigarlo).
 
 Referencia de mercado: Doppler arranca en USD 10 con 2.500 contactos y envíos ilimitados.
 
+### 6.5 Cómo se cobra — RESPUESTA DE TIENDANUBE (27-jul-2026)
+
+Contestó Lucas, de socios@. Se elige en *Datos de publicación* → modalidad de cobro, después
+de completar el país. Hay tres opciones y **son excluyentes**:
+
+| Modalidad | Quién cobra | Se queda Areben |
+|---|---|---|
+| Suscripción mensual recurrente | Tiendanube | **70%** |
+| Pago único | Tiendanube | **70%** |
+| Gratis, marcada con *cobros externos* | Areben | **100%** |
+
+La comisión se genera automáticamente cuando el pago se confirma y se ve en *Comisiones* del
+Partner Portal. Para retirarla hay que **emitir factura e iniciar el retiro de dinero** — no
+es una acreditación automática.
+
+**Lo que cambia el 30%** (sobre los precios *propuestos* de §6.4, que siguen sin decidirse):
+
+| Plan | Precio | Contribución sin TN | Contribución con TN 30% | Margen |
+|---|---|---|---|---|
+| Emprendedor | USD 9 | $6,60 | **$3,90** | 67% → 43% |
+| Tienda | USD 25 | $15,40 | **$7,90** | 57% → 32% |
+| Pro | USD 59 | $30,20 | **$12,50** | 46% → 21% |
+
+En los planes baratos **la comisión de Tiendanube pesa más que todo el costo de envío**: en
+Emprendedor son $2,70 de comisión contra $2,40 de SES. El punto de equilibrio de §6.2 (5
+comerciantes) pasa a **~9** si cobra Tiendanube.
+
+El 30% no es un robo — compra la fricción cero del checkout dentro del panel donde el
+comerciante ya paga su plan, que es exactamente donde se pierden las conversiones. Pero
+convierte al canal oficial en una decisión de adquisición, no de margen.
+
 ---
 
 ## 7. Competencia y viabilidad comercial
@@ -263,51 +300,68 @@ conocido justamente porque muchos ya lo hicieron. La versión defendible de esta
 es "otro email marketing barato", sino **el paquete Resorty + mailer vendido dentro de
 Tiendanube a comerciantes que ya confían en la primera app**.
 
-### 7.6 El canal está bloqueado por Tiendanube, no por falta de desarrollo
+### 7.6 El canal — RESPUESTA DE TIENDANUBE (27-jul-2026)
 
-Si la apuesta es el combo y no el mailer suelto, **la prioridad no la marca el mailer** — y
-acá aparece el problema de fondo, que no es de código:
+Hasta el 26-jul este documento decía que el canal estaba cerrado por los dos extremos:
+NubeSDK obligatorio para homologar (desde el 5-jun-2026) pero imposible de usar, porque sus
+slots solo corren en Patagonia y Patagonia ya no se puede instalar. **Contestaron y el
+diagnóstico cambia.** Lo que dijo Lucas, punto por punto:
 
-- **NubeSDK es obligatorio en homologación desde el 5-jun-2026**: sin él no se aprueba
-  ninguna app nueva de storefront. Esa fecha ya pasó, así que Resorty **hoy no se puede
-  publicar** sin migrar.
-- **Pero NubeSDK no se puede usar en los temas actuales.** La documentación oficial dice que
-  los slots solo están soportados en el tema **Patagonia**, y Patagonia **ya no está
-  disponible para instalaciones nuevas** — la tienda demo creada desde el Portal de Partners
-  vino con Morelia. O sea: el camino obligatorio está cerrado por el otro extremo.
-- Después vienen las fechas de corte para las apps que **ya están publicadas**: 30-ago-2026
-  se bloquean las instalaciones nuevas sin SDK, 30-oct-2026 empieza la desinstalación
-  progresiva (`project_tiendanube_nubesdk`).
-- **El mailer no tiene ninguna fecha límite** — no inyecta nada en el storefront, así que
-  NubeSDK no lo toca (`TIENDANUBE-PUBLICACION.md` §1).
+- **El deadlock de desarrollo se rompe**: pueden **activar el slot en tiendas demo** a pedido.
+  Ese es el ambiente de prueba que no existía.
+- **En tiendas productivas sigue igual**: los scripts con SDK corren **solo en Patagonia**;
+  en el resto de los diseños corre **el script sin SDK**. Y **no hay fecha** para que el SDK
+  llegue a todos los diseños.
+- **Las apps legacy no se caen**: "si aún no se hizo el rollout del SDK en todos los diseños,
+  se seguirá ejecutando el script sin SDK". Las fechas de corte (30-ago / 30-oct) hay que
+  releerlas así: lo exigible es **tener cargado el script con SDK**, no que el SDK funcione en
+  todos lados. Cuando el rollout llegue, empieza a impactar de inmediato.
+- **Hay que cargar los dos scripts**, con SDK y sin SDK. La migración a NubeSDK no reemplaza
+  al widget actual: **convive** con él. Es trabajo extra, no trabajo sustituto.
+- **Los webhooks de LGPD no se dan de alta por API** — por eso el 422. Se cargan en el
+  formulario de *Datos básicos* y con eso quedan. (`app/uninstalled` sí va por
+  `POST /webhooks`, y ya funcionaba.)
+- **Homologación**: no la responden por acá. Se pide desde el Partner Portal y ahí llega un
+  mail de Tech Solutions con los pasos. O sea, los requisitos de consentimiento y listas
+  siguen sin respuesta hasta que se arranque el trámite.
 
-**La consecuencia estratégica:** el cuello de botella del negocio no es tiempo de desarrollo
-ni plata de infraestructura, es **una respuesta de Tiendanube que todavía no llegó**. Las
-preguntas 1, 2, 3 y 5 de `areben-popups/CONSULTA-TIENDANUBE.md` — el mail a
-socios@tiendanube.com que está redactado y **sin enviar** — determinan si el canal existe,
-cuándo, y si se puede cobrar por él. **Enviarlo es la acción de mayor palanca de todo este
-documento, y no cuesta nada.**
+**La consecuencia estratégica:** el cuello de botella dejó de ser Tiendanube. De acá en
+adelante es una decisión de Bruno — §7.7.
 
-### 7.7 Plan D — vender fuera de la App Store
+### 7.7 Plan D — CONFIRMADO: se puede vender fuera de la App Store
 
-La pregunta 3 de esa consulta abre una salida que no depende de la homologación: si un script
-que **el propio comerciante** pega en *Códigos externos* o inyecta por GTM **no** cae bajo el
-bloqueo de NubeSDK, entonces el combo Resorty + mailer se puede vender **directo**, sin App
-Store, sin homologación y sin fechas de corte. Es exactamente como está instalado Resorty en
-Zattia hoy (GTM-P5B8T7QV).
+La pregunta que abría la salida era si un script que pega **el propio comerciante** cae bajo
+el bloqueo de NubeSDK. La respuesta fue **no**, y es literal:
+
+> "No, el SDK no impacta en códigos ingresados en esos lugares. Solo impacta en scripts
+> cargados por los aplicativos a través del partner portal."
+
+O sea: **Códigos externos y GTM quedan fuera del alcance de NubeSDK**, sin fecha de corte y
+sin homologación. Es exactamente como está instalado Resorty en Zattia hoy (GTM-P5B8T7QV) —
+y ese camino **no se rompe en agosto ni en octubre**.
 
 | | App Store | Venta directa (GTM) |
 |---|---|---|
-| Homologación | Obligatoria, hoy bloqueada | No aplica |
+| Homologación | Obligatoria; se pide y contesta Tech Solutions | No aplica |
+| NubeSDK | Obligatorio cargarlo, además del legacy | **No aplica nunca** |
 | Descubrimiento | El comerciante te encuentra solo | Hay que salir a buscarlo |
 | Fricción de instalación | Un clic | El comerciante pega un script |
-| Cobro | Sin documentar (pregunta 5) | Facturación propia, control total |
+| Cobro | TN cobra y retiene 30%, o cobrás vos con 100% | Facturación propia, 100% |
 | Riesgo de plataforma | Alto: cambian las reglas y te caés | Bajo |
 
-No es tan bueno como la App Store para adquirir, pero **no depende de que Tiendanube
-conteste** y sirve para conseguir los primeros comerciantes mientras el canal oficial se
-destraba. Con el costo de cambio de §7.4 jugando a favor, cinco tiendas conseguidas a mano
-hoy valen más que cincuenta dentro de un año.
+Lo importante es que **ya no es "mientras tanto"**: la venta directa es un camino completo y
+permanente, con el 100% del ingreso y cero dependencia del calendario de Tiendanube. La App
+Store es un canal de **adquisición** que se compra con el 30% (o con el trabajo de cobrar
+aparte) más la reescritura del widget a NubeSDK.
+
+**Recomendación**: arrancar por venta directa —cuesta cero desarrollo nuevo, ya está probado
+en Zattia— y tratar la App Store como una segunda fase que se evalúa cuando haya comerciantes
+pagando. Con el costo de cambio de §7.4 jugando a favor, cinco tiendas conseguidas a mano hoy
+valen más que cincuenta dentro de un año.
+
+⚠️ Pero ojo con el orden: **vender directo adelanta los blanqueos de infraestructura**. Vercel
+sigue en Hobby, que prohíbe uso comercial, y Neon en Free compartido con Resorty en vivo
+(§10). Antes del primer peso cobrado, eso se arregla.
 
 ---
 
@@ -379,11 +433,18 @@ chica **antes** de construir encima.
 | 5 | Aislamiento de reputación por inquilino | No | **Sí** |
 | 6 | Los 4 webhooks obligatorios de TN | No | **Sí** — ver `TIENDANUBE-PUBLICACION.md` |
 | 7 | App propia en Partners (hoy comparte credencial con Resorty) | No | **Sí** |
-| 8 | Definir cómo se cobra | No | **Sí** |
+| 8 | ~~Definir cómo se cobra~~ | No | **Resuelto 27-jul** — §6.5 |
 
-**Orden sugerido:** (1) destrabar el envío — Resend ya, apelación de SES en paralelo ·
-(2) Neon pago antes del primer blast · (3) cola en el servidor · (4) el resto del andamiaje
-de Tiendanube · (5) publicar.
+**Actualización 27-jul-2026.** Los bloqueantes 6 y 8 se destrabaron con la respuesta de
+Tiendanube: los tres webhooks de LGPD se cargan en *Datos básicos* (no por API) y la
+modalidad de cobro está documentada en §6.5. Y, sobre todo, **2, 3, 4, 6, 7 y 8 solo bloquean
+la App Store**: por venta directa (§7.7) no aplican 6 ni 7. Los que quedan para cobrar el
+primer peso por cualquier vía son **1 (SES), 2 (Vercel Pro) y 3 (Neon pago)** — y de esos, el
+único fuera de control es SES.
+
+**Orden sugerido:** (1) destrabar el envío — apelación de SES · (2) Vercel Pro y Neon pago
+antes de cobrarle a nadie · (3) cola en el servidor · (4) primeros comerciantes por venta
+directa · (5) recién ahí evaluar App Store + NubeSDK.
 
 ---
 
