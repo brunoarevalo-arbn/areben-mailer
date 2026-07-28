@@ -7,7 +7,63 @@
 
 ---
 
-## Titular
+## 🚀 Titular (actualizado el 28-jul-2026): ya no dependemos de SES
+
+**El envío pasó a Resend.** AWS nunca contestó el caso `178473604500639` (al 28-jul seguía
+en `DENIED` / "se necesita más información", igual que el 24-jul), así que se prendió el
+plan B que la capa de proveedor dejaba listo desde el 24-jul: `EMAIL_PROVIDER=resend` +
+`RESEND_API_KEY` en Vercel prod y en `.env`. **No hizo falta tocar código.**
+
+Verificado el 28-jul con el dominio `bdiaccesorios.com.ar` ya autenticado en Resend:
+
+| Prueba | Resultado |
+|---|---|
+| Mail a Google Workspace | ✅ inbox |
+| Mail a **Hotmail**, con formato de campaña real | ✅ **inbox** — con SES caía en spam |
+| Mailbox simulator de SES | ✅ aceptado por Resend |
+| `ensayo-motor.ts --contactos=40` | ✅ 40/40, 0 fallidos, 9 s, **4,44/seg** ⇒ BDI ~63 min |
+
+> **El hallazgo que importa:** la misma casilla de Hotmail que caía en "no deseado" con SES
+> entró en inbox por Resend, con el mismo dominio y el mismo contenido comercial. Confirma
+> §3.1-bis: la autenticación estaba impecable y lo que faltaba era **reputación de IP**.
+> Resend corre arriba de SES pero con **su** pool de IPs, que ya la tiene.
+
+⚠️ Los 40 del ensayo entraron en **una sola invocación** (`lotes:2, continuar:false`): no
+se volvió a ejercitar el auto-encadenamiento entre invocaciones. Eso quedó validado con SES
+el 26-jul y es lógica del motor, no del proveedor.
+
+**Convivencia con SES:** no hay conflicto. SES usa `mail.<dominio>` como Custom MAIL FROM y
+Resend usa `send.<dominio>`. Los dos quedan configurados y se alterna con `EMAIL_PROVIDER`.
+Si AWS aprobara algún día, volver a SES es cambiar esa env var — pero conviene pensarlo dos
+veces: la reputación de IP de Resend es justamente lo que arregló Outlook.
+
+### Setup de Resend, para no volver a deducirlo
+
+- **Región del dominio: `us-east-1`, NO São Paulo.** `lib/email/procesar.ts` envía
+  secuencial y las funciones corren en `iad1`; São Paulo agregaba ~120 ms por mail
+  (+30 min sobre los 16.825 de BDI). La región no se cambia sin recrear el dominio.
+- **Manual setup**, no el "Auto configure" por OAuth de Cloudflare: las zonas de BDI y
+  Zattia viven en otra cuenta (NS `sharon`/`simon`) que la de `arebensrl.com`.
+- **3 registros por dominio**, todos en subdominios: `resend._domainkey` TXT (DKIM, único
+  por dominio) · `send` MX → `feedback-smtp.us-east-1.amazonses.com` prio 10 · `send` TXT →
+  `v=spf1 include:amazonses.com ~all`.
+- 🛑 **"Enable Receiving" siempre apagado**: pide MX en el **apex** y rompería el correo
+  (el de BDI está en **Zoho**, no en Workspace).
+- Plan free = 1 dominio y **100 mails/día**: sirve para probar, no para enviar. Pro
+  US$20/mes = 50k mails, sin tope diario, 10 dominios.
+
+### ▶️ Pendiente
+
+1. Pagar Pro — sin eso no entra Zattia ni sale el masivo.
+2. Agregar `zattia.com.ar` (us-east-1, manual) + sus 3 registros. `send.zattia.com.ar`
+   está libre, verificado.
+3. Webhook en Resend → `/api/webhooks/resend`, eventos **`email.bounced`** y
+   **`email.complained`** (los únicos dos que el código maneja) + `RESEND_WEBHOOK_SECRET`.
+4. `scripts/ensayo-motor.ts --limpiar`.
+
+---
+
+## Titular original (SES)
 
 **Lo único que falta es el acceso a producción de SES.** Todo el resto del andamiaje de
 envío (dominios, DKIM, remitentes, rebotes, quejas, supresión) está terminado y verificado.
