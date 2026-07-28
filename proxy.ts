@@ -44,6 +44,12 @@ export async function proxy(req: NextRequest) {
 
   // Ruta protegida sin sesión → login.
   if (!session?.userId) {
+    // Las de /api/ no se redirigen: un 307 lo sigue fetch solo y termina
+    // devolviendo el HTML de /login con status 200, así que el que hace polling
+    // cree que le contestaron bien y explota al parsear. Un 401 se entiende.
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'no autenticado' }, { status: 401 });
+    }
     return NextResponse.redirect(new URL('/login', req.url));
   }
 
