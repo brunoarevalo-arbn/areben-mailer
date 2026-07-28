@@ -1,8 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getCuentaActiva } from "@/lib/cuenta";
-import { chequear } from "@/lib/auth";
+import { autorizar, chequear } from "@/lib/auth";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
@@ -14,7 +13,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function crearCampania() {
-  const cuenta = await getCuentaActiva();
+  const { cuenta } = await autorizar("editar");
   const campania = await prisma.campania.create({
     data: {
       cuentaId: cuenta.id,
@@ -45,7 +44,10 @@ function parseDestino(destino: string): { listaId: string | null; segmentoId: st
 }
 
 export async function guardarCampania(input: GuardarInput) {
-  const cuenta = await getCuentaActiva();
+  const auth = await chequear("editar");
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const cuenta = auth.ctx.cuenta;
+
   const { listaId, segmentoId } = parseDestino(input.destino);
   const asuntoB = input.asuntoB?.trim() || null;
   // Solo hay A/B si hay asuntoB y un porcentaje válido.
@@ -175,7 +177,10 @@ export async function promoverGanador(id: string, ganador: "A" | "B") {
 }
 
 export async function guardarComoPlantilla(nombre: string, contenido: ContenidoCampania) {
-  const cuenta = await getCuentaActiva();
+  const auth = await chequear("editar");
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const cuenta = auth.ctx.cuenta;
+
   await prisma.plantilla.create({
     data: { cuentaId: cuenta.id, nombre: nombre || "Plantilla", contenido: contenido as object },
   });

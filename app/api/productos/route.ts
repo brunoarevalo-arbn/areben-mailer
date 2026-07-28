@@ -1,12 +1,17 @@
-import { prisma } from "@/lib/prisma";
-import { getCuentaActiva } from "@/lib/cuenta";
+import { autorizarApi } from "@/lib/auth";
 import { buscarProductos } from "@/lib/tn/products";
 
 // Búsqueda de productos TN para el bloque Producto del editor.
-// Bajo /api/productos → requiere Basic Auth (no está en las rutas públicas del proxy).
 export async function GET(req: Request) {
   const q = new URL(req.url).searchParams.get("q") ?? "";
-  const cuenta = await getCuentaActiva();
+
+  // Antes usaba getCuentaActiva(), que LANZA sin sesión: devolvía un 500 donde
+  // corresponde un 401. Además el editor consume esto por fetch, así que la
+  // respuesta tiene que ser JSON y no un redirect.
+  const auth = await autorizarApi("ver");
+  if (auth instanceof Response) return auth;
+  const { cuenta } = auth;
+
   if (!cuenta.tnStoreId || !cuenta.tnToken) {
     return Response.json({ productos: [], error: "TN no conectada" }, { status: 400 });
   }

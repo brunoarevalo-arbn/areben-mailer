@@ -1,8 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getCuentaActiva } from "@/lib/cuenta";
-import { chequear } from "@/lib/auth";
+import { autorizar, chequear } from "@/lib/auth";
 import { importCustomersIncremental } from "@/lib/tn/import";
 import { revalidatePath } from "next/cache";
 
@@ -34,7 +33,7 @@ export async function sincronizarContactosTN() {
 
 /** Importa contactos desde un CSV (email[,nombre] por línea) a una lista. */
 export async function importarCSV(listaId: string, csv: string) {
-  const cuenta = await getCuentaActiva();
+  const { cuenta } = await autorizar("editar");
   const lineas = csv.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   let creados = 0;
   let total = 0;

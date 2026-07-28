@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getCuentaActiva } from "@/lib/cuenta";
+import { autorizar, chequear } from "@/lib/auth";
 
 function slugify(s: string): string {
   return (
@@ -35,7 +35,7 @@ async function slugUnico(cuentaId: string, base: string): Promise<string> {
 }
 
 export async function crearFormulario() {
-  const cuenta = await getCuentaActiva();
+  const { cuenta } = await autorizar("editar");
   const nombre = "Formulario sin título";
   const slug = await slugUnico(cuenta.id, `form-${Date.now().toString(36)}`);
   const form = await prisma.formulario.create({
@@ -55,7 +55,10 @@ export async function guardarFormulario(input: {
   listaId: string; // "" = ninguna
   activo: boolean;
 }) {
-  const cuenta = await getCuentaActiva();
+  const auth = await chequear("editar");
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const cuenta = auth.ctx.cuenta;
+
   // Aseguramos que el formulario es de esta cuenta.
   const form = await prisma.formulario.findFirst({
     where: { id: input.id, cuentaId: cuenta.id },
@@ -82,7 +85,7 @@ export async function guardarFormulario(input: {
 }
 
 export async function eliminarFormulario(id: string) {
-  const cuenta = await getCuentaActiva();
+  const { cuenta } = await autorizar("editar");
   await prisma.formulario.deleteMany({ where: { id, cuentaId: cuenta.id } });
   revalidatePath("/formularios");
   redirect("/formularios");

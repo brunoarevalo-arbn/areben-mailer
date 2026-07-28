@@ -1,8 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getCuentaActiva } from "@/lib/cuenta";
-import { chequear } from "@/lib/auth";
+import { autorizar, chequear, getAuth } from "@/lib/auth";
 import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { sendEmail } from "@/lib/email/enviar";
@@ -12,7 +11,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function crearAutomation(trigger: Trigger) {
-  const cuenta = await getCuentaActiva();
+  const { cuenta } = await autorizar("editar");
   const rem = await getRemitenteEnvio(cuenta.id);
   const p = presetsPara(cuenta.nombre, urlTiendaDe(cuenta, rem?.email))[trigger];
   const a = await prisma.automation.create({
@@ -37,7 +36,10 @@ export async function guardarAutomation(input: {
   preheader: string;
   contenido: ContenidoCampania;
 }) {
-  const cuenta = await getCuentaActiva();
+  const auth = await chequear("editar");
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const cuenta = auth.ctx.cuenta;
+
   await prisma.automation.update({
     where: { id: input.id, cuentaId: cuenta.id },
     data: {
@@ -54,9 +56,10 @@ export async function guardarAutomation(input: {
 }
 
 export async function toggleAutomation(id: string) {
-  // Se lee con la cuenta de la sesión antes de autorizar porque el permiso
-  // depende de hacia dónde va el toggle.
-  const cuenta = await getCuentaActiva();
+  // getAuth y no autorizar(): acá primero hay que saber hacia dónde va el
+  // toggle, porque de eso depende qué permiso pedir. getAuth ya valida sesión y
+  // cuenta, y está memoizada, así que el chequeo de abajo no cuesta otra query.
+  const { cuenta } = await getAuth();
   const a = await prisma.automation.findFirst({ where: { id, cuentaId: cuenta.id } });
   if (!a) return { ok: false };
   const nuevoEstado = a.estado === "ACTIVO" ? "PAUSADO" : "ACTIVO";

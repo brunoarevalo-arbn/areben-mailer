@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getCuentaActiva } from "@/lib/cuenta";
+import { autorizar, chequear } from "@/lib/auth";
 import { getIdentityStatus } from "@/lib/email/proveedores/ses";
 
 export async function crearRemitente(input: {
@@ -10,7 +10,10 @@ export async function crearRemitente(input: {
   email: string;
   responderA: string;
 }) {
-  const cuenta = await getCuentaActiva();
+  const auth = await chequear("remitentes");
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const cuenta = auth.ctx.cuenta;
+
   const email = input.email.trim().toLowerCase();
   const nombre = input.nombre.trim();
   if (!email.includes("@")) return { ok: false, error: "Email inválido" };
@@ -38,13 +41,16 @@ export async function crearRemitente(input: {
 }
 
 export async function eliminarRemitente(id: string): Promise<void> {
-  const cuenta = await getCuentaActiva();
+  const { cuenta } = await autorizar("remitentes");
   await prisma.remitente.deleteMany({ where: { id, cuentaId: cuenta.id } });
   revalidatePath("/remitentes");
 }
 
 export async function hacerPrincipal(id: string) {
-  const cuenta = await getCuentaActiva();
+  const auth = await chequear("remitentes");
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const cuenta = auth.ctx.cuenta;
+
   const rem = await prisma.remitente.findFirst({
     where: { id, cuentaId: cuenta.id },
     select: { id: true },
@@ -63,7 +69,10 @@ export async function hacerPrincipal(id: string) {
 
 /** Consulta SES el estado de verificación del dominio del remitente. */
 export async function verificarRemitente(id: string) {
-  const cuenta = await getCuentaActiva();
+  const auth = await chequear("remitentes");
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const cuenta = auth.ctx.cuenta;
+
   const rem = await prisma.remitente.findFirst({
     where: { id, cuentaId: cuenta.id },
     select: { id: true, dominio: true },
