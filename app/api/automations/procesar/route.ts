@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania, type ProductoEmail } from "@/lib/email/render";
 import { sendEmail } from "@/lib/email/enviar";
 import { destinatarioPermitido } from "@/lib/email/proveedor";
+import { inyectarTracking } from "@/lib/email/tracking";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { tnGet } from "@/lib/tn/client";
 
@@ -55,6 +56,25 @@ export async function GET(req: Request) {
     // Carrito: sumar los productos que dejó como bloque
     if (esCarrito && td.productos?.length) bloques.push({ tipo: "productos", items: td.productos });
 
+    // Con el gate cerrado —o en ensayo, si este contacto no está habilitado— no
+    // mandamos nada de verdad, pero dejamos correr el flujo igual: así se ve que
+    // la automation dispara cuando tiene que disparar, sin molestar a nadie.
+    // No se crea Envio: un mail que no salió no debe ensuciar las métricas.
+    if (!destinatarioPermitido(contacto.email)) {
+      await prisma.automationRun.update({ where: { id: run.id }, data: { estado: "ENVIADO", sesMessageId: "dry-run" } });
+      enviados++;
+      continue;
+    }
+
+    // El Envio se crea ANTES de renderizar porque su id es lo que hace medible
+    // al mail: el pixel de apertura y los links de click cuelgan de él. Sin esto
+    // la automation manda a ciegas y no se sabe si sirve.
+    const envio = await prisma.envio.upsert({
+      where: { automationRunId: run.id },
+      update: {},
+      create: { cuentaId: automation.cuentaId, contactoId: contacto.id, automationRunId: run.id },
+    });
+
     const unsubUrl = `${appUrl}/baja?c=${contacto.id}`;
     const opts = {
       preheader: automation.preheader ?? undefined,
@@ -64,18 +84,12 @@ export async function GET(req: Request) {
     let html = renderEmailHtml({ bloques }, opts);
     html = aplicarMergeTags(html, contacto);
     if (esCarrito) html = html.replaceAll("${cart.url}", td.abandonedUrl ?? "#");
+    // El tracking va al final: sobre el HTML ya resuelto, para que envuelva
+    // también los links que salieron de los merge tags y del carrito.
+    if (appUrl) html = inyectarTracking(html, envio.id, appUrl);
     // Parte text/plain: un mail solo-HTML es señal de spam, sobre todo en Outlook.
     let texto = aplicarMergeTags(renderEmailTexto({ bloques }, opts), contacto);
     if (esCarrito) texto = texto.replaceAll("${cart.url}", td.abandonedUrl ?? "#");
-
-    // Con el gate cerrado —o en ensayo, si este contacto no está habilitado— no
-    // mandamos nada de verdad, pero dejamos correr el flujo igual: así se ve que
-    // la automation dispara cuando tiene que disparar, sin molestar a nadie.
-    if (!destinatarioPermitido(contacto.email)) {
-      await prisma.automationRun.update({ where: { id: run.id }, data: { estado: "ENVIADO", sesMessageId: "dry-run" } });
-      enviados++;
-      continue;
-    }
 
     const rem = await getRemitenteEnvio(automation.cuentaId);
     try {
@@ -89,10 +103,19 @@ export async function GET(req: Request) {
         fromName: rem?.nombre,
         replyTo: rem?.responderA ?? undefined,
       });
-      await prisma.automationRun.update({ where: { id: run.id }, data: { estado: "ENVIADO", sesMessageId: res.messageId } });
+      await prisma.$transaction([
+        prisma.automationRun.update({ where: { id: run.id }, data: { estado: "ENVIADO", sesMessageId: res.messageId } }),
+        prisma.envio.update({
+          where: { id: envio.id },
+          data: { estado: "ENVIADO", sesMessageId: res.messageId, enviadoAt: new Date() },
+        }),
+      ]);
       enviados++;
     } catch {
-      await prisma.automationRun.update({ where: { id: run.id }, data: { estado: "FALLIDO" } });
+      await prisma.$transaction([
+        prisma.automationRun.update({ where: { id: run.id }, data: { estado: "FALLIDO" } }),
+        prisma.envio.update({ where: { id: envio.id }, data: { estado: "FALLIDO" } }),
+      ]);
       fallidos++;
     }
   }

@@ -115,8 +115,8 @@ export async function enviarCampania(id: string) {
     const testTotal = Math.min(contactos.length, Math.max(2, Math.floor((contactos.length * pct) / 100)));
     const muestra = shuffle([...contactos]).slice(0, testTotal);
     const mitad = Math.ceil(muestra.length / 2);
-    await crearEnvios(id, muestra.slice(0, mitad), "A");
-    await crearEnvios(id, muestra.slice(mitad), "B");
+    await crearEnvios(cuenta.id, id, muestra.slice(0, mitad), "A");
+    await crearEnvios(cuenta.id, id, muestra.slice(mitad), "B");
     await prisma.campania.update({ where: { id }, data: { estado: "ENVIANDO" } });
     const total = await prisma.envio.count({ where: { campaniaId: id } });
     after(() => arrancarCola());
@@ -124,7 +124,7 @@ export async function enviarCampania(id: string) {
   }
 
   // Envío normal (sin A/B).
-  await crearEnvios(id, contactos, null);
+  await crearEnvios(cuenta.id, id, contactos, null);
   await prisma.campania.update({ where: { id }, data: { estado: "ENVIANDO" } });
   const total = await prisma.envio.count({ where: { campaniaId: id } });
   after(() => arrancarCola());
@@ -154,7 +154,7 @@ export async function promoverGanador(id: string, ganador: "A" | "B") {
   const testSet = new Set(yaEnviados.map((e) => e.contactoId));
   const resto = contactos.filter((c) => !testSet.has(c.id));
 
-  await crearEnvios(id, resto, ganador);
+  await crearEnvios(cuenta.id, id, resto, ganador);
   await prisma.campania.update({
     where: { id },
     data: { abGanador: ganador, abResueltoAt: new Date(), estado: "ENVIANDO" },

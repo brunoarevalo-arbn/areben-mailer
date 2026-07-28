@@ -37,6 +37,7 @@ model Cuenta {
   plantillas   Plantilla[]
   automations  Automation[]
   formularios  Formulario[]
+  envios       Envio[]
 }
 
 model Plantilla {
@@ -103,6 +104,9 @@ model AutomationRun {
   triggerData  Json       @default("{}") // datos del evento (checkout id, etc.)
   sesMessageId String?
   createdAt    DateTime   @default(now())
+
+  /// El mail que salió de este run. Es donde viven su apertura y sus clicks.
+  envio Envio?
 
   @@index([estado, proximoAt])
   @@index([automationId, contactoId, createdAt])
@@ -359,24 +363,35 @@ enum EstadoEnvio {
   FALLIDO
 }
 
+/// Un mail concreto a un contacto. Cuelga de la CUENTA, y de ahí sale de una
+/// campaña o de un run de automation — nunca de las dos. Que ambos caminos
+/// terminen en la misma tabla es lo que hace que el tracking y las métricas del
+/// home sean uno solo. Columnas agregadas por scripts/add-envio-automation.ts.
 model Envio {
-  id           String      @id @default(cuid())
-  campaniaId   String
-  campania     Campania    @relation(fields: [campaniaId], references: [id], onDelete: Cascade)
-  contactoId   String
-  contacto     Contacto    @relation(fields: [contactoId], references: [id], onDelete: Cascade)
-  estado       EstadoEnvio @default(ENCOLADO)
-  variante     String? // A/B: "A" | "B" (test o ganador promovido); null = envío normal
-  sesMessageId String? // Message-ID que devuelve SES
-  enviadoAt    DateTime?
-  abiertoAt    DateTime?
-  clickAt      DateTime?
-  createdAt    DateTime    @default(now())
+  id              String         @id @default(cuid())
+  cuentaId        String
+  cuenta          Cuenta         @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  campaniaId      String?
+  campania        Campania?      @relation(fields: [campaniaId], references: [id], onDelete: Cascade)
+  automationRunId String?        @unique
+  automationRun   AutomationRun? @relation(fields: [automationRunId], references: [id], onDelete: Cascade)
+  contactoId      String
+  contacto        Contacto       @relation(fields: [contactoId], references: [id], onDelete: Cascade)
+  estado          EstadoEnvio    @default(ENCOLADO)
+  variante        String? // A/B: "A" | "B" (test o ganador promovido); null = envío normal
+  sesMessageId    String? // Message-ID que devuelve el proveedor (SES o Resend)
+  enviadoAt       DateTime?
+  abiertoAt       DateTime?
+  clickAt         DateTime?
+  createdAt       DateTime       @default(now())
 
   eventos Evento[]
 
+  // Sigue valiendo con campaniaId nulo: Postgres considera distintos a dos NULL,
+  // así que no le pone techo a los envíos de automation.
   @@unique([campaniaId, contactoId])
   @@index([campaniaId, estado])
+  @@index([cuentaId, enviadoAt])
   @@index([sesMessageId])
 }
 

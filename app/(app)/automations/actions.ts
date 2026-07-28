@@ -6,13 +6,14 @@ import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
-import { PRESETS, type Trigger } from "@/lib/automations";
+import { presetsPara, urlTiendaDe, type Trigger } from "@/lib/automations";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function crearAutomation(trigger: Trigger) {
   const cuenta = await getCuentaActiva();
-  const p = PRESETS[trigger];
+  const rem = await getRemitenteEnvio(cuenta.id);
+  const p = presetsPara(cuenta.nombre, urlTiendaDe(cuenta, rem?.email))[trigger];
   const a = await prisma.automation.create({
     data: {
       cuentaId: cuenta.id,

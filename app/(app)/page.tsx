@@ -67,7 +67,9 @@ export default async function Home() {
     );
   }
   const d30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const scope = { campania: { cuentaId: cid } };
+  // Directo por cuenta, no por la campaña: así los KPIs incluyen también los
+  // mails que mandan las automations, que no tienen campaña detrás.
+  const scope = { cuentaId: cid };
 
   // Serie temporal: 30 días (UTC) para envíos/aperturas/clicks.
   const dias: string[] = [];
@@ -111,16 +113,16 @@ export default async function Home() {
     prisma.$queryRaw<{ dia: string; metric: string; n: number }[]>`
       SELECT d AS dia, m AS metric, COUNT(*)::int AS n FROM (
         SELECT to_char(date_trunc('day', e."enviadoAt"), 'YYYY-MM-DD') AS d, 'env' AS m
-          FROM "Envio" e JOIN "Campania" c ON c.id = e."campaniaId"
-          WHERE c."cuentaId" = ${cid} AND e."enviadoAt" >= ${desde}
+          FROM "Envio" e
+          WHERE e."cuentaId" = ${cid} AND e."enviadoAt" >= ${desde}
         UNION ALL
         SELECT to_char(date_trunc('day', e."abiertoAt"), 'YYYY-MM-DD'), 'abr'
-          FROM "Envio" e JOIN "Campania" c ON c.id = e."campaniaId"
-          WHERE c."cuentaId" = ${cid} AND e."abiertoAt" >= ${desde}
+          FROM "Envio" e
+          WHERE e."cuentaId" = ${cid} AND e."abiertoAt" >= ${desde}
         UNION ALL
         SELECT to_char(date_trunc('day', e."clickAt"), 'YYYY-MM-DD'), 'clk'
-          FROM "Envio" e JOIN "Campania" c ON c.id = e."campaniaId"
-          WHERE c."cuentaId" = ${cid} AND e."clickAt" >= ${desde}
+          FROM "Envio" e
+          WHERE e."cuentaId" = ${cid} AND e."clickAt" >= ${desde}
       ) t GROUP BY d, m
     `,
   ]);
