@@ -127,6 +127,11 @@ model Usuario {
   rol          RolUsuario @default(ADMIN)
   passwordHash String?    // scrypt "salt:hash"; nullable hasta setear contraseña
   interno      Boolean    @default(false) // equipo Areben: puede cambiar de marca
+  /// Desactivar en vez de borrar: corta la sesión viva (getAuth lo chequea en
+  /// cada request) y deja rastro de que la persona existió.
+  /// Columna agregada por scripts/add-usuarios-gestion.ts.
+  activo        Boolean   @default(true)
+  ultimoLoginAt DateTime?
   createdAt    DateTime   @default(now())
 
   @@unique([cuentaId, email])

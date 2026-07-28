@@ -49,14 +49,17 @@ export const getAuth = cache(async (): Promise<Ctx> => {
 
   const usuario = await prisma.usuario.findUnique({
     where: { id: session.userId as string },
-    select: { id: true, email: true, nombre: true, rol: true, interno: true },
+    select: { id: true, email: true, nombre: true, rol: true, interno: true, activo: true },
   });
 
-  // El usuario se borró pero su cookie sigue viva. El `?sesion=expirada` es lo
-  // que le permite al proxy borrar la cookie: si redirigiéramos a /login pelado,
-  // el proxy nos rebotaría a / (la cookie todavía tiene userId) y el usuario
-  // quedaría rebotando entre las dos rutas para siempre.
-  if (!usuario) redirect('/login?sesion=expirada');
+  // El usuario se borró (o lo desactivaron) pero su cookie sigue viva. Que el
+  // corte pase por acá es lo que hace que desactivar a alguien tenga efecto
+  // inmediato en vez de esperar a que venza el token, siete días después.
+  //
+  // El `?sesion=expirada` es lo que le permite al proxy borrar la cookie: si
+  // redirigiéramos a /login pelado, el proxy nos rebotaría a / (la cookie
+  // todavía tiene userId) y el usuario quedaría rebotando entre las dos rutas.
+  if (!usuario || !usuario.activo) redirect('/login?sesion=expirada');
 
   const cuenta = session.cuentaId
     ? await prisma.cuenta.findUnique({ where: { id: session.cuentaId as string } })

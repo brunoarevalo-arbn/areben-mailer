@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Zap,
   AtSign,
+  UserCog,
   LogOut,
   type LucideIcon,
 } from 'lucide-react';
@@ -39,6 +40,7 @@ const NAV: { href: string; label: string; icon: LucideIcon; permiso?: Permiso }[
   { href: '/formularios', label: 'Formularios', icon: ClipboardList },
   { href: '/automations', label: 'Automations', icon: Zap },
   { href: '/remitentes', label: 'Remitentes', icon: AtSign, permiso: 'remitentes' },
+  { href: '/usuarios', label: 'Usuarios', icon: UserCog, permiso: 'usuarios' },
 ];
 
 export function Sidebar({
