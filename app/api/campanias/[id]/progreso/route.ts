@@ -1,13 +1,21 @@
 import { prisma } from "@/lib/prisma";
+import { autorizarApi } from "@/lib/auth";
 
 // Progreso de una campaña en curso. Solo lee: el envío lo maneja la cola del
-// servidor, el editor únicamente mira. Ruta protegida por sesión (el proxy no
-// la lista como pública).
+// servidor, el editor únicamente mira.
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const campania = await prisma.campania.findUnique({
-    where: { id },
+  // autorizarApi y no autorizar: un redirect acá sería un 307 que fetch sigue
+  // hasta el HTML de /login, y el polling del editor reventaría en res.json().
+  const auth = await autorizarApi("ver");
+  if (auth instanceof Response) return auth;
+
+  // Filtrado por cuenta: antes era findUnique({ id }) pelado, así que con un id
+  // ajeno se leían las métricas de otra marca. 404 y no 403, para no confirmarle
+  // a quien sondea que ese id existe.
+  const campania = await prisma.campania.findFirst({
+    where: { id, cuentaId: auth.cuenta.id },
     select: { estado: true, procesandoHasta: true },
   });
   if (!campania) return Response.json({ error: "no existe" }, { status: 404 });

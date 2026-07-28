@@ -14,12 +14,15 @@ export function AutomationEditor({
   nombreCuenta,
   triggerLabel,
   estadoInicial,
+  emailPrueba,
   initial,
 }: {
   id: string;
   nombreCuenta: string;
   triggerLabel: string;
   estadoInicial: string;
+  /** Mail de quien está mirando: la prueba sale a su casilla, no a una fija. */
+  emailPrueba: string;
   initial: { nombre: string; asunto: string; preheader: string; esperaHoras: number; capDias: number; contenido: ContenidoCampania };
 }) {
   const [nombre, setNombre] = useState(initial.nombre);
@@ -29,7 +32,7 @@ export function AutomationEditor({
   const [capDias, setCapDias] = useState(initial.capDias);
   const [bloques, setBloques] = useState<Bloque[]>(initial.contenido?.bloques ?? []);
   const [estado, setEstado] = useState(estadoInicial);
-  const [pruebaEmail, setPruebaEmail] = useState("brunoarevalo@arebensrl.com");
+  const [pruebaEmail, setPruebaEmail] = useState(emailPrueba);
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
   const [sending, startSend] = useTransition();

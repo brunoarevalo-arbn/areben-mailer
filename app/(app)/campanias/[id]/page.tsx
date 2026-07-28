@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { CampaniaEditor } from "@/components/CampaniaEditor";
 import { prisma } from "@/lib/prisma";
-import { getCuentaActiva } from "@/lib/cuenta";
+import { getAuth } from "@/lib/auth";
 import { contactosElegibles } from "@/lib/campanias";
 import type { ContenidoCampania } from "@/lib/email/render";
 
@@ -15,7 +15,10 @@ export default async function CampaniaEditorPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const cuenta = await getCuentaActiva();
+  // getAuth y no getCuentaActiva: el input de "enviar prueba" tiene que arrancar
+  // con el mail de quien está mirando. Con una dirección fija, un editor creía
+  // que se mandaba la prueba a él cuando en realidad iba a otra casilla.
+  const { cuenta, email } = await getAuth();
 
   const [campania, listas, segmentos] = await Promise.all([
     prisma.campania.findFirst({ where: { id, cuentaId: cuenta.id } }),
@@ -119,7 +122,7 @@ export default async function CampaniaEditorPage({
         }}
         listas={listas}
         segmentos={segmentos}
-        emailPrueba="brunoarevalo@arebensrl.com"
+        emailPrueba={email}
         estado={campania.estado}
         abInfo={abInfo}
       />

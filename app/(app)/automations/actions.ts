@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
+import { chequear } from "@/lib/auth";
 import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { sendEmail } from "@/lib/email/enviar";
@@ -53,10 +54,20 @@ export async function guardarAutomation(input: {
 }
 
 export async function toggleAutomation(id: string) {
+  // Se lee con la cuenta de la sesión antes de autorizar porque el permiso
+  // depende de hacia dónde va el toggle.
   const cuenta = await getCuentaActiva();
   const a = await prisma.automation.findFirst({ where: { id, cuentaId: cuenta.id } });
   if (!a) return { ok: false };
   const nuevoEstado = a.estado === "ACTIVO" ? "PAUSADO" : "ACTIVO";
+
+  // Asimétrico a propósito. Encender registra un webhook en Tiendanube y
+  // habilita mails que salen solos, para siempre, sin que nadie apriete nada:
+  // eso es "enviar". Pausar es la acción segura, y ante un problema ("el link
+  // del carrito está mal") conviene que un editor pueda frenarla sin esperar a
+  // que aparezca un admin.
+  const auth = await chequear(nuevoEstado === "ACTIVO" ? "enviar" : "editar");
+  if (!auth.ok) return { ok: false, error: auth.error };
 
   if (nuevoEstado === "ACTIVO" && cuenta.tnStoreId && cuenta.tnToken) {
     const event = TRIGGER_EVENT[a.trigger];
@@ -70,7 +81,14 @@ export async function toggleAutomation(id: string) {
 }
 
 export async function enviarPruebaAutomation(id: string, email: string) {
-  const cuenta = await getCuentaActiva();
+  const auth = await chequear("probar");
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const { cuenta, email: emailSesion, nombre, rol } = auth.ctx;
+
+  // Mismo criterio que enviarPrueba de campañas: el destinatario sale de la
+  // sesión, no del cliente, salvo que sea ADMIN.
+  const destino = rol === "ADMIN" ? email : emailSesion;
+
   const a = await prisma.automation.findFirst({ where: { id, cuentaId: cuenta.id } });
   if (!a?.asunto) return { ok: false, error: "Falta el asunto" };
   const html = aplicarMergeTags(
@@ -79,19 +97,19 @@ export async function enviarPruebaAutomation(id: string, email: string) {
       unsubscribeUrl: `${process.env.APP_URL}/baja?token=preview`,
       nombreCuenta: cuenta.nombre,
     }),
-    { nombre: "Bruno", email },
+    { nombre: nombre ?? "", email: destino },
   );
   const rem = await getRemitenteEnvio(cuenta.id);
   try {
     const res = await sendEmail({
-      to: email,
+      to: destino,
       subject: `[PRUEBA] ${a.asunto}`,
       html,
       fromEmail: rem?.email,
       fromName: rem?.nombre,
       replyTo: rem?.responderA ?? undefined,
     });
-    return { ok: true, messageId: res.messageId };
+    return { ok: true, messageId: res.messageId, destino };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }

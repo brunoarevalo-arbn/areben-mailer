@@ -25,6 +25,16 @@ export async function proxy(req: NextRequest) {
   const token = req.cookies.get('session')?.value;
   const session = await decrypt(token);
 
+  // Sesión huérfana: la cookie es válida pero el usuario ya no existe o quedó
+  // sin cuenta, y getAuth() nos mandó acá. Hay que BORRAR la cookie, cosa que
+  // un server component no puede hacer. Sin esto el rebote de abajo devolvería
+  // a la app, la app volvería a redirigir, y el usuario quedaría en un bucle.
+  if (pathname === '/login' && req.nextUrl.searchParams.has('sesion')) {
+    const res = NextResponse.next();
+    res.cookies.delete('session');
+    return res;
+  }
+
   // Ya logueado y yendo a /login → a la app.
   if (session?.userId && pathname === '/login') {
     return NextResponse.redirect(new URL('/', req.url));

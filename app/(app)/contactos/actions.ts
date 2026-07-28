@@ -2,12 +2,17 @@
 
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
+import { chequear } from "@/lib/auth";
 import { importCustomersIncremental } from "@/lib/tn/import";
 import { revalidatePath } from "next/cache";
 
 /** Sincroniza contactos nuevos/cambiados desde TN (incremental). */
 export async function sincronizarContactosTN() {
-  const cuenta = await getCuentaActiva();
+  // Toca la integración con Tiendanube y reescribe la audiencia entera: ADMIN.
+  const auth = await chequear("integrar");
+  if (!auth.ok) return { ok: false, error: auth.error, nuevos: 0, actualizados: 0 };
+  const cuenta = auth.ctx.cuenta;
+
   if (!cuenta.tnStoreId || !cuenta.tnToken)
     return { ok: false, error: "TN no conectada", nuevos: 0, actualizados: 0 };
 

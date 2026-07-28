@@ -16,11 +16,15 @@ export const verifySession = cache(async () => {
     redirect('/login');
   }
 
+  // ⛔ El `rol` del JWT NO se expone a propósito. El token dura 7 días: si se
+  // autorizara con él, degradar a alguien no tendría efecto hasta que se
+  // deslogueara. Para autorizar está `autorizar()`/`chequear()` de @/lib/auth,
+  // que leen el rol de la base. Sacarlo de acá hace que el compilador impida
+  // volver al camino viejo.
   return {
     isAuth: true as const,
     userId: session.userId,
     cuentaId: session.cuentaId,
-    rol: session.rol,
   };
 });
 

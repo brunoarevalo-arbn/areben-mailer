@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AutomationEditor } from "@/components/AutomationEditor";
 import { prisma } from "@/lib/prisma";
-import { getCuentaActiva } from "@/lib/cuenta";
+import { getAuth } from "@/lib/auth";
 import type { ContenidoCampania } from "@/lib/email/render";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ const TRIGGER_LABEL: Record<string, string> = {
 
 export default async function AutomationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const cuenta = await getCuentaActiva();
+  const { cuenta, email } = await getAuth();
   const a = await prisma.automation.findFirst({ where: { id, cuentaId: cuenta.id } });
   if (!a) notFound();
 
@@ -29,6 +29,7 @@ export default async function AutomationPage({ params }: { params: Promise<{ id:
         nombreCuenta={cuenta.nombre}
         triggerLabel={TRIGGER_LABEL[a.trigger] ?? a.trigger}
         estadoInicial={a.estado}
+        emailPrueba={email}
         initial={{
           nombre: a.nombre,
           asunto: a.asunto ?? "",

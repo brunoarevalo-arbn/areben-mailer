@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
+import { chequear } from "@/lib/auth";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
@@ -77,7 +78,12 @@ function shuffle<T>(arr: T[]): T[] {
 
 /** Encola una campaña: crea los Envío para los contactos elegibles y la pone ENVIANDO. */
 export async function enviarCampania(id: string) {
-  const cuenta = await getCuentaActiva();
+  // El envío a la lista completa es la acción más cara de la app: no se deshace
+  // y una lista mal armada quema la reputación del dominio. Solo ADMIN.
+  const auth = await chequear("enviar");
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const cuenta = auth.ctx.cuenta;
+
   const campania = await prisma.campania.findFirst({ where: { id, cuentaId: cuenta.id } });
   if (!campania) return { ok: false, error: "Campaña no encontrada" };
   if (!campania.asunto) return { ok: false, error: "Falta el asunto" };
@@ -133,7 +139,11 @@ export async function enviarCampania(id: string) {
 
 /** Promueve el asunto ganador al resto de la lista (holdout). Manual. */
 export async function promoverGanador(id: string, ganador: "A" | "B") {
-  const cuenta = await getCuentaActiva();
+  // Manda al holdout, que es todo el resto de la lista: mismo peso que enviar.
+  const auth = await chequear("enviar");
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const cuenta = auth.ctx.cuenta;
+
   const campania = await prisma.campania.findFirst({ where: { id, cuentaId: cuenta.id } });
   if (!campania) return { ok: false, error: "Campaña no encontrada" };
   if (campania.abTestPct == null) return { ok: false, error: "La campaña no es A/B" };
@@ -173,7 +183,18 @@ export async function guardarComoPlantilla(nombre: string, contenido: ContenidoC
 }
 
 export async function enviarPrueba(id: string, emailDestino: string) {
-  const cuenta = await getCuentaActiva();
+  const auth = await chequear("probar");
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const { cuenta, email: emailSesion, nombre, rol } = auth.ctx;
+
+  // 🛑 El destinatario NO se toma del cliente salvo que sea ADMIN. Aceptar
+  // cualquier dirección convertía el panel en "mandá el HTML que quieras, desde
+  // un dominio verificado, a quien quieras" — un canal de phishing con la
+  // reputación de la marca de garantía. El ADMIN lo necesita de verdad: probar
+  // en Gmail, Outlook y Yahoo es la única forma de ver cómo lo clasifica cada
+  // filtro de spam.
+  const destino = rol === "ADMIN" ? emailDestino : emailSesion;
+
   const campania = await prisma.campania.findFirst({
     where: { id, cuentaId: cuenta.id },
   });
@@ -186,7 +207,7 @@ export async function enviarPrueba(id: string, emailDestino: string) {
     unsubscribeUrl: `${process.env.APP_URL}/baja?token=preview`,
     nombreCuenta: cuenta.nombre,
   };
-  const destinatario = { nombre: "Bruno", email: emailDestino };
+  const destinatario = { nombre: nombre ?? "", email: destino };
   const htmlFinal = aplicarMergeTags(renderEmailHtml(contenido, opts), destinatario);
   // La prueba tiene que salir igual que el envío real, parte de texto incluida:
   // si no, no sirve para juzgar cómo la va a clasificar el filtro de spam.
@@ -195,7 +216,7 @@ export async function enviarPrueba(id: string, emailDestino: string) {
   const rem = await getRemitenteEnvio(cuenta.id);
   try {
     const res = await sendEmail({
-      to: emailDestino,
+      to: destino,
       subject: `[PRUEBA] ${campania.asunto}`,
       html: htmlFinal,
       text: textoFinal,
@@ -204,7 +225,7 @@ export async function enviarPrueba(id: string, emailDestino: string) {
       fromName: rem?.nombre,
       replyTo: rem?.responderA ?? undefined,
     });
-    return { ok: true, messageId: res.messageId };
+    return { ok: true, messageId: res.messageId, destino };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
