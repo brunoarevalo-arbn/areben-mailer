@@ -5,6 +5,7 @@ import type { Bloque, ContenidoCampania } from "@/lib/email/render";
 import { BloquesEditor } from "@/components/BloquesEditor";
 import { guardarAutomation, enviarPruebaAutomation, toggleAutomation } from "@/app/(app)/automations/actions";
 import { Button } from "@/components/ui/Button";
+import { usePermisos } from "@/components/PermisosProvider";
 import { Pause, Play } from "lucide-react";
 
 const input = "rounded-lg border border-border-strong bg-background text-foreground placeholder:text-subtle px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-ring/30";
@@ -33,6 +34,9 @@ export function AutomationEditor({
   const [bloques, setBloques] = useState<Bloque[]>(initial.contenido?.bloques ?? []);
   const [estado, setEstado] = useState(estadoInicial);
   const [pruebaEmail, setPruebaEmail] = useState(emailPrueba);
+  const { puede, motivo, soloLectura } = usePermisos();
+  // Encender manda mails que salen solos: eso es "enviar". Pausar no.
+  const puedeActivar = puede("enviar");
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
   const [sending, startSend] = useTransition();
@@ -63,7 +67,8 @@ export function AutomationEditor({
         <Button
           variant={estado === "ACTIVO" ? "secondary" : "primary"}
           onClick={toggle}
-          disabled={toggling}
+          disabled={toggling || soloLectura || (estado !== "ACTIVO" && !puedeActivar)}
+          title={estado !== "ACTIVO" && !puedeActivar ? motivo("enviar") : undefined}
           className="ml-auto"
         >
           {estado === "ACTIVO"
@@ -89,6 +94,11 @@ export function AutomationEditor({
 
       <BloquesEditor bloques={bloques} onChange={setBloques} nombreCuenta={nombreCuenta} preheader={preheader} />
 
+      {soloLectura ? (
+        <div className="rounded-xl border border-border bg-surface-muted p-4 text-sm text-muted">
+          Estás viendo esta automation en modo lectura.
+        </div>
+      ) : (
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface p-4 shadow-sm">
         <Button variant="primary" onClick={guardar} disabled={saving}>
           {saving ? "Guardando…" : "Guardar"}
@@ -99,6 +109,7 @@ export function AutomationEditor({
         </Button>
         {msg && <span className="text-sm text-muted">{msg}</span>}
       </div>
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
 } from "@/app/(app)/campanias/actions";
 import { BloquesList } from "@/components/BloquesList";
 import { Button } from "@/components/ui/Button";
+import { usePermisos } from "@/components/PermisosProvider";
 import { AISoonButton } from "@/components/ui/AISoonButton";
 import { inputClass } from "@/lib/ui";
 
@@ -68,6 +69,8 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
   const [destino, setDestino] = useState(initial.destino ?? "");
   const [bloques, setBloques] = useState(initial.contenido?.bloques ?? []);
   const [pruebaEmail, setPruebaEmail] = useState(emailPrueba);
+  const { puede, motivo, soloLectura } = usePermisos();
+  const puedeEnviar = puede("enviar");
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
   const [sending, startSend] = useTransition();
@@ -248,6 +251,11 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
         <BloquesList bloques={bloques} onChange={setBloques} />
 
         {/* Acciones */}
+        {soloLectura ? (
+          <div className="rounded-xl border border-border bg-surface-muted p-4 text-sm text-muted">
+            Estás viendo esta campaña en modo lectura.
+          </div>
+        ) : (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface p-4 shadow-sm">
           <Button variant="primary" onClick={guardar} disabled={saving}>
             {saving ? "Guardando…" : "Guardar"}
@@ -270,6 +278,7 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
           </Button>
           {msg && <span className="text-sm text-muted">{msg}</span>}
         </div>
+        )}
 
         {/* Panel de resultados A/B — elegir ganador */}
         {esperandoGanador && (
@@ -301,7 +310,14 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
                     <div className="text-xs text-subtle">
                       {d.aperturas.toLocaleString("es-AR")} / {d.enviados.toLocaleString("es-AR")} aperturas
                     </div>
-                    <Button variant="accent" size="sm" onClick={() => mandarGanador(v)} disabled={promoviendo} className="w-full">
+                    <Button
+                      variant="accent"
+                      size="sm"
+                      onClick={() => mandarGanador(v)}
+                      disabled={promoviendo || !puedeEnviar}
+                      title={puedeEnviar ? undefined : motivo("enviar")}
+                      className="w-full"
+                    >
                       Mandar {v} al resto
                     </Button>
                   </div>
@@ -330,11 +346,18 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
               {abActivo ? "Enviar test A/B" : "Enviar a la lista"}
             </div>
             <p className="text-xs text-muted">
-              {abActivo
-                ? `Se manda el asunto A y B al ${abPct}% de la lista. Después elegís el ganador y se manda al resto.`
-                : "Se envía solo a los contactos de la lista que aceptan marketing y están activos."}
+              {!puedeEnviar
+                ? "La campaña queda lista. El envío a la lista lo dispara un administrador."
+                : abActivo
+                  ? `Se manda el asunto A y B al ${abPct}% de la lista. Después elegís el ganador y se manda al resto.`
+                  : "Se envía solo a los contactos de la lista que aceptan marketing y están activos."}
             </p>
-            <Button variant="accent" onClick={enviarTodo} disabled={enviado}>
+            <Button
+              variant="accent"
+              onClick={enviarTodo}
+              disabled={enviado || !puedeEnviar}
+              title={puedeEnviar ? undefined : motivo("enviar")}
+            >
               {enviado ? "Enviada / en curso" : abActivo ? "Enviar test A/B" : "Enviar a la lista"}
             </Button>
             {progreso && <div className="text-sm text-foreground">{progreso}</div>}

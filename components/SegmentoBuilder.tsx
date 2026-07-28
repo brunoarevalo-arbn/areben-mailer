@@ -4,6 +4,7 @@ import { useState, useEffect, useTransition } from "react";
 import { CAMPOS, type Reglas, type Condicion, type CondCampo } from "@/lib/segmentos";
 import { guardarSegmento, contarSegmento } from "@/app/(app)/segmentos/actions";
 import { Button } from "@/components/ui/Button";
+import { usePermisos } from "@/components/PermisosProvider";
 import { X } from "lucide-react";
 
 const input = "rounded-lg border border-border-strong bg-background text-foreground placeholder:text-subtle px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-ring/30";
@@ -29,6 +30,7 @@ export function SegmentoBuilder({
   const [count, setCount] = useState<number | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
+  const { soloLectura } = usePermisos();
 
   const reglas: Reglas = { op, condiciones: conds };
 
@@ -119,7 +121,7 @@ export function SegmentoBuilder({
         <div className="text-2xl font-semibold tabular-nums text-foreground">{count === null ? "…" : count.toLocaleString("es-AR")}</div>
         <div className="ml-auto flex items-center gap-2">
           {msg && <span className="text-sm text-muted">{msg}</span>}
-          <Button variant="primary" onClick={guardar} disabled={saving}>
+          <Button variant="primary" onClick={guardar} disabled={saving || soloLectura} title={soloLectura ? `Tu usuario es de solo lectura.` : undefined}>
             {saving ? "Guardando…" : "Guardar"}
           </Button>
         </div>

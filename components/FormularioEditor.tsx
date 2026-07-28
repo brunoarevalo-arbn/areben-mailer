@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { usePermisos } from "@/components/PermisosProvider";
 import { Card } from "@/components/ui/Card";
 import { guardarFormulario, eliminarFormulario } from "@/app/(app)/formularios/actions";
 
@@ -72,6 +73,7 @@ export function FormularioEditor({ listas, publicUrl, initial }: Props) {
   const [activo, setActivo] = useState(initial.activo);
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
+  const { soloLectura } = usePermisos();
 
   const iframe = `<iframe src="${publicUrl}" width="100%" height="480" style="border:0;max-width:440px" title="${titulo.replace(/"/g, "&quot;")}"></iframe>`;
 
@@ -168,7 +170,7 @@ export function FormularioEditor({ listas, publicUrl, initial }: Props) {
         </Card>
 
         <div className="flex items-center gap-2">
-          <Button variant="primary" onClick={guardar} disabled={saving}>
+          <Button variant="primary" onClick={guardar} disabled={saving || soloLectura} title={soloLectura ? `Tu usuario es de solo lectura.` : undefined}>
             {saving ? "Guardando…" : "Guardar"}
           </Button>
           {msg && <span className="text-sm text-muted">{msg}</span>}

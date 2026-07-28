@@ -3,7 +3,6 @@ import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { decrypt } from './session';
-import { prisma } from './prisma';
 
 // Data Access Layer: centraliza la verificación de sesión. Memoizado por
 // render con cache() para no repetir el decrypt/consulta en un mismo pase.
@@ -28,15 +27,7 @@ export const verifySession = cache(async () => {
   };
 });
 
-// Usuario de sesión para la UI (DTO acotado, sin passwordHash).
-export const getSessionUser = cache(async () => {
-  const session = await verifySession();
-  try {
-    return await prisma.usuario.findUnique({
-      where: { id: session.userId },
-      select: { id: true, nombre: true, email: true, rol: true, interno: true },
-    });
-  } catch {
-    return null;
-  }
-});
+// getSessionUser vivía acá y quedó sin uso: el layout ahora usa getAuth() de
+// @/lib/auth, que trae lo mismo (usuario fresco de la base) más la cuenta y el
+// permiso. Dos funciones que hacen la misma consulta invitan a autorizar con la
+// que no valida nada.
