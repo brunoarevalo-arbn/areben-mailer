@@ -29,16 +29,14 @@ export const DOMINIO_SIMULADOR = 'simulator.amazonses.com';
  * sale nada. Preferimos quedarnos mudos a mandarle de más a 16.000 personas.
  *
  * El nombre es neutro a propósito. Antes esto se llamaba `SES_SANDBOX`, y ese
- * nombre mentía: frenaba el envío con CUALQUIER proveedor, así que migrar a
- * Resend habría dejado la app sin enviar nada y sin ninguna pista de por qué.
- * Mientras `ENVIO_REAL` no esté definida se respeta la env vieja, para que el
- * deploy que hoy corre en Vercel siga comportándose igual.
+ * nombre mentía por partida doble: frenaba el envío con CUALQUIER proveedor —así
+ * que migrar a Resend habría dejado la app muda sin ninguna pista de por qué— y
+ * además nombraba un estado de AWS que dejó de existir el 29-jul, cuando la
+ * cuenta salió del sandbox. Una env que decide quién recibe 16.825 mails no
+ * puede llamarse por algo que ya no es cierto.
  */
 export function envioRealHabilitado(): boolean {
-  const flag = process.env.ENVIO_REAL;
-  if (flag !== undefined) return flag === 'true';
-  // Compat: se puede borrar en cuanto ENVIO_REAL esté cargada en Vercel y .env.
-  return process.env.SES_SANDBOX === 'false';
+  return process.env.ENVIO_REAL === 'true';
 }
 
 /**
@@ -52,7 +50,7 @@ export function envioRealHabilitado(): boolean {
  * habilita todas sus casillas: hoy `@bdiaccesorios.com.ar` y `@zattia.com.ar`
  * ya reciben, sin verificar nada nuevo.
  */
-function listaEnsayo(): string[] {
+export function listaEnsayo(): string[] {
   return (process.env.ENVIO_ENSAYO ?? '')
     .split(',')
     .map((e) => e.trim().toLowerCase())

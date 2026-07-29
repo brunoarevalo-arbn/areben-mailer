@@ -11,6 +11,7 @@ import {
   FileText,
   ClipboardList,
   Zap,
+  Gauge,
   AtSign,
   UserCog,
   LogOut,
@@ -39,6 +40,7 @@ const NAV: { href: string; label: string; icon: LucideIcon; permiso?: Permiso }[
   { href: '/plantillas', label: 'Plantillas', icon: FileText },
   { href: '/formularios', label: 'Formularios', icon: ClipboardList },
   { href: '/automations', label: 'Automations', icon: Zap },
+  { href: '/envio', label: 'Estado del envío', icon: Gauge, permiso: 'enviar' },
   { href: '/remitentes', label: 'Remitentes', icon: AtSign, permiso: 'remitentes' },
   { href: '/usuarios', label: 'Usuarios', icon: UserCog, permiso: 'usuarios' },
 ];
