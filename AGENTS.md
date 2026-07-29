@@ -118,11 +118,18 @@ Tres estados, no dos (`lib/email/proveedor.ts`):
 - La vista `/envio` muestra el estado real del gate y del proveedor sin entrar a Vercel.
 
 **Proveedor:** se elige con `EMAIL_PROVIDER` (`ses` | `resend` | `sendgrid`;
-default `ses`). En producción está en **`resend`** — Hotmail pasó de spam a inbox
-al migrar. ⚠️ El `.env` local **no** define `EMAIL_PROVIDER`, así que localmente
-cae a SES: si probás envíos, seteala. SES quedó aprobado para producción
-(50k/día) y sigue disponible como alternativa; la elección final está pendiente
-de un ensayo comparativo.
+default `ses`). En producción está en **`resend`**, pero **la decisión tomada el
+29-jul-2026 es arrancar el envío propio por SES**: está aprobado (50k/día) y toda
+la base cuesta menos de un dólar, contra USD 20/mes de Resend Pro. ⚠️ El `.env`
+local **no** define `EMAIL_PROVIDER`, así que localmente cae a SES.
+
+**Resend no se da de baja**: el plan free (100 mails/día, 3.000/mes) cuesta cero y
+es la red de seguridad **medida** — el 28-jul la misma casilla de Hotmail cayó en
+spam por SES y entró en inbox por Resend. Cambiar de proveedor es esa env var
+**más un redeploy**.
+
+⚠️ **Los 100/día son un límite de Resend, no del mailer.** Con SES no hay tope
+práctico: el escalonado se decide por reputación, no porque el proveedor frene.
 
 **Cola:** el servidor manda, no el navegador. Lease en `Campania.procesandoHasta`
 + auto-encadenamiento entre invocaciones, con el cron de 15 min como perro
@@ -438,3 +445,17 @@ temprano cuesta varias veces su tamaño.
   les llega como "Hola ". En esa lista no se usa el merge tag, o se usa con un
   saludo que funcione vacío. En `Perfit — abrieron 2026` casi no pasa: 668 de 685
   tienen nombre.
+- 🔴 **El ramp del primer envío se ordena por BUZÓN, no por antigüedad.** Medido:
+  `Perfit — abrieron 2026` es **55,6% Microsoft** (381 de 685) y solo 14,7% Gmail,
+  mientras `Nuby — suscriptores` es **87,4% Gmail** y 8,3% Microsoft. Estrenar la
+  IP fría de SES contra la lista "tibia" sería mandar la mitad al buzón que ya nos
+  mandó a spam. **Gmail primero, Microsoft al final** (o por Resend free, que ahí
+  entra en inbox).
+- ⚠️ **Las 880 "aperturas" de la campaña de Perfit están infladas.** Outlook y
+  Hotmail pre-cargan las imágenes en su escaneo de seguridad y disparan el pixel
+  sin que nadie mire nada — es la razón de ese 55,6%. La señal real son los **94
+  clicks**, que no se falsifican por prefetch. Falta exportarlos de Perfit.
+- ⚠️ **El motor manda a una lista o segmento COMPLETO**: no hay "mandale a 500 de
+  estos 5.280", y los segmentos no filtran por dominio ni por cantidad (ver
+  `CAMPOS` en `lib/segmentos.ts`). Para escalonar hacen falta **listas por tramo**,
+  que es la misma pieza que después necesita la cuarentena del SaaS.

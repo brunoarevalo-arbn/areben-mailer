@@ -151,7 +151,9 @@ titulo("Lo que no puede faltar nunca");
     // `productos-dinamicos` está acá por lo mismo que `productos` —nace sin nada
     // que decir— y además sus productos ni siquiera viven en el bloque. Que SÍ
     // aporte texto cuando los tiene lo fija `probar-productos-dinamicos.ts`.
-    if (["espaciador", "imagen", "carrito", "productos", "productos-dinamicos", "columnas", "video", "redes"].includes(t)) return false;
+    // "menu" nace con links sin URL (mismo motivo que "redes"), y "html" nace
+    // sin contenido y además no tiene conversión razonable a texto plano.
+    if (["espaciador", "imagen", "carrito", "productos", "productos-dinamicos", "columnas", "video", "redes", "menu", "html"].includes(t)) return false;
     return renderEmailTexto({ ...base, bloques: [b] }, OPTS) === vacio;
   });
   ok(sinTexto.length === 0, "todo tipo con contenido aporta algo a la parte de texto", sinTexto.join(", "));

@@ -42,6 +42,12 @@ interface Ctx extends CtxEstilo {
   /** Logo y sitio de la marca (`Cuenta.config`, los trae TN). Ídem: defaults. */
   logoCuenta: string;
   urlCuenta: string;
+  /**
+   * ¿Esta CUENTA puede usar el bloque `html`? No es el permiso del usuario que
+   * edita —al enviar no hay usuario, solo cuenta—. Ausente/`false` = el bloque
+   * no se dibuja aunque el Json lo tenga. Ver `Cuenta.config.htmlCrudoHabilitado`.
+   */
+  permiteHtmlCrudo: boolean;
 }
 
 /** Atajo: el estilo de un rol de este bloque, con las cuatro capas aplicadas. */
@@ -187,7 +193,7 @@ function estProducto(tipo: TipoBloque, rolNombre: RolEstilo, ctx: Ctx, propio: E
 /** Render de una grilla de productos, reutilizable (ej. email de carrito abandonado). */
 export function renderProductosHtml(items: ProductoEmail[], tema?: Tema): string {
   const pal = resolverPaleta(tema);
-  const ctx: Ctx = { pal, muestraCarrito: false, nombreCuenta: "", logoCuenta: "", urlCuenta: "" };
+  const ctx: Ctx = { pal, muestraCarrito: false, nombreCuenta: "", logoCuenta: "", urlCuenta: "", permiteHtmlCrudo: false };
   return renderProductos(items, pal, estProducto("productos", "cuerpo", ctx, undefined));
 }
 
@@ -307,12 +313,38 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       );
     }
     case "columnas": {
-      const t = e("imagen");
-      const cell = (c: Columna) =>
+      // Cuatro variantes, dos formas de celda. `variante` decide, de cada lado,
+      // si va imagen o texto — no hay un quinto caso "mixto libre" a propósito:
+      // menos combinaciones, menos perillas que probar en el panel de estilo.
+      const variante = b.variante ?? "imagenes";
+      const izqPct = b.proporcion ?? 50;
+      const derPct = 100 - izqPct;
+      const tImg = e("imagen");
+      const tTitulo = e("titulo");
+      const tCuerpo = e("cuerpo");
+
+      const celdaImagen = (c: Columna, pct: number) =>
         c.imagen
-          ? `<td width="50%" valign="top"${clase(CLASES.col)} style="padding:6px"><a href="${esc(c.url || "#")}"><img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:${px(t.radio ?? 8)};display:block" alt="" /></a></td>`
-          : `<td width="50%"></td>`;
-      return pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px"><tr>${cell(b.izq)}${cell(b.der)}</tr></table>`, caja());
+          ? `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px"><a href="${esc(c.url || "#")}"><img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:${px(tImg.radio ?? 8)};display:block" alt="" /></a></td>`
+          : `<td width="${pct}%"></td>`;
+
+      const celdaTexto = (c: Columna, pct: number) => {
+        const titulo = c.titulo
+          ? `<div style="margin:0 0 6px;font-size:${px(tTitulo.tamano ?? 18)};font-weight:${tTitulo.peso ?? 700};line-height:${tTitulo.interlinea ?? 1.3};color:${tTitulo.color};text-align:${tTitulo.align ?? "left"}${extra(tTitulo, ["tamano", "peso", "interlinea", "color", "align"])}">${esc(c.titulo)}</div>`
+          : "";
+        const texto = c.texto
+          ? `<div style="font-size:${px(tCuerpo.tamano ?? 14)};line-height:${tCuerpo.interlinea ?? 1.5};color:${tCuerpo.color};text-align:${tCuerpo.align ?? "left"}${extra(tCuerpo, ["tamano", "interlinea", "color", "align"])}">${nl(c.texto)}</div>`
+          : "";
+        const contenido = `${titulo}${texto}`;
+        const interior = c.url ? `<a href="${esc(c.url)}" style="text-decoration:none;color:inherit">${contenido}</a>` : contenido;
+        return `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px">${interior}</td>`;
+      };
+
+      const celda = (c: Columna, pct: number, comoImagen: boolean) => (comoImagen ? celdaImagen(c, pct) : celdaTexto(c, pct));
+      const izqImagen = variante === "imagenes" || variante === "imagen-texto";
+      const derImagen = variante === "imagenes" || variante === "texto-imagen";
+
+      return pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px"><tr>${celda(b.izq, izqPct, izqImagen)}${celda(b.der, derPct, derImagen)}</tr></table>`, caja());
     }
     case "video": {
       // El ▶ estaba superpuesto con `position:absolute`, y **Gmail elimina
@@ -332,6 +364,21 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         .map((l) => `<a href="${esc(l.url)}" style="display:inline-block;margin:0 8px;color:${t.color};font-size:${px(t.tamano ?? 14)};text-decoration:none${extra(t, ["color", "tamano", "align", "subrayado"])}">${esc(l.red)}</a>`)
         .join("")}</div>`, caja());
     }
+    case "menu": {
+      const t = e("cuerpo");
+      const enlaces = (b.links ?? []).filter((l) => l.url && l.texto);
+      if (!enlaces.length) return "";
+      const align = t.align ?? "center";
+      return pad(
+        `<div style="text-align:${align};margin:12px 0">${enlaces
+          .map(
+            (l) =>
+              `<a href="${esc(l.url)}" style="display:inline-block;margin:0 12px;font-size:${px(t.tamano ?? 14)};font-weight:${t.peso ?? 600};color:${t.color};text-decoration:none${extra(t, ["tamano", "peso", "color", "align"])}">${esc(l.texto)}</a>`,
+          )
+          .join("")}</div>`,
+        caja(),
+      );
+    }
     case "divisor": {
       const t = e("caja");
       return pad(`<hr style="border:0;border-top:${px(t.bordeAncho ?? 1)} ${t.bordeEstilo ?? "solid"} ${t.bordeColor ?? pal.bordeSuave};margin:24px 0" />`, t);
@@ -344,7 +391,6 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     }
     case "hero": {
       const t0 = e("imagen");
-      const img = b.imagen ? `<img src="${esc(b.imagen)}" alt="" style="width:100%;display:block;margin:0${extra(t0, ["radio", "align", "color", "tamano"])}" />` : "";
       // El `bg` lo elige el autor, así que el color del texto se decide por ESE
       // fondo y no por el tema: un hero blanco dentro de un mail oscuro tendría
       // título blanco sobre blanco si se heredara la paleta.
@@ -353,7 +399,35 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h1${clase(...clasesTitulo(x))} style="margin:0 0 10px;font-size:${px(x.tamano ?? 30)};line-height:${x.interlinea ?? 1.2};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.titulo)}</h1>`; })() : "";
       const s = b.subtitulo ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 20px;font-size:${px(x.tamano ?? 17)};line-height:${x.interlinea ?? 1.5};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.subtitulo)}</p>`; })() : "";
       const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
-      const cajaHtml = t || s || btn ? `<div style="background:${esc(bg)};${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}">${t}${s}${btn}</div>` : "";
+      const interior = `${t}${s}${btn}`;
+
+      // Portada con imagen de FONDO: el texto va encima, no arriba. Outlook no
+      // entiende `background-image` en un `<div>`, así que necesita su propio
+      // camino con `<v:rect>` — mismo criterio que el botón VML: los dos
+      // caminos van siempre, y el que no aplica se esconde con comentarios
+      // condicionales para que no se dibujen los dos a la vez.
+      if (b.fondoImagen) {
+        const alto = Math.min(600, Math.max(120, Math.round(b.alto ?? 280)));
+        const estiloCaja = `${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}`;
+        return `<!--[if mso]>
+<v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:${pal.ancho}px;height:${alto}px">
+<v:fill type="frame" src="${esc(b.fondoImagen)}" color="${esc(bg)}" />
+<v:textbox inset="0,0,0,0">
+<div style="${estiloCaja}">
+${interior}
+</div>
+</v:textbox>
+</v:rect>
+<![endif]-->
+<!--[if !mso]><!-->
+<div style="background-image:url(${esc(b.fondoImagen)});background-size:cover;background-position:center;min-height:${px(alto)};${estiloCaja}">
+${interior}
+</div>
+<!--<![endif]-->`;
+      }
+
+      const img = b.imagen ? `<img src="${esc(b.imagen)}" alt="" style="width:100%;display:block;margin:0${extra(t0, ["radio", "align", "color", "tamano"])}" />` : "";
+      const cajaHtml = interior ? `<div style="background:${esc(bg)};${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}">${interior}</div>` : "";
       return `${img}${cajaHtml}`;
     }
     case "seccion": {
@@ -372,6 +446,12 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
       return pad(`<div style="border:${px(c.bordeAncho ?? 2)} ${c.bordeEstilo ?? "dashed"} ${c.bordeColor ?? pal.acento};border-radius:${px(c.radio ?? 12)};background:${bg};${padCss(c.padY ?? 24, c.padX ?? 24)};text-align:center;margin:8px 0 16px">${t}${cod}${btn}</div>`, undefined);
     }
+    // ⛔ Gateado por la CUENTA, no por quién lo editó — ver el comentario en
+    // `Ctx.permiteHtmlCrudo`. Sin el toggle prendido, el bloque no se dibuja
+    // aunque el Json lo tenga: la paleta del editor es nomás la UI, el freno
+    // real vive acá.
+    case "html":
+      return ctx.permiteHtmlCrudo ? pad(b.contenido ?? "", caja()) : "";
     default:
       return "";
   }
@@ -415,6 +495,12 @@ export interface RenderOpts {
    * grilla, y un hueco es peor que nada.
    */
   productosDinamicos?: Record<string, ProductoEmail[]>;
+  /**
+   * ¿La cuenta puede usar el bloque `html`? Sale de
+   * `Cuenta.config.htmlCrudoHabilitado` vía `marcaDe()`. Ausente/`false` = el
+   * bloque `html` no se dibuja, aunque el documento lo tenga guardado.
+   */
+  permiteHtmlCrudo?: boolean;
 }
 
 /** Renderiza el contenido a un HTML de email completo (shell + bloques + footer). */
@@ -433,6 +519,7 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
     nombreCuenta: opts.nombreCuenta,
     logoCuenta: opts.logoCuenta?.trim() ?? "",
     urlCuenta: opts.urlCuenta?.trim() ?? "",
+    permiteHtmlCrudo: !!opts.permiteHtmlCrudo,
   };
   // El encabezado se saca de la lista y se dibuja arriba de la tarjeta, que es
   // donde estuvo siempre. `leerContenido` ya garantiza que hay uno solo y que
@@ -521,12 +608,18 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       if (r > 0) lineas.push(`y ${r} producto${r === 1 ? "" : "s"} más: \${cart.url}`);
       return lineas.join("\n");
     }
-    case "columnas":
-      return [b.izq?.url, b.der?.url].filter(Boolean).join("\n") || null;
+    case "columnas": {
+      // Sirve tanto para la variante de fotos (solo el link) como para la de
+      // texto (título + texto + link) — cada lado aporta lo que tenga.
+      const lado = (c: Columna) => [c.titulo, c.texto, c.url].filter(Boolean).join(" — ");
+      return [lado(b.izq), lado(b.der)].filter(Boolean).join("\n") || null;
+    }
     case "video":
       return b.url ? `Ver el video: ${b.url}` : null;
     case "redes":
       return (b.links ?? []).filter((l) => l.url).map((l) => link(l.red, l.url)).join("\n") || null;
+    case "menu":
+      return (b.links ?? []).filter((l) => l.url && l.texto).map((l) => link(l.texto, l.url)).join(" · ") || null;
     case "divisor":
       return "—";
     case "espaciador":
@@ -538,6 +631,9 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       return [b.titulo, b.texto, b.botonTexto ? link(b.botonTexto, b.botonUrl) : null].filter(Boolean).join("\n") || null;
     case "cupon":
       return [b.texto, b.codigo, b.botonTexto ? link(b.botonTexto, b.botonUrl) : null].filter(Boolean).join("\n") || null;
+    // Sin conversión razonable a texto plano: es la escotilla de HTML libre.
+    case "html":
+      return null;
     default:
       return null;
   }

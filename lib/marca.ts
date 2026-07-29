@@ -31,6 +31,12 @@ export interface ConfigCuenta {
   lastSyncContactos?: string;
   /** Cuándo se trajeron los datos de la tienda por última vez. */
   marcaSync?: string;
+  /**
+   * ¿Esta cuenta puede usar el bloque `html` (HTML crudo)? Lo prende un ADMIN
+   * a mano desde Remitentes. Ausente = no: es la escotilla de administrador,
+   * no un default para cualquier marca nueva.
+   */
+  htmlCrudoHabilitado?: boolean;
 }
 
 /**
@@ -44,7 +50,7 @@ export interface ConfigCuenta {
  */
 export type Marca = Pick<
   RenderOpts,
-  "nombreCuenta" | "logoCuenta" | "urlCuenta" | "direccionPostal" | "temaMarca"
+  "nombreCuenta" | "logoCuenta" | "urlCuenta" | "direccionPostal" | "temaMarca" | "permiteHtmlCrudo"
 >;
 
 const txt = (v: unknown): string | undefined => {
@@ -64,6 +70,7 @@ export function leerConfigCuenta(valor: unknown): ConfigCuenta {
     direccion: txt(c.direccion),
     lastSyncContactos: txt(c.lastSyncContactos),
     marcaSync: txt(c.marcaSync),
+    htmlCrudoHabilitado: c.htmlCrudoHabilitado === true,
   };
 }
 
@@ -79,6 +86,7 @@ export function marcaDe(cuenta: { nombre: string; config: unknown }): Marca {
     urlCuenta: c.url,
     direccionPostal: c.direccion,
     temaMarca,
+    permiteHtmlCrudo: c.htmlCrudoHabilitado,
   };
 }
 

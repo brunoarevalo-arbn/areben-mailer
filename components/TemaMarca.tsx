@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { renderEmailHtml, type Bloque } from "@/lib/email/render";
 import type { Tema } from "@/lib/email/tema";
 import type { Marca } from "@/lib/marca";
-import { guardarTemaMarca, traerMarcaDeTienda } from "@/app/(app)/remitentes/actions";
+import { guardarHtmlCrudoHabilitado, guardarTemaMarca, traerMarcaDeTienda } from "@/app/(app)/remitentes/actions";
 
 // Aspecto por defecto de los mails de la marca.
 //
@@ -49,6 +49,9 @@ export function TemaMarca({
   const [trayendo, startTraer] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [msgMarca, setMsgMarca] = useState<string | null>(null);
+  const [htmlCrudo, setHtmlCrudo] = useState<boolean>(!!marcaInicial.permiteHtmlCrudo);
+  const [guardandoHtml, startHtml] = useTransition();
+  const [msgHtml, setMsgHtml] = useState<string | null>(null);
 
   const sucio = JSON.stringify(tema ?? {}) !== JSON.stringify(inicial ?? {});
   const previewHtml = renderEmailHtml(
@@ -77,6 +80,18 @@ export function TemaMarca({
       setMarca(r.marca);
       setMsgMarca(r.marca.logoCuenta ? "Listo: logo, sitio y datos de tu tienda." : "Listo, pero tu tienda no tiene logo cargado en Tiendanube.");
     });
+
+  const cambiarHtmlCrudo = (v: boolean) => {
+    setHtmlCrudo(v);
+    setMsgHtml(null);
+    startHtml(async () => {
+      const r = await guardarHtmlCrudoHabilitado(v);
+      if (!r.ok) {
+        setHtmlCrudo(!v);
+        setMsgHtml(r.error ?? "No se pudo guardar.");
+      }
+    });
+  };
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -123,6 +138,27 @@ export function TemaMarca({
             </div>
           </dl>
           {msgMarca && <p className="mt-2 text-xs text-muted">{msgMarca}</p>}
+        </div>
+
+        <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={htmlCrudo}
+              disabled={guardandoHtml}
+              onChange={(e) => cambiarHtmlCrudo(e.target.checked)}
+              className="mt-0.5 accent-accent"
+            />
+            <span>
+              <span className="text-sm font-medium text-foreground">Bloque HTML avanzado</span>
+              <p className="mt-1 text-xs text-muted">
+                Deja escribir HTML libre dentro de un mail. Sale desde tu dominio y con tu
+                reputación de envío: activalo solo para cuentas de confianza. Con esto apagado,
+                el bloque no se dibuja en el envío aunque una plantilla lo tenga guardado.
+              </p>
+              {msgHtml && <p className="mt-1 text-xs text-danger-foreground">{msgHtml}</p>}
+            </span>
+          </label>
         </div>
 
         <TemaSelector

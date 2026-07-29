@@ -6,7 +6,7 @@ import {
   type Bloque, type ContenidoCampania, type TipoBloque,
 } from "@/lib/email/render";
 import { resolverPaleta, type Tema } from "@/lib/email/tema";
-import { resolverEstilo, type Estilos, type RolEstilo } from "@/lib/email/estilos";
+import { resolverEstilo, ROLES_POR_TIPO, type Estilos, type RolEstilo } from "@/lib/email/estilos";
 import { ListaBloques } from "@/components/editor/ListaBloques";
 import { FormBloque } from "@/components/editor/FormBloque";
 import { PanelEstilo } from "@/components/editor/PanelEstilo";
@@ -36,6 +36,22 @@ const REPRESENTA: Record<RolEstilo, TipoBloque> = {
   imagen: "imagen",
   nota: "productos",
 };
+
+/**
+ * Qué roles ofrece la pestaña Estilo para ESTE bloque puntual.
+ *
+ * `ROLES_POR_TIPO` es por TIPO, así que no sabe que un `columnas` en variante
+ * "imagenes" no dibuja ningún texto: ofrecer `titulo`/`cuerpo` ahí sería la
+ * misma perilla desconectada que `probar-panel-estilo.ts` está pensado para
+ * cazar, nada más que a nivel de instancia y no de tipo.
+ */
+function rolesDe(b: Bloque): readonly RolEstilo[] {
+  if (b.tipo !== "columnas") return ROLES_POR_TIPO[b.tipo];
+  const variante = b.variante ?? "imagenes";
+  const conImagen = variante === "imagenes" || variante === "imagen-texto" || variante === "texto-imagen";
+  const conTexto = variante === "textos" || variante === "imagen-texto" || variante === "texto-imagen";
+  return ["caja", ...(conImagen ? (["imagen"] as const) : []), ...(conTexto ? (["titulo", "cuerpo"] as const) : [])];
+}
 
 /** Los roles que tiene sentido fijar para todo el mail de una sola vez. */
 const ROLES_DOC: readonly RolEstilo[] = ["titulo", "subtitulo", "cuerpo", "boton", "nota"];
@@ -214,6 +230,7 @@ export function EditorMail({
               onBorrar={borrar}
               onInsertar={insertar}
               soloLectura={soloLectura}
+              avanzado={avanzado}
             />
           </div>
         </div>
@@ -259,6 +276,7 @@ export function EditorMail({
                     })
                   }
                   pal={pal}
+                  roles={rolesDe(seleccionado)}
                   avanzado={avanzado}
                 />
               )}

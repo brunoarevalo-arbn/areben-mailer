@@ -32,6 +32,9 @@ export interface ProductoEmail {
 export interface Columna {
   imagen: string;
   url: string;
+  /** Solo para las variantes de texto del bloque `columnas`. */
+  titulo?: string;
+  texto?: string;
 }
 
 /**
@@ -181,18 +184,54 @@ export type Bloque = BloqueBase &
     // carrito real del contacto justo antes de enviar, EN ESTE LUGAR de la lista
     // — que es la diferencia con `productos`, que es una grilla curada.
     | { tipo: "carrito"; items?: ProductoEmail[]; restantes?: number }
-    | { tipo: "columnas"; izq: Columna; der: Columna }
+    | {
+        tipo: "columnas";
+        /** Ausente = "imagenes", que es el bloque de siempre: dos fotos lado a lado. */
+        variante?: "imagenes" | "textos" | "imagen-texto" | "texto-imagen";
+        /** % de ancho de la columna izquierda. Ausente = 50 (parejo). */
+        proporcion?: 40 | 50 | 60;
+        izq: Columna;
+        der: Columna;
+      }
     | { tipo: "video"; imagen: string; url: string }
     | { tipo: "redes"; links: { red: string; url: string }[] }
+    /** Barra de navegación: un puñado de links de texto en fila. */
+    | { tipo: "menu"; links: { texto: string; url: string }[] }
     | { tipo: "divisor" }
     // Aire vertical y nada más. Parece de más hasta que se arma un diseño en serio:
     // la plantilla que motivó esto usa 12 espaciadores, de 5 a 75px, y sin ellos
     // los bloques se apilan pegados.
     | { tipo: "espaciador"; alto?: number }
     // Bloques "ricos"
-    | { tipo: "hero"; imagen: string; titulo: string; subtitulo: string; botonTexto: string; botonUrl: string; bg: string }
+    | {
+        tipo: "hero";
+        imagen: string;
+        titulo: string;
+        subtitulo: string;
+        botonTexto: string;
+        botonUrl: string;
+        bg: string;
+        /**
+         * Portada con el texto ENCIMA de una foto, en vez de arriba de ella.
+         * Mutuamente excluyente con `imagen` en el editor —cuando está, `imagen`
+         * no se dibuja—, pero un documento puede traer las dos sin romperse.
+         */
+        fondoImagen?: string;
+        /** Alto aproximado en px, solo con `fondoImagen`. Outlook no mide el texto. */
+        alto?: number;
+      }
     | { tipo: "seccion"; bg: string; titulo: string; texto: string; botonTexto: string; botonUrl: string }
     | { tipo: "cupon"; texto: string; codigo: string; botonTexto: string; botonUrl: string }
+    /**
+     * HTML crudo. Escotilla de administrador, no de comerciante: sale desde un
+     * dominio verificado por vos y con tu reputación de envío.
+     *
+     * ⛔ El freno real no es la paleta del editor —esa es solo la UI, y el Json
+     * se puede editar por otro camino—. `renderBloque` no lo dibuja si la
+     * CUENTA no lo tiene habilitado (`Cuenta.config.htmlCrudoHabilitado`, un
+     * toggle de ADMIN en Remitentes). Al enviar no hay usuario, solo cuenta.
+     */
+    | { tipo: "html"; contenido: string }
   );
 
 export type TipoBloque = Bloque["tipo"];
@@ -201,7 +240,8 @@ export type TipoBloque = Bloque["tipo"];
 export const TIPOS_BLOQUE = [
   "encabezado",
   "hero", "seccion", "cupon", "titulo", "texto", "boton", "imagen",
-  "productos", "productos-dinamicos", "carrito", "columnas", "video", "redes", "divisor", "espaciador",
+  "productos", "productos-dinamicos", "carrito", "columnas", "video", "redes", "menu",
+  "divisor", "espaciador", "html",
 ] as const satisfies readonly TipoBloque[];
 
 /**
@@ -226,11 +266,13 @@ export const ETIQUETA_BLOQUE = {
   productos: "Productos elegidos",
   "productos-dinamicos": "Productos automáticos",
   carrito: "Carrito abandonado",
-  columnas: "Dos imágenes",
+  columnas: "Dos columnas",
   video: "Video",
   redes: "Redes sociales",
+  menu: "Menú",
   divisor: "Línea divisoria",
   espaciador: "Espacio en blanco",
+  html: "HTML avanzado",
 } as const satisfies Record<TipoBloque, string>;
 
 export interface ContenidoCampania {
@@ -298,11 +340,13 @@ export function nuevoBloque(tipo: TipoBloque): Bloque {
     case "columnas": return { id, tipo, izq: { imagen: "", url: "" }, der: { imagen: "", url: "" } };
     case "video": return { id, tipo, imagen: "", url: "" };
     case "redes": return { id, tipo, links: [{ red: "Instagram", url: "" }] };
+    case "menu": return { id, tipo, links: [{ texto: "Inicio", url: "" }, { texto: "Tienda", url: "" }] };
     case "divisor": return { id, tipo };
     case "espaciador": return { id, tipo, alto: 24 };
     case "hero": return { id, tipo, imagen: "", titulo: "Título principal", subtitulo: "Un subtítulo que acompaña", botonTexto: "Ver más", botonUrl: "", bg: "#ffffff" };
     case "seccion": return { id, tipo, bg: "#faf7f0", titulo: "Título de sección", texto: "Texto de la sección.", botonTexto: "", botonUrl: "" };
     case "cupon": return { id, tipo, texto: "Usá este código en el checkout", codigo: "DESCUENTO10", botonTexto: "Comprar", botonUrl: "" };
+    case "html": return { id, tipo, contenido: "" };
   }
 }
 

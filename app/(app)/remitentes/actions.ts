@@ -150,3 +150,26 @@ export async function guardarTemaMarca(tema: Tema | null) {
   revalidatePath("/remitentes");
   return { ok: true as const };
 }
+
+/**
+ * Prende o apaga el bloque `html` (HTML crudo) para esta cuenta.
+ *
+ * Es el freno del lado del envío, no de la UI: `renderBloque` no dibuja un
+ * bloque `html` si la cuenta no tiene esto prendido, sin importar quién lo
+ * haya guardado en el Json. `remitentes` ya es ADMIN-only en la matriz de
+ * permisos, así que no hace falta un chequeo aparte acá.
+ */
+export async function guardarHtmlCrudoHabilitado(habilitado: boolean) {
+  const chk = await chequear("remitentes");
+  if (!chk.ok) return chk;
+  const { cuenta } = chk.ctx;
+
+  const config = (cuenta.config as Prisma.JsonObject) ?? {};
+  const nuevo: Prisma.JsonObject = { ...config };
+  if (habilitado) nuevo.htmlCrudoHabilitado = true;
+  else delete nuevo.htmlCrudoHabilitado;
+
+  await prisma.cuenta.update({ where: { id: cuenta.id }, data: { config: nuevo } });
+  revalidatePath("/remitentes");
+  return { ok: true as const };
+}

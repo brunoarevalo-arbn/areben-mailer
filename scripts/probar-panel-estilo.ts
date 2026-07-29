@@ -70,11 +70,18 @@ function muestra(tipo: TipoBloque): Bloque {
   if (tipo === "boton") b.url = "https://ejemplo.com";
   if (tipo === "seccion" || tipo === "cupon") { b.botonTexto = "Comprar"; b.botonUrl = "https://ejemplo.com"; }
   if (tipo === "columnas") {
+    // "imagen-texto" ejercita los dos tipos de celda en el mismo fixture: la
+    // izquierda dibuja imagen (rol `imagen`) y la derecha texto (`titulo` y
+    // `cuerpo`). Con la variante por defecto ("imagenes") los roles de texto
+    // nunca tendrían nada que mostrar, sea cual sea el estilo.
+    b.variante = "imagen-texto";
     b.izq = { imagen: "https://ejemplo.com/a.jpg", url: "https://ejemplo.com" };
-    b.der = { imagen: "https://ejemplo.com/b.jpg", url: "https://ejemplo.com" };
+    b.der = { titulo: "Título", texto: "Texto", url: "https://ejemplo.com" };
   }
   if (tipo === "productos" || tipo === "carrito") b.items = PRODUCTO;
   if (tipo === "redes") b.links = [{ red: "Instagram", url: "https://instagram.com/x" }];
+  if (tipo === "menu") b.links = [{ texto: "Inicio", url: "https://ejemplo.com" }];
+  if (tipo === "html") b.contenido = "<p>Hola</p>";
   return b as unknown as Bloque;
 }
 
@@ -93,6 +100,9 @@ const render = (b: Bloque, estilo?: Estilos) => {
       // que sí funcionan se leerían como perillas desconectadas.
       productosDinamicos:
         bl.tipo === "productos-dinamicos" ? { [claveProductos(bl)]: PRODUCTO } : undefined,
+      // El bloque `html` está gateado por cuenta: sin esto, CUALQUIER estilo de
+      // `caja` se leería como desconectado, porque el bloque ni se dibuja.
+      permiteHtmlCrudo: bl.tipo === "html",
     },
   );
 };

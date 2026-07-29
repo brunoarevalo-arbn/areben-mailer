@@ -340,6 +340,13 @@ const BASE_POR_TIPO: Partial<Record<TipoBloque, Estilos>> = {
   "productos-dinamicos": { cuerpo: { tamano: 14 } },
   carrito: { titulo: { tamano: 15, interlinea: 1.35, peso: 600 } },
   redes: { cuerpo: { color: "$link", tamano: 14 } },
+  menu: { cuerpo: { color: "$texto", tamano: 14, peso: 600 } },
+  // Medidas de columna, más chicas que un `titulo`/`texto` sueltos porque
+  // comparten la mitad del ancho del mail.
+  columnas: { titulo: { tamano: 18, peso: 700, interlinea: 1.3 }, cuerpo: { tamano: 14, interlinea: 1.5 } },
+  // Sin margen lateral por default: la escotilla de HTML crudo es a sangre
+  // salvo que alguien elija lo contrario desde la pestaña Estilo.
+  html: { caja: { padX: 0 } },
 };
 
 /**
@@ -364,15 +371,19 @@ export const ROLES_POR_TIPO: Record<TipoBloque, readonly RolEstilo[]> = {
   productos: ["caja", "cuerpo", "nota", "imagen"],
   "productos-dinamicos": ["caja", "cuerpo", "nota", "imagen"],
   carrito: ["caja", "titulo", "nota", "imagen"],
-  columnas: ["caja", "imagen"],
+  // "imagen" solo pesa en la variante de dos fotos; en las de texto no se dibuja
+  // ningún `<img>`, así que ofrecer su control ahí sería una perilla suelta.
+  columnas: ["caja", "imagen", "titulo", "cuerpo"],
   video: ["caja", "imagen", "boton"],
   redes: ["caja", "cuerpo"],
+  menu: ["caja", "cuerpo"],
   divisor: ["caja"],
   espaciador: [],
   // Ídem: la foto de la portada va a sangre, sin radio.
   hero: ["caja", "titulo", "subtitulo", "boton"],
   seccion: ["caja", "titulo", "subtitulo", "boton"],
   cupon: ["caja", "titulo", "cuerpo", "boton"],
+  html: ["caja"],
 };
 
 /**

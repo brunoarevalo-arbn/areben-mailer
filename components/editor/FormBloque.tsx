@@ -158,10 +158,34 @@ export function FormBloque({
         </div>
       );
 
-    case "hero":
+    case "hero": {
+      const conFondo = !!b.fondoImagen;
       return (
         <div className="space-y-3">
-          <ImagenDrop value={b.imagen} onChange={(imagen) => set({ imagen })} placeholder="URL de la imagen (banner)" />
+          <Select
+            label="Cómo va la imagen"
+            fullWidth
+            value={conFondo ? "fondo" : "arriba"}
+            onChange={(e) => {
+              if (e.target.value === "fondo") set({ fondoImagen: b.fondoImagen || b.imagen || "", imagen: "" });
+              else set({ imagen: b.imagen || b.fondoImagen || "", fondoImagen: undefined });
+            }}
+          >
+            <option value="arriba">Arriba del texto</option>
+            <option value="fondo">De fondo, con el texto encima</option>
+          </Select>
+          {conFondo ? (
+            <>
+              <ImagenDrop value={b.fondoImagen ?? ""} onChange={(fondoImagen) => set({ fondoImagen })} placeholder="URL de la imagen de fondo" />
+              <Rango label="Alto aproximado" value={b.alto ?? 280} onChange={(alto) => set({ alto })} min={120} max={500} step={10} />
+              <p className="text-xs text-subtle">
+                Outlook no puede medir cuánto ocupa el texto: si es largo, puede quedar apretado.
+                Subí el alto si hace falta.
+              </p>
+            </>
+          ) : (
+            <ImagenDrop value={b.imagen} onChange={(imagen) => set({ imagen })} placeholder="URL de la imagen (banner)" />
+          )}
           <Input label="Título principal" fullWidth value={b.titulo} onChange={(e) => set({ titulo: e.target.value })} />
           <Input label="Subtítulo" fullWidth value={b.subtitulo} onChange={(e) => set({ subtitulo: e.target.value })} />
           <Input label="Texto del botón" fullWidth value={b.botonTexto} onChange={(e) => set({ botonTexto: e.target.value })} />
@@ -169,6 +193,7 @@ export function FormBloque({
           <ColorFijo label="Fondo del texto" value={b.bg} onChange={(bg) => set({ bg })} />
         </div>
       );
+    }
 
     case "seccion":
       return (
@@ -236,27 +261,89 @@ export function FormBloque({
         </p>
       );
 
-    case "columnas":
+    case "columnas": {
+      const variante = b.variante ?? "imagenes";
+      // Qué campo se edita en cada lado, según la variante elegida.
+      const campo = (lado: "izq" | "der"): "imagen" | "texto" => {
+        if (variante === "imagenes") return "imagen";
+        if (variante === "textos") return "texto";
+        if (variante === "imagen-texto") return lado === "izq" ? "imagen" : "texto";
+        return lado === "izq" ? "texto" : "imagen"; // texto-imagen
+      };
       return (
         <div className="space-y-4">
+          <Select
+            label="Formato"
+            fullWidth
+            value={variante}
+            onChange={(e) => {
+              const v = e.target.value;
+              set({ variante: v === "imagenes" ? undefined : (v as "textos" | "imagen-texto" | "texto-imagen") });
+            }}
+          >
+            <option value="imagenes">Dos imágenes</option>
+            <option value="textos">Dos textos</option>
+            <option value="imagen-texto">Imagen + texto</option>
+            <option value="texto-imagen">Texto + imagen</option>
+          </Select>
+          <Select
+            label="Proporción"
+            fullWidth
+            value={String(b.proporcion ?? 50)}
+            onChange={(e) => {
+              const v = e.target.value;
+              set({ proporcion: v === "50" ? undefined : (Number(v) as 40 | 60) });
+            }}
+          >
+            <option value="50">Pareja (50 / 50)</option>
+            <option value="40">Angosta a la izquierda (40 / 60)</option>
+            <option value="60">Angosta a la derecha (60 / 40)</option>
+          </Select>
           {(["izq", "der"] as const).map((lado) => (
             <div key={lado} className="space-y-2">
               <div className="text-xs font-semibold text-muted">{lado === "izq" ? "Izquierda" : "Derecha"}</div>
-              <ImagenDrop
-                value={b[lado].imagen}
-                onChange={(imagen) => set({ [lado]: { ...b[lado], imagen } } as Partial<Bloque>)}
-                placeholder="URL de la imagen"
-              />
-              <Input
-                fullWidth
-                value={b[lado].url}
-                placeholder="Link"
-                onChange={(e) => set({ [lado]: { ...b[lado], url: e.target.value } } as Partial<Bloque>)}
-              />
+              {campo(lado) === "imagen" ? (
+                <>
+                  <ImagenDrop
+                    value={b[lado].imagen}
+                    onChange={(imagen) => set({ [lado]: { ...b[lado], imagen } } as Partial<Bloque>)}
+                    placeholder="URL de la imagen"
+                  />
+                  <Input
+                    fullWidth
+                    value={b[lado].url}
+                    placeholder="Link"
+                    onChange={(e) => set({ [lado]: { ...b[lado], url: e.target.value } } as Partial<Bloque>)}
+                  />
+                </>
+              ) : (
+                <>
+                  <Input
+                    fullWidth
+                    value={b[lado].titulo ?? ""}
+                    placeholder="Título"
+                    onChange={(e) => set({ [lado]: { ...b[lado], titulo: e.target.value } } as Partial<Bloque>)}
+                  />
+                  <Textarea
+                    fullWidth
+                    rows={3}
+                    value={b[lado].texto ?? ""}
+                    placeholder="Texto"
+                    onChange={(e) => set({ [lado]: { ...b[lado], texto: e.target.value } } as Partial<Bloque>)}
+                  />
+                  <Input
+                    fullWidth
+                    value={b[lado].url}
+                    placeholder="Link (opcional)"
+                    onChange={(e) => set({ [lado]: { ...b[lado], url: e.target.value } } as Partial<Bloque>)}
+                  />
+                </>
+              )}
             </div>
           ))}
         </div>
       );
+    }
 
     case "video":
       return (
@@ -312,8 +399,66 @@ export function FormBloque({
         </div>
       );
 
+    case "menu":
+      return (
+        <div className="space-y-2">
+          {b.links.map((l, k) => (
+            <div key={k} className="flex items-end gap-2">
+              <Input
+                label={k === 0 ? "Texto" : undefined}
+                className="w-28"
+                value={l.texto}
+                placeholder="Inicio"
+                onChange={(e) => set({ links: b.links.map((x, j) => (j === k ? { ...x, texto: e.target.value } : x)) })}
+              />
+              <Input
+                label={k === 0 ? "URL" : undefined}
+                fullWidth
+                value={l.url}
+                placeholder="https://…"
+                onChange={(e) => set({ links: b.links.map((x, j) => (j === k ? { ...x, url: e.target.value } : x)) })}
+              />
+              <button
+                type="button"
+                onClick={() => set({ links: b.links.filter((_, j) => j !== k) })}
+                aria-label={`Quitar ${l.texto || "el link"}`}
+                className="mb-2.5 text-danger-foreground transition-opacity hover:opacity-70"
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => set({ links: [...b.links, { texto: "", url: "" }] })}
+            className="rounded-lg border border-border-strong px-2.5 py-1 text-xs text-muted transition-colors hover:bg-surface-muted"
+          >
+            + Agregar link
+          </button>
+        </div>
+      );
+
     case "divisor":
       return <p className="text-sm text-muted">Una línea horizontal para separar secciones. No tiene nada que configurar acá; el color y el grosor van en la pestaña Estilo.</p>;
+
+    case "html":
+      return (
+        <div className="space-y-2">
+          <Textarea
+            label="HTML"
+            fullWidth
+            rows={10}
+            className="font-mono text-xs"
+            value={b.contenido}
+            onChange={(e) => set({ contenido: e.target.value })}
+            hint="Se pega tal cual, sin ningún chequeo. Es una escotilla de administrador: rompe fácil y sale desde tu dominio."
+          />
+          <p className="text-xs text-subtle">
+            Si la cuenta no tiene este bloque habilitado (Remitentes → Bloque HTML avanzado), no
+            se dibuja en el envío aunque quede guardado acá.
+          </p>
+        </div>
+      );
   }
 }
 

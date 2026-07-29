@@ -4,8 +4,8 @@ import { useState } from "react";
 import { ETIQUETA_BLOQUE, TIPOS_BLOQUE, type Bloque, type TipoBloque } from "@/lib/email/render";
 import { ETIQUETA_FUENTE } from "@/lib/email/bloques";
 import {
-  AlignLeft, ChevronDown, ChevronUp, Columns2, Copy, GripVertical, ImageIcon,
-  LayoutTemplate, Minus, MousePointerClick, MoveVertical, PanelTop, Play, Plus,
+  AlignLeft, ChevronDown, ChevronUp, Code2, Columns2, Copy, GripVertical, ImageIcon,
+  LayoutTemplate, Menu as MenuIcon, Minus, MousePointerClick, MoveVertical, PanelTop, Play, Plus,
   Share2, ShoppingBag, ShoppingCart, Sparkles, Ticket, Trash2, Type,
 } from "lucide-react";
 
@@ -42,8 +42,10 @@ const ICONO: Record<TipoBloque, typeof Type> = {
   columnas: Columns2,
   video: Play,
   redes: Share2,
+  menu: MenuIcon,
   divisor: Minus,
   espaciador: MoveVertical,
+  html: Code2,
 };
 
 /** Una línea de contexto para reconocer el bloque sin abrirlo. */
@@ -71,16 +73,27 @@ function resumen(b: Bloque): string {
       return `${ETIQUETA_FUENTE[b.fuente]} · ${b.n ?? 4}`;
     case "carrito":
       return "Se completa al enviar";
-    case "columnas":
-      return "Dos imágenes lado a lado";
+    case "columnas": {
+      const ETIQUETA_VARIANTE = {
+        imagenes: "Dos imágenes",
+        textos: "Dos textos",
+        "imagen-texto": "Imagen + texto",
+        "texto-imagen": "Texto + imagen",
+      } as const;
+      return ETIQUETA_VARIANTE[b.variante ?? "imagenes"];
+    }
     case "video":
       return b.url || "Sin link";
     case "redes":
       return b.links.map((l) => l.red).filter(Boolean).join(", ") || "Sin redes";
+    case "menu":
+      return b.links.map((l) => l.texto).filter(Boolean).join(", ") || "Sin links";
     case "divisor":
       return "—";
     case "espaciador":
       return `${b.alto ?? 24}px`;
+    case "html":
+      return b.contenido.trim() ? "HTML propio" : "Vacío";
   }
 }
 
@@ -93,6 +106,7 @@ export function ListaBloques({
   onBorrar,
   onInsertar,
   soloLectura = false,
+  avanzado = false,
 }: {
   bloques: Bloque[];
   seleccionadoId: string | null;
@@ -103,6 +117,8 @@ export function ListaBloques({
   onBorrar: (i: number) => void;
   onInsertar: (tipo: TipoBloque, i: number) => void;
   soloLectura?: boolean;
+  /** `puede(rol,"avanzado")`: sin esto, `html` no aparece en la paleta. */
+  avanzado?: boolean;
 }) {
   const [arrastrando, setArrastrando] = useState<number | null>(null);
   /** Dónde va a caer lo que se está arrastrando: en qué fila y de qué lado. */
@@ -180,6 +196,7 @@ export function ListaBloques({
         {paletaEn === i && (
           <Paleta
             hayEncabezado={hayEncabezado}
+            avanzado={avanzado}
             enCero={i === 0}
             onElegir={(tipo) => {
               setPaletaEn(null);
@@ -340,15 +357,20 @@ export function ListaBloques({
 
 function Paleta({
   hayEncabezado,
+  avanzado,
   enCero,
   onElegir,
 }: {
   hayEncabezado: boolean;
+  /** `puede(rol,"avanzado")`: sin esto, `html` no se ofrece — es la escotilla de ADMIN. */
+  avanzado: boolean;
   /** El encabezado solo se puede insertar arriba de todo, que es donde existe. */
   enCero: boolean;
   onElegir: (t: TipoBloque) => void;
 }) {
-  const disponibles = TIPOS_BLOQUE.filter((t) => t !== "encabezado" || (!hayEncabezado && enCero));
+  const disponibles = TIPOS_BLOQUE.filter(
+    (t) => (t !== "encabezado" || (!hayEncabezado && enCero)) && (t !== "html" || avanzado),
+  );
   return (
     <div className="my-1 grid grid-cols-2 gap-1 rounded-lg border border-border bg-surface-muted p-1.5">
       {disponibles.map((t) => {
