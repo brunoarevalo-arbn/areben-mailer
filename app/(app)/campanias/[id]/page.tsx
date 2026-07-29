@@ -5,7 +5,7 @@ import { CampaniaEditor } from "@/components/CampaniaEditor";
 import { prisma } from "@/lib/prisma";
 import { getAuth } from "@/lib/auth";
 import { contactosElegibles } from "@/lib/campanias";
-import type { ContenidoCampania } from "@/lib/email/render";
+import { leerContenido } from "@/lib/email/esquema";
 import { temaDe } from "@/lib/email/tema";
 
 export const dynamic = "force-dynamic";
@@ -117,7 +117,7 @@ export default async function CampaniaEditorPage({
           asunto: campania.asunto ?? "",
           preheader: campania.preheader ?? "",
           destino: destinoInicial,
-          contenido: (campania.contenido as unknown as ContenidoCampania) ?? { bloques: [] },
+          contenido: leerContenido(campania.contenido),
           asuntoB: campania.asuntoB ?? "",
           abTestPct: campania.abTestPct ?? null,
         }}

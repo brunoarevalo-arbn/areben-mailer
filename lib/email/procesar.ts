@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
+import { renderEmailHtml, renderEmailTexto, aplicarMergeTags } from "@/lib/email/render";
+import { leerContenido } from "./esquema";
 import { temaDe } from "@/lib/email/tema";
 import { inyectarTracking } from "@/lib/email/tracking";
 import { sendEmail, esThrottle } from "@/lib/email/enviar";
@@ -29,7 +30,7 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
   if (!campania) return null;
 
   const appUrl = process.env.APP_URL ?? "";
-  const contenido = campania.contenido as unknown as ContenidoCampania;
+  const contenido = leerContenido(campania.contenido);
   const rem = await getRemitenteEnvio(campania.cuentaId);
 
   const envios = await prisma.envio.findMany({

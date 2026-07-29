@@ -1,10 +1,19 @@
+import type { Bloque } from "./email/bloques";
+
 export type Trigger = "NUEVO_CLIENTE" | "COMPRA" | "CARRITO_ABANDONADO";
 
 export interface Preset {
   nombre: string;
   esperaHoras: number;
   asunto: string;
-  bloques: object[];
+  /**
+   * Tipado contra `Bloque`, no `object[]`.
+   *
+   * Con `object[]` un `tipo` mal escrito compilaba igual y el bloque
+   * simplemente no se dibujaba — sin error, sin aviso, en una automation que
+   * ya le estaba llegando a gente.
+   */
+  bloques: Bloque[];
 }
 
 /**
@@ -19,7 +28,7 @@ export interface Preset {
  * caso se omite el botón en lugar de mandar a un link roto.
  */
 export function presetsPara(nombreMarca: string, urlTienda: string): Record<Trigger, Preset> {
-  const botonTienda = urlTienda
+  const botonTienda: Bloque[] = urlTienda
     ? [{ tipo: "boton", texto: "Ver la tienda", url: urlTienda }]
     : [];
 

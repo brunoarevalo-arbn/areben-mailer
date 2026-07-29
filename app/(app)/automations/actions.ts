@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { autorizar, chequear, getAuth } from "@/lib/auth";
 import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
+import { leerContenido } from "@/lib/email/esquema";
 import { temaDe } from "@/lib/email/tema";
 import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
@@ -22,7 +23,7 @@ export async function crearAutomation(trigger: Trigger) {
       trigger,
       esperaHoras: p.esperaHoras,
       asunto: p.asunto,
-      contenido: { bloques: p.bloques },
+      contenido: { bloques: p.bloques } as object,
     },
   });
   redirect(`/automations/${a.id}`);
@@ -96,7 +97,7 @@ export async function enviarPruebaAutomation(id: string, email: string) {
   const a = await prisma.automation.findFirst({ where: { id, cuentaId: cuenta.id } });
   if (!a?.asunto) return { ok: false, error: "Falta el asunto" };
   const html = aplicarMergeTags(
-    renderEmailHtml(a.contenido as unknown as ContenidoCampania, {
+    renderEmailHtml(leerContenido(a.contenido), {
       preheader: a.preheader ?? undefined,
       unsubscribeUrl: `${process.env.APP_URL}/baja?token=preview`,
       nombreCuenta: cuenta.nombre,

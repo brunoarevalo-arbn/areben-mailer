@@ -4,6 +4,14 @@
 // El aspecto (colores, ancho, fuente) vive en lib/email/tema.ts y llega acá ya
 // resuelto como `Paleta`. Este archivo no decide de qué color es nada.
 import { resolverPaleta, combinarTema, esColorOscuro, type Paleta, type Tema } from "./tema";
+import { leerContenido } from "./esquema";
+import type { Bloque, Columna, ContenidoCampania, ProductoEmail } from "./bloques";
+
+// Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
+// sin ciclo) pero se re-exportan desde acá: media app importa `Bloque` y
+// `nuevoBloque` de "@/lib/email/render" y no hay razón para hacerla cambiar.
+export type { Bloque, BloqueBase, TipoBloque, ContenidoCampania, ProductoEmail, Columna } from "./bloques";
+export { nuevoBloque, duplicarBloque, nuevoId, TIPOS_BLOQUE } from "./bloques";
 
 /**
  * Colores de texto legibles sobre un fondo cualquiera.
@@ -17,85 +25,6 @@ function tonosSobre(bg: string): { texto: string; cuerpo: string; medio: string 
   return esColorOscuro(bg)
     ? { texto: "#fafafa", cuerpo: "#d5d4d4", medio: "#b8b8b8" }
     : { texto: "#171717", cuerpo: "#404040", medio: "#525252" };
-}
-
-export interface ProductoEmail {
-  nombre: string;
-  precio: string;
-  precioPromo?: string;
-  imagen: string;
-  url: string;
-  /**
-   * Variante elegida, ya legible: "iPhone 17 Pro Max · ROSA".
-   *
-   * Sale de `variant_values` del checkout de TN. Va aparte del nombre porque el
-   * `name` que devuelve TN ya trae la variante entre paréntesis —"MAGSAFE CASE
-   * (iPhone 17 Pro Max, ROSA)"— y repetirla se lee como un error.
-   */
-  variante?: string;
-  /** Unidades. Solo se muestra si es > 1: un "Cantidad: 1" en cada línea es ruido. */
-  cantidad?: number;
-}
-
-export interface Columna {
-  imagen: string;
-  url: string;
-}
-
-export type Bloque =
-  | { tipo: "titulo"; texto: string; align?: "left" | "center" }
-  | { tipo: "texto"; texto: string; align?: "left" | "center" }
-  | { tipo: "boton"; texto: string; url: string; align?: "left" | "center"; full?: boolean }
-  | { tipo: "imagen"; url: string; alt?: string }
-  | { tipo: "productos"; items: ProductoEmail[] }
-  // Placeholder: no se carga a mano. El procesador de automations le mete el
-  // carrito real del contacto justo antes de enviar, EN ESTE LUGAR de la lista
-  // — que es la diferencia con `productos`, que es una grilla curada.
-  | { tipo: "carrito"; items?: ProductoEmail[]; restantes?: number }
-  | { tipo: "columnas"; izq: Columna; der: Columna }
-  | { tipo: "video"; imagen: string; url: string }
-  | { tipo: "redes"; links: { red: string; url: string }[] }
-  | { tipo: "divisor" }
-  // Aire vertical y nada más. Parece de más hasta que se arma un diseño en serio:
-  // la plantilla que motivó esto usa 12 espaciadores, de 5 a 75px, y sin ellos
-  // los bloques se apilan pegados.
-  | { tipo: "espaciador"; alto?: number }
-  // Bloques "ricos"
-  | { tipo: "hero"; imagen: string; titulo: string; subtitulo: string; botonTexto: string; botonUrl: string; bg: string }
-  | { tipo: "seccion"; bg: string; titulo: string; texto: string; botonTexto: string; botonUrl: string }
-  | { tipo: "cupon"; texto: string; codigo: string; botonTexto: string; botonUrl: string };
-
-export interface ContenidoCampania {
-  bloques: Bloque[];
-  /**
-   * Aspecto de ESTA campaña. Viaja dentro del Json `contenido` que ya existe en
-   * `Campania` y `Automation`, así que no hizo falta ninguna migración — la base
-   * se comparte con popups y `db:push` está prohibido.
-   */
-  tema?: Tema;
-}
-
-/** Bloque inicial por tipo, compartido por todos los editores de contenido. */
-export function nuevoBloque(tipo: Bloque["tipo"]): Bloque {
-  switch (tipo) {
-    case "titulo": return { tipo, texto: "Título", align: "left" };
-    case "texto": return { tipo, texto: "Escribí tu mensaje. Podés usar ${contacto.nombre}.", align: "left" };
-    case "boton": return { tipo, texto: "Ver más", url: "", align: "left", full: false };
-    case "imagen": return { tipo, url: "", alt: "" };
-    case "productos": return { tipo, items: [] };
-    // Nace vacío A PROPÓSITO: si trajera productos de ejemplo, una automation
-    // guardada con ellos se los mandaría a un cliente real. La muestra del
-    // editor la pone el preview (`muestraCarrito`), no el dato.
-    case "carrito": return { tipo, items: [] };
-    case "columnas": return { tipo, izq: { imagen: "", url: "" }, der: { imagen: "", url: "" } };
-    case "video": return { tipo, imagen: "", url: "" };
-    case "redes": return { tipo, links: [{ red: "Instagram", url: "" }] };
-    case "divisor": return { tipo };
-    case "espaciador": return { tipo, alto: 24 };
-    case "hero": return { tipo, imagen: "", titulo: "Título principal", subtitulo: "Un subtítulo que acompaña", botonTexto: "Ver más", botonUrl: "", bg: "#ffffff" };
-    case "seccion": return { tipo, bg: "#faf7f0", titulo: "Título de sección", texto: "Texto de la sección.", botonTexto: "", botonUrl: "" };
-    case "cupon": return { tipo, texto: "Usá este código en el checkout", codigo: "DESCUENTO10", botonTexto: "Comprar", botonUrl: "" };
-  }
 }
 
 const esc = (s: string) =>
@@ -298,7 +227,11 @@ export interface RenderOpts {
 }
 
 /** Renderiza el contenido a un HTML de email completo (shell + bloques + footer). */
-export function renderEmailHtml(contenido: ContenidoCampania, opts: RenderOpts): string {
+export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): string {
+  // Cinturón y tiradores: los call sites ya normalizan, pero si alguno se olvida
+  // el mail sale igual bien. Es barato — un contenido que ya está en la versión
+  // actual se devuelve tal cual, sin recorrer nada.
+  const contenido = leerContenido(entrada);
   // El tema de la campaña pisa al de la marca, campo por campo.
   const pal = resolverPaleta(combinarTema(opts.temaMarca, contenido.tema));
   const cuerpo = (contenido.bloques ?? [])
@@ -403,7 +336,8 @@ function bloqueATexto(b: Bloque): string | null {
  * URLs de redirección en texto plano se ven horribles y espantan más de lo que
  * miden. El costo es que un click desde la versión texto no queda registrado.
  */
-export function renderEmailTexto(contenido: ContenidoCampania, opts: RenderOpts): string {
+export function renderEmailTexto(entrada: ContenidoCampania, opts: RenderOpts): string {
+  const contenido = leerContenido(entrada);
   const cuerpo = (contenido.bloques ?? [])
     .map(bloqueATexto)
     .filter((t): t is string => !!t && t.trim() !== "")

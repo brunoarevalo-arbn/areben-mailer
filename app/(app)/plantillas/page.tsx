@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
 import { usarPlantilla, usarPreset, eliminarPlantilla } from "./actions";
 import { PRESETS } from "@/lib/plantillas/presets";
-import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
+import { renderEmailHtml, aplicarMergeTags } from "@/lib/email/render";
+import { leerContenido } from "@/lib/email/esquema";
 import { temaDe } from "@/lib/email/tema";
 
 export const dynamic = "force-dynamic";
@@ -76,7 +77,7 @@ export default async function PlantillasPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {plantillas.map((p) => {
-              const nBloques = ((p.contenido as unknown as ContenidoCampania)?.bloques ?? []).length;
+              const nBloques = leerContenido(p.contenido).bloques.length;
               return (
                 <Card key={p.id}>
                   <div className="font-medium text-foreground">{p.nombre}</div>

@@ -14,7 +14,7 @@ de verdad: leé el gate antes de tocar el motor de envío.
 Next 16 (App Router, server actions) · React 19 · Prisma 7 + Postgres (Neon) ·
 Tailwind 4 · Vercel.
 
-## ⛔ Las cinco reglas que no se negocian
+## ⛔ Las seis reglas que no se negocian
 
 1. **Nunca `prisma db push` ni `npm run db:push`.** La base es **compartida con
    `areben-popups` (Resorty)** — mismo host Neon. Prisma no conoce esas tablas y
@@ -30,6 +30,11 @@ Tailwind 4 · Vercel.
    tendría efecto. El rol sale de la base, en `lib/auth.ts`.
 5. **El gate de envío no se abre para probar.** Para probar está el modo ensayo
    (abajo).
+6. **El `contenido` de la base se lee con `leerContenido()` de `lib/email/esquema`**,
+   nunca con un cast. Y lo que se le pasa al renderer es el contenido **entero**
+   (`{ ...contenido, bloques }`), no una lista de campos a mano: enumerarlos hacía
+   que cada campo nuevo se perdiera **solo en el envío**. Lo verifica
+   `probar-esquema.ts`.
 
 ## Comandos
 
@@ -49,6 +54,7 @@ node --import tsx scripts/probar-permisos.ts   # invariantes de la matriz
 node --import tsx scripts/probar-gate.ts       # el gate no se abre solo
 node --import tsx scripts/probar-carrito.ts    # el carrito de muestra no sale en un envío real
 node --import tsx scripts/probar-tema.ts       # un tema no deja el mail ilegible
+node --import tsx scripts/probar-esquema.ts    # el Json de bloques migra sin perder nada
 ```
 
 ⚠️ **`.github/workflows/permisos.yml` está en `.git/info/exclude` y nunca corrió
@@ -66,6 +72,9 @@ app/api/…         tn/* (OAuth + webhooks) · track/{open,click} · webhooks/{r
                   ses/sns · campanias/procesar-cola · automations/procesar
 lib/email/…       motor: proveedor.ts (gate+contrato), cola.ts, procesar.ts,
                   enviar.ts, render.ts, tema.ts, tracking.ts, supresion.ts
+                  bloques.ts  ← QUÉ es un mail (tipos + nuevoBloque). Sin HTML.
+                  esquema.ts  ← leerContenido(): ÚNICA puerta al Json de la base
+                  estilos.ts  ← cascada de estilo por bloque (tokens + lista blanca)
 lib/auth.ts       autorizar/chequear/autorizarApi ← ÚNICO camino de autorización
 lib/permisos.ts   matriz de roles (puro: lo importa server Y cliente)
 lib/tn/…          cliente Tiendanube, import de contactos/órdenes, webhooks

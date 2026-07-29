@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania, type ProductoEmail } from "@/lib/email/render";
+import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ProductoEmail } from "@/lib/email/render";
+import { leerContenido } from "@/lib/email/esquema";
 import { sendEmail } from "@/lib/email/enviar";
 import { destinatarioPermitido } from "@/lib/email/proveedor";
 import { inyectarTracking } from "@/lib/email/tracking";
@@ -54,7 +55,7 @@ export async function GET(req: Request) {
       } catch { /* si no se puede verificar, seguimos con el envío */ }
     }
 
-    const contenido = automation.contenido as unknown as ContenidoCampania;
+    const contenido = leerContenido(automation.contenido);
     let bloques = [...(contenido?.bloques ?? [])];
 
     // Carrito: los productos que dejó, en el lugar del diseño donde van.
@@ -106,16 +107,20 @@ export async function GET(req: Request) {
       nombreCuenta: automation.cuenta.nombre,
       temaMarca: temaDe(automation.cuenta.config),
     };
-    // `contenido.tema` viaja aparte de los bloques: si se pasara solo `{ bloques }`
-    // la automation perdería su aspecto y saldría con el de la marca.
-    let html = renderEmailHtml({ bloques, tema: contenido?.tema }, opts);
+    // Se pasa el contenido ENTERO con los bloques pisados, no `{ bloques, tema }`.
+    //
+    // Enumerar los campos a mano hacía que cada cosa nueva del contenido —el tema
+    // lo fue, los estilos de documento lo son— se perdiera **solo en el envío**:
+    // el preview del editor la mostraba y el mail salía sin ella. Un bug que solo
+    // se ve en el correo que ya se mandó.
+    let html = renderEmailHtml({ ...contenido, bloques }, opts);
     html = aplicarMergeTags(html, contacto);
     if (esCarrito) html = html.replaceAll("${cart.url}", td.abandonedUrl ?? "#");
     // El tracking va al final: sobre el HTML ya resuelto, para que envuelva
     // también los links que salieron de los merge tags y del carrito.
     if (appUrl) html = inyectarTracking(html, envio.id, appUrl);
     // Parte text/plain: un mail solo-HTML es señal de spam, sobre todo en Outlook.
-    let texto = aplicarMergeTags(renderEmailTexto({ bloques }, opts), contacto);
+    let texto = aplicarMergeTags(renderEmailTexto({ ...contenido, bloques }, opts), contacto);
     if (esCarrito) texto = texto.replaceAll("${cart.url}", td.abandonedUrl ?? "#");
 
     const rem = await getRemitenteEnvio(automation.cuentaId);

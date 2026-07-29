@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { autorizar, chequear } from "@/lib/auth";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
+import { leerContenido } from "@/lib/email/esquema";
 import { temaDe } from "@/lib/email/tema";
 import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
@@ -207,7 +208,7 @@ export async function enviarPrueba(id: string, emailDestino: string) {
   if (!campania) return { ok: false, error: "Campaña no encontrada" };
   if (!campania.asunto) return { ok: false, error: "Falta el asunto" };
 
-  const contenido = campania.contenido as unknown as ContenidoCampania;
+  const contenido = leerContenido(campania.contenido);
   const opts = {
     preheader: campania.preheader ?? undefined,
     unsubscribeUrl: `${process.env.APP_URL}/baja?token=preview`,
