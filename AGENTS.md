@@ -64,6 +64,7 @@ node --import tsx scripts/probar-encabezado.ts # el link de baja no se puede bor
 node --import tsx scripts/probar-imagenes.ts   # permisos, multi-tenant y SVG de /api/imagenes
 node --import tsx scripts/probar-marca.ts      # la marca de TN no se guarda adentro del Json
 node --import tsx scripts/probar-panel-estilo.ts # ningún control del panel está desconectado
+node --import tsx scripts/probar-presets.ts    # ninguna plantilla prearmada tiene un botón que no lleva a nada
 ```
 
 ⚠️ `probar-render.ts` compara contra `scripts/fixtures/render-golden.json`. Si el
@@ -208,6 +209,32 @@ fija que aparece en el 100% de los renders, con la lista de bloques que sea.
 hay `@media (prefers-color-scheme)`**: recolorear el shell sin que los bloques
 acompañen deja texto oscuro sobre fondo oscuro, que es peor que no hacer nada.
 Entra cuando los bloques emitan sus propias clases de tema.
+
+## Las plantillas que vienen con la app (`lib/plantillas/presets.ts`)
+
+Un solo archivo con **los presets de campaña y los de automation**, un solo tipo
+`Preset` y una sola forma de instanciarlos: `presetsPara(cuenta, remitenteEmail)`.
+Hasta F6 eran dos tipos en dos archivos y solo el de automations se resolvía
+contra la tienda — por eso las 5 plantillas de la galería tenían **todos los
+botones vacíos**.
+
+- **Un preset se declara como función de la cuenta**, nunca como una constante:
+  el nombre de la marca va al copy y su sitio a los links, y eso se resuelve al
+  instanciar. El logo ni se toca — lo pone el bloque `encabezado` al renderizar.
+  Guardar cualquiera de las tres cosas adentro del Json es la bienvenida de
+  Zattia firmando como "BDI Accesorios".
+- **Sin sitio cargado, el botón no se dibuja.** Los bloques ricos dibujan el
+  botón cuando `botonTexto` tiene algo, así que vaciar el texto es cómo se lo
+  saca. Un `href=""` que ya salió no se arregla. Lo fija `probar-presets.ts`,
+  que renderiza cada preset con y sin tienda.
+- **El contenido pasa por `leerContenido()` al instanciarse**, igual que el que
+  viene de la base: así lo que se guarda nace en la versión actual del esquema,
+  con ids y con la cabecera de marca puesta.
+- Los de automation son los mismos de la lista, distinguidos solo por tener
+  `trigger`. `presetsGaleria()` es "todos menos esos".
+- Las plantillas guardadas se editan en **`/plantillas/[id]`** con el mismo
+  `EditorMail` que campañas y automations. Antes había que crear una campaña
+  desde la plantilla para poder tocarla, y quedaba una campaña fantasma.
 
 ## Productos automáticos (`productos-dinamicos`)
 

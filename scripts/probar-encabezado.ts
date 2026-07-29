@@ -15,8 +15,10 @@
 import { renderEmailHtml, renderEmailTexto, nuevoBloque, TIPOS_BLOQUE } from "../lib/email/render";
 import { leerContenido, V_ACTUAL } from "../lib/email/esquema";
 import type { Bloque, ContenidoCampania } from "../lib/email/render";
-import { PRESETS } from "../lib/plantillas/presets";
-import { presetsPara } from "../lib/automations";
+import { presetsPara } from "../lib/plantillas/presets";
+
+/** Una cuenta de mentira para instanciar los presets. */
+const CUENTA = { nombre: "Marca Uno", config: { url: "https://ejemplo.com" } };
 
 let fallas = 0;
 const ok = (cond: boolean, que: string, detalle = "") => {
@@ -173,14 +175,8 @@ titulo("El link de baja está en el 100% de los renders");
     ok(texto(c).includes(BAJA), `texto con ${que}`);
   }
 }
-for (const p of PRESETS) {
-  ok(render({ bloques: p.bloques, tema: p.tema }).includes(BAJA), `preset "${p.id}"`);
-}
-{
-  const presets = presetsPara("Marca Uno", "https://ejemplo.com");
-  for (const [trigger, p] of Object.entries(presets)) {
-    ok(render({ bloques: p.bloques }).includes(BAJA), `automation ${trigger}`);
-  }
+for (const p of presetsPara(CUENTA)) {
+  ok(render(p.contenido).includes(BAJA), `preset "${p.id}"`);
 }
 
 // ─── Borrarlo tiene efecto ───────────────────────────────────────────────────

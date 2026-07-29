@@ -17,7 +17,10 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { renderEmailHtml, renderEmailTexto, type ContenidoCampania } from "../lib/email/render";
-import { PRESETS } from "../lib/plantillas/presets";
+import { presetsPara } from "../lib/plantillas/presets";
+
+/** Una cuenta de mentira para instanciar los presets. */
+const CUENTA = { nombre: "Marca de prueba", config: { url: "https://ejemplo.com" } };
 
 const GOLDEN = join(import.meta.dirname, "fixtures", "render-golden.json");
 const capturar = process.argv.includes("--capturar");
@@ -48,8 +51,8 @@ function capturarTodo(): Record<string, string> {
   out["simple.html"] = renderEmailHtml(SIMPLE, OPTS);
   out["simple.texto"] = renderEmailTexto(SIMPLE, OPTS);
 
-  for (const p of PRESETS) {
-    const c = { bloques: p.bloques, tema: p.tema } as ContenidoCampania;
+  for (const p of presetsPara(CUENTA)) {
+    const c = p.contenido;
     out[`${p.id}.html`] = sha(renderEmailHtml(c, OPTS));
     out[`${p.id}.texto`] = sha(renderEmailTexto(c, OPTS));
     // Con la muestra prendida: es lo que ve el editor, y es el camino donde el

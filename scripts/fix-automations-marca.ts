@@ -9,7 +9,8 @@
 //
 // Correr:  node --import tsx --env-file=.env scripts/fix-automations-marca.ts
 import { prisma } from '../lib/prisma.ts';
-import { presetsPara, urlTiendaDe, type Trigger } from '../lib/automations.ts';
+import { type Trigger } from '../lib/automations.ts';
+import { presetDeTrigger } from '../lib/plantillas/presets.ts';
 import { getRemitenteEnvio } from '../lib/remitentes.ts';
 
 /** Marcas de agua del preset viejo. */
@@ -33,10 +34,10 @@ async function main() {
     }
 
     const rem = await getRemitenteEnvio(a.cuentaId);
-    const preset = presetsPara(a.cuenta.nombre, urlTiendaDe(a.cuenta, rem?.email))[a.trigger as Trigger];
+    const preset = presetDeTrigger(a.trigger as Trigger, a.cuenta, rem?.email);
     await prisma.automation.update({
       where: { id: a.id },
-      data: { asunto: preset.asunto, contenido: { bloques: preset.bloques } },
+      data: { asunto: preset.asunto, contenido: preset.contenido },
     });
     console.log(`   ✅ ${a.cuenta.slug}/${a.nombre} → "${preset.asunto}"`);
     corregidas++;

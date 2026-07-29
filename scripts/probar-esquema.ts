@@ -10,8 +10,10 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { leerContenido, V_ACTUAL } from "../lib/email/esquema";
 import { nuevoBloque, duplicarBloque, type Bloque } from "../lib/email/bloques";
-import { presetsPara } from "../lib/automations";
-import { PRESETS } from "../lib/plantillas/presets";
+import { presetsPara, presetDeTrigger } from "../lib/plantillas/presets";
+
+/** Una cuenta de mentira para instanciar los presets. Ver `presetsPara`. */
+const CUENTA = { nombre: "Marca de prueba", config: { url: "https://ejemplo.com" } };
 
 let fallas = 0;
 function ok(cond: boolean, que: string, detalle = "") {
@@ -150,29 +152,46 @@ titulo("El saneo de estilos");
   ok(cuerpo(c)[0].estilo === undefined, "si no quedó nada, no queda ni el objeto vacío");
 }
 
-// ─── Los presets reales migran sin perder nada ───────────────────────────────
-titulo("Fixtures reales: los 5 presets de plantilla + los 3 de automation");
-for (const p of PRESETS) {
-  const antes = p.bloques.length;
-  const c = leerContenido({ bloques: p.bloques, tema: p.tema });
+// ─── Los presets reales nacen en la forma actual ─────────────────────────────
+//
+// Un preset se guarda tal cual sale de `presetsPara`, así que si naciera en una
+// versión vieja del esquema sería el único documento del sistema que entra a la
+// base sin migrar. Por eso pasan por `leerContenido` al instanciarse y acá se
+// fija que releerlos no cambie nada.
+titulo("Fixtures reales: los presets que vienen con la app");
+for (const p of presetsPara(CUENTA)) {
+  const antes = cuerpo(p.contenido).length;
+  ok(p.contenido.v === V_ACTUAL, `preset "${p.id}": nace en v${V_ACTUAL}`, `nació en v${p.contenido.v}`);
+  ok(p.contenido.bloques[0]?.tipo === "encabezado", `preset "${p.id}": estrena cabecera de marca`);
+  ok(p.contenido.bloques.every((b) => b.id), `preset "${p.id}": todos los bloques con id`);
+
+  const c = leerContenido(JSON.parse(JSON.stringify(p.contenido)));
   ok(cuerpo(c).length === antes, `preset "${p.id}": ${antes} bloques y siguen ${antes}`, `quedaron ${cuerpo(c).length}`);
-  ok(c.bloques[0]?.tipo === "encabezado", `preset "${p.id}": estrena cabecera de marca`);
-  const tiposAntes = p.bloques.map((b) => b.tipo).join(",");
+  const tiposAntes = cuerpo(p.contenido).map((b) => b.tipo).join(",");
   const tiposDespues = cuerpo(c).map((b) => b.tipo).join(",");
   ok(tiposAntes === tiposDespues, `preset "${p.id}": los tipos y el orden no cambian`, `${tiposAntes}\n      → ${tiposDespues}`);
 }
 {
-  const presets = presetsPara("Marca de prueba", "https://ejemplo.com");
-  for (const [trigger, p] of Object.entries(presets)) {
-    const c = leerContenido({ bloques: p.bloques });
-    ok(cuerpo(c).length === p.bloques.length, `automation ${trigger}: no pierde bloques`);
-  }
   // El carrito tiene que seguir en su lugar: si el bloque se moviera al final,
   // el mail diría "dejaste esto" y mostraría los productos DESPUÉS del botón.
-  const ca = leerContenido({ bloques: presets.CARRITO_ABANDONADO.bloques });
+  const ca = presetDeTrigger("CARRITO_ABANDONADO", CUENTA).contenido;
   const iCarrito = ca.bloques.findIndex((b) => b.tipo === "carrito");
   const iBoton = ca.bloques.findIndex((b) => b.tipo === "boton");
   ok(iCarrito >= 0 && iBoton > iCarrito, "el carrito sigue ANTES del botón");
+}
+// ─── Un preset no puede guardar la marca que lo instanció ────────────────────
+//
+// Es el bug que ya pasó (la bienvenida de Zattia firmando "BDI Accesorios"),
+// ahora con dos formas nuevas de repetirse: el nombre de la marca en la cabecera
+// y el catálogo de la tienda adentro de un bloque de productos.
+titulo("Ningún preset guarda datos de la marca adentro del Json");
+for (const p of presetsPara({ nombre: "Marca Uno", config: { url: "https://uno.com" } })) {
+  const cab = p.contenido.bloques[0] as Extract<Bloque, { tipo: "encabezado" }>;
+  ok(!cab.texto && !cab.logo, `preset "${p.id}": la cabecera no lleva la marca escrita`);
+  const conProductos = p.contenido.bloques.filter(
+    (b) => b.tipo === "productos-dinamicos" && "items" in b,
+  );
+  ok(conProductos.length === 0, `preset "${p.id}": el bloque dinámico no trae productos`);
 }
 
 // ─── El carrito no se llena solo ─────────────────────────────────────────────

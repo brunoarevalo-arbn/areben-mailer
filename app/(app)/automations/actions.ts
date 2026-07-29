@@ -9,14 +9,15 @@ import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { marcaDe } from "@/lib/marca";
 import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
-import { presetsPara, urlTiendaDe, type Trigger } from "@/lib/automations";
+import { type Trigger } from "@/lib/automations";
+import { presetDeTrigger } from "@/lib/plantillas/presets";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function crearAutomation(trigger: Trigger) {
   const { cuenta } = await autorizar("editar");
   const rem = await getRemitenteEnvio(cuenta.id);
-  const p = presetsPara(cuenta.nombre, urlTiendaDe(cuenta, rem?.email))[trigger];
+  const p = presetDeTrigger(trigger, cuenta, rem?.email);
   const a = await prisma.automation.create({
     data: {
       cuentaId: cuenta.id,
@@ -24,7 +25,10 @@ export async function crearAutomation(trigger: Trigger) {
       trigger,
       esperaHoras: p.esperaHoras,
       asunto: p.asunto,
-      contenido: { bloques: p.bloques } as object,
+      // El contenido ENTERO, no `{ bloques }`: el preset ya viene con la versión
+      // del esquema, los ids y la cabecera de marca puestos, y enumerar campos a
+      // mano es lo que los perdía.
+      contenido: p.contenido as object,
     },
   });
   redirect(`/automations/${a.id}`);

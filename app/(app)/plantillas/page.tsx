@@ -1,31 +1,71 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
-import { usarPlantilla, usarPreset, eliminarPlantilla } from "./actions";
-import { PRESETS } from "@/lib/plantillas/presets";
+import { usarPlantilla, usarPreset, eliminarPlantilla, crearPlantilla } from "./actions";
+import { presetsGaleria } from "@/lib/plantillas/presets";
+import { getRemitenteEnvio } from "@/lib/remitentes";
 import { renderEmailHtml, aplicarMergeTags } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
 import { marcaDe } from "@/lib/marca";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * La miniatura es el mail de verdad, renderizado y escalado.
+ *
+ * No es una captura ni un dibujo aparte: es `renderEmailHtml` con la marca de
+ * esta cuenta puesta. Una galería que muestre una versión genérica miente sobre
+ * lo que va a salir, y el comerciante lo descubre después de elegir.
+ */
+function Miniatura({ titulo, html }: { titulo: string; html: string }) {
+  return (
+    <div className="h-56 overflow-hidden border-b border-border bg-white">
+      <iframe
+        title={titulo}
+        // `sandbox=""` sin `allow-same-origin`: el srcDoc hereda el origen del
+        // panel, y `esc()` no escapa comillas. Sin esto, un texto guardado puede
+        // ejecutar JS con la sesión de quien mira.
+        sandbox=""
+        srcDoc={html}
+        className="pointer-events-none h-[560px] w-[400px] origin-top-left"
+        style={{ transform: "scale(0.68)" }}
+        tabIndex={-1}
+      />
+    </div>
+  );
+}
+
 export default async function PlantillasPage() {
   const cuenta = await getCuentaActiva();
-  const plantillas = await prisma.plantilla.findMany({
-    where: { cuentaId: cuenta.id },
-    orderBy: { createdAt: "desc" },
-  });
+  const [plantillas, remitente] = await Promise.all([
+    prisma.plantilla.findMany({
+      where: { cuentaId: cuenta.id },
+      orderBy: { createdAt: "desc" },
+    }),
+    // El sitio de la tienda sale de `Cuenta.config`; el remitente es el fallback
+    // para las cuentas que todavía no lo tienen cargado.
+    getRemitenteEnvio(cuenta.id),
+  ]);
 
-  // Preview de cada prearmada (render real, con un nombre de ejemplo para los merge tags).
   const marca = marcaDe(cuenta);
-  const previews = PRESETS.map((p) => {
-    // Con la marca puesta: la galería tiene que mostrar cómo va a quedar ESTA
-    // tienda —su tema, su logo, su link—, no una versión genérica que después
-    // no se parece a nada.
-    const html = renderEmailHtml({ bloques: p.bloques, tema: p.tema }, { unsubscribeUrl: "#", ...marca });
-    return { preset: p, html: aplicarMergeTags(html, { nombre: "Ana", email: "ana@ejemplo.com" }) };
+  const opts = { unsubscribeUrl: "#", ...marca };
+  const ejemplo = { nombre: "Ana", email: "ana@ejemplo.com" };
+  const vista = (c: Parameters<typeof renderEmailHtml>[0]) =>
+    aplicarMergeTags(renderEmailHtml(c, opts), ejemplo);
+
+  // Prearmadas: los presets de automation no van acá, esos se crean desde
+  // /automations con su disparador.
+  const previews = presetsGaleria(cuenta, remitente?.email).map((p) => ({
+    preset: p,
+    html: vista(p.contenido),
+  }));
+
+  const guardadas = plantillas.map((p) => {
+    const contenido = leerContenido(p.contenido);
+    return { id: p.id, nombre: p.nombre, bloques: contenido.bloques.length, html: vista(contenido) };
   });
 
   return (
@@ -42,16 +82,7 @@ export default async function PlantillasPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {previews.map(({ preset, html }) => (
             <Card key={preset.id} padding="none" className="overflow-hidden">
-              <div className="h-56 overflow-hidden border-b border-border bg-white">
-                <iframe
-                  title={preset.nombre}
-                  sandbox=""
-                  srcDoc={html}
-                  className="pointer-events-none h-[560px] w-[400px] origin-top-left"
-                  style={{ transform: "scale(0.68)" }}
-                  tabIndex={-1}
-                />
-              </div>
+              <Miniatura titulo={preset.nombre} html={html} />
               <div className="p-4">
                 <div className="font-medium text-foreground">{preset.nombre}</div>
                 <div className="mt-1 text-xs text-muted">{preset.descripcion}</div>
@@ -68,25 +99,42 @@ export default async function PlantillasPage() {
 
       {/* Mis plantillas (guardadas desde el editor) */}
       <section className="space-y-3">
-        <h2 className="text-sm font-medium text-foreground">
-          Mis plantillas <span className="text-subtle">({plantillas.length})</span>
-        </h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-medium text-foreground">
+            Mis plantillas <span className="text-subtle">({plantillas.length})</span>
+          </h2>
+          <form action={crearPlantilla}>
+            <button className="rounded-xl border border-border px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface-muted hover:border-border-strong">
+              + Nueva plantilla
+            </button>
+          </form>
+        </div>
         {plantillas.length === 0 ? (
           <EmptyState
             title="Sin plantillas guardadas"
-            message='Abrí una campaña, armá el diseño y tocá "Guardar como plantilla" para reusarlo.'
+            message='Creá una en blanco, o abrí una campaña y tocá "Guardar como plantilla" para reusar su diseño.'
           />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {plantillas.map((p) => {
-              const nBloques = leerContenido(p.contenido).bloques.length;
-              return (
-                <Card key={p.id}>
-                  <div className="font-medium text-foreground">{p.nombre}</div>
-                  <div className="mt-1 text-sm text-subtle">{nBloques} bloques</div>
-                  <div className="mt-3 flex items-center gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {guardadas.map((p) => (
+              <Card key={p.id} padding="none" className="overflow-hidden">
+                {/* Misma miniatura que las prearmadas: un diseño guardado se
+                    reconoce mirándolo, no leyendo "8 bloques". */}
+                <Miniatura titulo={p.nombre} html={p.html} />
+                <div className="p-4">
+                  <div className="truncate font-medium text-foreground" title={p.nombre}>
+                    {p.nombre}
+                  </div>
+                  <div className="mt-1 text-xs text-muted">{p.bloques} bloques</div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Link
+                      href={`/plantillas/${p.id}`}
+                      className="rounded-xl bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+                    >
+                      Editar
+                    </Link>
                     <form action={usarPlantilla.bind(null, p.id)}>
-                      <button className="rounded-xl bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover">
+                      <button className="rounded-xl border border-border px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface-muted hover:border-border-strong">
                         Usar
                       </button>
                     </form>
@@ -96,9 +144,9 @@ export default async function PlantillasPage() {
                       </button>
                     </form>
                   </div>
-                </Card>
-              );
-            })}
+                </div>
+              </Card>
+            ))}
           </div>
         )}
       </section>

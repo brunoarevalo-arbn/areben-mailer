@@ -6,7 +6,10 @@ import { renderEmailHtml, renderEmailTexto, nuevoBloque, TIPOS_BLOQUE } from "..
 import { inyectarTracking } from "../lib/email/tracking";
 import { CLASES } from "../lib/email/shell";
 import { V_ACTUAL } from "../lib/email/esquema";
-import { PRESETS } from "../lib/plantillas/presets";
+import { presetsPara } from "../lib/plantillas/presets";
+
+/** Una cuenta de mentira para instanciar los presets. */
+const CUENTA = { nombre: "Marca de prueba", config: { url: "https://ejemplo.com" } };
 import type { ContenidoCampania } from "../lib/email/render";
 
 let fallas = 0;
@@ -157,8 +160,8 @@ titulo("Lo que no puede faltar nunca");
 // ─── Peso ────────────────────────────────────────────────────────────────────
 titulo("Peso: Gmail recorta a ~102 KB y al recortar TIRA el <style>");
 {
-  for (const p of PRESETS) {
-    const kb = Buffer.byteLength(render({ bloques: p.bloques, tema: p.tema }), "utf8") / 1024;
+  for (const p of presetsPara(CUENTA)) {
+    const kb = Buffer.byteLength(render(p.contenido), "utf8") / 1024;
     ok(kb < 80, `${p.id}: ${kb.toFixed(1)} KB (tope 80)`);
   }
   ok(!TODO.includes("data:image"), "cero imágenes en base64");

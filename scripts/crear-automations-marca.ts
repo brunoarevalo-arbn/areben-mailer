@@ -12,7 +12,8 @@
 //
 // Idempotente: si la marca ya tiene esa automation, no la duplica ni la pisa.
 import { prisma } from '../lib/prisma.ts';
-import { presetsPara, urlTiendaDe, type Trigger } from '../lib/automations.ts';
+import { type Trigger } from '../lib/automations.ts';
+import { presetDeTrigger } from '../lib/plantillas/presets.ts';
 import { getRemitenteEnvio } from '../lib/remitentes.ts';
 
 const TRIGGERS: Trigger[] = ['NUEVO_CLIENTE', 'COMPRA', 'CARRITO_ABANDONADO'];
@@ -26,16 +27,16 @@ async function main() {
 
   for (const cuenta of cuentas) {
     const rem = await getRemitenteEnvio(cuenta.id);
-    const presets = presetsPara(cuenta.nombre, urlTiendaDe(cuenta, rem?.email));
+    const preset = (t: Trigger) => presetDeTrigger(t, cuenta, rem?.email);
     console.log(`\n▶ ${cuenta.nombre} (${cuenta.slug})${cuenta.tnStoreId ? '' : ' — sin Tiendanube conectada'}`);
 
     for (const trigger of TRIGGERS) {
       const ya = await prisma.automation.findFirst({ where: { cuentaId: cuenta.id, trigger } });
       if (ya) {
-        console.log(`   = ${presets[trigger].nombre.padEnd(24)} ya existe (${ya.estado})`);
+        console.log(`   = ${preset(trigger).nombre.padEnd(24)} ya existe (${ya.estado})`);
         continue;
       }
-      const p = presets[trigger];
+      const p = preset(trigger);
       await prisma.automation.create({
         data: {
           cuentaId: cuenta.id,
@@ -43,7 +44,7 @@ async function main() {
           trigger,
           esperaHoras: p.esperaHoras,
           asunto: p.asunto,
-          contenido: { bloques: p.bloques },
+          contenido: p.contenido,
         },
       });
       console.log(`   + ${p.nombre.padEnd(24)} creada · "${p.asunto}"`);
