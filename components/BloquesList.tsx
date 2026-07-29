@@ -6,7 +6,7 @@ import { AISoonButton } from "@/components/ui/AISoonButton";
 import { inputClass } from "@/lib/ui";
 import { ChevronUp, ChevronDown, X } from "lucide-react";
 
-const TIPOS = ["hero", "seccion", "cupon", "titulo", "texto", "boton", "imagen", "productos", "carrito", "columnas", "video", "redes", "divisor"] as const;
+const TIPOS = ["hero", "seccion", "cupon", "titulo", "texto", "boton", "imagen", "productos", "carrito", "columnas", "video", "redes", "divisor", "espaciador"] as const;
 
 const selectClass = `${inputClass} py-1.5`;
 const alignSelect = (value: "left" | "center", onChange: (v: "left" | "center") => void) => (
@@ -120,6 +120,21 @@ export function BloquesList({
           )}
           {b.tipo === "productos" && (
             <ProductosBlock items={b.items} onChange={(items) => setBloque(i, { items })} />
+          )}
+          {b.tipo === "espaciador" && (
+            <label className="flex items-center gap-2 text-xs text-muted">
+              Alto
+              <input
+                type="range"
+                min={4}
+                max={120}
+                step={4}
+                value={b.alto ?? 24}
+                onChange={(e) => setBloque(i, { alto: Number(e.target.value) })}
+                className="flex-1 accent-accent"
+              />
+              <span className="w-12 tabular-nums text-foreground">{b.alto ?? 24}px</span>
+            </label>
           )}
           {b.tipo === "carrito" && (
             <p className="text-xs text-muted leading-relaxed">

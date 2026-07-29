@@ -22,7 +22,7 @@ export default async function PlantillasPage() {
   const previews = PRESETS.map((p) => {
     // Con el tema de la marca: la galería tiene que mostrar cómo va a quedar
     // ESTA tienda, no una versión genérica que después no se parece a nada.
-    const html = renderEmailHtml({ bloques: p.bloques }, { unsubscribeUrl: "#", nombreCuenta: cuenta.nombre, temaMarca });
+    const html = renderEmailHtml({ bloques: p.bloques, tema: p.tema }, { unsubscribeUrl: "#", nombreCuenta: cuenta.nombre, temaMarca });
     return { preset: p, html: aplicarMergeTags(html, { nombre: "Ana", email: "ana@ejemplo.com" }) };
   });
 

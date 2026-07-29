@@ -83,6 +83,15 @@ ok(
   'ninguna fuente depende de una descarga',
 );
 
+// ─── El espaciador ───────────────────────────────────────────────────────────
+// `font-size:0;line-height:0` no es adorno: sin eso Outlook le suma la altura de
+// línea por defecto y el espacio mide bastante más de lo que dice.
+const esp = html([{ tipo: 'espaciador', alto: 40 }]);
+ok(esp.includes('height:40px;font-size:0;line-height:0'), 'espaciador: alto exacto y sin line-height heredado');
+ok(html([{ tipo: 'espaciador', alto: 9999 }]).includes('height:120px'), 'espaciador: alto absurdo se acota');
+ok(html([{ tipo: 'espaciador', alto: 0 }]).includes('height:4px'), 'espaciador: alto 0 se acota al mínimo');
+ok(html([{ tipo: 'espaciador' }]).includes('height:24px'), 'espaciador: sin alto usa el default');
+
 // ─── temaDe lee lo que hay y no explota con lo que no ────────────────────────
 ok(temaDe({ tema: { base: 'oscuro' } })?.base === 'oscuro', 'temaDe: lee el tema guardado');
 ok(temaDe({ url: 'x' }) === undefined, 'temaDe: config sin tema devuelve undefined');

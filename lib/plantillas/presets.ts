@@ -1,4 +1,5 @@
 import type { Bloque } from "@/lib/email/render";
+import type { Tema } from "@/lib/email/tema";
 
 // Plantillas prearmadas que vienen con la app (compartidas por todas las marcas).
 // Aprovechan los bloques ricos (hero, sección con fondo, cupón). Son esqueletos:
@@ -8,6 +9,8 @@ export interface Preset {
   nombre: string;
   descripcion: string;
   bloques: Bloque[];
+  /** Aspecto propio. Sin esto, la plantilla usa el de la marca. */
+  tema?: Tema;
 }
 
 const redes: Bloque = {
@@ -20,6 +23,51 @@ const redes: Bloque = {
 };
 
 export const PRESETS: Preset[] = [
+  {
+    id: "carrito-oscuro",
+    nombre: "Carrito abandonado (oscuro)",
+    descripcion: "Fondo negro, CTA azul y el carrito real de la persona. Para recuperar compras.",
+    // Adaptación de una plantilla de Really Good Emails que trajo Bruno.
+    //
+    // ⛔ De la original NO queda nada suyo: ni las imágenes (apuntaban a su CDN,
+    // `d1oco4z2z1fhwp.cloudfront.net`, que puede desaparecer cuando quieran) ni
+    // el pie "Designed with RGE Studio". Lo que se tomó es la estructura.
+    //
+    // Lo que no se pudo reproducir y conviene saber: la barra de navegación y la
+    // tira de 4 íconos del pie no tienen bloque equivalente todavía.
+    tema: { base: "oscuro", acento: "#2d9ff7", ancho: 700 },
+    bloques: [
+      { tipo: "espaciador", alto: 20 },
+      {
+        tipo: "hero",
+        imagen: "",
+        titulo: "¿Todavía lo estás pensando?",
+        subtitulo: "Te distrajiste, nos pasa a todos. Terminá la compra que dejaste empezada.",
+        botonTexto: "",
+        botonUrl: "",
+        bg: "#161616",
+      },
+      { tipo: "espaciador", alto: 32 },
+      { tipo: "titulo", texto: "Tu carrito", align: "center" },
+      // Se llena solo con lo que la persona dejó. Va ACÁ y no al final: después
+      // del botón, "esto dejaste" quedaría hablando de nada.
+      { tipo: "carrito", items: [] },
+      { tipo: "espaciador", alto: 28 },
+      // ${cart.url} lo resuelve el procesador con el link real del checkout.
+      { tipo: "boton", texto: "Volver a mi carrito", url: "${cart.url}", align: "center", full: false },
+      { tipo: "espaciador", alto: 32 },
+      {
+        tipo: "seccion",
+        bg: "#e6e6e6",
+        titulo: "¿Dudas o necesitás ayuda?",
+        texto: "Escribinos y te respondemos. Estamos para darte una mano con tu compra.",
+        botonTexto: "",
+        botonUrl: "",
+      },
+      { tipo: "espaciador", alto: 24 },
+      redes,
+    ],
+  },
   {
     id: "newsletter",
     nombre: "Newsletter",

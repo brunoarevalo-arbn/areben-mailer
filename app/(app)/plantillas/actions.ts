@@ -15,7 +15,7 @@ export async function usarPreset(presetId: string) {
     data: {
       cuentaId: cuenta.id,
       nombre: preset.nombre,
-      contenido: { bloques: preset.bloques } as object,
+      contenido: { bloques: preset.bloques, tema: preset.tema } as object,
     },
   });
   redirect(`/campanias/${campania.id}`);

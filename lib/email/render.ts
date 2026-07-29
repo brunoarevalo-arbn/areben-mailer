@@ -56,6 +56,10 @@ export type Bloque =
   | { tipo: "video"; imagen: string; url: string }
   | { tipo: "redes"; links: { red: string; url: string }[] }
   | { tipo: "divisor" }
+  // Aire vertical y nada más. Parece de más hasta que se arma un diseño en serio:
+  // la plantilla que motivó esto usa 12 espaciadores, de 5 a 75px, y sin ellos
+  // los bloques se apilan pegados.
+  | { tipo: "espaciador"; alto?: number }
   // Bloques "ricos"
   | { tipo: "hero"; imagen: string; titulo: string; subtitulo: string; botonTexto: string; botonUrl: string; bg: string }
   | { tipo: "seccion"; bg: string; titulo: string; texto: string; botonTexto: string; botonUrl: string }
@@ -87,6 +91,7 @@ export function nuevoBloque(tipo: Bloque["tipo"]): Bloque {
     case "video": return { tipo, imagen: "", url: "" };
     case "redes": return { tipo, links: [{ red: "Instagram", url: "" }] };
     case "divisor": return { tipo };
+    case "espaciador": return { tipo, alto: 24 };
     case "hero": return { tipo, imagen: "", titulo: "Título principal", subtitulo: "Un subtítulo que acompaña", botonTexto: "Ver más", botonUrl: "", bg: "#ffffff" };
     case "seccion": return { tipo, bg: "#faf7f0", titulo: "Título de sección", texto: "Texto de la sección.", botonTexto: "", botonUrl: "" };
     case "cupon": return { tipo, texto: "Usá este código en el checkout", codigo: "DESCUENTO10", botonTexto: "Comprar", botonUrl: "" };
@@ -238,6 +243,12 @@ function renderBloque(b: Bloque, pal: Paleta, muestraCarrito = false): string {
         .join("")}</div>`);
     case "divisor":
       return pad(`<hr style="border:0;border-top:1px solid ${pal.bordeSuave};margin:24px 0" />`);
+    case "espaciador": {
+      // `font-size:0;line-height:0` no es adorno: sin eso Outlook le mete la
+      // altura de línea por defecto y el espacio termina midiendo de más.
+      const alto = Math.min(120, Math.max(4, Math.round(b.alto ?? 24)));
+      return `<div style="height:${alto}px;font-size:0;line-height:0">&nbsp;</div>`;
+    }
     case "hero": {
       const img = b.imagen ? `<img src="${esc(b.imagen)}" alt="" style="width:100%;display:block;margin:0" />` : "";
       // El `bg` lo elige el autor, así que el color del texto se decide por ESE
@@ -366,6 +377,9 @@ function bloqueATexto(b: Bloque): string | null {
       return (b.links ?? []).filter((l) => l.url).map((l) => link(l.red, l.url)).join("\n") || null;
     case "divisor":
       return "—";
+    case "espaciador":
+      // No aporta nada legible: en texto plano el aire ya lo dan los saltos.
+      return null;
     case "hero":
       return [b.titulo, b.subtitulo, b.botonTexto ? link(b.botonTexto, b.botonUrl) : null].filter(Boolean).join("\n") || null;
     case "seccion":
