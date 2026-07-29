@@ -7,6 +7,34 @@
 
 ---
 
+## ✅ Titular (29-jul-2026): AWS aprobó — y ya no era el blocker
+
+El caso `178473604500639` se resolvió. **La cuenta salió del sandbox**: 50.000 mails/día,
+14/seg, en `us-east-1`. Llegó un día después de migrar a Resend, y eso cambia qué significa.
+
+**No es "volver a SES".** El 28-jul se midió que la misma casilla de Hotmail que caía en
+spam con SES entra en inbox por Resend. SES recién aprobado sale con IP compartida fría
+frente a Outlook, que es exactamente el problema que Resend resolvió. **El proveedor se
+elige después de un ensayo comparativo**, no por default.
+
+Lo que la aprobación sí desbloquea, y es lo importante: **se puede mandar a casillas
+semilla sin verificarlas una por una**. En sandbox cada destinatario había que darlo de
+alta a mano, y por eso nunca se pudo comparar proveedores contra los buzones que importan.
+Ahora se puede: misma marca, mismo contenido, misma lista semilla, dos corridas cambiando
+solo `EMAIL_PROVIDER`.
+
+### El gate dejó de colgar de una env que mentía
+
+`SES_SANDBOX` nombraba un estado de AWS que ya no existe, y era lo único que decidía si
+salían los mails cuando `ENVIO_REAL` no estaba definida. Se cerró así:
+
+- `ENVIO_REAL` cargada explícitamente en Vercel prod y en `.env` (arranca en `"false"`).
+- El fallback a `SES_SANDBOX` se borró de `envioRealHabilitado()`.
+- `scripts/probar-gate.ts` fija las invariantes y corre en CI: el gate no puede volver a
+  abrirse por una env que nadie está mirando.
+
+---
+
 ## 🚀 Titular (actualizado el 28-jul-2026): ya no dependemos de SES
 
 **El envío pasó a Resend.** AWS nunca contestó el caso `178473604500639` (al 28-jul seguía
@@ -63,7 +91,11 @@ veces: la reputación de IP de Resend es justamente lo que arregló Outlook.
 
 ---
 
-## Titular original (SES)
+## Titular original (SES) — histórico, resuelto el 29-jul
+
+> ⚠️ Todo lo que sigue en esta sección describe la situación **hasta el 29-jul-2026**, y se
+> conserva porque explica cómo se llegó acá. La cuenta ya salió del sandbox: ver el titular
+> del 29-jul arriba.
 
 **Lo único que falta es el acceso a producción de SES.** Todo el resto del andamiaje de
 envío (dominios, DKIM, remitentes, rebotes, quejas, supresión) está terminado y verificado.
@@ -318,16 +350,17 @@ después de arreglar lo que el propio ensayo destapó:
 **~1 hora**. Ojo que el simulador no consume la cuota diaria: con la cuenta ya en producción
 el techo real lo pone la cuota que apruebe AWS, no el motor.
 
-**Cuando llegue la aprobación:** poner `ENVIO_REAL=true` en Vercel prod y en `.env`,
-redeployar (`vercel deploy --prod --yes`, no hay autodeploy de GitHub) y recién ahí hacer
-el E2E real del envío, incluido el A/B.
+**La aprobación llegó el 29-jul.** Para abrir el envío: `ENVIO_REAL=true` en Vercel prod y
+en `.env`, redeployar (`vercel deploy --prod --yes`, no hay autodeploy de GitHub) y recién
+ahí el E2E real del envío, incluido el A/B. Antes de eso va el ensayo comparativo de
+proveedores — el script de ensayo aborta si el gate está en `real`, y está bien que así sea.
 
-> **Por qué se renombró (26-jul-2026):** el flag se llamaba `SES_SANDBOX`, y ese nombre
-> mentía — bloqueaba el envío **con cualquier proveedor**. Migrar a Resend habría dejado la
-> app sin mandar un solo mail, sin ninguna pista de por qué. `ENVIO_REAL` es neutro.
-> Mientras `ENVIO_REAL` no esté definida se sigue respetando `SES_SANDBOX`, así que el
-> deploy actual no cambia de comportamiento; la compat se puede borrar en cuanto la env
-> nueva esté cargada.
+> **Por qué se renombró (26-jul-2026) y por qué se terminó de cerrar (29-jul):** el flag se
+> llamaba `SES_SANDBOX`, y ese nombre mentía por partida doble — bloqueaba el envío **con
+> cualquier proveedor** (migrar a Resend habría dejado la app muda sin ninguna pista de por
+> qué), y nombraba un estado de AWS que dejó de existir cuando la cuenta salió del sandbox.
+> La compat que respetaba la env vieja ya se borró: hoy `envioRealHabilitado()` mira
+> **solo** `ENVIO_REAL`, y `scripts/probar-gate.ts` lo fija en CI.
 
 ---
 
@@ -349,7 +382,7 @@ La app **ya está preparada** para cambiar de proveedor — no es un refactor, e
 2. Dar de alta el webhook en su panel y guardar el signing secret
    (`RESEND_WEBHOOK_SECRET` / equivalente de SendGrid).
 3. Setear `EMAIL_PROVIDER` + la API key en Vercel y en `.env`.
-4. Generalizar el gate `SES_SANDBOX` (ver 4).
+4. ~~Generalizar el gate `SES_SANDBOX`~~ **hecho el 29-jul** (ver 4).
 
 **Costo:** SES es lejos lo más barato. Ojo con el número: la cuenta está en el plan
 **Essentials**, que son **US$0,16 cada 1.000** — los US$0,10 son el plan *à la carte*, al que
