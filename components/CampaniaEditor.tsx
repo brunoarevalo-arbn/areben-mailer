@@ -382,7 +382,7 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
       {/* Columna preview */}
       <div className="lg:sticky lg:top-6 h-fit">
         <div className="mb-2 text-sm text-muted">Vista previa</div>
-        <iframe title="preview" srcDoc={previewHtml} className="h-[70vh] w-full rounded-xl border border-border bg-white" />
+        <iframe title="preview" sandbox="" srcDoc={previewHtml} className="h-[70vh] w-full rounded-xl border border-border bg-white" />
       </div>
     </div>
   );

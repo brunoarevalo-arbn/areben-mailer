@@ -73,6 +73,7 @@ export function TemaMarca({ inicial, nombreCuenta }: { inicial: Tema | undefined
         <div className="mb-2 text-sm text-muted">Vista previa</div>
         <iframe
           title="Vista previa del diseño"
+          sandbox=""
           srcDoc={previewHtml}
           className="h-[60vh] w-full rounded-xl border border-border"
         />

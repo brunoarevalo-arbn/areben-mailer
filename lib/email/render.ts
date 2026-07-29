@@ -3,9 +3,13 @@
 //
 // El aspecto (colores, ancho, fuente) vive en lib/email/tema.ts y llega acá ya
 // resuelto como `Paleta`. Este archivo no decide de qué color es nada.
-import { resolverPaleta, combinarTema, esColorOscuro, type Paleta, type Tema } from "./tema";
+import { resolverPaleta, combinarTema, type Paleta, type Tema } from "./tema";
 import { leerContenido } from "./esquema";
-import type { Bloque, Columna, ContenidoCampania, ProductoEmail } from "./bloques";
+import {
+  resolverEstilo, tonosSobre, extra, px, padCss,
+  type CtxEstilo, type EstiloResuelto, type Estilos, type RolEstilo,
+} from "./estilos";
+import type { Bloque, Columna, ContenidoCampania, ProductoEmail, TipoBloque } from "./bloques";
 
 // Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
 // sin ciclo) pero se re-exportan desde acá: media app importa `Bloque` y
@@ -13,32 +17,39 @@ import type { Bloque, Columna, ContenidoCampania, ProductoEmail } from "./bloque
 export type { Bloque, BloqueBase, TipoBloque, ContenidoCampania, ProductoEmail, Columna } from "./bloques";
 export { nuevoBloque, duplicarBloque, nuevoId, TIPOS_BLOQUE } from "./bloques";
 
-/**
- * Colores de texto legibles sobre un fondo cualquiera.
- *
- * Los bloques `hero`, `seccion` y `cupon` traen su propio `bg` elegido por el
- * autor. Si el texto heredara la paleta del tema, un hero blanco dentro de un
- * mail oscuro saldría con el título blanco sobre blanco — invisible. Se decide
- * por el fondo real del bloque, no por el del mail.
- */
-function tonosSobre(bg: string): { texto: string; cuerpo: string; medio: string } {
-  return esColorOscuro(bg)
-    ? { texto: "#fafafa", cuerpo: "#d5d4d4", medio: "#b8b8b8" }
-    : { texto: "#171717", cuerpo: "#404040", medio: "#525252" };
-}
-
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 const nl = (s: string) => esc(s).replace(/\n/g, "<br>");
 
+/**
+ * Todo lo que un bloque necesita para dibujarse.
+ *
+ * Reemplaza al par `(pal, muestraCarrito)` que se venía pasando suelto: ahora
+ * también viajan los estilos del documento, que son la capa (b) de la cascada.
+ */
+interface Ctx extends CtxEstilo {
+  muestraCarrito: boolean;
+}
+
+/** Atajo: el estilo de un rol de este bloque, con las cuatro capas aplicadas. */
+const est = (
+  tipo: TipoBloque,
+  rol: RolEstilo,
+  ctx: Ctx,
+  propio: Estilos | undefined,
+  sobre?: string,
+): EstiloResuelto => resolverEstilo(tipo, rol, { pal: ctx.pal, doc: ctx.doc, propio }, sobre);
+
 /** Contenedor con padding horizontal para los bloques "de texto". */
-const pad = (inner: string) => `<div style="padding:0 32px">${inner}</div>`;
+const pad = (inner: string, e?: EstiloResuelto) =>
+  `<div style="padding:0 ${px(e?.padX ?? 32)}">${inner}</div>`;
 
 /** Ancla de botón. El color sale del acento del tema, no del renderer. */
-function botonAnchor(texto: string, url: string, pal: Paleta, full = false): string {
+function botonAnchor(texto: string, url: string, e: EstiloResuelto, full = false): string {
   const w = full ? ";width:100%;box-sizing:border-box;text-align:center" : "";
-  return `<a href="${esc(url || "#")}" style="display:inline-block;padding:14px 32px;font-size:16px;font-weight:600;color:${pal.sobreAcento};background:${pal.acento};border-radius:8px;text-decoration:none${w}">${esc(texto)}</a>`;
+  const resto = extra(e, ["padX", "padY", "tamano", "peso", "color", "fondo", "radio", "align"]);
+  return `<a href="${esc(url || "#")}" style="display:inline-block;${padCss(e.padY, e.padX)};font-size:${px(e.tamano ?? 16)};font-weight:${e.peso ?? 600};color:${e.color};background:${e.fondo};border-radius:${px(e.radio ?? 8)};text-decoration:none${resto}${w}">${esc(texto)}</a>`;
 }
 
 function fmtPrecio(v: string): string {
@@ -55,20 +66,20 @@ function precioHtml(p: ProductoEmail, pal: Paleta): string {
 }
 
 /** Renglón "iPhone 11 · Marrón — 2 u." Vacío si el producto no aporta ninguno de los dos. */
-function detalleHtml(p: ProductoEmail, pal: Paleta): string {
+function detalleHtml(p: ProductoEmail, e: EstiloResuelto): string {
   const partes = [p.variante, (p.cantidad ?? 1) > 1 ? `${p.cantidad} u.` : null].filter(Boolean);
   return partes.length
-    ? `<div style="margin-top:3px;font-size:13px;color:${pal.tenue}">${esc(partes.join(" — "))}</div>`
+    ? `<div style="margin-top:3px;font-size:${px(e.tamano ?? 13)};color:${e.color}${extra(e, ["tamano", "color"])}">${esc(partes.join(" — "))}</div>`
     : "";
 }
 
-function renderCard(p: ProductoEmail, pal: Paleta): string {
+function renderCard(p: ProductoEmail, pal: Paleta, eTexto: EstiloResuelto, eNota: EstiloResuelto, eImg: EstiloResuelto): string {
   return `<td width="50%" valign="top" style="padding:8px">
     <a href="${esc(p.url)}" style="text-decoration:none;color:inherit">
-      <img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:8px;display:block" />
-      <div style="margin-top:8px;font-size:14px;color:${pal.cuerpo}">${esc(p.nombre)}</div>
-      ${detalleHtml(p, pal)}
-      <div style="margin-top:2px;font-size:14px">${precioHtml(p, pal)}</div>
+      <img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:${px(eImg.radio ?? 8)};display:block" />
+      <div style="margin-top:8px;font-size:${px(eTexto.tamano ?? 14)};color:${eTexto.color}${extra(eTexto, ["tamano", "color"])}">${esc(p.nombre)}</div>
+      ${detalleHtml(p, eNota)}
+      <div style="margin-top:2px;font-size:${px(eTexto.tamano ?? 14)}">${precioHtml(p, pal)}</div>
     </a>
   </td>`;
 }
@@ -79,16 +90,16 @@ function renderCard(p: ProductoEmail, pal: Paleta): string {
  * Es la diferencia de fondo con `renderCard`: una grilla de tarjetas dice "mirá
  * estos productos", y un carrito abandonado tiene que decir "esto dejaste".
  */
-function renderLineaCarrito(p: ProductoEmail, pal: Paleta): string {
+function renderLineaCarrito(p: ProductoEmail, pal: Paleta, eNombre: EstiloResuelto, eNota: EstiloResuelto, eImg: EstiloResuelto): string {
   const foto = p.imagen
-    ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:8px;display:block" />`
+    ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:${px(eImg.radio ?? 8)};display:block" />`
     : "";
   return `<tr>
     <td width="25%" valign="top" style="padding:10px 0"><a href="${esc(p.url)}">${foto}</a></td>
     <td valign="top" style="padding:10px 14px">
       <a href="${esc(p.url)}" style="text-decoration:none;color:inherit">
-        <div style="font-size:15px;line-height:1.35;color:${pal.texto};font-weight:600">${esc(p.nombre)}</div>
-        ${detalleHtml(p, pal)}
+        <div style="font-size:${px(eNombre.tamano ?? 15)};line-height:${eNombre.interlinea ?? 1.35};color:${eNombre.color};font-weight:${eNombre.peso ?? 600}${extra(eNombre, ["tamano", "interlinea", "color", "peso", "align"])}">${esc(p.nombre)}</div>
+        ${detalleHtml(p, eNota)}
       </a>
     </td>
     <td width="22%" valign="top" align="right" style="padding:10px 0;font-size:14px;white-space:nowrap">${precioHtml(p, pal)}</td>
@@ -102,10 +113,10 @@ function renderLineaCarrito(p: ProductoEmail, pal: Paleta): string {
  * El `${cart.url}` del link lo resuelve el procesador de automations sobre el
  * HTML ya armado, igual que el resto de los links del carrito.
  */
-function renderCarrito(items: ProductoEmail[], pal: Paleta, restantes = 0): string {
+function renderCarrito(items: ProductoEmail[], pal: Paleta, e: EstProducto, restantes = 0): string {
   if (items.length === 0) return "";
   const filas = items
-    .map((p) => renderLineaCarrito(p, pal))
+    .map((p) => renderLineaCarrito(p, pal, e.nombre, e.nota, e.img))
     .join(`<tr><td colspan="3" style="border-top:1px solid ${pal.borde};font-size:0;line-height:0">&nbsp;</td></tr>`);
   const mas =
     restantes > 0
@@ -120,58 +131,105 @@ const CARRITO_MUESTRA: ProductoEmail[] = [
   { nombre: "Otro producto", variante: "Variante", precio: "10990", precioPromo: "7490", imagen: "", url: "#" },
 ];
 
-/** Render de una grilla de productos, reutilizable (ej. email de carrito abandonado). */
-export function renderProductosHtml(items: ProductoEmail[], tema?: Tema): string {
-  return renderProductos(items, resolverPaleta(tema));
+/**
+ * Los tres roles que usan la grilla de productos y las líneas del carrito.
+ *
+ * Van juntos porque las tres funciones que dibujan producto los necesitan a los
+ * tres, y resolverlos adentro del loop sería recalcular la cascada por ítem.
+ */
+interface EstProducto {
+  nombre: EstiloResuelto;
+  nota: EstiloResuelto;
+  img: EstiloResuelto;
 }
 
-function renderProductos(items: ProductoEmail[], pal: Paleta): string {
+function estProducto(tipo: TipoBloque, rolNombre: RolEstilo, ctx: Ctx, propio: Estilos | undefined): EstProducto {
+  return {
+    nombre: est(tipo, rolNombre, ctx, propio),
+    nota: est(tipo, "nota", ctx, propio),
+    img: est(tipo, "imagen", ctx, propio),
+  };
+}
+
+/** Render de una grilla de productos, reutilizable (ej. email de carrito abandonado). */
+export function renderProductosHtml(items: ProductoEmail[], tema?: Tema): string {
+  const pal = resolverPaleta(tema);
+  const ctx: Ctx = { pal, muestraCarrito: false };
+  return renderProductos(items, pal, estProducto("productos", "cuerpo", ctx, undefined));
+}
+
+function renderProductos(items: ProductoEmail[], pal: Paleta, e: EstProducto): string {
   if (items.length === 0) return "";
   const filas: string[] = [];
   for (let i = 0; i < items.length; i += 2) {
-    const a = renderCard(items[i], pal);
-    const b = items[i + 1] ? renderCard(items[i + 1], pal) : `<td width="50%"></td>`;
+    const a = renderCard(items[i], pal, e.nombre, e.nota, e.img);
+    const b = items[i + 1] ? renderCard(items[i + 1], pal, e.nombre, e.nota, e.img) : `<td width="50%"></td>`;
     filas.push(`<tr>${a}${b}</tr>`);
   }
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px">${filas.join("")}</table>`;
 }
 
-function renderBloque(b: Bloque, pal: Paleta, muestraCarrito = false): string {
+function renderBloque(b: Bloque, ctx: Ctx): string {
+  const { pal } = ctx;
+  // Los cuatro escalones de la cascada, resueltos para ESTE bloque. `sobre` es
+  // el fondo real cuando el bloque trae uno propio: solo pesa si nadie eligió el
+  // color a mano.
+  const e = (rol: RolEstilo, sobre?: string) => est(b.tipo, rol, ctx, b.estilo, sobre);
+  const caja = () => e("caja");
+
   switch (b.tipo) {
-    case "titulo":
-      return pad(`<h1 style="margin:16px 0;font-size:26px;line-height:1.25;color:${pal.texto};text-align:${b.align ?? "left"}">${esc(b.texto)}</h1>`);
-    case "texto":
-      return pad(`<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:${pal.cuerpo};text-align:${b.align ?? "left"}">${nl(b.texto)}</p>`);
-    case "boton":
-      return pad(`<div style="text-align:${b.align ?? "left"};margin:8px 0 20px">${botonAnchor(b.texto, b.url, pal, b.full)}</div>`);
-    case "imagen":
-      return pad(`<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" style="max-width:100%;height:auto;border-radius:8px;margin:8px 0 16px;display:block" />`);
+    case "titulo": {
+      const t = e("titulo");
+      return pad(`<h1 style="margin:16px 0;font-size:${px(t.tamano ?? 26)};line-height:${t.interlinea ?? 1.25};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${esc(b.texto)}</h1>`, caja());
+    }
+    case "texto": {
+      const t = e("cuerpo");
+      return pad(`<p style="margin:0 0 16px;font-size:${px(t.tamano ?? 16)};line-height:${t.interlinea ?? 1.6};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${nl(b.texto)}</p>`, caja());
+    }
+    case "boton": {
+      const t = e("boton");
+      return pad(`<div style="text-align:${b.align ?? t.align ?? "left"};margin:8px 0 20px">${botonAnchor(b.texto, b.url, t, b.full)}</div>`, caja());
+    }
+    case "imagen": {
+      const t = e("imagen");
+      return pad(`<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" style="max-width:100%;height:auto;border-radius:${px(t.radio ?? 8)};margin:8px 0 16px;display:block${extra(t, ["radio", "align", "tamano", "color"])}" />`, caja());
+    }
     case "productos":
-      return pad(renderProductos(b.items ?? [], pal));
+      return pad(renderProductos(b.items ?? [], pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo)), caja());
     case "carrito": {
       // Sin items no se inventa nada: si el carrito llegó vacío, el bloque
       // desaparece. La muestra es solo del preview del editor.
-      const items = b.items?.length ? b.items : muestraCarrito ? CARRITO_MUESTRA : [];
-      return pad(renderCarrito(items, pal, b.items?.length ? b.restantes ?? 0 : 0));
+      const items = b.items?.length ? b.items : ctx.muestraCarrito ? CARRITO_MUESTRA : [];
+      return pad(
+        renderCarrito(items, pal, estProducto(b.tipo, "titulo", ctx, b.estilo), b.items?.length ? b.restantes ?? 0 : 0),
+        caja(),
+      );
     }
     case "columnas": {
+      const t = e("imagen");
       const cell = (c: Columna) =>
         c.imagen
-          ? `<td width="50%" valign="top" style="padding:6px"><a href="${esc(c.url || "#")}"><img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:8px;display:block" alt="" /></a></td>`
+          ? `<td width="50%" valign="top" style="padding:6px"><a href="${esc(c.url || "#")}"><img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:${px(t.radio ?? 8)};display:block" alt="" /></a></td>`
           : `<td width="50%"></td>`;
-      return pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px"><tr>${cell(b.izq)}${cell(b.der)}</tr></table>`);
+      return pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px"><tr>${cell(b.izq)}${cell(b.der)}</tr></table>`, caja());
     }
-    case "video":
+    case "video": {
+      const t = e("imagen");
       return b.imagen
-        ? pad(`<a href="${esc(b.url || "#")}" style="display:block;position:relative;margin:8px 0 16px"><img src="${esc(b.imagen)}" width="100%" style="max-width:100%;border-radius:8px;display:block" alt="Ver video" /><span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:48px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.5)">▶</span></a>`)
+        ? pad(`<a href="${esc(b.url || "#")}" style="display:block;position:relative;margin:8px 0 16px"><img src="${esc(b.imagen)}" width="100%" style="max-width:100%;border-radius:${px(t.radio ?? 8)};display:block" alt="Ver video" /><span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:48px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.5)">▶</span></a>`, caja())
         : "";
-    case "redes":
+    }
+    case "redes": {
+      const t = e("cuerpo");
       return pad(`<div style="text-align:center;margin:16px 0">${(b.links ?? [])
         .filter((l) => l.url)
-        .map((l) => `<a href="${esc(l.url)}" style="display:inline-block;margin:0 8px;color:${pal.link};font-size:14px;text-decoration:none">${esc(l.red)}</a>`)
-        .join("")}</div>`);
-    case "divisor":
-      return pad(`<hr style="border:0;border-top:1px solid ${pal.bordeSuave};margin:24px 0" />`);
+        .map((l) => `<a href="${esc(l.url)}" style="display:inline-block;margin:0 8px;color:${t.color};font-size:${px(t.tamano ?? 14)};text-decoration:none${extra(t, ["color", "tamano", "align", "subrayado"])}">${esc(l.red)}</a>`)
+        .join("")}</div>`, caja());
+    }
+    case "divisor": {
+      const t = e("caja");
+      return pad(`<hr style="border:0;border-top:${px(t.bordeAncho ?? 1)} ${t.bordeEstilo ?? "solid"} ${t.bordeColor ?? pal.bordeSuave};margin:24px 0" />`, t);
+    }
     case "espaciador": {
       // `font-size:0;line-height:0` no es adorno: sin eso Outlook le mete la
       // altura de línea por defecto y el espacio termina midiendo de más.
@@ -179,31 +237,34 @@ function renderBloque(b: Bloque, pal: Paleta, muestraCarrito = false): string {
       return `<div style="height:${alto}px;font-size:0;line-height:0">&nbsp;</div>`;
     }
     case "hero": {
-      const img = b.imagen ? `<img src="${esc(b.imagen)}" alt="" style="width:100%;display:block;margin:0" />` : "";
+      const t0 = e("imagen");
+      const img = b.imagen ? `<img src="${esc(b.imagen)}" alt="" style="width:100%;display:block;margin:0${extra(t0, ["radio", "align", "color", "tamano"])}" />` : "";
       // El `bg` lo elige el autor, así que el color del texto se decide por ESE
       // fondo y no por el tema: un hero blanco dentro de un mail oscuro tendría
       // título blanco sobre blanco si se heredara la paleta.
-      const bg = b.bg || pal.tarjeta;
-      const sobre = tonosSobre(bg);
-      const t = b.titulo ? `<h1 style="margin:0 0 10px;font-size:30px;line-height:1.2;color:${sobre.texto}">${esc(b.titulo)}</h1>` : "";
-      const s = b.subtitulo ? `<p style="margin:0 0 20px;font-size:17px;line-height:1.5;color:${sobre.medio}">${esc(b.subtitulo)}</p>` : "";
-      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, pal) : "";
-      const caja = t || s || btn ? `<div style="background:${esc(bg)};padding:36px 32px;text-align:center">${t}${s}${btn}</div>` : "";
-      return `${img}${caja}`;
+      const c = caja();
+      const bg = c.autoFondo ? b.bg || pal.tarjeta : c.fondo!;
+      const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h1 style="margin:0 0 10px;font-size:${px(x.tamano ?? 30)};line-height:${x.interlinea ?? 1.2};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.titulo)}</h1>`; })() : "";
+      const s = b.subtitulo ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 20px;font-size:${px(x.tamano ?? 17)};line-height:${x.interlinea ?? 1.5};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.subtitulo)}</p>`; })() : "";
+      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton")) : "";
+      const cajaHtml = t || s || btn ? `<div style="background:${esc(bg)};${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}">${t}${s}${btn}</div>` : "";
+      return `${img}${cajaHtml}`;
     }
     case "seccion": {
-      const bg = b.bg || pal.seccion;
-      const sobre = tonosSobre(bg);
-      const t = b.titulo ? `<h2 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:${sobre.texto}">${esc(b.titulo)}</h2>` : "";
-      const tx = b.texto ? `<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:${sobre.medio}">${nl(b.texto)}</p>` : "";
-      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, pal) : "";
-      return `<div style="background:${esc(bg)};padding:32px;text-align:center">${t}${tx}${btn}</div>`;
+      const c = caja();
+      const bg = c.autoFondo ? b.bg || pal.seccion : c.fondo!;
+      const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h2 style="margin:0 0 8px;font-size:${px(x.tamano ?? 22)};line-height:${x.interlinea ?? 1.3};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.titulo)}</h2>`; })() : "";
+      const tx = b.texto ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 16px;font-size:${px(x.tamano ?? 16)};line-height:${x.interlinea ?? 1.6};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${nl(b.texto)}</p>`; })() : "";
+      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton")) : "";
+      return `<div style="background:${esc(bg)};${padCss(c.padY ?? 32, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}">${t}${tx}${btn}</div>`;
     }
     case "cupon": {
-      const t = b.texto ? `<div style="font-size:16px;color:${tonosSobre(pal.cuponFondo).cuerpo};margin-bottom:8px">${esc(b.texto)}</div>` : "";
-      const cod = b.codigo ? `<div style="font-size:26px;font-weight:700;letter-spacing:3px;color:${pal.cuponTexto};margin-bottom:14px">${esc(b.codigo)}</div>` : "";
-      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, pal) : "";
-      return pad(`<div style="border:2px dashed ${pal.acento};border-radius:12px;background:${pal.cuponFondo};padding:24px;text-align:center;margin:8px 0 16px">${t}${cod}${btn}</div>`);
+      const c = caja();
+      const bg = c.fondo ?? pal.cuponFondo;
+      const t = b.texto ? (() => { const x = e("cuerpo", bg); return `<div style="font-size:${px(x.tamano ?? 16)};color:${x.color}${extra(x, ["tamano", "color", "align"])};margin-bottom:8px">${esc(b.texto)}</div>`; })() : "";
+      const cod = b.codigo ? (() => { const x = e("titulo"); return `<div style="font-size:${px(x.tamano ?? 26)};font-weight:${x.peso ?? 700};letter-spacing:${px(x.espaciado ?? 3)};color:${x.color}${extra(x, ["tamano", "peso", "espaciado", "color", "align", "interlinea"])};margin-bottom:14px">${esc(b.codigo)}</div>`; })() : "";
+      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton")) : "";
+      return pad(`<div style="border:${px(c.bordeAncho ?? 2)} ${c.bordeEstilo ?? "dashed"} ${c.bordeColor ?? pal.acento};border-radius:${px(c.radio ?? 12)};background:${bg};${padCss(c.padY ?? 24, c.padX ?? 24)};text-align:center;margin:8px 0 16px">${t}${cod}${btn}</div>`, undefined);
     }
     default:
       return "";
@@ -234,8 +295,9 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
   const contenido = leerContenido(entrada);
   // El tema de la campaña pisa al de la marca, campo por campo.
   const pal = resolverPaleta(combinarTema(opts.temaMarca, contenido.tema));
+  const ctx: Ctx = { pal, doc: contenido.estilos, muestraCarrito: !!opts.muestraCarrito };
   const cuerpo = (contenido.bloques ?? [])
-    .map((b) => renderBloque(b, pal, opts.muestraCarrito))
+    .map((b) => renderBloque(b, ctx))
     .join("\n");
   const preheader = opts.preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(opts.preheader)}</div>`

@@ -44,6 +44,7 @@ export default async function PlantillasPage() {
               <div className="h-56 overflow-hidden border-b border-border bg-white">
                 <iframe
                   title={preset.nombre}
+                  sandbox=""
                   srcDoc={html}
                   className="pointer-events-none h-[560px] w-[400px] origin-top-left"
                   style={{ transform: "scale(0.68)" }}

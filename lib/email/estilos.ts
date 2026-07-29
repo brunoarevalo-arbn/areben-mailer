@@ -11,7 +11,8 @@
 // emisores de CSS llegan después: el normalizador del esquema tiene que poder
 // filtrar un `estilo` que venga de la base antes de que exista quien lo dibuje.
 
-import { FUENTES, type Paleta } from "./tema";
+import { FUENTES, esColorOscuro, type Paleta } from "./tema";
+import type { TipoBloque } from "./bloques";
 
 /**
  * Colores de la marca que un bloque puede nombrar.
@@ -252,4 +253,222 @@ export function sanearEstilos(v: unknown): Estilos | undefined {
     if (e) out[rol] = e;
   }
   return Object.keys(out).length ? out : undefined;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// La cascada
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * El piso de "heredar": lo que cada rol vale cuando nadie tocó nada.
+ *
+ * Son los mismos números que hasta ahora estaban escritos a mano dentro de cada
+ * `case` del renderer. Que estén acá es lo que permite que la capa de documento
+ * —"en este mail todos los títulos son Georgia 32"— exista.
+ */
+const BASE: Record<RolEstilo, EstiloBloque> = {
+  caja: { padX: 32 },
+  titulo: { color: "$texto", tamano: 26, interlinea: 1.25, align: "left" },
+  subtitulo: { color: "$medio", tamano: 17, interlinea: 1.5, align: "left" },
+  cuerpo: { color: "$cuerpo", tamano: 16, interlinea: 1.6, align: "left" },
+  boton: { color: "$sobreAcento", fondo: "$acento", tamano: 16, peso: 600, radio: 8, padX: 32, padY: 14 },
+  imagen: { radio: 8 },
+  nota: { color: "$tenue", tamano: 13 },
+};
+
+/**
+ * Lo que cambia según el bloque.
+ *
+ * El título de un `hero` mide 30px, el de una `seccion` 22 y el del bloque
+ * `titulo` 26. Sin este escalón habría que elegir uno y romper los otros dos.
+ */
+const BASE_POR_TIPO: Partial<Record<TipoBloque, Estilos>> = {
+  hero: {
+    caja: { padX: 32, padY: 36 },
+    titulo: { tamano: 30, interlinea: 1.2 },
+    subtitulo: { tamano: 17, interlinea: 1.5 },
+  },
+  seccion: {
+    caja: { padX: 32, padY: 32 },
+    titulo: { tamano: 22, interlinea: 1.3 },
+    // El texto de una sección es acompañamiento, no cuerpo: por eso va en el
+    // tono medio y no en el de párrafo. Es el rol `subtitulo` con otra medida.
+    subtitulo: { tamano: 16, interlinea: 1.6 },
+  },
+  cupon: {
+    caja: {
+      fondo: "$cuponFondo", radio: 12, padX: 24, padY: 24,
+      bordeAncho: 2, bordeEstilo: "dashed", bordeColor: "$acento",
+    },
+    titulo: { color: "$cuponTexto", tamano: 26, peso: 700, espaciado: 3 },
+    cuerpo: { tamano: 16 },
+  },
+  productos: { cuerpo: { tamano: 14 } },
+  carrito: { titulo: { tamano: 15, interlinea: 1.35, peso: 600 } },
+  redes: { cuerpo: { color: "$link", tamano: 14 } },
+};
+
+/** Todo resuelto a valores que se pueden escribir: hex, px, enums. */
+export interface EstiloResuelto extends Omit<EstiloBloque, "color" | "fondo" | "bordeColor" | "fuente"> {
+  color: string;
+  fondo?: string;
+  bordeColor?: string;
+  /** El stack completo, no la clave. */
+  fuente?: string;
+  /**
+   * Qué propiedades eligió una persona — las capas (b) y (c), no el BASE.
+   *
+   * Es el dato que separa "así se ve un título" de "así quiero ESTE título", y
+   * de él dependen tres cosas: que `extra()` agregue solo lo elegido (y que por
+   * lo tanto un mail sin estilos salga byte por byte como salía antes), que el
+   * texto se recalcule contra el fondo real del bloque cuando nadie eligió el
+   * color, y que el modo oscuro del cliente pueda repintar sin pisar una
+   * decisión de quien armó el mail.
+   */
+  elegidas: ReadonlySet<string>;
+  /** Atajos de lo mismo, que son los dos casos que más se preguntan. */
+  autoColor: boolean;
+  autoFondo: boolean;
+}
+
+export interface CtxEstilo {
+  pal: Paleta;
+  /** Capa (b): estilos del documento. */
+  doc?: Estilos;
+  /** Capa (c): estilos de este bloque. */
+  propio?: Estilos;
+}
+
+/** `$acento` → el hex de la paleta. Un hex se devuelve tal cual. */
+function resolverColor(v: ValorColor | undefined, pal: Paleta): string | undefined {
+  if (!v) return undefined;
+  if (v.startsWith("$")) {
+    const t = pal[v.slice(1) as TokenColor];
+    return typeof t === "string" ? t : undefined;
+  }
+  return v;
+}
+
+/**
+ * Un rol, con las cuatro capas aplicadas en orden.
+ *
+ * `sobre` es el fondo REAL sobre el que se apoya este rol, cuando no es el del
+ * mail (el `bg` de un hero, el de una sección). Solo se usa si el color quedó
+ * heredado: si alguien lo eligió, se respeta aunque quede ilegible — es su mail.
+ */
+export function resolverEstilo(
+  tipo: TipoBloque,
+  rol: RolEstilo,
+  ctx: CtxEstilo,
+  sobre?: string,
+): EstiloResuelto {
+  const mezclado: EstiloBloque = {
+    ...BASE[rol],
+    ...(BASE_POR_TIPO[tipo]?.[rol] ?? {}),
+    ...(ctx.doc?.[rol] ?? {}),
+    ...(ctx.propio?.[rol] ?? {}),
+  };
+
+  // "¿Lo eligió una persona?" se responde mirando las capas de arriba, no el
+  // mezclado — el BASE también escribe la clave.
+  const elegidas = new Set<string>([
+    ...Object.keys(ctx.doc?.[rol] ?? {}),
+    ...Object.keys(ctx.propio?.[rol] ?? {}),
+  ]);
+  const autoColor = !elegidas.has("color");
+  const autoFondo = !elegidas.has("fondo");
+
+  let color = resolverColor(mezclado.color, ctx.pal) ?? ctx.pal.cuerpo;
+  // Legibilidad contextual: generaliza lo que hoy hacen hero, seccion y cupon.
+  if (autoColor && sobre) {
+    const t = tonosSobre(sobre);
+    color = rol === "titulo" ? t.texto : rol === "nota" ? t.medio : rol === "subtitulo" ? t.medio : t.cuerpo;
+  }
+
+  const { color: _c, fondo: _f, bordeColor: _b, fuente: _fu, ...resto } = mezclado;
+  return {
+    ...resto,
+    color,
+    fondo: resolverColor(mezclado.fondo, ctx.pal),
+    bordeColor: resolverColor(mezclado.bordeColor, ctx.pal),
+    fuente: mezclado.fuente ? FUENTES[mezclado.fuente] : undefined,
+    elegidas,
+    autoColor,
+    autoFondo,
+  };
+}
+
+/**
+ * Colores de texto legibles sobre un fondo cualquiera.
+ *
+ * Vive acá y no en render.ts porque ahora lo necesita la cascada. Es la misma
+ * tabla de siempre.
+ */
+export function tonosSobre(bg: string): { texto: string; cuerpo: string; medio: string } {
+  return esColorOscuro(bg)
+    ? { texto: "#fafafa", cuerpo: "#d5d4d4", medio: "#b8b8b8" }
+    : { texto: "#171717", cuerpo: "#404040", medio: "#525252" };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Emisión
+//
+// Los bloques siguen escribiendo su plantilla de siempre y le interpolan los
+// valores resueltos — por eso un mail sin estilos sale byte por byte igual que
+// antes. `extra()` agrega SOLO lo que alguien eligió y la plantilla no usa.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const px = (n: number) => `${Math.round(n)}px`;
+
+/**
+ * `padding`, en la forma corta cuando los dos lados son iguales.
+ *
+ * No es cosmética del código: `padding:32px` y `padding:32px 32px` significan lo
+ * mismo pero son bytes distintos, y el golden que fija "el mail no cambió"
+ * compara texto. Escribirlo como siempre se escribió deja el diff limpio.
+ */
+export const padCss = (y?: number, x?: number): string => {
+  if (y === undefined && x === undefined) return "";
+  const py = y ?? 0;
+  const pxx = x ?? 0;
+  return `padding:${py === pxx ? px(py) : `${px(py)} ${px(pxx)}`}`;
+};
+
+/**
+ * Lo que una persona eligió y la plantilla del bloque no escribió.
+ *
+ * Dos filtros, y los dos importan:
+ *
+ * - **Solo lo elegido.** Si emitiera también los valores del BASE, un bloque sin
+ *   estilos saldría con declaraciones que antes no tenía (`line-height` en el
+ *   texto de un cupón, por ejemplo) y el mail cambiaría sin que nadie lo pida.
+ *   La plantilla ya escribe lo que siempre escribió; acá va lo nuevo.
+ * - **Menos `yaUsadas`.** Lo que el `case` interpola por su cuenta: repetirlo
+ *   duplicaría la declaración.
+ *
+ * Devuelve `""` o algo que arranca con `;`, para pegarlo al final de un
+ * `style="…"` sin pensar.
+ */
+export function extra(e: EstiloResuelto, yaUsadas: readonly (keyof EstiloResuelto)[] = []): string {
+  const usadas = new Set<string>(yaUsadas as readonly string[]);
+  const out: string[] = [];
+  const poner = (k: keyof EstiloResuelto, css: string) => {
+    if (!usadas.has(k) && e.elegidas.has(k) && e[k] !== undefined) out.push(css);
+  };
+
+  poner("fuente", `font-family:${e.fuente}`);
+  poner("tamano", `font-size:${px(e.tamano!)}`);
+  poner("peso", `font-weight:${e.peso}`);
+  poner("interlinea", `line-height:${e.interlinea}`);
+  poner("espaciado", `letter-spacing:${px(e.espaciado!)}`);
+  poner("align", `text-align:${e.align}`);
+  if (!usadas.has("mayusculas") && e.elegidas.has("mayusculas") && e.mayusculas) out.push("text-transform:uppercase");
+  if (!usadas.has("subrayado") && e.elegidas.has("subrayado") && e.subrayado) out.push("text-decoration:underline");
+  poner("fondo", `background:${e.fondo}`);
+  poner("radio", `border-radius:${px(e.radio!)}`);
+  if (!usadas.has("bordeAncho") && e.elegidas.has("bordeAncho") && e.bordeAncho) {
+    out.push(`border:${px(e.bordeAncho)} ${e.bordeEstilo ?? "solid"} ${e.bordeColor ?? e.color}`);
+  }
+
+  return out.length ? ";" + out.join(";") : "";
 }

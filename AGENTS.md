@@ -55,7 +55,14 @@ node --import tsx scripts/probar-gate.ts       # el gate no se abre solo
 node --import tsx scripts/probar-carrito.ts    # el carrito de muestra no sale en un envío real
 node --import tsx scripts/probar-tema.ts       # un tema no deja el mail ilegible
 node --import tsx scripts/probar-esquema.ts    # el Json de bloques migra sin perder nada
+node --import tsx scripts/probar-estilos.ts    # la cascada respeta el orden y no inyecta
+node --import tsx scripts/probar-render.ts     # golden: el mail no cambió sin querer
 ```
+
+⚠️ `probar-render.ts` compara contra `scripts/fixtures/render-golden.json`. Si el
+HTML cambió **a propósito**, se bendice con `--capturar` y el golden se commitea
+**junto** con el cambio, así el diff del commit muestra qué se movió en el mail.
+Nunca "para que pase".
 
 ⚠️ **`.github/workflows/permisos.yml` está en `.git/info/exclude` y nunca corrió
 en CI** (falta el scope `workflow` en el token). Correr esos cinco scripts a mano
@@ -116,6 +123,30 @@ campaña.
 **Tracking:** todo mail —de campaña o de automation— termina en la tabla `Envio`
 (`campaniaId` o `automationRunId`, nunca los dos). Por eso las métricas del home
 son una sola consulta.
+
+## El aspecto del mail: la cascada
+
+Cuatro escalones, de abajo hacia arriba (`lib/email/estilos.ts`):
+
+1. `BASE[rol]` — lo que cada rol vale cuando nadie tocó nada
+2. `BASE_POR_TIPO[tipo][rol]` — el título de un `hero` mide 30px, el de una `seccion` 22
+3. `ContenidoCampania.estilos` — "en ESTE mail, todos los títulos…"
+4. `Bloque.estilo` — el override puntual
+
+Un color se guarda de tres formas: **`$acento`** (token de la marca, se repinta
+solo cuando cambia el tema) · **`#f59e0b`** (elegido a mano, queda clavado) ·
+**clave ausente** (heredar). Ese "ausente" es la convención, no un `""` ni un
+`null`: `EstiloResuelto.elegidas` responde "¿lo eligió una persona?" y de eso
+dependen la legibilidad contextual y el modo oscuro.
+
+⚠️ **La plantilla de cada bloque escribe lo que siempre escribió y solo le cambia
+los valores; `extra()` agrega únicamente lo elegido.** Si `extra()` emitiera
+también el BASE, un mail sin estilos saldría distinto al de ayer. Lo custodia el
+golden.
+
+⚠️ **Ningún string del Json llega al HTML sin pasar por `hex()`, `px()` o un
+enum** — `esc()` no escapa comillas, así que un color con una comilla se escapa
+del atributo `style="…"`. Los preview van con `sandbox=""` por lo mismo.
 
 ## Auth y permisos
 
