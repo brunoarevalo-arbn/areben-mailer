@@ -6,7 +6,7 @@ import { destinatarioPermitido } from "@/lib/email/proveedor";
 import { inyectarTracking } from "@/lib/email/tracking";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { tnGet } from "@/lib/tn/client";
-import { temaDe } from "@/lib/email/tema";
+import { marcaDe } from "@/lib/marca";
 
 export const maxDuration = 60;
 const BATCH = 30;
@@ -104,8 +104,7 @@ export async function GET(req: Request) {
     const opts = {
       preheader: automation.preheader ?? undefined,
       unsubscribeUrl: unsubUrl,
-      nombreCuenta: automation.cuenta.nombre,
-      temaMarca: temaDe(automation.cuenta.config),
+      ...marcaDe(automation.cuenta),
     };
     // Se pasa el contenido ENTERO con los bloques pisados, no `{ bloques, tema }`.
     //

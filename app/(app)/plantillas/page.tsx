@@ -7,7 +7,7 @@ import { usarPlantilla, usarPreset, eliminarPlantilla } from "./actions";
 import { PRESETS } from "@/lib/plantillas/presets";
 import { renderEmailHtml, aplicarMergeTags } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
-import { temaDe } from "@/lib/email/tema";
+import { marcaDe } from "@/lib/marca";
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +19,12 @@ export default async function PlantillasPage() {
   });
 
   // Preview de cada prearmada (render real, con un nombre de ejemplo para los merge tags).
-  const temaMarca = temaDe(cuenta.config);
+  const marca = marcaDe(cuenta);
   const previews = PRESETS.map((p) => {
-    // Con el tema de la marca: la galería tiene que mostrar cómo va a quedar
-    // ESTA tienda, no una versión genérica que después no se parece a nada.
-    const html = renderEmailHtml({ bloques: p.bloques, tema: p.tema }, { unsubscribeUrl: "#", nombreCuenta: cuenta.nombre, temaMarca });
+    // Con la marca puesta: la galería tiene que mostrar cómo va a quedar ESTA
+    // tienda —su tema, su logo, su link—, no una versión genérica que después
+    // no se parece a nada.
+    const html = renderEmailHtml({ bloques: p.bloques, tema: p.tema }, { unsubscribeUrl: "#", ...marca });
     return { preset: p, html: aplicarMergeTags(html, { nombre: "Ana", email: "ana@ejemplo.com" }) };
   });
 

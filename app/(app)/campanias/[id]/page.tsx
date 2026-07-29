@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuth } from "@/lib/auth";
 import { contactosElegibles } from "@/lib/campanias";
 import { leerContenido } from "@/lib/email/esquema";
-import { temaDe } from "@/lib/email/tema";
+import { marcaDe } from "@/lib/marca";
 
 export const dynamic = "force-dynamic";
 
@@ -111,7 +111,7 @@ export default async function CampaniaEditorPage({
       )}
       <CampaniaEditor
         id={campania.id}
-        nombreCuenta={cuenta.nombre}
+        marca={marcaDe(cuenta)}
         initial={{
           nombre: campania.nombre,
           asunto: campania.asunto ?? "",
@@ -126,7 +126,6 @@ export default async function CampaniaEditorPage({
         emailPrueba={email}
         estado={campania.estado}
         abInfo={abInfo}
-        temaMarca={temaDe(cuenta.config)}
       />
     </div>
   );

@@ -4,24 +4,24 @@ import { renderEmailHtml, type Bloque, type ContenidoCampania } from "@/lib/emai
 import { BloquesList } from "@/components/BloquesList";
 import { TemaSelector } from "@/components/TemaSelector";
 import type { Tema } from "@/lib/email/tema";
+import type { Marca } from "@/lib/marca";
 
 export function BloquesEditor({
   bloques,
   onChange,
-  nombreCuenta,
+  marca,
   preheader,
   tema,
   onTemaChange,
-  temaMarca,
   base,
 }: {
   bloques: Bloque[];
   onChange: (b: Bloque[]) => void;
-  nombreCuenta: string;
+  /** Nombre, logo, sitio, pie y tema de la marca (`marcaDe(cuenta)`). */
+  marca: Marca;
   preheader?: string;
   tema?: Tema;
   onTemaChange?: (t: Tema | undefined) => void;
-  temaMarca?: Tema | null;
   /**
    * El contenido completo del que salieron `bloques` y `tema`. El preview lo
    * usa de base para no perder lo que el editor todavía no muestra (versión del
@@ -32,18 +32,18 @@ export function BloquesEditor({
 }) {
   const previewHtml = renderEmailHtml(
     { ...base, bloques, tema },
-    { preheader, unsubscribeUrl: "#", nombreCuenta, muestraCarrito: true, temaMarca },
+    { preheader, unsubscribeUrl: "#", muestraCarrito: true, ...marca },
   );
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="space-y-6">
-        <BloquesList bloques={bloques} onChange={onChange} nombreCuenta={nombreCuenta} />
+        <BloquesList bloques={bloques} onChange={onChange} marca={marca} />
         {onTemaChange && (
           <TemaSelector
             tema={tema}
             onChange={onTemaChange}
-            temaMarca={temaMarca}
+            temaMarca={marca.temaMarca}
             ayuda="Solo para esta automation. Sin tocar nada, usa el de la marca."
           />
         )}

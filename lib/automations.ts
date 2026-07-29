@@ -1,4 +1,5 @@
 import type { Bloque } from "./email/bloques";
+import { leerConfigCuenta } from "./marca";
 
 export type Trigger = "NUEVO_CLIENTE" | "COMPRA" | "CARRITO_ABANDONADO";
 
@@ -79,9 +80,10 @@ export function urlTiendaDe(
   cuenta: { config: unknown },
   remitenteEmail?: string | null,
 ): string {
-  const config = (cuenta.config as Record<string, unknown>) ?? {};
-  const url = typeof config.url === "string" ? config.url.trim() : "";
-  if (url) return url.replace(/\/+$/, "");
+  // `config.url` la trae Tiendanube sola en el callback del OAuth (y el botón
+  // "traer de mi tienda" de /remitentes para las cuentas ya conectadas).
+  const url = leerConfigCuenta(cuenta.config).url;
+  if (url) return url;
 
   const dominio = remitenteEmail?.split("@")[1]?.trim().toLowerCase();
   return dominio ? `https://${dominio}` : "";

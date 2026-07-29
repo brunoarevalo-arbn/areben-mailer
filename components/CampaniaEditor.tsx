@@ -13,6 +13,7 @@ import {
 import { BloquesList } from "@/components/BloquesList";
 import { TemaSelector } from "@/components/TemaSelector";
 import type { Tema } from "@/lib/email/tema";
+import type { Marca } from "@/lib/marca";
 import { Button } from "@/components/ui/Button";
 import { usePermisos } from "@/components/PermisosProvider";
 import { AISoonButton } from "@/components/ui/AISoonButton";
@@ -39,7 +40,8 @@ interface AbInfo {
 
 interface Props {
   id: string;
-  nombreCuenta: string;
+  /** Nombre, logo, sitio, pie y tema de la marca (`marcaDe(cuenta)`). */
+  marca: Marca;
   initial: {
     nombre: string;
     asunto: string;
@@ -54,15 +56,13 @@ interface Props {
   emailPrueba: string;
   estado: string;
   abInfo?: AbInfo;
-  /** Tema por defecto de la marca. La campaña lo pisa campo por campo. */
-  temaMarca?: Tema | null;
 }
 
 const PCT_OPCIONES = [10, 20, 30, 50];
 const tasa = (ap: number, env: number) => (env ? Math.round((ap / env) * 100) : 0);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, emailPrueba, estado, abInfo, temaMarca }: Props) {
+export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPrueba, estado, abInfo }: Props) {
   const router = useRouter();
   const [nombre, setNombre] = useState(initial.nombre);
   const [asunto, setAsunto] = useState(initial.asunto);
@@ -92,7 +92,7 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
 
   const previewHtml = renderEmailHtml(
     contenido(),
-    { preheader, unsubscribeUrl: "#", nombreCuenta, muestraCarrito: true, temaMarca },
+    { preheader, unsubscribeUrl: "#", muestraCarrito: true, ...marca },
   );
 
   const campData = () => ({
@@ -266,11 +266,11 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
         </div>
 
         {/* Bloques */}
-        <BloquesList bloques={bloques} onChange={setBloques} nombreCuenta={nombreCuenta} />
+        <BloquesList bloques={bloques} onChange={setBloques} marca={marca} />
         <TemaSelector
           tema={tema}
           onChange={setTema}
-          temaMarca={temaMarca}
+          temaMarca={marca.temaMarca}
           ayuda="Solo para esta campaña. Sin tocar nada, usa el de la marca."
         />
 

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { autorizar, chequear } from "@/lib/auth";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
-import { temaDe } from "@/lib/email/tema";
+import { marcaDe } from "@/lib/marca";
 import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { contactosElegibles, crearEnvios } from "@/lib/campanias";
@@ -212,9 +212,9 @@ export async function enviarPrueba(id: string, emailDestino: string) {
   const opts = {
     preheader: campania.preheader ?? undefined,
     unsubscribeUrl: `${process.env.APP_URL}/baja?token=preview`,
-    nombreCuenta: cuenta.nombre,
-    // La prueba tiene que salir con el MISMO aspecto que el envío real.
-    temaMarca: temaDe(cuenta.config),
+    // La prueba tiene que salir con el MISMO aspecto que el envío real: mismo
+    // tema, mismo logo, mismo pie.
+    ...marcaDe(cuenta),
   };
   const destinatario = { nombre: nombre ?? "", email: destino };
   const htmlFinal = aplicarMergeTags(renderEmailHtml(contenido, opts), destinatario);

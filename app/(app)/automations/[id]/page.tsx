@@ -5,7 +5,7 @@ import { AutomationEditor } from "@/components/AutomationEditor";
 import { prisma } from "@/lib/prisma";
 import { getAuth } from "@/lib/auth";
 import { leerContenido } from "@/lib/email/esquema";
-import { temaDe } from "@/lib/email/tema";
+import { marcaDe } from "@/lib/marca";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +27,7 @@ export default async function AutomationPage({ params }: { params: Promise<{ id:
       <PageHeader eyebrow="Automation" title={a.nombre} />
       <AutomationEditor
         id={a.id}
-        nombreCuenta={cuenta.nombre}
+        marca={marcaDe(cuenta)}
         triggerLabel={TRIGGER_LABEL[a.trigger] ?? a.trigger}
         estadoInicial={a.estado}
         emailPrueba={email}
@@ -39,7 +39,6 @@ export default async function AutomationPage({ params }: { params: Promise<{ id:
           capDias: a.capDias,
           contenido: leerContenido(a.contenido),
         }}
-        temaMarca={temaDe(cuenta.config)}
       />
     </div>
   );

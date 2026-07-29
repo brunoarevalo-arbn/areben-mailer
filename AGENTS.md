@@ -60,6 +60,7 @@ node --import tsx scripts/probar-render.ts     # golden: el mail no cambió sin 
 node --import tsx scripts/probar-html.ts       # VML, media queries, tracking, peso
 node --import tsx scripts/probar-encabezado.ts # el link de baja no se puede borrar
 node --import tsx scripts/probar-imagenes.ts   # permisos, multi-tenant y SVG de /api/imagenes
+node --import tsx scripts/probar-marca.ts      # la marca de TN no se guarda adentro del Json
 ```
 
 ⚠️ `probar-render.ts` compara contra `scripts/fixtures/render-golden.json`. Si el
@@ -179,9 +180,11 @@ se cambia por un logo y se puede borrar. Tres cosas que no son obvias:
 - **Se dibuja FUERA de la tarjeta de contenido**, sobre el fondo de página —
   donde estuvo siempre. Por eso hay **uno solo y va primero**: `leerContenido` lo
   acomoda y `renderEmailHtml` lo saca de la lista antes de recorrer el cuerpo.
-- **`texto` vacío = el nombre de la cuenta**, resuelto al renderizar. Que el
-  default sea vacío y no el nombre copiado adentro es lo que deja compartir una
-  plantilla entre marcas sin que la bienvenida de Zattia salga firmada por BDI.
+- **`texto` vacío = el nombre de la cuenta** y **`variante` ausente = el logo de
+  la tienda si lo hay**, resueltos al renderizar. Que el default sea vacío y no
+  el dato copiado adentro es lo que deja compartir una plantilla entre marcas
+  sin que la bienvenida de Zattia salga firmada por BDI. `variante:"texto"` es
+  una elección explícita y le gana al logo.
 - **La migración v2→v3 se lo materializa a todo documento que no lo tenga.** Sin
   eso, cada campaña y plantilla ya guardada habría salido sin cabecera.
 
@@ -194,6 +197,33 @@ fija que aparece en el 100% de los renders, con la lista de bloques que sea.
 hay `@media (prefers-color-scheme)`**: recolorear el shell sin que los bloques
 acompañen deja texto oscuro sobre fondo oscuro, que es peor que no hacer nada.
 Entra cuando los bloques emitan sus propias clases de tema.
+
+## La marca la trae Tiendanube sola (`lib/marca.ts`)
+
+El logo, el sitio, el idioma y el domicilio salen del endpoint `/store` y viven
+en **`Cuenta.config`** (Json libre — sin columna nueva: la base es compartida).
+`lib/marca.ts` es el **único** archivo que conoce la forma de ese Json.
+
+- **`marcaDe(cuenta)` devuelve un pedazo de `RenderOpts`**, así que los 8 call
+  sites del renderer hacen `{ unsubscribeUrl, ...marcaDe(cuenta) }`. Está atado
+  por tipos a `RenderOpts` a propósito: un campo de marca nuevo llega a todos
+  lados sin que haya que acordarse de ninguno. Enumerar campos a mano es el bug
+  que hacía que el preview mostrara una cosa y el mail saliera otra.
+- **Nada de esto se guarda adentro del contenido**: son defaults que resuelve el
+  render. El mismo Json sale con el logo de BDI en BDI y con el de Zattia en
+  Zattia. Lo fija `probar-marca.ts`.
+- ⚠️ **TN devuelve el logo sin protocolo** (`//d1a9….cloudfront.net/…`). En un
+  `<img>` de mail eso es una imagen rota: no hay página de la cual heredar el
+  `https:`. Lo normaliza `normalizarStore()`.
+- El sitio sale de `url_with_protocol` (el dominio propio), no de
+  `original_domain`. Sin barra final: los links se arman concatenando.
+- **Cómo entra**: sola en el callback del OAuth (una única llamada a `/store`
+  para nombre, mail y marca) · el botón **"Traer de mi tienda"** de
+  `/remitentes` para las cuentas ya conectadas · `scripts/traer-marcas.ts`
+  (dry-run por defecto) para hacerlo de a todas.
+- ⚠️ **El merge nunca pisa el resto del `config`** — ahí viven `tema` y
+  `lastSyncContactos`. Va siempre por `configConTienda()`, y un campo que TN
+  devuelve vacío no borra el que ya estaba.
 
 ## Biblioteca de imágenes (Vercel Blob)
 

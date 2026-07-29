@@ -1,7 +1,9 @@
-import { exchangeCode, tnGet } from '@/lib/tn/client';
+import { exchangeCode, leerStore, type DatosTienda } from '@/lib/tn/client';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { createSession, decrypt } from '@/lib/session';
+import { configConTienda } from '@/lib/marca';
+import type { Prisma } from '@prisma/client';
 
 // TN redirige acá tras la instalación con ?code=... Canjeamos el token y lo guardamos.
 //
@@ -11,28 +13,6 @@ import { createSession, decrypt } from '@/lib/session';
 // tienda demo (la cuenta activa cae por defecto en el slug "bdi" cuando no hay sesión).
 // Una instalación jamás debe tocar la cuenta de otra tienda.
 
-/** Nombre de la tienda según TN (`name` puede venir multiidioma). */
-async function nombreDeTienda(storeId: string, token: string): Promise<string | null> {
-  try {
-    const { data } = await tnGet<{ name?: string | Record<string, string> }>(storeId, token, 'store');
-    const n = data?.name;
-    const nombre = typeof n === 'string' ? n : n ? Object.values(n)[0] : null;
-    return nombre?.trim() || null;
-  } catch {
-    return null; // si falla, seguimos con un nombre genérico
-  }
-}
-
-/** Email del dueño de la tienda según TN (para dar de alta su usuario). */
-async function emailDeTienda(storeId: string, token: string): Promise<string | null> {
-  try {
-    const { data } = await tnGet<{ email?: string }>(storeId, token, 'store');
-    return data?.email?.trim().toLowerCase() || null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Deja al comerciante adentro: asegura su usuario y abre la sesión.
  *
@@ -40,11 +20,11 @@ async function emailDeTienda(storeId: string, token: string): Promise<string | n
  * (no hay registro ni invitación). Si ya hay una sesión válida —Bruno conectando
  * una marca con `?state=`— no se toca.
  */
-async function entrarComoComerciante(cuentaId: string, storeId: string, token: string) {
+async function entrarComoComerciante(cuentaId: string, storeId: string, tienda: DatosTienda | null) {
   const sesionActual = await decrypt((await cookies()).get('session')?.value);
   if (sesionActual?.userId) return;
 
-  const email = (await emailDeTienda(storeId, token)) ?? `tienda-${storeId}@tiendanube.local`;
+  const email = tienda?.email || `tienda-${storeId}@tiendanube.local`;
   const usuario =
     (await prisma.usuario.findFirst({ where: { cuentaId, email } })) ??
     (await prisma.usuario.create({ data: { cuentaId, email, rol: 'ADMIN', interno: false } }));
@@ -78,11 +58,23 @@ export async function GET(req: Request) {
     const storeId = String(token.user_id);
     const destino = new URL(process.env.APP_URL ?? req.url);
 
-    // 1) La tienda ya está vinculada a una cuenta → solo refrescamos su token.
+    // Una sola llamada a `/store` para todo el callback: el nombre de la cuenta,
+    // el mail del dueño y la marca (logo, sitio, idioma, domicilio). Antes se
+    // pedía dos veces y se usaban dos campos.
+    const tienda = await leerStore(storeId, token.access_token);
+    const ahora = new Date().toISOString();
+    /** El config de la cuenta con la marca de TN adentro, sin pisar el resto. */
+    const config = (previo: unknown): Prisma.JsonObject | undefined =>
+      tienda ? (configConTienda(previo, tienda, ahora) as Prisma.JsonObject) : undefined;
+
+    // 1) La tienda ya está vinculada a una cuenta → refrescamos token y marca.
     const yaVinculada = await prisma.cuenta.findUnique({ where: { tnStoreId: storeId } });
     if (yaVinculada) {
-      await prisma.cuenta.update({ where: { id: yaVinculada.id }, data: { tnToken: token.access_token } });
-      await entrarComoComerciante(yaVinculada.id, storeId, token.access_token);
+      await prisma.cuenta.update({
+        where: { id: yaVinculada.id },
+        data: { tnToken: token.access_token, config: config(yaVinculada.config) },
+      });
+      await entrarComoComerciante(yaVinculada.id, storeId, tienda);
       destino.search = '?tn=conectado';
       return Response.redirect(destino);
     }
@@ -95,20 +87,26 @@ export async function GET(req: Request) {
       if (cuenta && !cuenta.tnStoreId) {
         await prisma.cuenta.update({
           where: { id: cuenta.id },
-          data: { tnStoreId: storeId, tnToken: token.access_token },
+          data: { tnStoreId: storeId, tnToken: token.access_token, config: config(cuenta.config) },
         });
-        await entrarComoComerciante(cuenta.id, storeId, token.access_token);
+        await entrarComoComerciante(cuenta.id, storeId, tienda);
         destino.search = '?tn=conectado';
         return Response.redirect(destino);
       }
     }
 
     // 3) Instalación de una tienda que no conocíamos → cuenta nueva para ella.
-    const nombre = (await nombreDeTienda(storeId, token.access_token)) ?? `Tienda ${storeId}`;
+    const nombre = tienda?.nombre || `Tienda ${storeId}`;
     const cuenta = await prisma.cuenta.create({
-      data: { nombre, slug: await slugLibre(nombre, storeId), tnStoreId: storeId, tnToken: token.access_token },
+      data: {
+        nombre,
+        slug: await slugLibre(nombre, storeId),
+        tnStoreId: storeId,
+        tnToken: token.access_token,
+        config: config({}) ?? {},
+      },
     });
-    await entrarComoComerciante(cuenta.id, storeId, token.access_token);
+    await entrarComoComerciante(cuenta.id, storeId, tienda);
     destino.search = `?tn=conectado&cuenta=${cuenta.slug}`;
     return Response.redirect(destino);
   } catch (e) {

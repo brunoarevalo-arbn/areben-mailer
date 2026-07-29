@@ -5,6 +5,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { autorizar, chequear } from "@/lib/auth";
 import { getIdentityStatus } from "@/lib/email/proveedores/ses";
+import { leerStore } from "@/lib/tn/client";
+import { configConTienda, marcaDe } from "@/lib/marca";
 import type { Tema } from "@/lib/email/tema";
 
 export async function crearRemitente(input: {
@@ -85,6 +87,39 @@ export async function verificarRemitente(id: string) {
   await prisma.remitente.update({ where: { id }, data: { estado } });
   revalidatePath("/remitentes");
   return { ok: true, estado };
+}
+
+/**
+ * Trae de Tiendanube el logo, el sitio, el idioma y el domicilio de la tienda.
+ *
+ * Las cuentas conectadas antes de esto tienen el `config` vacío: el callback del
+ * OAuth ya guarda la marca, pero solo corre cuando alguien instala o reinstala
+ * la app. Este botón es el camino para las que ya están adentro — y para volver
+ * a traerla cuando el comerciante cambia el logo en su tienda.
+ *
+ * Va con `integrar` (no con `remitentes`): lo que hace es leer Tiendanube.
+ */
+export async function traerMarcaDeTienda() {
+  const chk = await chequear("integrar");
+  if (!chk.ok) return chk;
+  const { cuenta } = chk.ctx;
+
+  if (!cuenta.tnStoreId || !cuenta.tnToken) {
+    return { ok: false as const, error: "Esta marca todavía no está conectada a Tiendanube." };
+  }
+
+  const tienda = await leerStore(cuenta.tnStoreId, cuenta.tnToken);
+  if (!tienda) return { ok: false as const, error: "Tiendanube no contestó. Probá de nuevo en un rato." };
+
+  const config = configConTienda(cuenta.config, tienda, new Date().toISOString());
+  await prisma.cuenta.update({
+    where: { id: cuenta.id },
+    data: { config: config as Prisma.JsonObject },
+  });
+  revalidatePath("/remitentes");
+  // Se devuelve lo que quedó para poder mostrarlo sin recargar: un "listo"
+  // pelado no deja ver si la tienda tenía logo cargado o no.
+  return { ok: true as const, marca: marcaDe({ nombre: cuenta.nombre, config }) };
 }
 
 /**

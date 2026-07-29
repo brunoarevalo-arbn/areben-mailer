@@ -5,7 +5,7 @@ import { autorizar, chequear, getAuth } from "@/lib/auth";
 import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
-import { temaDe } from "@/lib/email/tema";
+import { marcaDe } from "@/lib/marca";
 import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { presetsPara, urlTiendaDe, type Trigger } from "@/lib/automations";
@@ -100,8 +100,7 @@ export async function enviarPruebaAutomation(id: string, email: string) {
     renderEmailHtml(leerContenido(a.contenido), {
       preheader: a.preheader ?? undefined,
       unsubscribeUrl: `${process.env.APP_URL}/baja?token=preview`,
-      nombreCuenta: cuenta.nombre,
-      temaMarca: temaDe(cuenta.config),
+      ...marcaDe(cuenta),
     }),
     { nombre: nombre ?? "", email: destino },
   );

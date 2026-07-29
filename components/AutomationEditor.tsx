@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import type { Bloque, ContenidoCampania } from "@/lib/email/render";
 import { BloquesEditor } from "@/components/BloquesEditor";
 import type { Tema } from "@/lib/email/tema";
+import type { Marca } from "@/lib/marca";
 import { guardarAutomation, enviarPruebaAutomation, toggleAutomation } from "@/app/(app)/automations/actions";
 import { Button } from "@/components/ui/Button";
 import { usePermisos } from "@/components/PermisosProvider";
@@ -13,22 +14,20 @@ const input = "rounded-lg border border-border-strong bg-background text-foregro
 
 export function AutomationEditor({
   id,
-  nombreCuenta,
+  marca,
   triggerLabel,
   estadoInicial,
   emailPrueba,
   initial,
-  temaMarca,
 }: {
   id: string;
-  nombreCuenta: string;
+  /** Nombre, logo, sitio, pie y tema de la marca (`marcaDe(cuenta)`). */
+  marca: Marca;
   triggerLabel: string;
   estadoInicial: string;
   /** Mail de quien está mirando: la prueba sale a su casilla, no a una fija. */
   emailPrueba: string;
   initial: { nombre: string; asunto: string; preheader: string; esperaHoras: number; capDias: number; contenido: ContenidoCampania };
-  /** Tema por defecto de la marca. La automation lo pisa campo por campo. */
-  temaMarca?: Tema | null;
 }) {
   const [nombre, setNombre] = useState(initial.nombre);
   const [asunto, setAsunto] = useState(initial.asunto);
@@ -104,11 +103,10 @@ export function AutomationEditor({
       <BloquesEditor
         bloques={bloques}
         onChange={setBloques}
-        nombreCuenta={nombreCuenta}
+        marca={marca}
         preheader={preheader}
         tema={tema}
         onTemaChange={setTema}
-        temaMarca={temaMarca}
         base={initial.contenido}
       />
 

@@ -5,6 +5,7 @@ import { ProductosBlock } from "@/components/ProductosBlock";
 import { ImagenDrop } from "@/components/editor/ImagenDrop";
 import { AISoonButton } from "@/components/ui/AISoonButton";
 import { inputClass } from "@/lib/ui";
+import type { Marca } from "@/lib/marca";
 import { ChevronUp, ChevronDown, X } from "lucide-react";
 
 const selectClass = `${inputClass} py-1.5`;
@@ -30,13 +31,18 @@ const colorInput = (value: string, onChange: (v: string) => void, label: string)
 export function BloquesList({
   bloques,
   onChange,
-  nombreCuenta = "",
+  marca,
 }: {
   bloques: Bloque[];
   onChange: (b: Bloque[]) => void;
-  /** Solo para mostrarlo de placeholder en el encabezado: lo resuelve el render. */
-  nombreCuenta?: string;
+  /**
+   * Solo para los placeholders del encabezado: el nombre y el logo los resuelve
+   * el render, no se copian adentro del bloque.
+   */
+  marca: Marca;
 }) {
+  const nombreCuenta = marca.nombreCuenta ?? "";
+  const logoTienda = marca.logoCuenta ?? "";
   // El encabezado es chapa del mail, no contenido: se dibuja fuera de la
   // tarjeta, hay uno solo y va primero. Por eso no se ofrece dos veces en la
   // paleta y no se puede mover — el renderer lo va a poner arriba igual, y una
@@ -83,13 +89,20 @@ export function BloquesList({
           </div>
           {b.tipo === "encabezado" && (
             <div className="space-y-2">
+              {/* "Automático" es la ausencia de `variante`, no un valor: así el
+                  bloque no decide por una marca que todavía no conoce y una
+                  plantilla sirve igual en una tienda con logo y en una sin. */}
               <select
-                className={`${selectClass} max-w-52`}
-                value={b.variante ?? "texto"}
-                onChange={(e) => setBloque(i, { variante: e.target.value as "texto" | "logo" })}
+                className={`${selectClass} max-w-64`}
+                value={b.variante ?? "auto"}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setBloque(i, { variante: v === "auto" ? undefined : (v as "texto" | "logo") });
+                }}
               >
+                <option value="auto">Automático{logoTienda ? " (el logo de tu tienda)" : " (el nombre de la marca)"}</option>
                 <option value="texto">Nombre de la marca</option>
-                <option value="logo">Logo</option>
+                <option value="logo">Otro logo</option>
               </select>
               {b.variante === "logo" ? (
                 <div className="space-y-2">
@@ -107,15 +120,21 @@ export function BloquesList({
                     />
                     <span className="w-12 tabular-nums text-foreground">{b.logoAncho ?? 140}px</span>
                   </label>
-                  <p className="text-xs text-subtle">Sin logo cargado se muestra el nombre.</p>
+                  <p className="text-xs text-subtle">
+                    {logoTienda ? "Sin cargar ninguno se usa el logo de tu tienda." : "Sin logo cargado se muestra el nombre."}
+                  </p>
                 </div>
               ) : (
                 <>
+                  {b.variante === undefined && logoTienda && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={logoTienda} alt="Logo de tu tienda" className="h-9 w-auto max-w-40 object-contain" />
+                  )}
                   <input className={inputClass} value={b.texto ?? ""} placeholder={nombreCuenta} onChange={(e) => setBloque(i, { texto: e.target.value })} />
                   <p className="text-xs text-subtle">Vacío = el nombre de la marca. Dejalo así para que la plantilla sirva en cualquier tienda.</p>
                 </>
               )}
-              <input className={inputClass} value={b.url ?? ""} placeholder="Link al tocarlo (opcional)" onChange={(e) => setBloque(i, { url: e.target.value })} />
+              <input className={inputClass} value={b.url ?? ""} placeholder={marca.urlCuenta || "Link al tocarlo (opcional)"} onChange={(e) => setBloque(i, { url: e.target.value })} />
               <div className="flex flex-wrap items-center gap-4">
                 <label className="flex items-center gap-1.5 text-xs text-muted">
                   <input type="checkbox" checked={b.linea !== false} onChange={(e) => setBloque(i, { linea: e.target.checked })} />

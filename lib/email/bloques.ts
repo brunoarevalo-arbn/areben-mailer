@@ -68,7 +68,11 @@ export type Bloque = BloqueBase &
      */
     | {
         tipo: "encabezado";
-        /** `"logo"` cae a texto si `logo` está vacío. */
+        /**
+         * Ausente = automático: el logo de la tienda si lo hay, si no el
+         * nombre. `"logo"` sin `logo` cargado cae al de la tienda y después al
+         * nombre; `"texto"` es la elección explícita de no mostrar el logo.
+         */
         variante?: "texto" | "logo";
         /**
          * Vacío = el nombre de la cuenta.
@@ -168,9 +172,11 @@ export function nuevoId(): string {
 export function nuevoBloque(tipo: TipoBloque): Bloque {
   const id = nuevoId();
   switch (tipo) {
-    // Nace SIN texto: vacío significa "el nombre de esta cuenta", y así el
-    // bloque es el mismo para las tres marcas y para el comerciante que venga.
-    case "encabezado": return { id, tipo, variante: "texto", texto: "", url: "" };
+    // Nace SIN texto y SIN variante: vacío significa "lo de esta cuenta" —el
+    // nombre, y el logo si la tienda tiene uno—, y así el bloque es el mismo
+    // para las tres marcas y para el comerciante que venga. Clavarle
+    // `variante:"texto"` era decidir por él que no quería su logo.
+    case "encabezado": return { id, tipo, texto: "", url: "" };
     case "titulo": return { id, tipo, texto: "Título", align: "left" };
     case "texto": return { id, tipo, texto: "Escribí tu mensaje. Podés usar ${contacto.nombre}.", align: "left" };
     case "boton": return { id, tipo, texto: "Ver más", url: "", align: "left", full: false };

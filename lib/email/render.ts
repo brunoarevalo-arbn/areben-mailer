@@ -36,6 +36,9 @@ interface Ctx extends CtxEstilo {
    * propio, que es el caso normal: así una plantilla no lleva la marca adentro.
    */
   nombreCuenta: string;
+  /** Logo y sitio de la marca (`Cuenta.config`, los trae TN). Ídem: defaults. */
+  logoCuenta: string;
+  urlCuenta: string;
 }
 
 /** Atajo: el estilo de un rol de este bloque, con las cuatro capas aplicadas. */
@@ -181,7 +184,7 @@ function estProducto(tipo: TipoBloque, rolNombre: RolEstilo, ctx: Ctx, propio: E
 /** Render de una grilla de productos, reutilizable (ej. email de carrito abandonado). */
 export function renderProductosHtml(items: ProductoEmail[], tema?: Tema): string {
   const pal = resolverPaleta(tema);
-  const ctx: Ctx = { pal, muestraCarrito: false, nombreCuenta: "" };
+  const ctx: Ctx = { pal, muestraCarrito: false, nombreCuenta: "", logoCuenta: "", urlCuenta: "" };
   return renderProductos(items, pal, estProducto("productos", "cuerpo", ctx, undefined));
 }
 
@@ -222,7 +225,20 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const nombre = b.texto?.trim() || ctx.nombreCuenta;
       const rotulo = b.mayusculas === false ? nombre : nombre.toUpperCase();
 
-      const logo = b.variante === "logo" ? b.logo?.trim() ?? "" : "";
+      // Tres estados, y el que importa es el del medio:
+      //   "logo"    → el logo del bloque, y si no cargaron ninguno, el de la tienda
+      //   ausente   → el logo de la tienda si lo hay; si no, el nombre (lo de antes)
+      //   "texto"   → el nombre, aunque la tienda tenga logo (alguien lo eligió)
+      // "Ausente = heredar" es la misma convención que el resto del motor, y es
+      // lo que hace que las campañas y plantillas que ya existen —a las que la
+      // migración les materializó un `{tipo:"encabezado"}` pelado— muestren el
+      // logo el primer minuto, sin que nadie las edite.
+      const logo =
+        b.variante === "logo"
+          ? b.logo?.trim() || ctx.logoCuenta
+          : b.variante === "texto"
+            ? ""
+            : ctx.logoCuenta;
       let interior: string;
       if (logo) {
         // El `width` en atributo además del inline: Outlook de escritorio no
@@ -236,8 +252,11 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         interior = `<span style="font-size:${px(t.tamano ?? 18)};font-weight:${t.peso ?? 700};letter-spacing:${px(t.espaciado ?? 1)};color:${t.color}${extra(t, ["tamano", "peso", "espaciado", "color", "align", "mayusculas"])}">${esc(rotulo)}</span>`;
       }
 
-      const conLink = b.url?.trim()
-        ? `<a href="${esc(b.url.trim())}" style="text-decoration:none;color:inherit">${interior}</a>`
+      // Sin link propio, la cabecera lleva a la tienda. Un logo que no se puede
+      // tocar es un clic perdido en el mail que más se mira.
+      const destino = b.url?.trim() || ctx.urlCuenta;
+      const conLink = destino
+        ? `<a href="${esc(destino)}" style="text-decoration:none;color:inherit">${interior}</a>`
         : interior;
       const barra =
         b.linea === false
@@ -348,6 +367,17 @@ export interface RenderOpts {
   preheader?: string;
   unsubscribeUrl: string;
   nombreCuenta: string;
+  /**
+   * Logo de la marca (lo trae Tiendanube). Es el **default** del bloque
+   * `encabezado`, no un valor clavado: el bloque puede pisarlo o pedir texto.
+   *
+   * Mismo criterio que `nombreCuenta`: la plantilla no lleva la marca adentro,
+   * se resuelve al renderizar. Es lo que deja compartir una plantilla entre
+   * tiendas sin que el mail de Zattia salga con el logo de BDI.
+   */
+  logoCuenta?: string;
+  /** Sitio de la tienda: a dónde lleva el encabezado si nadie puso otro link. */
+  urlCuenta?: string;
   direccionPostal?: string;
   /**
    * Solo para el preview del editor: dibuja el bloque `carrito` con productos de
@@ -373,6 +403,8 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
     doc: contenido.estilos,
     muestraCarrito: !!opts.muestraCarrito,
     nombreCuenta: opts.nombreCuenta,
+    logoCuenta: opts.logoCuenta?.trim() ?? "",
+    urlCuenta: opts.urlCuenta?.trim() ?? "",
   };
   // El encabezado se saca de la lista y se dibuja arriba de la tarjeta, que es
   // donde estuvo siempre. `leerContenido` ya garantiza que hay uno solo y que
