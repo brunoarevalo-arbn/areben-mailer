@@ -421,12 +421,20 @@ temprano cuesta varias veces su tamaño.
   ensayo comparativo y el webhook de Resend.
 - **Verificar en browser lo de permisos** con el usuario EDITOR de prueba: las
   4 fases están deployadas pero solo se probaron por script.
-- **El import de Perfit está escrito y verificado en dry-run, sin aplicar.**
-  `scripts/importar-nuby-perfit.ts` con los tres CSV de `~/Downloads` (29-jul):
-  15.834 mails únicos, **650 a suprimir (638 de ellos hoy `ACTIVO` en la base)**,
-  4.249 contactos nuevos, 127 que pasan a aceptar marketing y 1.376 que quedan
-  afuera a propósito. Falta correrlo con `--aplicar`, que escribe en producción.
+- **✅ El import de Perfit está APLICADO** (29-jul-2026,
+  `scripts/importar-nuby-perfit.ts`). BDI pasó de 16.976 a **21.225 contactos**:
+  4.249 nuevos, **650 suprimidos (615 rebotes + 22 bajas + 1 queja + 12 creados
+  ya suprimidos)** y 127 que pasaron a aceptar marketing. **Audiencia real:
+  18.554.** Verificado: acentos sin mojibake, `custom` en los 4.249 nuevos, y
+  correrlo de nuevo da 0 en todo (idempotente).
 - **El primer envío propio ya tiene forma**: la lista `Perfit — abrieron 2026`
-  (800 contactos que abrieron la última campaña) va sola y primero. Después
-  `Nuby — suscriptores` por tramos. La lista completa tiene 6,9% de apertura y
-  6,7% de rebote medidos en Perfit: es un histórico frío y no se manda de una.
+  va sola y primero — 800 miembros, de los cuales **685 son mandables** (los 115
+  restantes son de los que dijeron "no" en el checkout). Después
+  `Nuby — suscriptores` (5.280) por tramos. La base completa tenía 6,9% de
+  apertura y 6,7% de rebote en Perfit: es un histórico frío y no se manda de una.
+- ⚠️ **4.241 de los 5.280 de `Nuby — suscriptores` no tienen nombre**: el pop-up
+  de Nuby pedía solo el mail. El merge tag `${contacto.nombre}` se reemplaza por
+  **string vacío** (`lib/email/render.ts:586`), así que un "Hola ${contacto.nombre}"
+  les llega como "Hola ". En esa lista no se usa el merge tag, o se usa con un
+  saludo que funcione vacío. En `Perfit — abrieron 2026` casi no pasa: 668 de 685
+  tienen nombre.
