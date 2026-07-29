@@ -38,6 +38,7 @@ model Cuenta {
   automations  Automation[]
   formularios  Formulario[]
   envios       Envio[]
+  imagenes     ImagenMail[]
 }
 
 model Plantilla {
@@ -445,4 +446,33 @@ model Formulario {
 
   @@unique([cuentaId, slug])
   @@index([cuentaId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Biblioteca de imágenes de los mails (Vercel Blob)
+// La tabla se crea por SQL crudo (scripts/add-imagenes-mail.ts):
+// ⛔ NO usar `prisma db push` en esta base (la comparte areben-popups).
+//
+// Se llama ImagenMail y no Imagen porque el esquema es compartido con Resorty.
+// ─────────────────────────────────────────────────────────────
+model ImagenMail {
+  id       String @id @default(cuid())
+  cuentaId String
+  cuenta   Cuenta @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  /// URL pública del blob: es lo que termina adentro del mail.
+  url      String
+  /// Ruta dentro del store, que es lo que necesita @vercel/blob para borrarla.
+  pathname String
+  nombre   String
+  mime     String
+  /// Blob se paga, y el egress de una imagen se paga POR DESTINATARIO. El
+  /// contador de consumo por cuenta arranca el día uno: medir no se retrofitea.
+  bytes    Int
+  /// Medidas reales, informadas por el navegador al subir.
+  ancho     Int?
+  alto      Int?
+  subidoPor String?
+  createdAt DateTime @default(now())
+
+  @@index([cuentaId, createdAt])
 }

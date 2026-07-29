@@ -2,6 +2,7 @@
 
 import { nuevoBloque, TIPOS_BLOQUE, type Bloque } from "@/lib/email/render";
 import { ProductosBlock } from "@/components/ProductosBlock";
+import { ImagenDrop } from "@/components/editor/ImagenDrop";
 import { AISoonButton } from "@/components/ui/AISoonButton";
 import { inputClass } from "@/lib/ui";
 import { ChevronUp, ChevronDown, X } from "lucide-react";
@@ -92,7 +93,7 @@ export function BloquesList({
               </select>
               {b.variante === "logo" ? (
                 <div className="space-y-2">
-                  <input className={inputClass} value={b.logo ?? ""} placeholder="URL del logo (https://…)" onChange={(e) => setBloque(i, { logo: e.target.value })} />
+                  <ImagenDrop value={b.logo ?? ""} onChange={(logo) => setBloque(i, { logo })} placeholder="URL del logo (https://…)" />
                   <label className="flex items-center gap-2 text-xs text-muted">
                     Ancho
                     <input
@@ -150,7 +151,7 @@ export function BloquesList({
           )}
           {b.tipo === "hero" && (
             <div className="space-y-2">
-              <input className={inputClass} value={b.imagen} placeholder="URL de la imagen (banner)" onChange={(e) => setBloque(i, { imagen: e.target.value })} />
+              <ImagenDrop value={b.imagen} onChange={(imagen) => setBloque(i, { imagen })} placeholder="URL de la imagen (banner)" />
               <input className={inputClass} value={b.titulo} placeholder="Título principal" onChange={(e) => setBloque(i, { titulo: e.target.value })} />
               <input className={inputClass} value={b.subtitulo} placeholder="Subtítulo" onChange={(e) => setBloque(i, { subtitulo: e.target.value })} />
               <div className="flex gap-2">
@@ -182,7 +183,7 @@ export function BloquesList({
             </div>
           )}
           {b.tipo === "imagen" && (
-            <input className={inputClass} value={b.url} placeholder="URL de la imagen (https://…)" onChange={(e) => setBloque(i, { url: e.target.value })} />
+            <ImagenDrop value={b.url} onChange={(url) => setBloque(i, { url })} />
           )}
           {b.tipo === "productos" && (
             <ProductosBlock items={b.items} onChange={(items) => setBloque(i, { items })} />
@@ -215,7 +216,7 @@ export function BloquesList({
             <div className="grid grid-cols-2 gap-2">
               {(["izq", "der"] as const).map((lado) => (
                 <div key={lado} className="space-y-1">
-                  <input className={inputClass} value={b[lado].imagen} placeholder="URL imagen" onChange={(e) => setBloque(i, { [lado]: { ...b[lado], imagen: e.target.value } } as Partial<Bloque>)} />
+                  <ImagenDrop value={b[lado].imagen} onChange={(imagen) => setBloque(i, { [lado]: { ...b[lado], imagen } } as Partial<Bloque>)} placeholder="URL imagen" />
                   <input className={inputClass} value={b[lado].url} placeholder="Link" onChange={(e) => setBloque(i, { [lado]: { ...b[lado], url: e.target.value } } as Partial<Bloque>)} />
                 </div>
               ))}
@@ -223,7 +224,7 @@ export function BloquesList({
           )}
           {b.tipo === "video" && (
             <div className="space-y-2">
-              <input className={inputClass} value={b.imagen} placeholder="URL de la miniatura (imagen)" onChange={(e) => setBloque(i, { imagen: e.target.value })} />
+              <ImagenDrop value={b.imagen} onChange={(imagen) => setBloque(i, { imagen })} placeholder="URL de la miniatura (imagen)" />
               <input className={inputClass} value={b.url} placeholder="URL del video (YouTube, etc.)" onChange={(e) => setBloque(i, { url: e.target.value })} />
             </div>
           )}

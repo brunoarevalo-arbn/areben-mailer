@@ -42,3 +42,4 @@ next-env.d.ts
 
 # permitir el ejemplo de variables
 !.env.example
+.env*.local

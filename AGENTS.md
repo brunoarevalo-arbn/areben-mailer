@@ -59,6 +59,7 @@ node --import tsx scripts/probar-estilos.ts    # la cascada respeta el orden y n
 node --import tsx scripts/probar-render.ts     # golden: el mail no cambió sin querer
 node --import tsx scripts/probar-html.ts       # VML, media queries, tracking, peso
 node --import tsx scripts/probar-encabezado.ts # el link de baja no se puede borrar
+node --import tsx scripts/probar-imagenes.ts   # permisos, multi-tenant y SVG de /api/imagenes
 ```
 
 ⚠️ `probar-render.ts` compara contra `scripts/fixtures/render-golden.json`. Si el
@@ -193,6 +194,27 @@ fija que aparece en el 100% de los renders, con la lista de bloques que sea.
 hay `@media (prefers-color-scheme)`**: recolorear el shell sin que los bloques
 acompañen deja texto oscuro sobre fondo oscuro, que es peor que no hacer nada.
 Entra cuando los bloques emitan sus propias clases de tema.
+
+## Biblioteca de imágenes (Vercel Blob)
+
+Store propio del proyecto: **`mailer-imagenes`**, linkeado a `areben-mailer`, que
+inyecta `BLOB_READ_WRITE_TOKEN` en los tres entornos. El SDK lo toma solo — no
+hay que pasarle `token` a `put()`.
+
+- Tabla **`ImagenMail`** (`scripts/add-imagenes-mail.ts`, SQL crudo). Se llama
+  así y no `Imagen` porque el esquema lo comparte Resorty.
+- `app/api/imagenes` (GET `ver` · POST `editar`) y `[id]` (DELETE `editar`).
+- ⛔ **SVG rechazado** aunque sea una imagen: ningún cliente de mail lo rasteriza
+  y es un archivo con `<script>` adentro servido desde un dominio propio. Va
+  PNG/JPG/GIF/WEBP hasta 5 MB.
+- **El `cuentaId` va en el WHERE**, nunca en un chequeo después del `findUnique`.
+- **El contador de bytes por cuenta existe desde el día uno.** La cuota puede
+  venir después; medir no se retrofitea: Blob se paga y el egress de una imagen
+  se paga **por destinatario** — 16.800 envíos con cinco fotos es ancho de banda
+  de verdad.
+- ⚠️ **Borrar una imagen rompe los mails ya enviados**: la URL está adentro del
+  correo que ya está en la casilla de otra persona. La UI avisa; no hay borrado
+  masivo.
 
 ## Auth y permisos
 
