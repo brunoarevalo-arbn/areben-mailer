@@ -6,7 +6,7 @@ import { AISoonButton } from "@/components/ui/AISoonButton";
 import { inputClass } from "@/lib/ui";
 import { ChevronUp, ChevronDown, X } from "lucide-react";
 
-const TIPOS = ["hero", "seccion", "cupon", "titulo", "texto", "boton", "imagen", "productos", "columnas", "video", "redes", "divisor"] as const;
+const TIPOS = ["hero", "seccion", "cupon", "titulo", "texto", "boton", "imagen", "productos", "carrito", "columnas", "video", "redes", "divisor"] as const;
 
 const selectClass = `${inputClass} py-1.5`;
 const alignSelect = (value: "left" | "center", onChange: (v: "left" | "center") => void) => (
@@ -120,6 +120,15 @@ export function BloquesList({
           )}
           {b.tipo === "productos" && (
             <ProductosBlock items={b.items} onChange={(items) => setBloque(i, { items })} />
+          )}
+          {b.tipo === "carrito" && (
+            <p className="text-xs text-muted leading-relaxed">
+              Se completa solo con lo que la persona dejó en el carrito: foto, nombre, variante,
+              cantidad y precio. Movelo para elegir en qué parte del mail aparece.
+              <br />
+              Solo tiene efecto en la automation de <strong>carrito abandonado</strong>. En una
+              campaña común no hay carrito, así que el bloque no se dibuja.
+            </p>
           )}
           {b.tipo === "columnas" && (
             <div className="grid grid-cols-2 gap-2">

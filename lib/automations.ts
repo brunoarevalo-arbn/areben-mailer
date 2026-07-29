@@ -50,6 +50,10 @@ export function presetsPara(nombreMarca: string, urlTienda: string): Record<Trig
       bloques: [
         { tipo: "titulo", texto: "Todavía estás a tiempo, ${contacto.nombre}" },
         { tipo: "texto", texto: "Dejaste esto en tu carrito. Completá tu compra antes de que se agote." },
+        // El carrito real va ACÁ, entre el texto que lo anuncia y el botón. Sin
+        // este bloque el procesador lo appendearía al final, después del botón:
+        // "dejaste esto" seguido de nada, y los productos abajo del CTA.
+        { tipo: "carrito", items: [] },
         // ${cart.url} lo reemplaza el procesador con el link real del checkout.
         { tipo: "boton", texto: "Completar mi compra", url: "${cart.url}" },
       ],

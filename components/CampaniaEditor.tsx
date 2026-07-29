@@ -75,7 +75,7 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
   const [saving, startSave] = useTransition();
   const [sending, startSend] = useTransition();
 
-  const previewHtml = renderEmailHtml({ bloques }, { preheader, unsubscribeUrl: "#", nombreCuenta });
+  const previewHtml = renderEmailHtml({ bloques }, { preheader, unsubscribeUrl: "#", nombreCuenta, muestraCarrito: true });
 
   const campData = () => ({
     id,

@@ -7,6 +7,16 @@ export interface ProductoEmail {
   precioPromo?: string;
   imagen: string;
   url: string;
+  /**
+   * Variante elegida, ya legible: "iPhone 17 Pro Max · ROSA".
+   *
+   * Sale de `variant_values` del checkout de TN. Va aparte del nombre porque el
+   * `name` que devuelve TN ya trae la variante entre paréntesis —"MAGSAFE CASE
+   * (iPhone 17 Pro Max, ROSA)"— y repetirla se lee como un error.
+   */
+  variante?: string;
+  /** Unidades. Solo se muestra si es > 1: un "Cantidad: 1" en cada línea es ruido. */
+  cantidad?: number;
 }
 
 export interface Columna {
@@ -20,6 +30,10 @@ export type Bloque =
   | { tipo: "boton"; texto: string; url: string; align?: "left" | "center"; full?: boolean }
   | { tipo: "imagen"; url: string; alt?: string }
   | { tipo: "productos"; items: ProductoEmail[] }
+  // Placeholder: no se carga a mano. El procesador de automations le mete el
+  // carrito real del contacto justo antes de enviar, EN ESTE LUGAR de la lista
+  // — que es la diferencia con `productos`, que es una grilla curada.
+  | { tipo: "carrito"; items?: ProductoEmail[]; restantes?: number }
   | { tipo: "columnas"; izq: Columna; der: Columna }
   | { tipo: "video"; imagen: string; url: string }
   | { tipo: "redes"; links: { red: string; url: string }[] }
@@ -41,6 +55,10 @@ export function nuevoBloque(tipo: Bloque["tipo"]): Bloque {
     case "boton": return { tipo, texto: "Ver más", url: "", align: "left", full: false };
     case "imagen": return { tipo, url: "", alt: "" };
     case "productos": return { tipo, items: [] };
+    // Nace vacío A PROPÓSITO: si trajera productos de ejemplo, una automation
+    // guardada con ellos se los mandaría a un cliente real. La muestra del
+    // editor la pone el preview (`muestraCarrito`), no el dato.
+    case "carrito": return { tipo, items: [] };
     case "columnas": return { tipo, izq: { imagen: "", url: "" }, der: { imagen: "", url: "" } };
     case "video": return { tipo, imagen: "", url: "" };
     case "redes": return { tipo, links: [{ red: "Instagram", url: "" }] };
@@ -71,18 +89,76 @@ function fmtPrecio(v: string): string {
   return "$" + n.toLocaleString("es-AR");
 }
 
-function renderCard(p: ProductoEmail): string {
-  const precio = p.precioPromo
+/** Precio, con el de lista tachado si hay promo. Compartido por la grilla y el carrito. */
+function precioHtml(p: ProductoEmail): string {
+  return p.precioPromo
     ? `<span style="color:#a3a3a3;text-decoration:line-through;font-size:13px">${fmtPrecio(p.precio)}</span> <span style="color:#171717;font-weight:600">${fmtPrecio(p.precioPromo)}</span>`
     : `<span style="color:#171717;font-weight:600">${fmtPrecio(p.precio)}</span>`;
+}
+
+/** Renglón "iPhone 11 · Marrón — 2 u." Vacío si el producto no aporta ninguno de los dos. */
+function detalleHtml(p: ProductoEmail): string {
+  const partes = [p.variante, (p.cantidad ?? 1) > 1 ? `${p.cantidad} u.` : null].filter(Boolean);
+  return partes.length
+    ? `<div style="margin-top:3px;font-size:13px;color:#a3a3a3">${esc(partes.join(" — "))}</div>`
+    : "";
+}
+
+function renderCard(p: ProductoEmail): string {
   return `<td width="50%" valign="top" style="padding:8px">
     <a href="${esc(p.url)}" style="text-decoration:none;color:inherit">
       <img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:8px;display:block" />
       <div style="margin-top:8px;font-size:14px;color:#404040">${esc(p.nombre)}</div>
-      <div style="margin-top:2px;font-size:14px">${precio}</div>
+      ${detalleHtml(p)}
+      <div style="margin-top:2px;font-size:14px">${precioHtml(p)}</div>
     </a>
   </td>`;
 }
+
+/**
+ * Una línea de carrito: foto | nombre + variante + cantidad | precio.
+ *
+ * Es la diferencia de fondo con `renderCard`: una grilla de tarjetas dice "mirá
+ * estos productos", y un carrito abandonado tiene que decir "esto dejaste".
+ */
+function renderLineaCarrito(p: ProductoEmail): string {
+  const foto = p.imagen
+    ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:8px;display:block" />`
+    : "";
+  return `<tr>
+    <td width="25%" valign="top" style="padding:10px 0"><a href="${esc(p.url)}">${foto}</a></td>
+    <td valign="top" style="padding:10px 14px">
+      <a href="${esc(p.url)}" style="text-decoration:none;color:inherit">
+        <div style="font-size:15px;line-height:1.35;color:#171717;font-weight:600">${esc(p.nombre)}</div>
+        ${detalleHtml(p)}
+      </a>
+    </td>
+    <td width="22%" valign="top" align="right" style="padding:10px 0;font-size:14px;white-space:nowrap">${precioHtml(p)}</td>
+  </tr>`;
+}
+
+/**
+ * El carrito completo. `restantes` es lo que se recortó: se dice, no se esconde
+ * — quien dejó 8 productos y ve 6 tiene que enterarse de que hay más.
+ *
+ * El `${cart.url}` del link lo resuelve el procesador de automations sobre el
+ * HTML ya armado, igual que el resto de los links del carrito.
+ */
+function renderCarrito(items: ProductoEmail[], restantes = 0): string {
+  if (items.length === 0) return "";
+  const filas = items.map(renderLineaCarrito).join(`<tr><td colspan="3" style="border-top:1px solid #ececec;font-size:0;line-height:0">&nbsp;</td></tr>`);
+  const mas =
+    restantes > 0
+      ? `<div style="margin:4px 0 0;font-size:14px;color:#525252"><a href="\${cart.url}" style="color:#525252">y ${restantes} producto${restantes === 1 ? "" : "s"} más</a></div>`
+      : "";
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px">${filas}</table>${mas}`;
+}
+
+/** Productos de mentira para el preview del editor. NUNCA salen en un envío real. */
+const CARRITO_MUESTRA: ProductoEmail[] = [
+  { nombre: "Producto de ejemplo", variante: "Variante · Color", cantidad: 2, precio: "12990", imagen: "", url: "#" },
+  { nombre: "Otro producto", variante: "Variante", precio: "10990", precioPromo: "7490", imagen: "", url: "#" },
+];
 
 /** Render de una grilla de productos, reutilizable (ej. email de carrito abandonado). */
 export function renderProductosHtml(items: ProductoEmail[]): string {
@@ -100,7 +176,7 @@ function renderProductos(items: ProductoEmail[]): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px">${filas.join("")}</table>`;
 }
 
-function renderBloque(b: Bloque): string {
+function renderBloque(b: Bloque, muestraCarrito = false): string {
   switch (b.tipo) {
     case "titulo":
       return pad(`<h1 style="margin:16px 0;font-size:26px;line-height:1.25;color:#171717;text-align:${b.align ?? "left"}">${esc(b.texto)}</h1>`);
@@ -112,6 +188,12 @@ function renderBloque(b: Bloque): string {
       return pad(`<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" style="max-width:100%;height:auto;border-radius:8px;margin:8px 0 16px;display:block" />`);
     case "productos":
       return pad(renderProductos(b.items ?? []));
+    case "carrito": {
+      // Sin items no se inventa nada: si el carrito llegó vacío, el bloque
+      // desaparece. La muestra es solo del preview del editor.
+      const items = b.items?.length ? b.items : muestraCarrito ? CARRITO_MUESTRA : [];
+      return pad(renderCarrito(items, b.items?.length ? b.restantes ?? 0 : 0));
+    }
     case "columnas": {
       const cell = (c: Columna) =>
         c.imagen
@@ -160,11 +242,18 @@ export interface RenderOpts {
   unsubscribeUrl: string;
   nombreCuenta: string;
   direccionPostal?: string;
+  /**
+   * Solo para el preview del editor: dibuja el bloque `carrito` con productos de
+   * muestra para que se vea cómo va a quedar.
+   *
+   * ⛔ Nunca en un envío real. En el envío, un carrito sin items no se dibuja.
+   */
+  muestraCarrito?: boolean;
 }
 
 /** Renderiza el contenido a un HTML de email completo (shell + bloques + footer). */
 export function renderEmailHtml(contenido: ContenidoCampania, opts: RenderOpts): string {
-  const cuerpo = (contenido.bloques ?? []).map(renderBloque).join("\n");
+  const cuerpo = (contenido.bloques ?? []).map((b) => renderBloque(b, opts.muestraCarrito)).join("\n");
   const preheader = opts.preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(opts.preheader)}</div>`
     : "";
@@ -197,6 +286,13 @@ export function renderEmailHtml(contenido: ContenidoCampania, opts: RenderOpts):
 /** Un bloque, en texto. `null` = no aporta nada legible (imágenes sueltas, etc.). */
 function bloqueATexto(b: Bloque): string | null {
   const link = (texto: string, url?: string) => (url ? `${texto}: ${url}` : texto);
+  /** "PRINT CASE (iPhone 11 · Marrón, 2 u.) — 7490". Mismo dato que la línea HTML. */
+  const lineaTexto = (p: ProductoEmail) => {
+    const detalle = [p.variante, (p.cantidad ?? 1) > 1 ? `${p.cantidad} u.` : null].filter(Boolean);
+    // Mismo formato que el HTML: TN devuelve "10990.00" y en el mail va "$10.990".
+    const precio = p.precioPromo || p.precio;
+    return `${p.nombre}${detalle.length ? ` (${detalle.join(", ")})` : ""}${precio ? ` — ${fmtPrecio(precio)}` : ""}`;
+  };
   switch (b.tipo) {
     case "titulo":
       return b.texto;
@@ -207,7 +303,14 @@ function bloqueATexto(b: Bloque): string | null {
     case "imagen":
       return b.alt ? `[${b.alt}]` : null;
     case "productos":
-      return (b.items ?? []).map((p) => link(`· ${p.nombre}${p.precio ? ` — ${p.precio}` : ""}`, p.url)).join("\n") || null;
+      return (b.items ?? []).map((p) => link(`· ${lineaTexto(p)}`, p.url)).join("\n") || null;
+    case "carrito": {
+      const lineas = (b.items ?? []).map((p) => link(`· ${lineaTexto(p)}`, p.url));
+      if (!lineas.length) return null;
+      const r = b.restantes ?? 0;
+      if (r > 0) lineas.push(`y ${r} producto${r === 1 ? "" : "s"} más: \${cart.url}`);
+      return lineas.join("\n");
+    }
     case "columnas":
       return [b.izq?.url, b.der?.url].filter(Boolean).join("\n") || null;
     case "video":

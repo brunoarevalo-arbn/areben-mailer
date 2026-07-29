@@ -34,7 +34,9 @@ export async function GET(req: Request) {
       continue;
     }
 
-    const td = run.triggerData as { checkoutId?: string; abandonedUrl?: string; productos?: ProductoEmail[] };
+    const td = run.triggerData as {
+      checkoutId?: string; abandonedUrl?: string; productos?: ProductoEmail[]; restantes?: number;
+    };
     const esCarrito = automation.trigger === "CARRITO_ABANDONADO";
 
     // Carrito abandonado: si ya completó la compra, no enviamos.
@@ -52,9 +54,30 @@ export async function GET(req: Request) {
     }
 
     const contenido = automation.contenido as unknown as ContenidoCampania;
-    const bloques = [...(contenido?.bloques ?? [])];
-    // Carrito: sumar los productos que dejó como bloque
-    if (esCarrito && td.productos?.length) bloques.push({ tipo: "productos", items: td.productos });
+    let bloques = [...(contenido?.bloques ?? [])];
+
+    // Carrito: los productos que dejó, en el lugar del diseño donde van.
+    //
+    // Si la automation tiene un bloque `carrito`, se rellena AHÍ — así el autor
+    // puede ponerlo entre un título "Tu carrito" y el botón, en vez de que caiga
+    // siempre al final. Si no lo tiene, se appendea como antes: las 3 automations
+    // que ya existen no declaran el bloque y tienen que seguir mostrando los
+    // productos.
+    //
+    // Lo que cambia en ese caso es el DIBUJO, no la posición: antes se appendeaba
+    // una grilla de tarjetas (`productos`) y ahora van las líneas de carrito. Es
+    // una mejora, no una ruptura — ninguna de las tres llegó a mandar un carrito
+    // real todavía, y una grilla nunca fue la forma de decir "esto dejaste".
+    if (esCarrito && td.productos?.length) {
+      const tieneBloque = bloques.some((b) => b.tipo === "carrito");
+      if (tieneBloque) {
+        bloques = bloques.map((b) =>
+          b.tipo === "carrito" ? { ...b, items: td.productos!, restantes: td.restantes ?? 0 } : b,
+        );
+      } else {
+        bloques.push({ tipo: "carrito", items: td.productos, restantes: td.restantes ?? 0 });
+      }
+    }
 
     // Con el gate cerrado —o en ensayo, si este contacto no está habilitado— no
     // mandamos nada de verdad, pero dejamos correr el flujo igual: así se ve que

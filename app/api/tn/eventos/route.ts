@@ -18,6 +18,15 @@ interface Resuelto {
   triggerData: object;
 }
 
+/**
+ * Cuántos productos del carrito entran en el mail.
+ *
+ * Medido contra los checkouts reales de BDI: de 30 carritos, uno solo pasa de 4
+ * productos y el más grande tiene 8. Con 6 entra casi todo, y lo que se recorta
+ * se avisa con "y N más" en vez de desaparecer.
+ */
+const TOPE_CARRITO = 6;
+
 // Resuelve datos del contacto según el evento.
 async function resolver(event: string, recursoId: string, storeId: string, token: string): Promise<Resuelto | null> {
   try {
@@ -36,12 +45,23 @@ async function resolver(event: string, recursoId: string, storeId: string, token
       const { data } = await tnGet<{
         contact_email?: string; contact_name?: string; customer?: Persona;
         abandoned_checkout_url?: string; contact_accepts_marketing?: boolean;
-        products?: { name?: string; price?: string; compare_at_price?: string; image?: string | { src?: string }; quantity?: number }[];
+        products?: {
+          name?: string; name_without_variants?: string | null; price?: string;
+          compare_at_price?: string; image?: string | { src?: string };
+          quantity?: number; variant_values?: string[];
+        }[];
       }>(storeId, token, `checkouts/${recursoId}`);
       const email = data.contact_email?.toLowerCase();
       if (!email) return null;
-      const productos = (data.products ?? []).slice(0, 4).map((p) => ({
-        nombre: p.name ?? "",
+      const todos = data.products ?? [];
+      const productos = todos.slice(0, TOPE_CARRITO).map((p) => ({
+        // `name` viene con la variante pegada — "MAGSAFE CASE (iPhone 17 Pro Max,
+        // ROSA)"— y la variante va en su propio renglón, así que usamos el nombre
+        // limpio. Ojo: `name_without_variants` es **null** en los productos sin
+        // variantes (verificado contra el checkout de BDI), de ahí el fallback.
+        nombre: p.name_without_variants || p.name || "",
+        variante: p.variant_values?.length ? p.variant_values.join(" · ") : undefined,
+        cantidad: typeof p.quantity === "number" ? p.quantity : undefined,
         precio: p.compare_at_price && p.compare_at_price !== p.price ? p.compare_at_price : p.price ?? "",
         precioPromo: p.compare_at_price && p.compare_at_price !== p.price ? p.price : undefined,
         imagen: typeof p.image === "string" ? p.image : p.image?.src ?? "",
@@ -52,7 +72,14 @@ async function resolver(event: string, recursoId: string, storeId: string, token
         nombre: data.contact_name ?? null,
         tnCustomerId: data.customer?.id?.toString() ?? null,
         acceptsMkt: data.contact_accepts_marketing === true,
-        triggerData: { checkoutId: recursoId, abandonedUrl: data.abandoned_checkout_url ?? "", productos },
+        triggerData: {
+          checkoutId: recursoId,
+          abandonedUrl: data.abandoned_checkout_url ?? "",
+          productos,
+          // Cuántos quedaron afuera del tope. Se muestra: esconderlo hace creer
+          // que el carrito era más chico de lo que fue.
+          restantes: Math.max(0, todos.length - productos.length),
+        },
       };
     }
   } catch {

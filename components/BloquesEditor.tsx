@@ -14,7 +14,7 @@ export function BloquesEditor({
   nombreCuenta: string;
   preheader?: string;
 }) {
-  const previewHtml = renderEmailHtml({ bloques }, { preheader, unsubscribeUrl: "#", nombreCuenta });
+  const previewHtml = renderEmailHtml({ bloques }, { preheader, unsubscribeUrl: "#", nombreCuenta, muestraCarrito: true });
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
