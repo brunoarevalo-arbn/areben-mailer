@@ -5,6 +5,7 @@ import { AutomationEditor } from "@/components/AutomationEditor";
 import { prisma } from "@/lib/prisma";
 import { getAuth } from "@/lib/auth";
 import type { ContenidoCampania } from "@/lib/email/render";
+import { temaDe } from "@/lib/email/tema";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export default async function AutomationPage({ params }: { params: Promise<{ id:
           capDias: a.capDias,
           contenido: (a.contenido as unknown as ContenidoCampania) ?? { bloques: [] },
         }}
+        temaMarca={temaDe(cuenta.config)}
       />
     </div>
   );

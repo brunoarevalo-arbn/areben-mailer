@@ -6,6 +6,7 @@ import { getCuentaActiva } from "@/lib/cuenta";
 import { usarPlantilla, usarPreset, eliminarPlantilla } from "./actions";
 import { PRESETS } from "@/lib/plantillas/presets";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
+import { temaDe } from "@/lib/email/tema";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,11 @@ export default async function PlantillasPage() {
   });
 
   // Preview de cada prearmada (render real, con un nombre de ejemplo para los merge tags).
+  const temaMarca = temaDe(cuenta.config);
   const previews = PRESETS.map((p) => {
-    const html = renderEmailHtml({ bloques: p.bloques }, { unsubscribeUrl: "#", nombreCuenta: cuenta.nombre });
+    // Con el tema de la marca: la galería tiene que mostrar cómo va a quedar
+    // ESTA tienda, no una versión genérica que después no se parece a nada.
+    const html = renderEmailHtml({ bloques: p.bloques }, { unsubscribeUrl: "#", nombreCuenta: cuenta.nombre, temaMarca });
     return { preset: p, html: aplicarMergeTags(html, { nombre: "Ana", email: "ana@ejemplo.com" }) };
   });
 

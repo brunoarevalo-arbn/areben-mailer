@@ -5,6 +5,7 @@ import { destinatarioPermitido } from "@/lib/email/proveedor";
 import { inyectarTracking } from "@/lib/email/tracking";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { tnGet } from "@/lib/tn/client";
+import { temaDe } from "@/lib/email/tema";
 
 export const maxDuration = 60;
 const BATCH = 30;
@@ -103,8 +104,11 @@ export async function GET(req: Request) {
       preheader: automation.preheader ?? undefined,
       unsubscribeUrl: unsubUrl,
       nombreCuenta: automation.cuenta.nombre,
+      temaMarca: temaDe(automation.cuenta.config),
     };
-    let html = renderEmailHtml({ bloques }, opts);
+    // `contenido.tema` viaja aparte de los bloques: si se pasara solo `{ bloques }`
+    // la automation perdería su aspecto y saldría con el de la marca.
+    let html = renderEmailHtml({ bloques, tema: contenido?.tema }, opts);
     html = aplicarMergeTags(html, contacto);
     if (esCarrito) html = html.replaceAll("${cart.url}", td.abandonedUrl ?? "#");
     // El tracking va al final: sobre el HTML ya resuelto, para que envuelva

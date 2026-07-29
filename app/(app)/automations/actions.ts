@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { autorizar, chequear, getAuth } from "@/lib/auth";
 import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
+import { temaDe } from "@/lib/email/tema";
 import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { presetsPara, urlTiendaDe, type Trigger } from "@/lib/automations";
@@ -99,6 +100,7 @@ export async function enviarPruebaAutomation(id: string, email: string) {
       preheader: a.preheader ?? undefined,
       unsubscribeUrl: `${process.env.APP_URL}/baja?token=preview`,
       nombreCuenta: cuenta.nombre,
+      temaMarca: temaDe(cuenta.config),
     }),
     { nombre: nombre ?? "", email: destino },
   );

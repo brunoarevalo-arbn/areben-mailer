@@ -1,5 +1,23 @@
 // Convierte el contenido de una campaña (bloques) en HTML de email.
 // Los bloques son un JSON simple; más adelante se suma un editor drag-and-drop.
+//
+// El aspecto (colores, ancho, fuente) vive en lib/email/tema.ts y llega acá ya
+// resuelto como `Paleta`. Este archivo no decide de qué color es nada.
+import { resolverPaleta, combinarTema, esColorOscuro, type Paleta, type Tema } from "./tema";
+
+/**
+ * Colores de texto legibles sobre un fondo cualquiera.
+ *
+ * Los bloques `hero`, `seccion` y `cupon` traen su propio `bg` elegido por el
+ * autor. Si el texto heredara la paleta del tema, un hero blanco dentro de un
+ * mail oscuro saldría con el título blanco sobre blanco — invisible. Se decide
+ * por el fondo real del bloque, no por el del mail.
+ */
+function tonosSobre(bg: string): { texto: string; cuerpo: string; medio: string } {
+  return esColorOscuro(bg)
+    ? { texto: "#fafafa", cuerpo: "#d5d4d4", medio: "#b8b8b8" }
+    : { texto: "#171717", cuerpo: "#404040", medio: "#525252" };
+}
 
 export interface ProductoEmail {
   nombre: string;
@@ -45,6 +63,12 @@ export type Bloque =
 
 export interface ContenidoCampania {
   bloques: Bloque[];
+  /**
+   * Aspecto de ESTA campaña. Viaja dentro del Json `contenido` que ya existe en
+   * `Campania` y `Automation`, así que no hizo falta ninguna migración — la base
+   * se comparte con popups y `db:push` está prohibido.
+   */
+  tema?: Tema;
 }
 
 /** Bloque inicial por tipo, compartido por todos los editores de contenido. */
@@ -77,10 +101,10 @@ const nl = (s: string) => esc(s).replace(/\n/g, "<br>");
 /** Contenedor con padding horizontal para los bloques "de texto". */
 const pad = (inner: string) => `<div style="padding:0 32px">${inner}</div>`;
 
-/** Ancla de botón (relleno ámbar). */
-function botonAnchor(texto: string, url: string, full = false): string {
+/** Ancla de botón. El color sale del acento del tema, no del renderer. */
+function botonAnchor(texto: string, url: string, pal: Paleta, full = false): string {
   const w = full ? ";width:100%;box-sizing:border-box;text-align:center" : "";
-  return `<a href="${esc(url || "#")}" style="display:inline-block;padding:14px 32px;font-size:16px;font-weight:600;color:#ffffff;background:#f59e0b;border-radius:8px;text-decoration:none${w}">${esc(texto)}</a>`;
+  return `<a href="${esc(url || "#")}" style="display:inline-block;padding:14px 32px;font-size:16px;font-weight:600;color:${pal.sobreAcento};background:${pal.acento};border-radius:8px;text-decoration:none${w}">${esc(texto)}</a>`;
 }
 
 function fmtPrecio(v: string): string {
@@ -90,27 +114,27 @@ function fmtPrecio(v: string): string {
 }
 
 /** Precio, con el de lista tachado si hay promo. Compartido por la grilla y el carrito. */
-function precioHtml(p: ProductoEmail): string {
+function precioHtml(p: ProductoEmail, pal: Paleta): string {
   return p.precioPromo
-    ? `<span style="color:#a3a3a3;text-decoration:line-through;font-size:13px">${fmtPrecio(p.precio)}</span> <span style="color:#171717;font-weight:600">${fmtPrecio(p.precioPromo)}</span>`
-    : `<span style="color:#171717;font-weight:600">${fmtPrecio(p.precio)}</span>`;
+    ? `<span style="color:${pal.tenue};text-decoration:line-through;font-size:13px">${fmtPrecio(p.precio)}</span> <span style="color:${pal.texto};font-weight:600">${fmtPrecio(p.precioPromo)}</span>`
+    : `<span style="color:${pal.texto};font-weight:600">${fmtPrecio(p.precio)}</span>`;
 }
 
 /** Renglón "iPhone 11 · Marrón — 2 u." Vacío si el producto no aporta ninguno de los dos. */
-function detalleHtml(p: ProductoEmail): string {
+function detalleHtml(p: ProductoEmail, pal: Paleta): string {
   const partes = [p.variante, (p.cantidad ?? 1) > 1 ? `${p.cantidad} u.` : null].filter(Boolean);
   return partes.length
-    ? `<div style="margin-top:3px;font-size:13px;color:#a3a3a3">${esc(partes.join(" — "))}</div>`
+    ? `<div style="margin-top:3px;font-size:13px;color:${pal.tenue}">${esc(partes.join(" — "))}</div>`
     : "";
 }
 
-function renderCard(p: ProductoEmail): string {
+function renderCard(p: ProductoEmail, pal: Paleta): string {
   return `<td width="50%" valign="top" style="padding:8px">
     <a href="${esc(p.url)}" style="text-decoration:none;color:inherit">
       <img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:8px;display:block" />
-      <div style="margin-top:8px;font-size:14px;color:#404040">${esc(p.nombre)}</div>
-      ${detalleHtml(p)}
-      <div style="margin-top:2px;font-size:14px">${precioHtml(p)}</div>
+      <div style="margin-top:8px;font-size:14px;color:${pal.cuerpo}">${esc(p.nombre)}</div>
+      ${detalleHtml(p, pal)}
+      <div style="margin-top:2px;font-size:14px">${precioHtml(p, pal)}</div>
     </a>
   </td>`;
 }
@@ -121,7 +145,7 @@ function renderCard(p: ProductoEmail): string {
  * Es la diferencia de fondo con `renderCard`: una grilla de tarjetas dice "mirá
  * estos productos", y un carrito abandonado tiene que decir "esto dejaste".
  */
-function renderLineaCarrito(p: ProductoEmail): string {
+function renderLineaCarrito(p: ProductoEmail, pal: Paleta): string {
   const foto = p.imagen
     ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:8px;display:block" />`
     : "";
@@ -129,11 +153,11 @@ function renderLineaCarrito(p: ProductoEmail): string {
     <td width="25%" valign="top" style="padding:10px 0"><a href="${esc(p.url)}">${foto}</a></td>
     <td valign="top" style="padding:10px 14px">
       <a href="${esc(p.url)}" style="text-decoration:none;color:inherit">
-        <div style="font-size:15px;line-height:1.35;color:#171717;font-weight:600">${esc(p.nombre)}</div>
-        ${detalleHtml(p)}
+        <div style="font-size:15px;line-height:1.35;color:${pal.texto};font-weight:600">${esc(p.nombre)}</div>
+        ${detalleHtml(p, pal)}
       </a>
     </td>
-    <td width="22%" valign="top" align="right" style="padding:10px 0;font-size:14px;white-space:nowrap">${precioHtml(p)}</td>
+    <td width="22%" valign="top" align="right" style="padding:10px 0;font-size:14px;white-space:nowrap">${precioHtml(p, pal)}</td>
   </tr>`;
 }
 
@@ -144,12 +168,14 @@ function renderLineaCarrito(p: ProductoEmail): string {
  * El `${cart.url}` del link lo resuelve el procesador de automations sobre el
  * HTML ya armado, igual que el resto de los links del carrito.
  */
-function renderCarrito(items: ProductoEmail[], restantes = 0): string {
+function renderCarrito(items: ProductoEmail[], pal: Paleta, restantes = 0): string {
   if (items.length === 0) return "";
-  const filas = items.map(renderLineaCarrito).join(`<tr><td colspan="3" style="border-top:1px solid #ececec;font-size:0;line-height:0">&nbsp;</td></tr>`);
+  const filas = items
+    .map((p) => renderLineaCarrito(p, pal))
+    .join(`<tr><td colspan="3" style="border-top:1px solid ${pal.borde};font-size:0;line-height:0">&nbsp;</td></tr>`);
   const mas =
     restantes > 0
-      ? `<div style="margin:4px 0 0;font-size:14px;color:#525252"><a href="\${cart.url}" style="color:#525252">y ${restantes} producto${restantes === 1 ? "" : "s"} más</a></div>`
+      ? `<div style="margin:4px 0 0;font-size:14px;color:${pal.medio}"><a href="\${cart.url}" style="color:${pal.link}">y ${restantes} producto${restantes === 1 ? "" : "s"} más</a></div>`
       : "";
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px">${filas}</table>${mas}`;
 }
@@ -161,38 +187,38 @@ const CARRITO_MUESTRA: ProductoEmail[] = [
 ];
 
 /** Render de una grilla de productos, reutilizable (ej. email de carrito abandonado). */
-export function renderProductosHtml(items: ProductoEmail[]): string {
-  return renderProductos(items);
+export function renderProductosHtml(items: ProductoEmail[], tema?: Tema): string {
+  return renderProductos(items, resolverPaleta(tema));
 }
 
-function renderProductos(items: ProductoEmail[]): string {
+function renderProductos(items: ProductoEmail[], pal: Paleta): string {
   if (items.length === 0) return "";
   const filas: string[] = [];
   for (let i = 0; i < items.length; i += 2) {
-    const a = renderCard(items[i]);
-    const b = items[i + 1] ? renderCard(items[i + 1]) : `<td width="50%"></td>`;
+    const a = renderCard(items[i], pal);
+    const b = items[i + 1] ? renderCard(items[i + 1], pal) : `<td width="50%"></td>`;
     filas.push(`<tr>${a}${b}</tr>`);
   }
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px">${filas.join("")}</table>`;
 }
 
-function renderBloque(b: Bloque, muestraCarrito = false): string {
+function renderBloque(b: Bloque, pal: Paleta, muestraCarrito = false): string {
   switch (b.tipo) {
     case "titulo":
-      return pad(`<h1 style="margin:16px 0;font-size:26px;line-height:1.25;color:#171717;text-align:${b.align ?? "left"}">${esc(b.texto)}</h1>`);
+      return pad(`<h1 style="margin:16px 0;font-size:26px;line-height:1.25;color:${pal.texto};text-align:${b.align ?? "left"}">${esc(b.texto)}</h1>`);
     case "texto":
-      return pad(`<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#404040;text-align:${b.align ?? "left"}">${nl(b.texto)}</p>`);
+      return pad(`<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:${pal.cuerpo};text-align:${b.align ?? "left"}">${nl(b.texto)}</p>`);
     case "boton":
-      return pad(`<div style="text-align:${b.align ?? "left"};margin:8px 0 20px">${botonAnchor(b.texto, b.url, b.full)}</div>`);
+      return pad(`<div style="text-align:${b.align ?? "left"};margin:8px 0 20px">${botonAnchor(b.texto, b.url, pal, b.full)}</div>`);
     case "imagen":
       return pad(`<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" style="max-width:100%;height:auto;border-radius:8px;margin:8px 0 16px;display:block" />`);
     case "productos":
-      return pad(renderProductos(b.items ?? []));
+      return pad(renderProductos(b.items ?? [], pal));
     case "carrito": {
       // Sin items no se inventa nada: si el carrito llegó vacío, el bloque
       // desaparece. La muestra es solo del preview del editor.
       const items = b.items?.length ? b.items : muestraCarrito ? CARRITO_MUESTRA : [];
-      return pad(renderCarrito(items, b.items?.length ? b.restantes ?? 0 : 0));
+      return pad(renderCarrito(items, pal, b.items?.length ? b.restantes ?? 0 : 0));
     }
     case "columnas": {
       const cell = (c: Columna) =>
@@ -208,29 +234,36 @@ function renderBloque(b: Bloque, muestraCarrito = false): string {
     case "redes":
       return pad(`<div style="text-align:center;margin:16px 0">${(b.links ?? [])
         .filter((l) => l.url)
-        .map((l) => `<a href="${esc(l.url)}" style="display:inline-block;margin:0 8px;color:#525252;font-size:14px;text-decoration:none">${esc(l.red)}</a>`)
+        .map((l) => `<a href="${esc(l.url)}" style="display:inline-block;margin:0 8px;color:${pal.link};font-size:14px;text-decoration:none">${esc(l.red)}</a>`)
         .join("")}</div>`);
     case "divisor":
-      return pad(`<hr style="border:0;border-top:1px solid #e5e5e5;margin:24px 0" />`);
+      return pad(`<hr style="border:0;border-top:1px solid ${pal.bordeSuave};margin:24px 0" />`);
     case "hero": {
       const img = b.imagen ? `<img src="${esc(b.imagen)}" alt="" style="width:100%;display:block;margin:0" />` : "";
-      const t = b.titulo ? `<h1 style="margin:0 0 10px;font-size:30px;line-height:1.2;color:#171717">${esc(b.titulo)}</h1>` : "";
-      const s = b.subtitulo ? `<p style="margin:0 0 20px;font-size:17px;line-height:1.5;color:#525252">${esc(b.subtitulo)}</p>` : "";
-      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl) : "";
-      const caja = t || s || btn ? `<div style="background:${esc(b.bg || "#ffffff")};padding:36px 32px;text-align:center">${t}${s}${btn}</div>` : "";
+      // El `bg` lo elige el autor, así que el color del texto se decide por ESE
+      // fondo y no por el tema: un hero blanco dentro de un mail oscuro tendría
+      // título blanco sobre blanco si se heredara la paleta.
+      const bg = b.bg || pal.tarjeta;
+      const sobre = tonosSobre(bg);
+      const t = b.titulo ? `<h1 style="margin:0 0 10px;font-size:30px;line-height:1.2;color:${sobre.texto}">${esc(b.titulo)}</h1>` : "";
+      const s = b.subtitulo ? `<p style="margin:0 0 20px;font-size:17px;line-height:1.5;color:${sobre.medio}">${esc(b.subtitulo)}</p>` : "";
+      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, pal) : "";
+      const caja = t || s || btn ? `<div style="background:${esc(bg)};padding:36px 32px;text-align:center">${t}${s}${btn}</div>` : "";
       return `${img}${caja}`;
     }
     case "seccion": {
-      const t = b.titulo ? `<h2 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:#171717">${esc(b.titulo)}</h2>` : "";
-      const tx = b.texto ? `<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#525252">${nl(b.texto)}</p>` : "";
-      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl) : "";
-      return `<div style="background:${esc(b.bg || "#faf7f0")};padding:32px;text-align:center">${t}${tx}${btn}</div>`;
+      const bg = b.bg || pal.seccion;
+      const sobre = tonosSobre(bg);
+      const t = b.titulo ? `<h2 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:${sobre.texto}">${esc(b.titulo)}</h2>` : "";
+      const tx = b.texto ? `<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:${sobre.medio}">${nl(b.texto)}</p>` : "";
+      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, pal) : "";
+      return `<div style="background:${esc(bg)};padding:32px;text-align:center">${t}${tx}${btn}</div>`;
     }
     case "cupon": {
-      const t = b.texto ? `<div style="font-size:16px;color:#404040;margin-bottom:8px">${esc(b.texto)}</div>` : "";
-      const cod = b.codigo ? `<div style="font-size:26px;font-weight:700;letter-spacing:3px;color:#b45309;margin-bottom:14px">${esc(b.codigo)}</div>` : "";
-      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl) : "";
-      return pad(`<div style="border:2px dashed #f59e0b;border-radius:12px;background:#fffbeb;padding:24px;text-align:center;margin:8px 0 16px">${t}${cod}${btn}</div>`);
+      const t = b.texto ? `<div style="font-size:16px;color:${tonosSobre(pal.cuponFondo).cuerpo};margin-bottom:8px">${esc(b.texto)}</div>` : "";
+      const cod = b.codigo ? `<div style="font-size:26px;font-weight:700;letter-spacing:3px;color:${pal.cuponTexto};margin-bottom:14px">${esc(b.codigo)}</div>` : "";
+      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, pal) : "";
+      return pad(`<div style="border:2px dashed ${pal.acento};border-radius:12px;background:${pal.cuponFondo};padding:24px;text-align:center;margin:8px 0 16px">${t}${cod}${btn}</div>`);
     }
     default:
       return "";
@@ -249,35 +282,49 @@ export interface RenderOpts {
    * ⛔ Nunca en un envío real. En el envío, un carrito sin items no se dibuja.
    */
   muestraCarrito?: boolean;
+  /** Tema por defecto de la marca (`Cuenta.config.tema`). Lo pisa el de la campaña. */
+  temaMarca?: Tema | null;
 }
 
 /** Renderiza el contenido a un HTML de email completo (shell + bloques + footer). */
 export function renderEmailHtml(contenido: ContenidoCampania, opts: RenderOpts): string {
-  const cuerpo = (contenido.bloques ?? []).map((b) => renderBloque(b, opts.muestraCarrito)).join("\n");
+  // El tema de la campaña pisa al de la marca, campo por campo.
+  const pal = resolverPaleta(combinarTema(opts.temaMarca, contenido.tema));
+  const cuerpo = (contenido.bloques ?? [])
+    .map((b) => renderBloque(b, pal, opts.muestraCarrito))
+    .join("\n");
   const preheader = opts.preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(opts.preheader)}</div>`
     : "";
 
+  // Sin borde cuando la tarjeta y el fondo son el mismo color: dibujar un
+  // recuadro alrededor de algo que no se distingue del fondo se ve como una
+  // línea suelta, no como una tarjeta. Es el "transparent" del editor de BEE.
+  const aSangre = pal.tarjeta.toLowerCase() === pal.fondo.toLowerCase();
+  const cajaCuerpo = aSangre
+    ? `background:${pal.tarjeta}`
+    : `background:${pal.tarjeta};border:1px solid ${pal.borde};border-radius:12px`;
+
   return `<!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif">
+<html lang="${esc(pal.idioma)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;background:${pal.fondo};font-family:${pal.fuente}">
   ${preheader}
-  <div style="max-width:600px;margin:0 auto;padding:24px 16px">
+  <div style="max-width:${pal.ancho}px;margin:0 auto;padding:24px 16px">
     <!-- Encabezado de marca -->
     <div style="text-align:center;padding:8px 0 16px">
-      <span style="font-size:18px;font-weight:700;letter-spacing:1px;color:#171717">${esc(opts.nombreCuenta.toUpperCase())}</span>
-      <div style="width:40px;height:3px;background:#f59e0b;margin:10px auto 0;border-radius:2px"></div>
+      <span style="font-size:18px;font-weight:700;letter-spacing:1px;color:${tonosSobre(pal.fondo).texto}">${esc(opts.nombreCuenta.toUpperCase())}</span>
+      <div style="width:40px;height:3px;background:${pal.acento};margin:10px auto 0;border-radius:2px"></div>
     </div>
     <!-- Cuerpo -->
-    <div style="background:#ffffff;border:1px solid #ececec;border-radius:12px;overflow:hidden">
+    <div style="${cajaCuerpo};overflow:hidden">
       <div style="height:12px"></div>
       ${cuerpo}
       <div style="height:16px"></div>
     </div>
     <!-- Footer -->
-    <div style="text-align:center;color:#a3a3a3;font-size:12px;line-height:1.6;margin-top:20px">
+    <div style="text-align:center;color:${pal.tenue};font-size:12px;line-height:1.6;margin-top:20px">
       ${esc(opts.nombreCuenta)}${opts.direccionPostal ? " · " + esc(opts.direccionPostal) : ""}<br>
-      <a href="${esc(opts.unsubscribeUrl)}" style="color:#a3a3a3">Desuscribirme</a>
+      <a href="${esc(opts.unsubscribeUrl)}" style="color:${pal.tenue}">Desuscribirme</a>
     </div>
   </div>
 </body></html>`;

@@ -11,6 +11,8 @@ import {
   promoverGanador,
 } from "@/app/(app)/campanias/actions";
 import { BloquesList } from "@/components/BloquesList";
+import { TemaSelector } from "@/components/TemaSelector";
+import type { Tema } from "@/lib/email/tema";
 import { Button } from "@/components/ui/Button";
 import { usePermisos } from "@/components/PermisosProvider";
 import { AISoonButton } from "@/components/ui/AISoonButton";
@@ -52,13 +54,15 @@ interface Props {
   emailPrueba: string;
   estado: string;
   abInfo?: AbInfo;
+  /** Tema por defecto de la marca. La campaña lo pisa campo por campo. */
+  temaMarca?: Tema | null;
 }
 
 const PCT_OPCIONES = [10, 20, 30, 50];
 const tasa = (ap: number, env: number) => (env ? Math.round((ap / env) * 100) : 0);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, emailPrueba, estado, abInfo }: Props) {
+export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, emailPrueba, estado, abInfo, temaMarca }: Props) {
   const router = useRouter();
   const [nombre, setNombre] = useState(initial.nombre);
   const [asunto, setAsunto] = useState(initial.asunto);
@@ -68,6 +72,7 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
   const [preheader, setPreheader] = useState(initial.preheader);
   const [destino, setDestino] = useState(initial.destino ?? "");
   const [bloques, setBloques] = useState(initial.contenido?.bloques ?? []);
+  const [tema, setTema] = useState<Tema | undefined>(initial.contenido?.tema);
   const [pruebaEmail, setPruebaEmail] = useState(emailPrueba);
   const { puede, motivo, soloLectura } = usePermisos();
   const puedeEnviar = puede("enviar");
@@ -75,7 +80,10 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
   const [saving, startSave] = useTransition();
   const [sending, startSend] = useTransition();
 
-  const previewHtml = renderEmailHtml({ bloques }, { preheader, unsubscribeUrl: "#", nombreCuenta, muestraCarrito: true });
+  const previewHtml = renderEmailHtml(
+    { bloques, tema },
+    { preheader, unsubscribeUrl: "#", nombreCuenta, muestraCarrito: true, temaMarca },
+  );
 
   const campData = () => ({
     id,
@@ -83,7 +91,7 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
     asunto,
     preheader,
     destino,
-    contenido: { bloques },
+    contenido: { bloques, tema },
     asuntoB: abActivo ? asuntoB : "",
     abTestPct: abActivo ? abPct : null,
   });
@@ -249,6 +257,12 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
 
         {/* Bloques */}
         <BloquesList bloques={bloques} onChange={setBloques} />
+        <TemaSelector
+          tema={tema}
+          onChange={setTema}
+          temaMarca={temaMarca}
+          ayuda="Solo para esta campaña. Sin tocar nada, usa el de la marca."
+        />
 
         {/* Acciones */}
         {soloLectura ? (

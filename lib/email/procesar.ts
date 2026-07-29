@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
+import { temaDe } from "@/lib/email/tema";
 import { inyectarTracking } from "@/lib/email/tracking";
 import { sendEmail, esThrottle } from "@/lib/email/enviar";
 import { destinatarioPermitido, modoEnvio } from "@/lib/email/proveedor";
@@ -66,6 +67,7 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
       preheader: campania.preheader ?? undefined,
       unsubscribeUrl: unsubUrl,
       nombreCuenta: campania.cuenta.nombre,
+      temaMarca: temaDe(campania.cuenta.config),
     };
     let html = renderEmailHtml(contenido, opts);
     html = aplicarMergeTags(html, envio.contacto);

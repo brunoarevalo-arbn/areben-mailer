@@ -2,6 +2,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
 import { RemitentesManager } from "@/components/RemitentesManager";
+import { TemaMarca } from "@/components/TemaMarca";
+import { temaDe } from "@/lib/email/tema";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +31,7 @@ export default async function RemitentesPage() {
         subtitle={`Desde qué dirección envía ${cuenta.nombre}. El dominio debe estar verificado en SES.`}
       />
       <RemitentesManager marca={cuenta.nombre} remitentes={remitentes} />
+      <TemaMarca inicial={temaDe(cuenta.config)} nombreCuenta={cuenta.nombre} />
     </div>
   );
 }

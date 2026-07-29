@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuth } from "@/lib/auth";
 import { contactosElegibles } from "@/lib/campanias";
 import type { ContenidoCampania } from "@/lib/email/render";
+import { temaDe } from "@/lib/email/tema";
 
 export const dynamic = "force-dynamic";
 
@@ -125,6 +126,7 @@ export default async function CampaniaEditorPage({
         emailPrueba={email}
         estado={campania.estado}
         abInfo={abInfo}
+        temaMarca={temaDe(cuenta.config)}
       />
     </div>
   );

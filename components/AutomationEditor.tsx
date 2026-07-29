@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import type { Bloque, ContenidoCampania } from "@/lib/email/render";
 import { BloquesEditor } from "@/components/BloquesEditor";
+import type { Tema } from "@/lib/email/tema";
 import { guardarAutomation, enviarPruebaAutomation, toggleAutomation } from "@/app/(app)/automations/actions";
 import { Button } from "@/components/ui/Button";
 import { usePermisos } from "@/components/PermisosProvider";
@@ -17,6 +18,7 @@ export function AutomationEditor({
   estadoInicial,
   emailPrueba,
   initial,
+  temaMarca,
 }: {
   id: string;
   nombreCuenta: string;
@@ -25,6 +27,8 @@ export function AutomationEditor({
   /** Mail de quien está mirando: la prueba sale a su casilla, no a una fija. */
   emailPrueba: string;
   initial: { nombre: string; asunto: string; preheader: string; esperaHoras: number; capDias: number; contenido: ContenidoCampania };
+  /** Tema por defecto de la marca. La automation lo pisa campo por campo. */
+  temaMarca?: Tema | null;
 }) {
   const [nombre, setNombre] = useState(initial.nombre);
   const [asunto, setAsunto] = useState(initial.asunto);
@@ -32,6 +36,7 @@ export function AutomationEditor({
   const [esperaHoras, setEsperaHoras] = useState(initial.esperaHoras);
   const [capDias, setCapDias] = useState(initial.capDias);
   const [bloques, setBloques] = useState<Bloque[]>(initial.contenido?.bloques ?? []);
+  const [tema, setTema] = useState<Tema | undefined>(initial.contenido?.tema);
   const [estado, setEstado] = useState(estadoInicial);
   const [pruebaEmail, setPruebaEmail] = useState(emailPrueba);
   const { puede, motivo, soloLectura } = usePermisos();
@@ -42,7 +47,7 @@ export function AutomationEditor({
   const [sending, startSend] = useTransition();
   const [toggling, startToggle] = useTransition();
 
-  const payload = () => ({ id, nombre, asunto, preheader, esperaHoras, capDias, contenido: { bloques } });
+  const payload = () => ({ id, nombre, asunto, preheader, esperaHoras, capDias, contenido: { bloques, tema } });
 
   const guardar = () => startSave(async () => { await guardarAutomation(payload()); setMsg("Guardado ✓"); setTimeout(() => setMsg(null), 2000); });
   const prueba = () => startSend(async () => { await guardarAutomation(payload()); const r = await enviarPruebaAutomation(id, pruebaEmail); setMsg(r.ok ? `Prueba enviada ✓` : `Error: ${r.error}`); setTimeout(() => setMsg(null), 4000); });
@@ -92,7 +97,15 @@ export function AutomationEditor({
         <input className={`${input} w-full`} value={preheader} onChange={(e) => setPreheader(e.target.value)} />
       </label>
 
-      <BloquesEditor bloques={bloques} onChange={setBloques} nombreCuenta={nombreCuenta} preheader={preheader} />
+      <BloquesEditor
+        bloques={bloques}
+        onChange={setBloques}
+        nombreCuenta={nombreCuenta}
+        preheader={preheader}
+        tema={tema}
+        onTemaChange={setTema}
+        temaMarca={temaMarca}
+      />
 
       {soloLectura ? (
         <div className="rounded-xl border border-border bg-surface-muted p-4 text-sm text-muted">
