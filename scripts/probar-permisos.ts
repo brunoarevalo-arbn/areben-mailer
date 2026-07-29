@@ -7,7 +7,7 @@
 import { puede, ROL_LABEL, ROL_DESCRIPCION, type Permiso, type Rol } from '../lib/permisos.ts';
 
 const ROLES: Rol[] = ['ADMIN', 'EDITOR', 'VIEWER'];
-const PERMISOS: Permiso[] = ['ver', 'editar', 'probar', 'enviar', 'integrar', 'remitentes', 'usuarios'];
+const PERMISOS: Permiso[] = ['ver', 'editar', 'probar', 'enviar', 'integrar', 'remitentes', 'usuarios', 'avanzado'];
 
 const ANCHO = 12;
 console.log('\n' + ' '.repeat(ANCHO) + ROLES.map((r) => r.padEnd(9)).join(''));
@@ -26,6 +26,10 @@ if (puede('VIEWER', 'editar')) errores.push('VIEWER no debería poder editar');
 if (!puede('ADMIN', 'usuarios')) errores.push('ADMIN debería administrar usuarios');
 if (puede('EDITOR', 'remitentes')) errores.push('EDITOR no debería tocar remitentes');
 if (puede(null, 'ver')) errores.push('un rol vacío no debería poder nada');
+// El panel avanzado es lo que separa "armar un mail" de "diseñarlo". Si EDITOR
+// lo gana, el toggle simple/avanzado deja de poder empaquetar un plan.
+if (puede('EDITOR', 'avanzado')) errores.push('EDITOR no debería ver los controles avanzados');
+if (!puede('ADMIN', 'avanzado')) errores.push('ADMIN debería ver los controles avanzados');
 
 console.log();
 if (errores.length) {

@@ -6,14 +6,39 @@ import {
   type Bloque, type ContenidoCampania, type TipoBloque,
 } from "@/lib/email/render";
 import { resolverPaleta, type Tema } from "@/lib/email/tema";
+import { resolverEstilo, type Estilos, type RolEstilo } from "@/lib/email/estilos";
 import { ListaBloques } from "@/components/editor/ListaBloques";
 import { FormBloque } from "@/components/editor/FormBloque";
+import { PanelEstilo } from "@/components/editor/PanelEstilo";
 import { PreviewMail } from "@/components/editor/PreviewMail";
 import { TemaSelector } from "@/components/TemaSelector";
 import { AISoonButton } from "@/components/ui/AISoonButton";
+import { usePermisos } from "@/components/PermisosProvider";
 import type { Marca } from "@/lib/marca";
 import type { Historial, OpcionesSet } from "@/components/editor/useHistorial";
 import { Palette, Redo2, Undo2 } from "lucide-react";
+
+/**
+ * Contra qué bloque se resuelve cada rol en la capa de DOCUMENTO.
+ *
+ * La capa del documento no pertenece a ningún bloque, pero el "automático" que
+ * muestra el panel sale de la cascada, que sí depende del tipo (el título de un
+ * `hero` mide 30px y el de una `seccion` 22). Se elige un representante por rol:
+ * el bloque más común que lo usa. Solo afecta el número gris que se muestra al
+ * lado del control, nunca lo que se guarda.
+ */
+const REPRESENTA: Record<RolEstilo, TipoBloque> = {
+  caja: "texto",
+  titulo: "titulo",
+  subtitulo: "seccion",
+  cuerpo: "texto",
+  boton: "boton",
+  imagen: "imagen",
+  nota: "productos",
+};
+
+/** Los roles que tiene sentido fijar para todo el mail de una sola vez. */
+const ROLES_DOC: readonly RolEstilo[] = ["titulo", "subtitulo", "cuerpo", "boton", "nota"];
 
 /**
  * El editor de mails, entero. Lo comparten campañas, automations y plantillas.
@@ -56,6 +81,11 @@ export function EditorMail({
 }) {
   const bloques = contenido.bloques ?? [];
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
+  const [pestana, setPestana] = useState<"contenido" | "estilo">("contenido");
+  // El panel avanzado cuelga del ROL, no de `localStorage`: es lo que permite
+  // empaquetarlo en un plan y bajarle el ruido a quien no lo necesita.
+  const { puede } = usePermisos();
+  const avanzado = puede("avanzado");
 
   const seleccionado = bloques.find((b) => b.id === seleccionadoId) ?? null;
   const setBloques = (bs: Bloque[], o?: OpcionesSet) => onChange({ ...contenido, bloques: bs }, o);
@@ -111,7 +141,18 @@ export function EditorMail({
     onChange(c);
   };
 
-  const anchoMail = resolverPaleta({ ...(marca.temaMarca ?? {}), ...(contenido.tema ?? {}) }).ancho;
+  /** Los estilos del documento (capa b). Vacío = la clave no existe. */
+  const setEstilosDoc = (e: Estilos | undefined) => {
+    const c = { ...contenido };
+    if (e) c.estilos = e;
+    else delete c.estilos;
+    onChange(c);
+  };
+
+  // La misma paleta que va a usar el render: los swatches del panel son los
+  // colores reales de la marca, no una aproximación del navegador.
+  const pal = resolverPaleta({ ...(marca.temaMarca ?? {}), ...(contenido.tema ?? {}) });
+  const anchoMail = pal.ancho;
 
   return (
     <div className="space-y-3">
@@ -178,18 +219,81 @@ export function EditorMail({
             diseño del mail, que ya trae su propia tarjeta. */}
         {seleccionado ? (
           <div className="space-y-3 rounded-xl border border-border bg-surface p-4 shadow-sm">
-            <h3 className="text-sm font-semibold text-foreground">{ETIQUETA_BLOQUE[seleccionado.tipo]}</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-foreground">{ETIQUETA_BLOQUE[seleccionado.tipo]}</h3>
+              <div className="flex items-center gap-1 rounded-lg border border-border p-0.5">
+                {(["contenido", "estilo"] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPestana(p)}
+                    aria-pressed={pestana === p}
+                    className={`rounded-md px-2.5 py-1 text-xs capitalize transition-colors ${
+                      pestana === p ? "bg-accent-subtle text-accent-subtle-foreground" : "text-muted hover:text-foreground"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
             <fieldset disabled={soloLectura} className="space-y-3 disabled:opacity-60">
-              <FormBloque bloque={seleccionado} onChange={editar} marca={marca} />
+              {pestana === "contenido" ? (
+                <FormBloque bloque={seleccionado} onChange={editar} marca={marca} />
+              ) : (
+                <PanelEstilo
+                  // Remonta al cambiar de bloque: si no, el picker libre que
+                  // quedó abierto en uno aparece abierto en el siguiente.
+                  key={seleccionado.id}
+                  tipo={seleccionado.tipo}
+                  valor={seleccionado.estilo}
+                  onChange={(e) => editar({ estilo: e })}
+                  resolver={(rol) =>
+                    resolverEstilo(seleccionado.tipo, rol, {
+                      pal,
+                      doc: contenido.estilos,
+                      propio: seleccionado.estilo,
+                    })
+                  }
+                  pal={pal}
+                  avanzado={avanzado}
+                />
+              )}
             </fieldset>
           </div>
         ) : (
-          <TemaSelector
-            tema={contenido.tema}
-            onChange={setTema}
-            temaMarca={marca.temaMarca}
-            ayuda={ayudaTema}
-          />
+          <div className="space-y-4">
+            <TemaSelector
+              tema={contenido.tema}
+              onChange={setTema}
+              temaMarca={marca.temaMarca}
+              ayuda={ayudaTema}
+            />
+            <div className="space-y-3 rounded-2xl border border-border bg-surface px-8 py-6 shadow-sm">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Tipografía del mail</h3>
+                <p className="mt-0.5 text-xs text-muted">
+                  Vale para todos los bloques de este mail. Un bloque suelto puede pisarlo desde su
+                  pestaña Estilo.
+                </p>
+              </div>
+              <fieldset disabled={soloLectura} className="space-y-3 disabled:opacity-60">
+                <PanelEstilo
+                  // La capa de documento no es de ningún bloque: cada rol se
+                  // resuelve contra un representante solo para mostrar el "auto".
+                  tipo="texto"
+                  valor={contenido.estilos}
+                  onChange={setEstilosDoc}
+                  resolver={(rol) =>
+                    resolverEstilo(REPRESENTA[rol], rol, { pal, doc: contenido.estilos })
+                  }
+                  pal={pal}
+                  roles={ROLES_DOC}
+                  avanzado={avanzado}
+                />
+              </fieldset>
+            </div>
+          </div>
         )}
 
         {/* Columna 3 · el mail */}

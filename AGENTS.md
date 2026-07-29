@@ -61,6 +61,7 @@ node --import tsx scripts/probar-html.ts       # VML, media queries, tracking, p
 node --import tsx scripts/probar-encabezado.ts # el link de baja no se puede borrar
 node --import tsx scripts/probar-imagenes.ts   # permisos, multi-tenant y SVG de /api/imagenes
 node --import tsx scripts/probar-marca.ts      # la marca de TN no se guarda adentro del Json
+node --import tsx scripts/probar-panel-estilo.ts # ningún control del panel está desconectado
 ```
 
 ⚠️ `probar-render.ts` compara contra `scripts/fixtures/render-golden.json`. Si el
@@ -142,6 +143,14 @@ solo cuando cambia el tema) · **`#f59e0b`** (elegido a mano, queda clavado) ·
 **clave ausente** (heredar). Ese "ausente" es la convención, no un `""` ni un
 `null`: `EstiloResuelto.elegidas` responde "¿lo eligió una persona?" y de eso
 dependen la legibilidad contextual y el modo oscuro.
+
+**El panel de estilo no ofrece lo que el mail no hace.** Los controles salen de
+`propsDeRol(tipo, rol)` en `estilos.ts`, y `probar-panel-estilo.ts` renderiza el
+bloque con y sin cada propiedad para exigir que el HTML cambie. Encontró 24
+perillas desconectadas el día que se escribió: casi todas eran la alineación, que
+en `titulo`/`texto`/`boton` la gana el campo de Contenido y en
+`hero`/`seccion`/`cupon` está centrada por diseño. Si un `case` del renderer deja
+de emitir algo, ese script se pone rojo el mismo día.
 
 ⚠️ **La plantilla de cada bloque escribe lo que siempre escribió y solo le cambia
 los valores; `extra()` agrega únicamente lo elegido.** Si `extra()` emitiera
@@ -255,7 +264,12 @@ hay que pasarle `token` a `put()`.
   (protegidos por `CRON_SECRET`).
 - Las rutas `/api/` sin sesión devuelven **401**, no un redirect a HTML.
 - Roles: `ADMIN` (todo) · `EDITOR` (arma, no envía) · `VIEWER` (mira). Permisos:
-  `ver`, `editar`, `probar`, `enviar`, `integrar`, `remitentes`, `usuarios`.
+  `ver`, `editar`, `probar`, `enviar`, `integrar`, `remitentes`, `usuarios`,
+  `avanzado`.
+- `avanzado` es el único permiso **sin action detrás**: gatea los controles finos
+  del panel de estilo (interlineado, espaciado, bordes, ocultar en celular). Vive
+  en la matriz y no en `localStorage` porque una preferencia de navegador no
+  sirve para empaquetar un plan ni para bajarle el ruido a un comerciante.
 - La UI y las actions leen **la misma** función `puede()` — por eso no hay
   botones visibles que después tiran 403.
 

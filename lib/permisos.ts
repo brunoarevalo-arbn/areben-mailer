@@ -17,10 +17,25 @@ export type Permiso =
   | 'enviar' // envío masivo, o encender una automation
   | 'integrar' // Tiendanube: sincronizar, registrar webhooks
   | 'remitentes' // identidad de envío del dominio
-  | 'usuarios'; // alta, baja y rol del equipo
+  | 'usuarios' // alta, baja y rol del equipo
+  /**
+   * Los controles finos del diseño del mail: interlínea, espaciado entre letras,
+   * grosores, bordes, ocultar en celular.
+   *
+   * Es el único permiso que no protege un dato: no hay action detrás, gatea
+   * pantalla. Aun así vive acá y **no en `localStorage`**, que es donde el
+   * instinto lo pondría. Dos razones: `localStorage` es preferencia de un
+   * navegador —la misma persona en otra máquina ve otra cosa— y sobre todo, un
+   * toggle de navegador no sirve para empaquetar planes ni para bajarle el costo
+   * de soporte a un comerciante que no tiene por qué ver el panel completo.
+   *
+   * Dentro del nivel que a cada uno le toca, la posición del acordeón sí puede
+   * ir a `localStorage`: eso sí es preferencia.
+   */
+  | 'avanzado';
 
 const MATRIZ: Record<Rol, Permiso[]> = {
-  ADMIN: ['ver', 'editar', 'probar', 'enviar', 'integrar', 'remitentes', 'usuarios'],
+  ADMIN: ['ver', 'editar', 'probar', 'enviar', 'integrar', 'remitentes', 'usuarios', 'avanzado'],
   EDITOR: ['ver', 'editar', 'probar'],
   VIEWER: ['ver'],
 };
@@ -51,4 +66,5 @@ export const MOTIVO: Record<Permiso, string> = {
   integrar: 'Solo un administrador puede tocar la conexión con Tiendanube.',
   remitentes: 'Solo un administrador puede administrar los remitentes.',
   usuarios: 'Solo un administrador puede administrar el equipo.',
+  avanzado: 'Los controles finos de diseño los ve un administrador.',
 };

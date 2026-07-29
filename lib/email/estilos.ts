@@ -31,6 +31,31 @@ export const TOKENS_COLOR = [
 export type TokenColor = (typeof TOKENS_COLOR)[number];
 
 /**
+ * Cómo se llama cada token en el panel.
+ *
+ * El nombre importa más de lo que parece: el selector de tokens tiene que ganarle
+ * al color picker, y le gana si lo que ofrece se entiende ("Acento de la marca")
+ * en vez de parecer jerga ("acento"). Lo que queda como token se repinta cuando
+ * el comerciante cambia su color — ese es el argumento de venta.
+ */
+export const TOKEN_LABEL: Record<TokenColor, string> = {
+  fondo: "Fondo de la página",
+  tarjeta: "Fondo del contenido",
+  borde: "Borde",
+  bordeSuave: "Borde suave",
+  texto: "Texto fuerte",
+  cuerpo: "Texto de párrafo",
+  medio: "Texto medio",
+  tenue: "Texto tenue",
+  acento: "Acento de la marca",
+  sobreAcento: "Sobre el acento",
+  link: "Links",
+  seccion: "Fondo de sección",
+  cuponFondo: "Fondo del cupón",
+  cuponTexto: "Texto del cupón",
+};
+
+/**
  * Un color, en una de tres formas:
  *
  *   "$acento"   → token de la marca. Se repinta solo cuando cambia el tema.
@@ -313,6 +338,132 @@ const BASE_POR_TIPO: Partial<Record<TipoBloque, Estilos>> = {
   carrito: { titulo: { tamano: 15, interlinea: 1.35, peso: 600 } },
   redes: { cuerpo: { color: "$link", tamano: 14 } },
 };
+
+/**
+ * Qué roles dibuja de verdad cada bloque.
+ *
+ * Es lo que el panel de estilo usa para no ofrecer controles que no hacen nada:
+ * un `divisor` no tiene título, y un control de tipografía ahí es una perilla
+ * desconectada — la peor clase de bug de UI, porque no falla, simplemente no
+ * pasa nada.
+ *
+ * ⚠️ **Espeja los `e("…")` de `renderBloque`.** Si un bloque empieza a usar un
+ * rol nuevo, se agrega acá o el control no aparece nunca. El `espaciador` no
+ * lleva ninguno a propósito: es un `div` con alto y nada más.
+ */
+export const ROLES_POR_TIPO: Record<TipoBloque, readonly RolEstilo[]> = {
+  // Sin `imagen`: el logo se dibuja con el ancho del bloque y no toma el radio.
+  encabezado: ["caja", "titulo"],
+  titulo: ["caja", "titulo"],
+  texto: ["caja", "cuerpo"],
+  boton: ["caja", "boton"],
+  imagen: ["caja", "imagen"],
+  productos: ["caja", "cuerpo", "nota", "imagen"],
+  carrito: ["caja", "titulo", "nota", "imagen"],
+  columnas: ["caja", "imagen"],
+  video: ["caja", "imagen", "boton"],
+  redes: ["caja", "cuerpo"],
+  divisor: ["caja"],
+  espaciador: [],
+  // Ídem: la foto de la portada va a sangre, sin radio.
+  hero: ["caja", "titulo", "subtitulo", "boton"],
+  seccion: ["caja", "titulo", "subtitulo", "boton"],
+  cupon: ["caja", "titulo", "cuerpo", "boton"],
+};
+
+/**
+ * Qué propiedades emite de verdad cada rol.
+ *
+ * Espeja lo que `renderBloque` y `extra()` escriben. No es documentación: es lo
+ * que el panel usa para no dibujar una perilla desconectada, que es la peor
+ * clase de bug de UI —no falla, simplemente no pasa nada y quien lo usa piensa
+ * que el mail está roto.
+ *
+ * ⚠️ **`ancho` y `alto` no están en ninguna lista.** Existen en `EstiloBloque` y
+ * el saneador los acepta, pero hoy `extra()` no los emite: ofrecerlos sería
+ * prometer algo que el mail no hace.
+ */
+const TIPOGRAFIA = [
+  "color", "tamano", "peso", "interlinea", "espaciado", "align",
+  "fuente", "mayusculas", "subrayado",
+] as const satisfies readonly (keyof EstiloBloque)[];
+
+const PROPS_POR_ROL: Record<RolEstilo, readonly (keyof EstiloBloque)[]> = {
+  // La caja depende del bloque: ver `propsCaja`.
+  caja: [],
+  titulo: TIPOGRAFIA,
+  subtitulo: TIPOGRAFIA,
+  cuerpo: TIPOGRAFIA,
+  // La nota (precio tachado, variante, "y 3 más") se dibuja sin `text-align`
+  // propio: sigue al bloque que la contiene.
+  nota: ["color", "tamano", "peso", "espaciado", "fuente", "mayusculas", "subrayado"],
+  boton: ["color", "fondo", "tamano", "peso", "radio", "padX", "padY", "fuente", "espaciado", "mayusculas"],
+  imagen: ["radio"],
+};
+
+/** Lo que `pad()` le da a la caja de cualquier bloque: margen lateral y visibilidad. */
+const CAJA_BASE = ["padX", "ocultarMovil", "ocultarEscritorio"] as const satisfies readonly (keyof EstiloBloque)[];
+
+/**
+ * La caja del bloque, que es el rol menos parejo de todos.
+ *
+ * La mayoría de los bloques se envuelven en `pad()`, que solo aplica el margen
+ * lateral y las clases de visibilidad. Los cuatro que dibujan su propio
+ * contenedor —encabezado, portada, sección y cupón— soportan más, y dos de ellos
+ * **no pasan por `clasesDe`**, así que ocultarlos en celular no funcionaría.
+ */
+function propsCaja(tipo: TipoBloque): readonly (keyof EstiloBloque)[] {
+  switch (tipo) {
+    case "encabezado":
+      return ["padX", "padY", "align", "bordeColor", "ocultarMovil", "ocultarEscritorio"];
+    case "hero":
+    case "seccion":
+      return ["fondo", "padX", "padY", "align"];
+    case "cupon":
+      return ["fondo", "padX", "padY", "radio", "bordeAncho", "bordeEstilo", "bordeColor"];
+    case "divisor":
+      return ["padX", "bordeAncho", "bordeEstilo", "bordeColor", "ocultarMovil", "ocultarEscritorio"];
+    default:
+      return CAJA_BASE;
+  }
+}
+
+/**
+ * Lo que un bloque puntual NO respeta, aunque su rol sí lo respete en general.
+ *
+ * Casi todo es una misma historia contada tres veces: **quién gana la
+ * alineación**. `titulo`, `texto` y `boton` la tienen en su formulario de
+ * contenido y el renderer escribe `b.align ?? t.align`, así que la del estilo no
+ * llega nunca; la portada, la sección y el cupón centran su interior por diseño.
+ * Ofrecer el control igual sería poner dos perillas para lo mismo y que solo
+ * funcione una.
+ *
+ * ⚠️ Esta lista no se escribe a ojo: sale de correr
+ * `scripts/probar-panel-estilo.ts`, que ejercita el renderer control por control
+ * y falla si el panel ofrece algo que no mueve nada.
+ */
+const SIN_EFECTO: Partial<Record<TipoBloque, Partial<Record<RolEstilo, readonly (keyof EstiloBloque)[]>>>> = {
+  // Las mayúsculas del encabezado se aplican en JS sobre el string, no con CSS:
+  // están en Contenido, no acá. `text-transform` no es confiable en Outlook.
+  encabezado: { titulo: ["mayusculas"] },
+  titulo: { titulo: ["align"] },
+  texto: { cuerpo: ["align"] },
+  carrito: { titulo: ["align"] },
+  redes: { cuerpo: ["align", "subrayado"] },
+  hero: { caja: ["align"], titulo: ["align"], subtitulo: ["align"] },
+  seccion: { caja: ["align"], titulo: ["align"], subtitulo: ["align"] },
+  cupon: { titulo: ["align", "interlinea"], cuerpo: ["align"] },
+  // El "botón" del video es el círculo con el ▶ encima de la miniatura: toma
+  // color, fondo y redondeo, y nada de tipografía porque no tiene texto.
+  video: { boton: ["tamano", "peso", "padX", "padY", "fuente", "espaciado", "mayusculas"] },
+};
+
+/** Los controles que el panel puede ofrecer para un rol de un bloque. */
+export function propsDeRol(tipo: TipoBloque, rol: RolEstilo): readonly (keyof EstiloBloque)[] {
+  const base = rol === "caja" ? propsCaja(tipo) : PROPS_POR_ROL[rol];
+  const fuera = SIN_EFECTO[tipo]?.[rol];
+  return fuera ? base.filter((k) => !fuera.includes(k)) : base;
+}
 
 /** Todo resuelto a valores que se pueden escribir: hex, px, enums. */
 export interface EstiloResuelto extends Omit<EstiloBloque, "color" | "fondo" | "bordeColor" | "fuente"> {
