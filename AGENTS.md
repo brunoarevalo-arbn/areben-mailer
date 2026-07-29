@@ -130,7 +130,32 @@ comerciantes.
 
 ## Documentos largos (no los leas salvo que el tema sea ese)
 
-- `SES-ESTADO.md` — estado de SES/Resend, DNS, DKIM, MAIL FROM, webhooks. Leerlo
-  antes de tocar deliverability o DNS.
-- `MODELO-DE-NEGOCIO.md` — precios, GTM, combo con Resorty.
+- `SES-ESTADO.md` — 22 KB: estado de SES/Resend, DNS, DKIM, MAIL FROM, webhooks.
+  Leerlo antes de tocar deliverability o DNS.
+- `MODELO-DE-NEGOCIO.md` — 25 KB: precios, GTM, combo con Resorty.
 - `TIENDANUBE-PUBLICACION.md` — requisitos de la App Store de TN.
+
+## Higiene de contexto
+
+Todo lo que entra al contexto se re-paga en cada turno posterior: un output largo
+temprano cuesta varias veces su tamaño.
+
+- **Los tres `.md` de arriba no se abren "para ver"** — son 50 KB entre los tres.
+  Buscar adentro con grep antes de leerlos enteros.
+- **Comandos largos van cortados**: `git log`, builds y deploys con `| tail -30`.
+- **Avisar el `/clear` al cerrar cada unidad de trabajo** — Bruno no lo tiene que
+  pedir. El marcador natural es después de deployar y verificar. El criterio no
+  es "cambió el tema" sino **"¿vamos a volver a abrir los mismos archivos?"**.
+  Donde más rinde es justo después de resolver un bug difícil: ese contexto es
+  casi todo intento fallido. Dentro de una tarea sin terminar va `/compact`.
+
+## Estado del trabajo
+
+- **Nada está enviando hoy.** El gate está cerrado y ninguna automation está
+  prendida en producción — prenderlas se hace **desde la UI**, que es lo que
+  registra el webhook en Tiendanube (un `UPDATE` a mano deja la automation
+  activa y sorda).
+- **Proveedor sin decidir.** Resend está activo; SES quedó aprobado. Falta el
+  ensayo comparativo y el webhook de Resend.
+- **Verificar en browser lo de permisos** con el usuario EDITOR de prueba: las
+  4 fases están deployadas pero solo se probaron por script.
