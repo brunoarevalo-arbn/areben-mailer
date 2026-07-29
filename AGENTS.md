@@ -53,6 +53,8 @@ node --import tsx scripts/auditar-permisos.ts  # toda action declara su permiso
 node --import tsx scripts/probar-permisos.ts   # invariantes de la matriz
 node --import tsx scripts/probar-gate.ts       # el gate no se abre solo
 node --import tsx scripts/probar-carrito.ts    # el carrito de muestra no sale en un envío real
+node --import tsx scripts/probar-productos-dinamicos.ts # la consulta se guarda, los productos no
+node --env-file=.env --import tsx scripts/verificar-productos-tn.ts # ↑ pero contra la API real de TN
 node --import tsx scripts/probar-tema.ts       # un tema no deja el mail ilegible
 node --import tsx scripts/probar-esquema.ts    # el Json de bloques migra sin perder nada
 node --import tsx scripts/probar-estilos.ts    # la cascada respeta el orden y no inyecta
@@ -206,6 +208,53 @@ fija que aparece en el 100% de los renders, con la lista de bloques que sea.
 hay `@media (prefers-color-scheme)`**: recolorear el shell sin que los bloques
 acompañen deja texto oscuro sobre fondo oscuro, que es peor que no hacer nada.
 Entra cuando los bloques emitan sus propias clases de tema.
+
+## Productos automáticos (`productos-dinamicos`)
+
+El bloque que justifica que este mailer viva sobre Tiendanube. Se ve igual que
+`productos` —es literalmente la misma grilla— pero **guarda la consulta, no los
+productos**: `fuente` (más vendidos · novedades · en oferta · de una categoría),
+`categoriaId` y cuántos. Una plantilla de "novedades del mes" se arma una vez y
+sale distinta cada vez, sin que nadie la edite.
+
+- **Los productos se resuelven al enviar**, con `resolverProductosDinamicos()`,
+  que devuelve un mapa `claveProductos(bloque) → productos` y viaja por
+  **`RenderOpts.productosDinamicos`** — igual que el logo y el nombre de la
+  marca. Lo llaman los **cuatro** caminos por los que sale un mail: la cola de
+  campañas, el procesador de automations y las dos acciones de "mandar prueba".
+- ⛔ **Los productos NO van adentro del bloque**, a diferencia del `carrito`. El
+  primer intento lo hizo así y falló por los dos lados: cada camino de guardado
+  tenía que acordarse de limpiarlos (son cuatro, y el quinto que se agregue
+  guarda el catálogo de una marca en una plantilla), y la limpieza que evitaba
+  eso vivía en `leerContenido` — que `renderEmailHtml` llama de nuevo por las
+  dudas, así que **borraba los productos justo antes de dibujarlos y el bloque no
+  aparecía nunca**. Con los productos afuera, el bloque no puede guardar lo que
+  no tiene.
+- ⚠️ **Se resuelve una vez por LOTE, antes del loop de destinatarios.** Adentro
+  del loop, los 16.800 contactos de BDI serían 16.800 llamadas a TN contra un
+  límite que se comparte con el monitor y con Resorty. Encima hay un caché de
+  proceso de 10 minutos por `cuenta+consulta`, que baja las ~840 llamadas de una
+  campaña a unas seis.
+- `leerContenido` **igual tira** cualquier `items` que llegue en un
+  `productos-dinamicos` (y un bloque así no entra por el camino rápido de
+  `esActual`): es la red por si un Json entra editado a mano o por un script.
+- **Sin productos el bloque no se dibuja** — no se manda un hueco. Vale para TN
+  caído, para "no quedó nada en oferta" y para `categoria` sin categoría elegida
+  (que además ni pregunta: mandar "lo que sea" donde el autor pidió una
+  categoría es peor que no mandar nada).
+- **Lo agotado no sale.** Se mira variante por variante, y ⚠️ **`stock: null` es
+  ilimitado, no cero**: tratarlo como cero deja media tienda afuera del mail.
+- ⚠️ **El modo de falla es silencioso.** Si el `sort_by` que le pedimos a TN
+  dejara de existir, la llamada falla, el bloque queda vacío y —como un bloque
+  vacío no se dibuja a propósito— **el mail sale sin él y sin ningún error**. Por
+  eso hay dos scripts: `probar-productos-dinamicos.ts` (puro, con un `fetch` de
+  mentira: verifica que le pedimos a TN lo que creemos) y
+  `verificar-productos-tn.ts` (contra la API real: verifica que TN lo entienda).
+  El segundo hay que correrlo cuando se toca `lib/tn/products.ts`. Corrido el
+  29-jul-2026: las cuatro fuentes devuelven productos en BDI, Zattia y Stunned.
+- El preview del editor resuelve la misma consulta por `/api/productos?fuente=…`,
+  con la **misma llave** (`claveProductos`, en el archivo puro). Dos definiciones
+  de "la misma consulta" serían dos respuestas distintas.
 
 ## La marca la trae Tiendanube sola (`lib/marca.ts`)
 

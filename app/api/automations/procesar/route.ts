@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ProductoEmail } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
+import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { sendEmail } from "@/lib/email/enviar";
 import { destinatarioPermitido } from "@/lib/email/proveedor";
 import { inyectarTracking } from "@/lib/email/tracking";
@@ -81,6 +82,15 @@ export async function GET(req: Request) {
       }
     }
 
+    // Productos automáticos: lo mismo que hace la cola de campañas, pero acá el
+    // caché de `resolverProductosDinamicos` pesa más todavía. Este cron corre
+    // cada 15 minutos sobre hasta 30 runs, y varios suelen ser de la misma
+    // automation de la misma cuenta: sin caché sería una llamada a TN por run.
+    //
+    // ⚠️ A diferencia del `carrito`, esto NO se mete adentro de los bloques:
+    // viaja por `opts` y por eso no puede terminar guardado en el documento.
+    const productosDinamicos = await resolverProductosDinamicos(bloques, automation.cuenta);
+
     // Con el gate cerrado —o en ensayo, si este contacto no está habilitado— no
     // mandamos nada de verdad, pero dejamos correr el flujo igual: así se ve que
     // la automation dispara cuando tiene que disparar, sin molestar a nadie.
@@ -104,6 +114,7 @@ export async function GET(req: Request) {
     const opts = {
       preheader: automation.preheader ?? undefined,
       unsubscribeUrl: unsubUrl,
+      productosDinamicos,
       ...marcaDe(automation.cuenta),
     };
     // Se pasa el contenido ENTERO con los bloques pisados, no `{ bloques, tema }`.

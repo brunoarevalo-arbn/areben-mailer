@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { ETIQUETA_BLOQUE, TIPOS_BLOQUE, type Bloque, type TipoBloque } from "@/lib/email/render";
+import { ETIQUETA_FUENTE } from "@/lib/email/bloques";
 import {
   AlignLeft, ChevronDown, ChevronUp, Columns2, Copy, GripVertical, ImageIcon,
   LayoutTemplate, Minus, MousePointerClick, MoveVertical, PanelTop, Play, Plus,
-  Share2, ShoppingBag, ShoppingCart, Ticket, Trash2, Type,
+  Share2, ShoppingBag, ShoppingCart, Sparkles, Ticket, Trash2, Type,
 } from "lucide-react";
 
 /**
@@ -36,6 +37,7 @@ const ICONO: Record<TipoBloque, typeof Type> = {
   boton: MousePointerClick,
   imagen: ImageIcon,
   productos: ShoppingBag,
+  "productos-dinamicos": Sparkles,
   carrito: ShoppingCart,
   columnas: Columns2,
   video: Play,
@@ -63,6 +65,10 @@ function resumen(b: Bloque): string {
       return b.url ? b.url.split("/").pop() ?? "" : "Sin imagen";
     case "productos":
       return b.items.length ? `${b.items.length} producto${b.items.length === 1 ? "" : "s"}` : "Sin productos";
+    // La consulta, no un conteo: el conteo todavía no existe cuando se arma el
+    // mail, y "4 productos" mentiría igual el día que la tienda tenga tres.
+    case "productos-dinamicos":
+      return `${ETIQUETA_FUENTE[b.fuente]} · ${b.n ?? 4}`;
     case "carrito":
       return "Se completa al enviar";
     case "columnas":

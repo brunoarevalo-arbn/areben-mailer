@@ -21,6 +21,12 @@ import {
   type EstiloBloque, type Estilos, type RolEstilo,
 } from "../lib/email/estilos";
 import { TIPOS_BLOQUE, nuevoBloque, renderEmailHtml, type Bloque, type TipoBloque } from "../lib/email/render";
+import { claveProductos } from "../lib/email/bloques";
+
+/** El producto de prueba, para los tres bloques que dibujan productos. */
+const PRODUCTO = [
+  { nombre: "Producto", precio: "1000", imagen: "https://ejemplo.com/p.jpg", url: "#", variante: "Rojo", cantidad: 2 },
+];
 
 let fallas = 0;
 
@@ -67,18 +73,29 @@ function muestra(tipo: TipoBloque): Bloque {
     b.izq = { imagen: "https://ejemplo.com/a.jpg", url: "https://ejemplo.com" };
     b.der = { imagen: "https://ejemplo.com/b.jpg", url: "https://ejemplo.com" };
   }
-  if (tipo === "productos" || tipo === "carrito") {
-    b.items = [{ nombre: "Producto", precio: "1000", imagen: "https://ejemplo.com/p.jpg", url: "#", variante: "Rojo", cantidad: 2 }];
-  }
+  if (tipo === "productos" || tipo === "carrito") b.items = PRODUCTO;
   if (tipo === "redes") b.links = [{ red: "Instagram", url: "https://instagram.com/x" }];
   return b as unknown as Bloque;
 }
 
-const render = (b: Bloque, estilo?: Estilos) =>
-  renderEmailHtml(
-    { v: 3, bloques: [estilo ? ({ ...b, estilo } as Bloque) : b] },
-    { unsubscribeUrl: "#", muestraCarrito: false, nombreCuenta: "Marca", logoCuenta: "", urlCuenta: "" },
+const render = (b: Bloque, estilo?: Estilos) => {
+  const bl = estilo ? ({ ...b, estilo } as Bloque) : b;
+  return renderEmailHtml(
+    { v: 3, bloques: [bl] },
+    {
+      unsubscribeUrl: "#",
+      muestraCarrito: false,
+      nombreCuenta: "Marca",
+      logoCuenta: "",
+      urlCuenta: "",
+      // `productos-dinamicos` NO guarda productos adentro: se los pasa el envío
+      // por `opts`. Sin esto el bloque sale vacío y los 17 controles de estilo
+      // que sí funcionan se leerían como perillas desconectadas.
+      productosDinamicos:
+        bl.tipo === "productos-dinamicos" ? { [claveProductos(bl)]: PRODUCTO } : undefined,
+    },
   );
+};
 
 /** ¿Poner `rol.prop` cambia el HTML de este bloque, con alguno de sus valores? */
 function mueve(tipo: TipoBloque, rol: RolEstilo, prop: keyof EstiloBloque): boolean {

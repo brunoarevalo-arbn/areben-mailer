@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags } from "@/lib/email/render";
 import { leerContenido } from "./esquema";
+import { resolverProductosDinamicos } from "./productos-dinamicos";
 import { marcaDe } from "@/lib/marca";
 import { inyectarTracking } from "@/lib/email/tracking";
 import { sendEmail, esThrottle } from "@/lib/email/enviar";
@@ -32,6 +33,12 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
   const appUrl = process.env.APP_URL ?? "";
   const contenido = leerContenido(campania.contenido);
   const rem = await getRemitenteEnvio(campania.cuentaId);
+
+  // Los productos automáticos se resuelven ACÁ, **antes** del loop: una vez por
+  // lote de 20 y no una vez por destinatario. Adentro del loop, los 16.800
+  // contactos de BDI serían 16.800 llamadas a la API de Tiendanube, contra un
+  // límite que se comparte con el monitor y con Resorty.
+  const productosDinamicos = await resolverProductosDinamicos(contenido.bloques, campania.cuenta);
 
   const envios = await prisma.envio.findMany({
     where: { campaniaId, estado: "ENCOLADO" },
@@ -67,6 +74,7 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
     const opts = {
       preheader: campania.preheader ?? undefined,
       unsubscribeUrl: unsubUrl,
+      productosDinamicos,
       ...marcaDe(campania.cuenta),
     };
     let html = renderEmailHtml(contenido, opts);

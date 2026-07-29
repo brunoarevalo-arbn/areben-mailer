@@ -5,6 +5,7 @@ import { autorizar, chequear, getAuth } from "@/lib/auth";
 import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
 import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
+import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { marcaDe } from "@/lib/marca";
 import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
@@ -96,10 +97,15 @@ export async function enviarPruebaAutomation(id: string, email: string) {
 
   const a = await prisma.automation.findFirst({ where: { id, cuentaId: cuenta.id } });
   if (!a?.asunto) return { ok: false, error: "Falta el asunto" };
+  const contenido = leerContenido(a.contenido);
+  // Ídem campañas: la prueba resuelve los productos automáticos. El `carrito`
+  // no, y está bien — en una prueba no hay carrito abandonado que mostrar.
+  const productosDinamicos = await resolverProductosDinamicos(contenido.bloques, cuenta);
   const html = aplicarMergeTags(
-    renderEmailHtml(leerContenido(a.contenido), {
+    renderEmailHtml(contenido, {
       preheader: a.preheader ?? undefined,
       unsubscribeUrl: `${process.env.APP_URL}/baja?token=preview`,
+      productosDinamicos,
       ...marcaDe(cuenta),
     }),
     { nombre: nombre ?? "", email: destino },

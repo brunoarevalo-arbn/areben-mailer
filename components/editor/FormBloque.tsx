@@ -2,7 +2,9 @@
 
 import type { Bloque } from "@/lib/email/render";
 import { ProductosBlock } from "@/components/ProductosBlock";
+import { ProductosDinamicosBlock } from "@/components/editor/ProductosDinamicosBlock";
 import { ImagenDrop } from "@/components/editor/ImagenDrop";
+import { Rango } from "@/components/editor/Rango";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
@@ -19,44 +21,6 @@ import { X } from "lucide-react";
  * el color de su marca.
  */
 
-function Rango({
-  label,
-  value,
-  onChange,
-  min,
-  max,
-  step = 1,
-  sufijo = "px",
-}: {
-  label: string;
-  value: number;
-  onChange: (n: number) => void;
-  min: number;
-  max: number;
-  step?: number;
-  sufijo?: string;
-}) {
-  return (
-    <label className="block">
-      <div className="mb-1 flex items-baseline justify-between">
-        <span className="text-xs font-semibold text-muted">{label}</span>
-        <span className="text-xs tabular-nums text-foreground">
-          {value}
-          {sufijo}
-        </span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-accent"
-      />
-    </label>
-  );
-}
 
 function Check({
   label,
@@ -243,6 +207,19 @@ export function FormBloque({
 
     case "productos":
       return <ProductosBlock items={b.items} onChange={(items) => set({ items })} />;
+
+    case "productos-dinamicos":
+      return (
+        <ProductosDinamicosBlock
+          fuente={b.fuente}
+          categoriaId={b.categoriaId}
+          n={b.n}
+          // `items` no se toca nunca desde acá: el bloque guarda la consulta y
+          // los productos los pone quien envía. Si el editor los escribiera, una
+          // plantilla compartida saldría con los productos de otra tienda.
+          onChange={(cambio) => set(cambio as Partial<Bloque>)}
+        />
+      );
 
     case "espaciador":
       return <Rango label="Alto" value={b.alto ?? 24} onChange={(alto) => set({ alto })} min={4} max={120} step={4} />;

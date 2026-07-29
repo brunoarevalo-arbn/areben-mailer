@@ -101,6 +101,15 @@ function sanearBloque(v: unknown, usados: Set<string>): Bloque | null {
   if (estilo) b.estilo = estilo;
   else delete b.estilo;
 
+  // Un bloque de productos automáticos guarda la CONSULTA y nunca los productos.
+  // Los items se los pone quien envía, sobre una copia en memoria, y se tiran acá
+  // por si alguna vez entraran por otro camino: un Json editado a mano, un script,
+  // una versión futura del editor que se distraiga.
+  //
+  // No es prolijidad. Una plantilla con productos adentro es la bienvenida de
+  // Zattia saludando en nombre de BDI, otra vez y con el catálogo.
+  if (b.tipo === "productos-dinamicos") delete b.items;
+
   return b as unknown as Bloque;
 }
 
@@ -113,6 +122,12 @@ function esActual(v: unknown): v is ContenidoCampania {
   // cuesta un recorrido sin trabajo adentro. Si esto no se chequeara, un Json
   // editado a mano con dos encabezados entraría por el camino rápido y el
   // editor mostraría una lista que el mail no respeta.
+  // Un bloque dinámico con productos adentro NO es "la forma actual", por más
+  // que el `v` diga 3: si entrara por el camino rápido, el saneo que los tira no
+  // correría nunca y el Json quedaría con el catálogo de una marca guardado.
+  if (bs.some((b) => (b as Bruto | null)?.tipo === "productos-dinamicos" && (b as Bruto).items !== undefined)) {
+    return false;
+  }
   const cabs = bs.filter((b) => (b as Bruto | null)?.tipo === "encabezado");
   return cabs.length === 0 || (cabs.length === 1 && cabs[0] === bs[0]);
 }

@@ -2,6 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { renderEmailHtml, type ContenidoCampania } from "@/lib/email/render";
+import { claveProductos, type ConsultaProductos, type ProductoEmail } from "@/lib/email/bloques";
 import type { Marca } from "@/lib/marca";
 import { Monitor, Smartphone } from "lucide-react";
 
@@ -50,6 +51,46 @@ export function PreviewMail({
   const contenidoDif = useDeferredValue(contenido);
   const preheaderDif = useDeferredValue(preheader);
 
+  // Los bloques de productos automáticos guardan una consulta, no productos, así
+  // que el preview tiene que resolverla igual que lo hace el envío — contra la
+  // misma tienda y con la misma llave (`claveProductos`). Si acá se dibujara una
+  // lista de ejemplo, el editor mostraría un mail que no existe.
+  const [productos, setProductos] = useState<Record<string, ProductoEmail[]>>({});
+
+  const consultas = useMemo(() => {
+    const m = new Map<string, ConsultaProductos>();
+    for (const b of contenidoDif.bloques) {
+      if (b.tipo === "productos-dinamicos") {
+        m.set(claveProductos(b), { fuente: b.fuente, categoriaId: b.categoriaId, n: b.n });
+      }
+    }
+    return m;
+  }, [contenidoDif]);
+
+  useEffect(() => {
+    // Solo lo que falta: cambiar el color de un título no vuelve a pedirle los
+    // productos a Tiendanube. Y dos bloques con la misma consulta comparten la
+    // respuesta, igual que en el envío.
+    const faltan = [...consultas].filter(([k]) => !(k in productos));
+    if (!faltan.length) return;
+    let vivo = true;
+    Promise.all(
+      faltan.map(async ([k, c]) => {
+        const sp = new URLSearchParams({ fuente: c.fuente, n: String(c.n ?? 4) });
+        if (c.categoriaId) sp.set("categoriaId", c.categoriaId);
+        const d = await fetch(`/api/productos?${sp}`)
+          .then((r) => r.json())
+          .catch(() => ({}));
+        return [k, (d.productos ?? []) as ProductoEmail[]] as const;
+      }),
+    ).then((pares) => {
+      if (vivo) setProductos((p) => ({ ...p, ...Object.fromEntries(pares) }));
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [consultas, productos]);
+
   const html = useMemo(
     () =>
       renderEmailHtml(contenidoDif, {
@@ -59,9 +100,13 @@ export function PreviewMail({
         // guardado sigue vacío: si trajera datos, una automation se los mandaría
         // a un cliente real.
         muestraCarrito: true,
+        // Los productos automáticos entran por el MISMO canal que en el envío
+        // (`opts`, no el documento) y con la misma llave. Es lo que hace que el
+        // preview no sea una aproximación de lo que va a salir.
+        productosDinamicos: productos,
         ...marca,
       }),
-    [contenidoDif, preheaderDif, marca],
+    [contenidoDif, preheaderDif, marca, productos],
   );
 
   useEffect(() => {

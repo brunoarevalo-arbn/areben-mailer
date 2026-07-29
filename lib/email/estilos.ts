@@ -335,6 +335,9 @@ const BASE_POR_TIPO: Partial<Record<TipoBloque, Estilos>> = {
     cuerpo: { tamano: 16 },
   },
   productos: { cuerpo: { tamano: 14 } },
+  // La misma grilla, así que las mismas medidas: si divergieran, cambiar un
+  // bloque elegido a mano por uno automático movería el diseño del mail.
+  "productos-dinamicos": { cuerpo: { tamano: 14 } },
   carrito: { titulo: { tamano: 15, interlinea: 1.35, peso: 600 } },
   redes: { cuerpo: { color: "$link", tamano: 14 } },
 };
@@ -359,6 +362,7 @@ export const ROLES_POR_TIPO: Record<TipoBloque, readonly RolEstilo[]> = {
   boton: ["caja", "boton"],
   imagen: ["caja", "imagen"],
   productos: ["caja", "cuerpo", "nota", "imagen"],
+  "productos-dinamicos": ["caja", "cuerpo", "nota", "imagen"],
   carrito: ["caja", "titulo", "nota", "imagen"],
   columnas: ["caja", "imagen"],
   video: ["caja", "imagen", "boton"],

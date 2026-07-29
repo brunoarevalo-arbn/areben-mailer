@@ -1,9 +1,23 @@
 import { autorizarApi } from "@/lib/auth";
-import { buscarProductos } from "@/lib/tn/products";
+import { buscarProductos, traerProductos } from "@/lib/tn/products";
+import type { FuenteProductos } from "@/lib/email/bloques";
 
-// Búsqueda de productos TN para el bloque Producto del editor.
+const FUENTES: readonly string[] = ["destacados", "recientes", "oferta", "categoria"];
+
+/**
+ * Productos de la tienda para el editor. Sirve a los dos bloques:
+ *
+ * - `?q=…`            → búsqueda por texto, para elegir a mano (bloque `productos`)
+ * - `?fuente=…&n=…`   → la MISMA consulta que resuelve el envío (bloque dinámico)
+ *
+ * Que el preview del bloque dinámico pase por acá y no por una lista de ejemplo
+ * es lo que hace que lo que se ve armando el mail sea lo que va a salir. La
+ * diferencia con el envío es solo cuándo se pregunta, no qué se pregunta.
+ */
 export async function GET(req: Request) {
-  const q = new URL(req.url).searchParams.get("q") ?? "";
+  const sp = new URL(req.url).searchParams;
+  const q = sp.get("q") ?? "";
+  const fuente = sp.get("fuente");
 
   // Antes usaba getCuentaActiva(), que LANZA sin sesión: devolvía un 500 donde
   // corresponde un 401. Además el editor consume esto por fetch, así que la
@@ -16,6 +30,17 @@ export async function GET(req: Request) {
     return Response.json({ productos: [], error: "TN no conectada" }, { status: 400 });
   }
   try {
+    if (fuente) {
+      if (!FUENTES.includes(fuente)) {
+        return Response.json({ productos: [], error: "fuente desconocida" }, { status: 400 });
+      }
+      const productos = await traerProductos(cuenta.tnStoreId, cuenta.tnToken, {
+        fuente: fuente as FuenteProductos,
+        categoriaId: sp.get("categoriaId") ?? undefined,
+        n: Number(sp.get("n")) || undefined,
+      });
+      return Response.json({ productos });
+    }
     const productos = await buscarProductos(cuenta.tnStoreId, cuenta.tnToken, q);
     return Response.json({ productos });
   } catch (e) {

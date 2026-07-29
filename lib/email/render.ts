@@ -10,6 +10,7 @@ import {
   type CtxEstilo, type EstiloResuelto, type Estilos, type RolEstilo,
 } from "./estilos";
 import { cabeza, apertura, cierre, botonVml, clase, clasesDe, CLASES } from "./shell";
+import { claveProductos } from "./bloques";
 import type { Bloque, Columna, ContenidoCampania, ProductoEmail, TipoBloque } from "./bloques";
 
 // Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
@@ -31,6 +32,8 @@ const nl = (s: string) => esc(s).replace(/\n/g, "<br>");
  */
 interface Ctx extends CtxEstilo {
   muestraCarrito: boolean;
+  /** Productos ya resueltos por consulta. Ver `RenderOpts.productosDinamicos`. */
+  productosDinamicos?: Record<string, ProductoEmail[]>;
   /**
    * Nombre de la marca. Lo usa el bloque `encabezado` cuando no trae texto
    * propio, que es el caso normal: así una plantilla no lleva la marca adentro.
@@ -283,6 +286,17 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     }
     case "productos":
       return pad(renderProductos(b.items ?? [], pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo)), caja());
+    // Se dibuja igual que `productos` —es la misma grilla— y la diferencia entera
+    // está en de dónde salen los productos: el bloque guarda la consulta y la
+    // respuesta llega por `opts`, resuelta contra la tienda minutos antes.
+    //
+    // Sin productos **no se dibuja nada**: si TN no contestó, o la consulta
+    // volvió vacía porque no hay nada en oferta, el mail sale sin el bloque en
+    // vez de con un hueco. Mismo criterio que el carrito vacío.
+    case "productos-dinamicos": {
+      const items = ctx.productosDinamicos?.[claveProductos(b)] ?? [];
+      return pad(renderProductos(items, pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo)), caja());
+    }
     case "carrito": {
       // Sin items no se inventa nada: si el carrito llegó vacío, el bloque
       // desaparece. La muestra es solo del preview del editor.
@@ -388,6 +402,19 @@ export interface RenderOpts {
   muestraCarrito?: boolean;
   /** Tema por defecto de la marca (`Cuenta.config.tema`). Lo pisa el de la campaña. */
   temaMarca?: Tema | null;
+  /**
+   * Los productos de los bloques `productos-dinamicos`, ya resueltos contra la
+   * tienda, indexados por `claveProductos(bloque)`.
+   *
+   * Viajan por acá y **no adentro del bloque** por lo mismo que el logo y el
+   * nombre de la marca: son datos de la tienda resueltos al enviar, y el
+   * documento tiene que poder compartirse entre marcas sin llevarlos adentro.
+   * Ver el comentario del bloque en `bloques.ts`.
+   *
+   * Ausente = el bloque no se dibuja. Es lo correcto: sin productos no hay
+   * grilla, y un hueco es peor que nada.
+   */
+  productosDinamicos?: Record<string, ProductoEmail[]>;
 }
 
 /** Renderiza el contenido a un HTML de email completo (shell + bloques + footer). */
@@ -402,6 +429,7 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
     pal,
     doc: contenido.estilos,
     muestraCarrito: !!opts.muestraCarrito,
+    productosDinamicos: opts.productosDinamicos,
     nombreCuenta: opts.nombreCuenta,
     logoCuenta: opts.logoCuenta?.trim() ?? "",
     urlCuenta: opts.urlCuenta?.trim() ?? "",
@@ -480,6 +508,12 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       return b.alt ? `[${b.alt}]` : null;
     case "productos":
       return (b.items ?? []).map((p) => link(`· ${lineaTexto(p)}`, p.url)).join("\n") || null;
+    // Los productos salen de `opts`, igual que en el HTML: la parte de texto no
+    // puede quedarse corta o el mail se vuelve vacío para quien lo lea así.
+    case "productos-dinamicos":
+      return (opts.productosDinamicos?.[claveProductos(b)] ?? [])
+        .map((p) => link(`· ${lineaTexto(p)}`, p.url))
+        .join("\n") || null;
     case "carrito": {
       const lineas = (b.items ?? []).map((p) => link(`· ${lineaTexto(p)}`, p.url));
       if (!lineas.length) return null;

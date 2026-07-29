@@ -144,8 +144,11 @@ titulo("Lo que no puede faltar nunca");
   const vacio = renderEmailTexto(base, OPTS);
   const sinTexto = TIPOS_BLOQUE.filter((t) => {
     const b = nuevoBloque(t);
-    // Los que no aportan texto legible a propósito.
-    if (["espaciador", "imagen", "carrito", "productos", "columnas", "video", "redes"].includes(t)) return false;
+    // Los que no aportan texto legible a propósito: recién creados están vacíos.
+    // `productos-dinamicos` está acá por lo mismo que `productos` —nace sin nada
+    // que decir— y además sus productos ni siquiera viven en el bloque. Que SÍ
+    // aporte texto cuando los tiene lo fija `probar-productos-dinamicos.ts`.
+    if (["espaciador", "imagen", "carrito", "productos", "productos-dinamicos", "columnas", "video", "redes"].includes(t)) return false;
     return renderEmailTexto({ ...base, bloques: [b] }, OPTS) === vacio;
   });
   ok(sinTexto.length === 0, "todo tipo con contenido aporta algo a la parte de texto", sinTexto.join(", "));

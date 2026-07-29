@@ -35,6 +35,44 @@ export interface Columna {
 }
 
 /**
+ * De dónde salen los productos de un bloque dinámico.
+ *
+ * Vive acá —y no en `lib/tn`— porque este archivo es puro y lo importa el
+ * editor: si la unión viviera del lado de Tiendanube, el `<Select>` del panel
+ * arrastraría el cliente de la API al bundle del navegador. `lib/tn/products.ts`
+ * importa el tipo desde acá, nunca al revés.
+ *
+ * `oferta` es la única que TN no sabe responder por sí sola: se filtra en casa.
+ */
+export type FuenteProductos = "destacados" | "recientes" | "oferta" | "categoria";
+
+/** Lo que define QUÉ productos trae un bloque dinámico. */
+export interface ConsultaProductos {
+  fuente: FuenteProductos;
+  categoriaId?: string;
+  n?: number;
+}
+
+/**
+ * La consulta, hecha texto.
+ *
+ * Vive acá —en el archivo puro— para que el preview del editor y el envío usen
+ * **la misma** llave: es lo que hace que dos bloques iguales cuesten una sola
+ * llamada, y lo que garantiza que lo que se ve armando el mail sea lo que sale.
+ * Dos definiciones de "la misma consulta" serían dos respuestas distintas.
+ */
+export const claveProductos = (c: ConsultaProductos): string =>
+  [c.fuente, c.categoriaId ?? "", c.n ?? ""].join("|");
+
+/** Cómo se llama cada fuente para quien arma el mail. */
+export const ETIQUETA_FUENTE = {
+  destacados: "Los más vendidos",
+  recientes: "Las novedades",
+  oferta: "Los que están en oferta",
+  categoria: "Los de una categoría",
+} as const satisfies Record<FuenteProductos, string>;
+
+/**
  * Lo que todo bloque tiene, sea del tipo que sea.
  *
  * Se intersecta con la unión de abajo en vez de repetirse en cada variante. El
@@ -101,6 +139,44 @@ export type Bloque = BloqueBase &
     | { tipo: "boton"; texto: string; url: string; align?: "left" | "center"; full?: boolean }
     | { tipo: "imagen"; url: string; alt?: string }
     | { tipo: "productos"; items: ProductoEmail[] }
+    /**
+     * La grilla de `productos`, pero guardando **la consulta y no los productos**.
+     *
+     * Es la diferencia entre un mail y un mail que sabe qué vende la tienda hoy:
+     * una plantilla de "novedades del mes" se arma una vez y sale distinta cada
+     * vez, sin que nadie la edite.
+     *
+     * Que guarde la consulta no es un detalle de implementación, es lo que
+     * permite que un preset se comparta entre marcas: un bloque con productos
+     * adentro le mandaría los de BDI a Zattia. Mismo motivo por el que el
+     * encabezado guarda el texto vacío en vez del nombre de la cuenta.
+     */
+    | {
+        tipo: "productos-dinamicos";
+        fuente: FuenteProductos;
+        /** Solo con `fuente:"categoria"`. Sin esto el bloque no se dibuja. */
+        categoriaId?: string;
+        /** Cuántos mostrar (2 a 6). La grilla es de a dos: un par se ve mejor. */
+        n?: number;
+        /**
+         * ⛔ **Acá no hay `items`, y es la decisión de diseño del bloque.**
+         *
+         * Los productos resueltos viajan por `RenderOpts.productosDinamicos`,
+         * indexados por `claveProductos`. El primer intento los metía adentro
+         * del bloque —como hace el `carrito`— y salió mal por los dos lados:
+         *
+         *  - **Del lado del guardado**, cada camino que persiste un documento
+         *    tenía que acordarse de limpiarlos, y son cuatro. El día que alguien
+         *    agregue un quinto, una plantilla se guarda con el catálogo de una
+         *    marca adentro. Silencioso.
+         *  - **Del lado del dibujo**, la limpieza que evitaba eso vivía en
+         *    `leerContenido`, que `renderEmailHtml` llama de nuevo por las
+         *    dudas: borraba los productos justo antes de dibujarlos y el bloque
+         *    no aparecía nunca.
+         *
+         * Con los productos afuera, el bloque no puede guardar lo que no tiene.
+         */
+      }
     // Placeholder: no se carga a mano. El procesador de automations le mete el
     // carrito real del contacto justo antes de enviar, EN ESTE LUGAR de la lista
     // — que es la diferencia con `productos`, que es una grilla curada.
@@ -125,7 +201,7 @@ export type TipoBloque = Bloque["tipo"];
 export const TIPOS_BLOQUE = [
   "encabezado",
   "hero", "seccion", "cupon", "titulo", "texto", "boton", "imagen",
-  "productos", "carrito", "columnas", "video", "redes", "divisor", "espaciador",
+  "productos", "productos-dinamicos", "carrito", "columnas", "video", "redes", "divisor", "espaciador",
 ] as const satisfies readonly TipoBloque[];
 
 /**
@@ -145,7 +221,10 @@ export const ETIQUETA_BLOQUE = {
   texto: "Texto",
   boton: "Botón",
   imagen: "Imagen",
-  productos: "Productos",
+  // "Productos" a secas era ambiguo desde que hay dos: los dos salen de la
+  // tienda, la diferencia es quién los elige.
+  productos: "Productos elegidos",
+  "productos-dinamicos": "Productos automáticos",
   carrito: "Carrito abandonado",
   columnas: "Dos imágenes",
   video: "Video",
@@ -208,6 +287,10 @@ export function nuevoBloque(tipo: TipoBloque): Bloque {
     case "boton": return { id, tipo, texto: "Ver más", url: "", align: "left", full: false };
     case "imagen": return { id, tipo, url: "", alt: "" };
     case "productos": return { id, tipo, items: [] };
+    // Nace en "los más vendidos" y no en "una categoría": es la única fuente que
+    // ya devuelve algo sin que haya que elegir nada, así que el bloque se ve
+    // funcionando en el preview desde el segundo cero.
+    case "productos-dinamicos": return { id, tipo, fuente: "destacados", n: 4 };
     // Nace vacío A PROPÓSITO: si trajera productos de ejemplo, una automation
     // guardada con ellos se los mandaría a un cliente real. La muestra del
     // editor la pone el preview (`muestraCarrito`), no el dato.

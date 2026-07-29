@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { autorizar, chequear } from "@/lib/auth";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
+import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { marcaDe } from "@/lib/marca";
 import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
@@ -209,9 +210,14 @@ export async function enviarPrueba(id: string, emailDestino: string) {
   if (!campania.asunto) return { ok: false, error: "Falta el asunto" };
 
   const contenido = leerContenido(campania.contenido);
+  // Los productos automáticos se resuelven también en la prueba. Es el momento
+  // donde MÁS importa: si el mail de prueba saliera sin el bloque, la conclusión
+  // sería "no anda" cuando en el envío real habría salido bien.
+  const productosDinamicos = await resolverProductosDinamicos(contenido.bloques, cuenta);
   const opts = {
     preheader: campania.preheader ?? undefined,
     unsubscribeUrl: `${process.env.APP_URL}/baja?token=preview`,
+    productosDinamicos,
     // La prueba tiene que salir con el MISMO aspecto que el envío real: mismo
     // tema, mismo logo, mismo pie.
     ...marcaDe(cuenta),
