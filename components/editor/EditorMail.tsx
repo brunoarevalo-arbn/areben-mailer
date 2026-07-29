@@ -186,7 +186,10 @@ export function EditorMail({
         <AISoonButton label="Redactar con IA" />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[220px_minmax(0,1fr)_minmax(340px,460px)]">
+      {/* 260px y no 220: con 220 la lista mostraba "Carrit…" y "Espa…", y el
+          mapa del mail existe justamente para saber qué bloque es cuál sin
+          abrirlo. El ancho sale de la columna del medio, que tiene aire. */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)_minmax(340px,460px)]">
         {/* Columna 1 · el mapa del mail */}
         <div className="space-y-2 rounded-xl border border-border bg-surface p-3 shadow-sm">
           <button
