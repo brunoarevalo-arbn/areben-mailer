@@ -128,6 +128,32 @@ export const TIPOS_BLOQUE = [
   "productos", "carrito", "columnas", "video", "redes", "divisor", "espaciador",
 ] as const satisfies readonly TipoBloque[];
 
+/**
+ * Cómo se llama cada bloque para quien arma el mail.
+ *
+ * Vive acá y no en el editor porque el nombre interno se filtraba a la pantalla
+ * (la paleta decía "+ cupon", "+ espaciador") y esos son nombres de código: el
+ * comerciante que abra esto no tiene por qué saber que a la portada le decimos
+ * `hero`. El `satisfies` obliga a que un tipo nuevo traiga su etiqueta.
+ */
+export const ETIQUETA_BLOQUE = {
+  encabezado: "Encabezado",
+  hero: "Portada",
+  seccion: "Sección con fondo",
+  cupon: "Cupón",
+  titulo: "Título",
+  texto: "Texto",
+  boton: "Botón",
+  imagen: "Imagen",
+  productos: "Productos",
+  carrito: "Carrito abandonado",
+  columnas: "Dos imágenes",
+  video: "Video",
+  redes: "Redes sociales",
+  divisor: "Línea divisoria",
+  espaciador: "Espacio en blanco",
+} as const satisfies Record<TipoBloque, string>;
+
 export interface ContenidoCampania {
   /**
    * Versión del esquema de bloques. La escribe `leerContenido`; nadie más.

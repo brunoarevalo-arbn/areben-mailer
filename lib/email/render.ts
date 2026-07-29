@@ -16,7 +16,7 @@ import type { Bloque, Columna, ContenidoCampania, ProductoEmail, TipoBloque } fr
 // sin ciclo) pero se re-exportan desde acá: media app importa `Bloque` y
 // `nuevoBloque` de "@/lib/email/render" y no hay razón para hacerla cambiar.
 export type { Bloque, BloqueBase, TipoBloque, ContenidoCampania, ProductoEmail, Columna } from "./bloques";
-export { nuevoBloque, duplicarBloque, nuevoId, TIPOS_BLOQUE } from "./bloques";
+export { nuevoBloque, duplicarBloque, nuevoId, TIPOS_BLOQUE, ETIQUETA_BLOQUE } from "./bloques";
 
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

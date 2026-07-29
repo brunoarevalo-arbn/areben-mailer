@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { renderEmailHtml, type ContenidoCampania } from "@/lib/email/render";
+import { type ContenidoCampania } from "@/lib/email/render";
 import {
   guardarCampania,
   enviarPrueba,
@@ -10,9 +10,8 @@ import {
   guardarComoPlantilla,
   promoverGanador,
 } from "@/app/(app)/campanias/actions";
-import { BloquesList } from "@/components/BloquesList";
-import { TemaSelector } from "@/components/TemaSelector";
-import type { Tema } from "@/lib/email/tema";
+import { EditorMail } from "@/components/editor/EditorMail";
+import { useHistorial } from "@/components/editor/useHistorial";
 import type { Marca } from "@/lib/marca";
 import { Button } from "@/components/ui/Button";
 import { usePermisos } from "@/components/PermisosProvider";
@@ -71,8 +70,17 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
   const [abPct, setAbPct] = useState(initial.abTestPct ?? 20);
   const [preheader, setPreheader] = useState(initial.preheader);
   const [destino, setDestino] = useState(initial.destino ?? "");
-  const [bloques, setBloques] = useState(initial.contenido?.bloques ?? []);
-  const [tema, setTema] = useState<Tema | undefined>(initial.contenido?.tema);
+  /**
+   * El documento entero, con deshacer.
+   *
+   * Antes acá vivían `bloques` y `tema` sueltos y el guardado los volvía a
+   * armar: eso perdía en cada guardado todo lo que el editor todavía no muestra
+   * —la versión del esquema, los estilos de documento— y el mail salía distinto
+   * de lo que se veía en pantalla. Es el mismo bug que ya se cerró del lado del
+   * envío de automations. Con el contenido como una sola pieza no se puede
+   * repetir.
+   */
+  const [contenido, setContenido, historial] = useHistorial<ContenidoCampania>(initial.contenido);
   const [pruebaEmail, setPruebaEmail] = useState(emailPrueba);
   const { puede, motivo, soloLectura } = usePermisos();
   const puedeEnviar = puede("enviar");
@@ -80,28 +88,13 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
   const [saving, startSave] = useTransition();
   const [sending, startSend] = useTransition();
 
-  /**
-   * El contenido ENTERO, con lo que el editor edita pisado encima.
-   *
-   * Escribir `{ bloques, tema }` a mano perdía en cada guardado todo lo que el
-   * editor todavía no muestra —la versión del esquema y los estilos de
-   * documento— y el mail salía distinto de lo que se veía en pantalla. Es el
-   * mismo bug que ya se cerró del lado del envío de automations.
-   */
-  const contenido = (): ContenidoCampania => ({ ...initial.contenido, bloques, tema });
-
-  const previewHtml = renderEmailHtml(
-    contenido(),
-    { preheader, unsubscribeUrl: "#", muestraCarrito: true, ...marca },
-  );
-
   const campData = () => ({
     id,
     nombre,
     asunto,
     preheader,
     destino,
-    contenido: contenido(),
+    contenido,
     asuntoB: abActivo ? asuntoB : "",
     abTestPct: abActivo ? abPct : null,
   });
@@ -177,9 +170,10 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
   const mejorEsB = abInfo ? tasa(abInfo.b.aperturas, abInfo.b.enviados) > tasa(abInfo.a.aperturas, abInfo.a.enviados) : false;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Columna editor */}
-      <div className="space-y-4">
+    <div className="space-y-4">
+      {/* Los datos de envío arriba, a lo ancho: el editor de abajo necesita las
+          tres columnas enteras y antes estaba metido en media pantalla. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-3 rounded-xl border border-border bg-surface p-4 shadow-sm">
           <label className="block text-sm">
             <span className="text-muted">Nombre interno</span>
@@ -264,16 +258,19 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
             </select>
           </label>
         </div>
+      </div>
 
-        {/* Bloques */}
-        <BloquesList bloques={bloques} onChange={setBloques} marca={marca} />
-        <TemaSelector
-          tema={tema}
-          onChange={setTema}
-          temaMarca={marca.temaMarca}
-          ayuda="Solo para esta campaña. Sin tocar nada, usa el de la marca."
-        />
+      <EditorMail
+        contenido={contenido}
+        onChange={setContenido}
+        historial={historial}
+        marca={marca}
+        preheader={preheader}
+        ayudaTema="Solo para esta campaña. Sin tocar nada, usa el de la marca."
+        soloLectura={soloLectura}
+      />
 
+      <div className="space-y-4">
         {/* Acciones */}
         {soloLectura ? (
           <div className="rounded-xl border border-border bg-surface-muted p-4 text-sm text-muted">
@@ -291,7 +288,7 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
               if (n === null) return;
               // Con el tema adentro: una plantilla guardada sin él se veía de
               // un color en la campaña y de otro al reusarla.
-              await guardarComoPlantilla(n, contenido());
+              await guardarComoPlantilla(n, contenido);
               setMsg("Plantilla guardada ✓");
               setTimeout(() => setMsg(null), 2000);
             }}
@@ -389,12 +386,6 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
             {progreso && <div className="text-sm text-foreground">{progreso}</div>}
           </div>
         )}
-      </div>
-
-      {/* Columna preview */}
-      <div className="lg:sticky lg:top-6 h-fit">
-        <div className="mb-2 text-sm text-muted">Vista previa</div>
-        <iframe title="preview" sandbox="" srcDoc={previewHtml} className="h-[70vh] w-full rounded-xl border border-border bg-white" />
       </div>
     </div>
   );

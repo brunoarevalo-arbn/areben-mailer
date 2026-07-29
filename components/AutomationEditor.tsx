@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { Bloque, ContenidoCampania } from "@/lib/email/render";
-import { BloquesEditor } from "@/components/BloquesEditor";
-import type { Tema } from "@/lib/email/tema";
+import type { ContenidoCampania } from "@/lib/email/render";
+import { EditorMail } from "@/components/editor/EditorMail";
+import { useHistorial } from "@/components/editor/useHistorial";
 import type { Marca } from "@/lib/marca";
 import { guardarAutomation, enviarPruebaAutomation, toggleAutomation } from "@/app/(app)/automations/actions";
 import { Button } from "@/components/ui/Button";
@@ -34,8 +34,7 @@ export function AutomationEditor({
   const [preheader, setPreheader] = useState(initial.preheader);
   const [esperaHoras, setEsperaHoras] = useState(initial.esperaHoras);
   const [capDias, setCapDias] = useState(initial.capDias);
-  const [bloques, setBloques] = useState<Bloque[]>(initial.contenido?.bloques ?? []);
-  const [tema, setTema] = useState<Tema | undefined>(initial.contenido?.tema);
+  const [contenido, setContenido, historial] = useHistorial<ContenidoCampania>(initial.contenido);
   const [estado, setEstado] = useState(estadoInicial);
   const [pruebaEmail, setPruebaEmail] = useState(emailPrueba);
   const { puede, motivo, soloLectura } = usePermisos();
@@ -49,8 +48,7 @@ export function AutomationEditor({
   // El contenido ENTERO, no `{ bloques, tema }`: enumerar los campos a mano
   // hacía que la versión del esquema y los estilos de documento se perdieran en
   // cada guardado, y el mail salía distinto de lo que mostraba el editor.
-  const contenido = (): ContenidoCampania => ({ ...initial.contenido, bloques, tema });
-  const payload = () => ({ id, nombre, asunto, preheader, esperaHoras, capDias, contenido: contenido() });
+  const payload = () => ({ id, nombre, asunto, preheader, esperaHoras, capDias, contenido });
 
   const guardar = () => startSave(async () => { await guardarAutomation(payload()); setMsg("Guardado ✓"); setTimeout(() => setMsg(null), 2000); });
   const prueba = () => startSend(async () => { await guardarAutomation(payload()); const r = await enviarPruebaAutomation(id, pruebaEmail); setMsg(r.ok ? `Prueba enviada ✓` : `Error: ${r.error}`); setTimeout(() => setMsg(null), 4000); });
@@ -100,14 +98,14 @@ export function AutomationEditor({
         <input className={`${input} w-full`} value={preheader} onChange={(e) => setPreheader(e.target.value)} />
       </label>
 
-      <BloquesEditor
-        bloques={bloques}
-        onChange={setBloques}
+      <EditorMail
+        contenido={contenido}
+        onChange={setContenido}
+        historial={historial}
         marca={marca}
         preheader={preheader}
-        tema={tema}
-        onTemaChange={setTema}
-        base={initial.contenido}
+        ayudaTema="Solo para esta automation. Sin tocar nada, usa el de la marca."
+        soloLectura={soloLectura}
       />
 
       {soloLectura ? (
