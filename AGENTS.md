@@ -57,6 +57,7 @@ node --import tsx scripts/probar-tema.ts       # un tema no deja el mail ilegibl
 node --import tsx scripts/probar-esquema.ts    # el Json de bloques migra sin perder nada
 node --import tsx scripts/probar-estilos.ts    # la cascada respeta el orden y no inyecta
 node --import tsx scripts/probar-render.ts     # golden: el mail no cambió sin querer
+node --import tsx scripts/probar-html.ts       # VML, media queries, tracking, peso
 ```
 
 ⚠️ `probar-render.ts` compara contra `scripts/fixtures/render-golden.json`. Si el
@@ -147,6 +148,32 @@ golden.
 ⚠️ **Ningún string del Json llega al HTML sin pasar por `hex()`, `px()` o un
 enum** — `esc()` no escapa comillas, así que un color con una comilla se escapa
 del atributo `style="…"`. Los preview van con `sandbox=""` por lo mismo.
+
+## El HTML que sale (`lib/email/shell.ts`)
+
+**REGLA ÚNICA: el inline lleva el valor de escritorio; una clase solo puede ser
+un override.** Nunca hay una propiedad que viva solo en el `<style>`. Hay
+clientes que lo descartan —Outlook de escritorio, y Gmail cuando **recorta arriba
+de ~102 KB**— y con esta regla lo peor que ven es el layout de escritorio, nunca
+uno roto. Lo verifica `probar-html.ts` recorriendo las etiquetas con `class`.
+
+- **Tabla exterior**, no un `div` con `max-width` — Outlook ignora `max-width` y
+  `margin:0 auto`, y el mail salía a ancho de ventana y pegado a la izquierda.
+- **`<o:PixelsPerInch>96`**: sin eso Outlook renderiza a 120 DPI y todo sale 25%
+  más grande.
+- **Botones**: VML para Outlook + `<a>` envuelta en `<!--[if !mso]>`. Si el ancla
+  no se esconde, Outlook dibuja los dos botones.
+- ⚠️ **`inyectarTracking` matchea `<a>` Y `<v:roundrect>`.** Con solo `<a>`, todo
+  click desde Outlook quedaba sin medir.
+- El corte responsive es **el ancho del mail**, no 600px fijos.
+- ⛔ Prohibido: `position` (Gmail lo elimina), `flex`/`grid`/`float`, `box-shadow`,
+  `calc()`, `rem`/`em`, base64.
+
+**Modo oscuro: solo declarado, no implementado.** Van `color-scheme` y
+`supported-color-schemes` para que Apple Mail no invierta a la fuerza, pero **no
+hay `@media (prefers-color-scheme)`**: recolorear el shell sin que los bloques
+acompañen deja texto oscuro sobre fondo oscuro, que es peor que no hacer nada.
+Entra cuando los bloques emitan sus propias clases de tema.
 
 ## Auth y permisos
 

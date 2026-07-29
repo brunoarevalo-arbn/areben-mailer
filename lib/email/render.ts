@@ -9,6 +9,7 @@ import {
   resolverEstilo, tonosSobre, extra, px, padCss,
   type CtxEstilo, type EstiloResuelto, type Estilos, type RolEstilo,
 } from "./estilos";
+import { cabeza, apertura, cierre, botonVml, clase, clasesDe, CLASES } from "./shell";
 import type { Bloque, Columna, ContenidoCampania, ProductoEmail, TipoBloque } from "./bloques";
 
 // Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
@@ -41,15 +42,33 @@ const est = (
   sobre?: string,
 ): EstiloResuelto => resolverEstilo(tipo, rol, { pal: ctx.pal, doc: ctx.doc, propio }, sobre);
 
+/**
+ * La clase que achica un título en el celular.
+ *
+ * Solo si **nadie eligió el tamaño**: si alguien puso 40px y la media query lo
+ * bajara a 22 igual, el control del panel sería mentira — el mail se vería
+ * distinto de lo que muestra el editor.
+ */
+const clasesTitulo = (e: EstiloResuelto): string[] => [
+  e.elegidas.has("tamano") ? "" : CLASES.titulo,
+  ...clasesDe(e),
+].filter(Boolean);
+
 /** Contenedor con padding horizontal para los bloques "de texto". */
 const pad = (inner: string, e?: EstiloResuelto) =>
-  `<div style="padding:0 ${px(e?.padX ?? 32)}">${inner}</div>`;
+  `<div${clase(CLASES.pad, ...(e ? clasesDe(e) : []))} style="padding:0 ${px(e?.padX ?? 32)}">${inner}</div>`;
 
-/** Ancla de botón. El color sale del acento del tema, no del renderer. */
-function botonAnchor(texto: string, url: string, e: EstiloResuelto, full = false): string {
+/**
+ * Botón: el VML para Outlook de escritorio y el ancla para todo el resto.
+ *
+ * Los dos van siempre. El ancla queda envuelta en `<!--[if !mso]><!-->` porque
+ * si no Outlook dibuja los dos, uno abajo del otro.
+ */
+function botonAnchor(texto: string, url: string, e: EstiloResuelto, pal: Paleta, full = false): string {
   const w = full ? ";width:100%;box-sizing:border-box;text-align:center" : "";
   const resto = extra(e, ["padX", "padY", "tamano", "peso", "color", "fondo", "radio", "align"]);
-  return `<a href="${esc(url || "#")}" style="display:inline-block;${padCss(e.padY, e.padX)};font-size:${px(e.tamano ?? 16)};font-weight:${e.peso ?? 600};color:${e.color};background:${e.fondo};border-radius:${px(e.radio ?? 8)};text-decoration:none${resto}${w}">${esc(texto)}</a>`;
+  const a = `<a href="${esc(url || "#")}" style="display:inline-block;${padCss(e.padY, e.padX)};font-size:${px(e.tamano ?? 16)};font-weight:${e.peso ?? 600};color:${e.color};background:${e.fondo};border-radius:${px(e.radio ?? 8)};text-decoration:none${resto}${w}">${esc(texto)}</a>`;
+  return `${botonVml(esc(texto), esc(url || "#"), e, pal, full)}<!--[if !mso]><!-->${a}<!--<![endif]-->`;
 }
 
 function fmtPrecio(v: string): string {
@@ -74,7 +93,7 @@ function detalleHtml(p: ProductoEmail, e: EstiloResuelto): string {
 }
 
 function renderCard(p: ProductoEmail, pal: Paleta, eTexto: EstiloResuelto, eNota: EstiloResuelto, eImg: EstiloResuelto): string {
-  return `<td width="50%" valign="top" style="padding:8px">
+  return `<td width="50%" valign="top"${clase(CLASES.col)} style="padding:8px">
     <a href="${esc(p.url)}" style="text-decoration:none;color:inherit">
       <img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:${px(eImg.radio ?? 8)};display:block" />
       <div style="margin-top:8px;font-size:${px(eTexto.tamano ?? 14)};color:${eTexto.color}${extra(eTexto, ["tamano", "color"])}">${esc(p.nombre)}</div>
@@ -95,6 +114,9 @@ function renderLineaCarrito(p: ProductoEmail, pal: Paleta, eNombre: EstiloResuel
     ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:${px(eImg.radio ?? 8)};display:block" />`
     : "";
   return `<tr>
+    <!-- Sin \`m-col\`: apilar la línea la parte en tres renglones por producto y
+         un carrito de 6 se vuelve interminable. Foto | nombre | precio aguanta
+         los 375px de un celular. -->
     <td width="25%" valign="top" style="padding:10px 0"><a href="${esc(p.url)}">${foto}</a></td>
     <td valign="top" style="padding:10px 14px">
       <a href="${esc(p.url)}" style="text-decoration:none;color:inherit">
@@ -180,7 +202,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
   switch (b.tipo) {
     case "titulo": {
       const t = e("titulo");
-      return pad(`<h1 style="margin:16px 0;font-size:${px(t.tamano ?? 26)};line-height:${t.interlinea ?? 1.25};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${esc(b.texto)}</h1>`, caja());
+      return pad(`<h1${clase(...clasesTitulo(t))} style="margin:16px 0;font-size:${px(t.tamano ?? 26)};line-height:${t.interlinea ?? 1.25};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${esc(b.texto)}</h1>`, caja());
     }
     case "texto": {
       const t = e("cuerpo");
@@ -188,7 +210,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     }
     case "boton": {
       const t = e("boton");
-      return pad(`<div style="text-align:${b.align ?? t.align ?? "left"};margin:8px 0 20px">${botonAnchor(b.texto, b.url, t, b.full)}</div>`, caja());
+      return pad(`<div style="text-align:${b.align ?? t.align ?? "left"};margin:8px 0 20px">${botonAnchor(b.texto, b.url, t, pal, b.full)}</div>`, caja());
     }
     case "imagen": {
       const t = e("imagen");
@@ -209,14 +231,19 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const t = e("imagen");
       const cell = (c: Columna) =>
         c.imagen
-          ? `<td width="50%" valign="top" style="padding:6px"><a href="${esc(c.url || "#")}"><img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:${px(t.radio ?? 8)};display:block" alt="" /></a></td>`
+          ? `<td width="50%" valign="top"${clase(CLASES.col)} style="padding:6px"><a href="${esc(c.url || "#")}"><img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:${px(t.radio ?? 8)};display:block" alt="" /></a></td>`
           : `<td width="50%"></td>`;
       return pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px"><tr>${cell(b.izq)}${cell(b.der)}</tr></table>`, caja());
     }
     case "video": {
+      // El ▶ estaba superpuesto con `position:absolute`, y **Gmail elimina
+      // `position`**: el triángulo caía suelto en cualquier lado de la tarjeta.
+      // Ahora es una pastilla debajo de la miniatura — se ve igual en todos
+      // lados y encima dice qué es, que un ▶ solo no lo dice.
       const t = e("imagen");
+      const btn = e("boton");
       return b.imagen
-        ? pad(`<a href="${esc(b.url || "#")}" style="display:block;position:relative;margin:8px 0 16px"><img src="${esc(b.imagen)}" width="100%" style="max-width:100%;border-radius:${px(t.radio ?? 8)};display:block" alt="Ver video" /><span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:48px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.5)">▶</span></a>`, caja())
+        ? pad(`<a href="${esc(b.url || "#")}" style="display:block;text-decoration:none;margin:8px 0 16px"><img src="${esc(b.imagen)}" width="100%" style="max-width:100%;border-radius:${px(t.radio ?? 8)};display:block" alt="Ver el video" /><span style="display:inline-block;margin-top:10px;padding:8px 18px;font-size:14px;font-weight:600;color:${btn.color};background:${btn.fondo};border-radius:${px(btn.radio ?? 8)};text-decoration:none">▶&nbsp; Ver el video</span></a>`, caja())
         : "";
     }
     case "redes": {
@@ -244,18 +271,18 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // título blanco sobre blanco si se heredara la paleta.
       const c = caja();
       const bg = c.autoFondo ? b.bg || pal.tarjeta : c.fondo!;
-      const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h1 style="margin:0 0 10px;font-size:${px(x.tamano ?? 30)};line-height:${x.interlinea ?? 1.2};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.titulo)}</h1>`; })() : "";
+      const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h1${clase(...clasesTitulo(x))} style="margin:0 0 10px;font-size:${px(x.tamano ?? 30)};line-height:${x.interlinea ?? 1.2};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.titulo)}</h1>`; })() : "";
       const s = b.subtitulo ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 20px;font-size:${px(x.tamano ?? 17)};line-height:${x.interlinea ?? 1.5};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.subtitulo)}</p>`; })() : "";
-      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton")) : "";
+      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
       const cajaHtml = t || s || btn ? `<div style="background:${esc(bg)};${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}">${t}${s}${btn}</div>` : "";
       return `${img}${cajaHtml}`;
     }
     case "seccion": {
       const c = caja();
       const bg = c.autoFondo ? b.bg || pal.seccion : c.fondo!;
-      const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h2 style="margin:0 0 8px;font-size:${px(x.tamano ?? 22)};line-height:${x.interlinea ?? 1.3};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.titulo)}</h2>`; })() : "";
+      const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h2${clase(...clasesTitulo(x))} style="margin:0 0 8px;font-size:${px(x.tamano ?? 22)};line-height:${x.interlinea ?? 1.3};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.titulo)}</h2>`; })() : "";
       const tx = b.texto ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 16px;font-size:${px(x.tamano ?? 16)};line-height:${x.interlinea ?? 1.6};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${nl(b.texto)}</p>`; })() : "";
-      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton")) : "";
+      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
       return `<div style="background:${esc(bg)};${padCss(c.padY ?? 32, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}">${t}${tx}${btn}</div>`;
     }
     case "cupon": {
@@ -263,7 +290,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const bg = c.fondo ?? pal.cuponFondo;
       const t = b.texto ? (() => { const x = e("cuerpo", bg); return `<div style="font-size:${px(x.tamano ?? 16)};color:${x.color}${extra(x, ["tamano", "color", "align"])};margin-bottom:8px">${esc(b.texto)}</div>`; })() : "";
       const cod = b.codigo ? (() => { const x = e("titulo"); return `<div style="font-size:${px(x.tamano ?? 26)};font-weight:${x.peso ?? 700};letter-spacing:${px(x.espaciado ?? 3)};color:${x.color}${extra(x, ["tamano", "peso", "espaciado", "color", "align", "interlinea"])};margin-bottom:14px">${esc(b.codigo)}</div>`; })() : "";
-      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton")) : "";
+      const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
       return pad(`<div style="border:${px(c.bordeAncho ?? 2)} ${c.bordeEstilo ?? "dashed"} ${c.bordeColor ?? pal.acento};border-radius:${px(c.radio ?? 12)};background:${bg};${padCss(c.padY ?? 24, c.padX ?? 24)};text-align:center;margin:8px 0 16px">${t}${cod}${btn}</div>`, undefined);
     }
     default:
@@ -311,11 +338,13 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
     ? `background:${pal.tarjeta}`
     : `background:${pal.tarjeta};border:1px solid ${pal.borde};border-radius:12px`;
 
+  // El namespace de VML va en el <html> o Outlook no dibuja los botones.
   return `<!doctype html>
-<html lang="${esc(pal.idioma)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;background:${pal.fondo};font-family:${pal.fuente}">
+<html lang="${esc(pal.idioma)}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+${cabeza(pal)}
+<body style="margin:0;padding:0;background:${pal.fondo};font-family:${pal.fuente}">
   ${preheader}
-  <div style="max-width:${pal.ancho}px;margin:0 auto;padding:24px 16px">
+${apertura(pal)}
     <!-- Encabezado de marca -->
     <div style="text-align:center;padding:8px 0 16px">
       <span style="font-size:18px;font-weight:700;letter-spacing:1px;color:${tonosSobre(pal.fondo).texto}">${esc(opts.nombreCuenta.toUpperCase())}</span>
@@ -332,7 +361,7 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
       ${esc(opts.nombreCuenta)}${opts.direccionPostal ? " · " + esc(opts.direccionPostal) : ""}<br>
       <a href="${esc(opts.unsubscribeUrl)}" style="color:${pal.tenue}">Desuscribirme</a>
     </div>
-  </div>
+${cierre}
 </body></html>`;
 }
 
