@@ -20,13 +20,14 @@ import { temaDe } from "./tema";
  *
  *   1 → el formato original, sin `v` (todo lo guardado antes del 29-jul-2026)
  *   2 → cada bloque tiene `id` estable, y `estilo`/`estilos` están saneados
+ *   3 → el encabezado de marca es un bloque, no HTML fijo del shell
  *
  * Cada cambio de forma de un bloque suma UN escalón con su función de migración.
  * No se reescribe un escalón ya publicado: un documento que ya subió a v2 nunca
  * vuelve a pasar por el paso 1→2, así que colgarle algo nuevo ahí no tendría
  * efecto sobre las filas que ya migraron.
  */
-export const V_ACTUAL = 2;
+export const V_ACTUAL = 3;
 
 type Bruto = Record<string, unknown>;
 type Migracion = (c: Bruto) => Bruto;
@@ -38,9 +39,42 @@ const MIGRACIONES: Record<number, Migracion> = {
   // `id` a lo que no tenga. Este escalón existe igual para dejar marcado en el
   // dato que ya pasó por acá, y para tener dónde colgar el próximo cambio.
   1: (c) => ({ ...c, v: 2 }),
+  // 2 → 3 · El encabezado de marca deja de estar cableado en el shell.
+  //
+  // Hasta acá el nombre de la marca lo escribía `renderEmailHtml` sí o sí, así
+  // que ningún documento lo tiene guardado. Si el bloque naciera solo para lo
+  // nuevo, **toda campaña y plantilla ya guardada saldría sin cabecera** — que
+  // es justo lo que no puede pasar al convertir algo fijo en algo editable.
+  //
+  // Se materializa SIN campos a propósito: un `encabezado` vacío resuelve el
+  // nombre desde la cuenta al renderizar, que es exactamente lo que hacía el
+  // shell. Escribirle el nombre adentro dejaría la marca clavada en el Json y
+  // rompería el día que esa plantilla se comparta entre comerciantes.
+  2: (c) => ({
+    ...c,
+    v: 3,
+    bloques: [{ tipo: "encabezado" }, ...(Array.isArray(c.bloques) ? c.bloques : [])],
+  }),
 };
 
 const CONOCIDOS = new Set<string>(TIPOS_BLOQUE);
+
+/**
+ * Un solo `encabezado`, y en la posición 0.
+ *
+ * No es prolijidad: el encabezado se dibuja **fuera** de la tarjeta de
+ * contenido. Dos encabezados, o uno en el medio de la lista, harían que el
+ * editor muestre un orden y el mail salga con otro. Sobrevive el primero, que
+ * es el que materializó la migración.
+ */
+function acomodarEncabezado(bs: Bloque[]): Bloque[] {
+  const i = bs.findIndex((b) => b.tipo === "encabezado");
+  if (i < 0) return bs;
+  const otros = bs.filter((b, j) => j !== i && b.tipo !== "encabezado");
+  // Ya estaba primero y era el único: no hay nada que mover.
+  if (i === 0 && otros.length === bs.length - 1) return bs;
+  return [bs[i], ...otros];
+}
 
 /**
  * Un bloque de la base, o `null` si no es rescatable.
@@ -72,12 +106,15 @@ function sanearBloque(v: unknown, usados: Set<string>): Bloque | null {
 
 /** ¿Ya está en la forma actual? Evita rehacer el trabajo en cada render. */
 function esActual(v: unknown): v is ContenidoCampania {
-  return (
-    !!v &&
-    typeof v === "object" &&
-    (v as Bruto).v === V_ACTUAL &&
-    Array.isArray((v as Bruto).bloques)
-  );
+  if (!v || typeof v !== "object" || (v as Bruto).v !== V_ACTUAL) return false;
+  const bs = (v as Bruto).bloques;
+  if (!Array.isArray(bs)) return false;
+  // El encabezado acomodado también es parte de "la forma actual", y mirarlo
+  // cuesta un recorrido sin trabajo adentro. Si esto no se chequeara, un Json
+  // editado a mano con dos encabezados entraría por el camino rápido y el
+  // editor mostraría una lista que el mail no respeta.
+  const cabs = bs.filter((b) => (b as Bruto | null)?.tipo === "encabezado");
+  return cabs.length === 0 || (cabs.length === 1 && cabs[0] === bs[0]);
 }
 
 /**
@@ -107,9 +144,11 @@ export function leerContenido(json: unknown): ContenidoCampania {
   }
 
   const usados = new Set<string>();
-  const bloques = (Array.isArray(c.bloques) ? c.bloques : [])
-    .map((b) => sanearBloque(b, usados))
-    .filter((b): b is Bloque => b !== null);
+  const bloques = acomodarEncabezado(
+    (Array.isArray(c.bloques) ? c.bloques : [])
+      .map((b) => sanearBloque(b, usados))
+      .filter((b): b is Bloque => b !== null),
+  );
 
   const out: ContenidoCampania = { v: V_ACTUAL, bloques };
 

@@ -283,6 +283,12 @@ const BASE: Record<RolEstilo, EstiloBloque> = {
  * `titulo` 26. Sin este escalón habría que elegir uno y romper los otros dos.
  */
 const BASE_POR_TIPO: Partial<Record<TipoBloque, Estilos>> = {
+  // Los mismos números que estaban escritos dentro del shell cuando el
+  // encabezado era HTML fijo: 18px, negrita, 1px de espaciado y centrado.
+  encabezado: {
+    caja: { padY: 12, padX: 0 },
+    titulo: { tamano: 18, peso: 700, espaciado: 1, align: "center" },
+  },
   hero: {
     caja: { padX: 32, padY: 36 },
     titulo: { tamano: 30, interlinea: 1.2 },

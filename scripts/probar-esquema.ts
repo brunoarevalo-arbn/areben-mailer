@@ -23,6 +23,16 @@ function ok(cond: boolean, que: string, detalle = "") {
 }
 const titulo = (s: string) => console.log(`\n${s}`);
 
+/**
+ * Los bloques SIN la cabecera de marca.
+ *
+ * Desde v3 la migración le materializa un `encabezado` a todo documento que no
+ * lo tenga (ver `probar-encabezado.ts`), así que los invariantes de contenido se
+ * miran contra el resto: lo que se está fijando acá es que la migración no
+ * pierda ni reordene lo que el comerciante escribió.
+ */
+const cuerpo = (c: { bloques: Bloque[] }) => c.bloques.filter((b) => b.tipo !== "encabezado");
+
 // ─── Forma y tolerancia ──────────────────────────────────────────────────────
 titulo("Un Json roto no puede tumbar una campaña");
 
@@ -43,7 +53,7 @@ titulo("Un tipo desconocido se descarta, no rompe");
       { tipo: "texto", texto: "También va" },
     ],
   });
-  ok(c.bloques.length === 2, "quedan los 2 conocidos", `quedaron ${c.bloques.length}`);
+  ok(cuerpo(c).length === 2, "quedan los 2 conocidos", `quedaron ${cuerpo(c).length}`);
   ok(!c.bloques.some((b) => b.tipo === ("carrusel3d" as never)), "el desconocido no sobrevive");
 }
 
@@ -54,7 +64,7 @@ titulo("Todo bloque sale con id propio y único");
     bloques: [{ tipo: "titulo", texto: "a" }, { tipo: "texto", texto: "b" }, { tipo: "divisor" }],
   });
   const ids = c.bloques.map((b) => b.id);
-  ok(ids.every((i) => typeof i === "string" && i.length > 0), "todos tienen id");
+  ok(ids.every((i) => typeof i === "string" && i.length > 0), "todos tienen id (la cabecera incluida)");
   ok(new Set(ids).size === ids.length, "los ids no se repiten");
 }
 {
@@ -67,7 +77,7 @@ titulo("Todo bloque sale con id propio y único");
       { tipo: "divisor", id: "igual" },
     ],
   });
-  const ids = c.bloques.map((b) => b.id);
+  const ids = cuerpo(c).map((b) => b.id);
   ok(new Set(ids).size === 3, "tres ids repetidos se desduplican", ids.join(", "));
   ok(ids[0] === "igual", "el primero conserva el suyo (no se reasigna todo)");
 }
@@ -120,7 +130,7 @@ titulo("El saneo de estilos");
       },
     ],
   });
-  const e = c.bloques[0].estilo?.titulo;
+  const e = cuerpo(c)[0].estilo?.titulo;
   ok(e?.color === "$acento", "un token válido pasa");
   ok(e?.fondo === "#fff", "un hex válido pasa, normalizado a minúscula");
   ok(e?.bordeColor === undefined, "⛔ el color con comillas NO pasa");
@@ -130,14 +140,14 @@ titulo("El saneo de estilos");
   ok(e?.align === undefined, "un align fuera del enum se descarta");
   ok(!("position" in (e ?? {})), "position ni siquiera se copia");
   ok(!("mayusculas" in (e ?? {})), "un false no se guarda: es lo mismo que heredar");
-  ok(!("inventado" in (c.bloques[0].estilo ?? {})), "un rol inexistente se descarta");
+  ok(!("inventado" in (cuerpo(c)[0].estilo ?? {})), "un rol inexistente se descarta");
 }
 {
   // "Heredar" tiene que ser la AUSENCIA de la clave. Si el saneo dejara `color:
   // undefined` o un `""`, la cascada y el modo oscuro no podrían distinguir
   // "nadie lo tocó" de "alguien lo puso en negro".
   const c = leerContenido({ bloques: [{ tipo: "titulo", texto: "T", estilo: { titulo: { color: "rojo" } } }] });
-  ok(c.bloques[0].estilo === undefined, "si no quedó nada, no queda ni el objeto vacío");
+  ok(cuerpo(c)[0].estilo === undefined, "si no quedó nada, no queda ni el objeto vacío");
 }
 
 // ─── Los presets reales migran sin perder nada ───────────────────────────────
@@ -145,16 +155,17 @@ titulo("Fixtures reales: los 5 presets de plantilla + los 3 de automation");
 for (const p of PRESETS) {
   const antes = p.bloques.length;
   const c = leerContenido({ bloques: p.bloques, tema: p.tema });
-  ok(c.bloques.length === antes, `preset "${p.id}": ${antes} bloques y siguen ${antes}`, `quedaron ${c.bloques.length}`);
+  ok(cuerpo(c).length === antes, `preset "${p.id}": ${antes} bloques y siguen ${antes}`, `quedaron ${cuerpo(c).length}`);
+  ok(c.bloques[0]?.tipo === "encabezado", `preset "${p.id}": estrena cabecera de marca`);
   const tiposAntes = p.bloques.map((b) => b.tipo).join(",");
-  const tiposDespues = c.bloques.map((b) => b.tipo).join(",");
+  const tiposDespues = cuerpo(c).map((b) => b.tipo).join(",");
   ok(tiposAntes === tiposDespues, `preset "${p.id}": los tipos y el orden no cambian`, `${tiposAntes}\n      → ${tiposDespues}`);
 }
 {
   const presets = presetsPara("Marca de prueba", "https://ejemplo.com");
   for (const [trigger, p] of Object.entries(presets)) {
     const c = leerContenido({ bloques: p.bloques });
-    ok(c.bloques.length === p.bloques.length, `automation ${trigger}: no pierde bloques`);
+    ok(cuerpo(c).length === p.bloques.length, `automation ${trigger}: no pierde bloques`);
   }
   // El carrito tiene que seguir en su lugar: si el bloque se moviera al final,
   // el mail diría "dejaste esto" y mostraría los productos DESPUÉS del botón.
@@ -168,7 +179,7 @@ for (const p of PRESETS) {
 titulo("La migración no le inventa productos al carrito");
 {
   const c = leerContenido({ bloques: [{ tipo: "carrito", items: [] }] });
-  const b = c.bloques[0] as Extract<Bloque, { tipo: "carrito" }>;
+  const b = cuerpo(c)[0] as Extract<Bloque, { tipo: "carrito" }>;
   ok((b.items ?? []).length === 0, "un carrito vacío sigue vacío");
 }
 

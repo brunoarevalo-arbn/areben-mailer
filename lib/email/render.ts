@@ -6,7 +6,7 @@
 import { resolverPaleta, combinarTema, type Paleta, type Tema } from "./tema";
 import { leerContenido } from "./esquema";
 import {
-  resolverEstilo, tonosSobre, extra, px, padCss,
+  resolverEstilo, extra, px, padCss,
   type CtxEstilo, type EstiloResuelto, type Estilos, type RolEstilo,
 } from "./estilos";
 import { cabeza, apertura, cierre, botonVml, clase, clasesDe, CLASES } from "./shell";
@@ -31,6 +31,11 @@ const nl = (s: string) => esc(s).replace(/\n/g, "<br>");
  */
 interface Ctx extends CtxEstilo {
   muestraCarrito: boolean;
+  /**
+   * Nombre de la marca. Lo usa el bloque `encabezado` cuando no trae texto
+   * propio, que es el caso normal: así una plantilla no lleva la marca adentro.
+   */
+  nombreCuenta: string;
 }
 
 /** Atajo: el estilo de un rol de este bloque, con las cuatro capas aplicadas. */
@@ -176,7 +181,7 @@ function estProducto(tipo: TipoBloque, rolNombre: RolEstilo, ctx: Ctx, propio: E
 /** Render de una grilla de productos, reutilizable (ej. email de carrito abandonado). */
 export function renderProductosHtml(items: ProductoEmail[], tema?: Tema): string {
   const pal = resolverPaleta(tema);
-  const ctx: Ctx = { pal, muestraCarrito: false };
+  const ctx: Ctx = { pal, muestraCarrito: false, nombreCuenta: "" };
   return renderProductos(items, pal, estProducto("productos", "cuerpo", ctx, undefined));
 }
 
@@ -200,6 +205,47 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
   const caja = () => e("caja");
 
   switch (b.tipo) {
+    case "encabezado": {
+      // ⚠️ Este bloque se dibuja SIEMPRE fuera de la tarjeta de contenido, sobre
+      // el fondo de la página — `renderEmailHtml` lo saca de la lista antes de
+      // recorrer el cuerpo. Por eso el `sobre` es `pal.fondo` y no la tarjeta:
+      // en un mail oscuro con tarjeta clara (o al revés) el nombre de la marca
+      // saldría del color equivocado.
+      const c = caja();
+      const t = e("titulo", pal.fondo);
+      const al = c.align ?? t.align ?? "center";
+      // `margin:auto` centra un bloque aunque el `text-align` no lo alcance
+      // (la barrita y el logo son elementos de bloque, no texto).
+      const m = (top: string) =>
+        al === "center" ? `${top} auto 0 auto` : al === "right" ? `${top} 0 0 auto` : `${top} auto 0 0`;
+
+      const nombre = b.texto?.trim() || ctx.nombreCuenta;
+      const rotulo = b.mayusculas === false ? nombre : nombre.toUpperCase();
+
+      const logo = b.variante === "logo" ? b.logo?.trim() ?? "" : "";
+      let interior: string;
+      if (logo) {
+        // El `width` en atributo además del inline: Outlook de escritorio no
+        // escala una imagen por CSS y la dibujaría a su tamaño original.
+        const eImg = e("imagen");
+        const anchoLogo = Math.min(pal.ancho - 64, Math.max(40, Math.round(b.logoAncho ?? 140)));
+        interior = `<img src="${esc(logo)}" alt="${esc(nombre)}" width="${anchoLogo}" style="width:${px(anchoLogo)};max-width:100%;height:auto;display:block;margin:${m("0")}${extra(eImg, ["align", "ancho", "alto"])}" />`;
+      } else {
+        // Sin logo cargado, la variante "logo" cae a texto en vez de dejar un
+        // ícono roto arriba de todo el mail.
+        interior = `<span style="font-size:${px(t.tamano ?? 18)};font-weight:${t.peso ?? 700};letter-spacing:${px(t.espaciado ?? 1)};color:${t.color}${extra(t, ["tamano", "peso", "espaciado", "color", "align", "mayusculas"])}">${esc(rotulo)}</span>`;
+      }
+
+      const conLink = b.url?.trim()
+        ? `<a href="${esc(b.url.trim())}" style="text-decoration:none;color:inherit">${interior}</a>`
+        : interior;
+      const barra =
+        b.linea === false
+          ? ""
+          : `<div style="width:40px;height:3px;background:${c.bordeColor ?? pal.acento};margin:${m("10px")};border-radius:2px"></div>`;
+
+      return `<div${clase(...clasesDe(c))} style="text-align:${al};${padCss(c.padY ?? 12, c.padX ?? 0)}${extra(c, ["align", "padX", "padY", "bordeAncho", "bordeColor", "bordeEstilo"])}">${conLink}${barra}</div>`;
+    }
     case "titulo": {
       const t = e("titulo");
       return pad(`<h1${clase(...clasesTitulo(t))} style="margin:16px 0;font-size:${px(t.tamano ?? 26)};line-height:${t.interlinea ?? 1.25};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${esc(b.texto)}</h1>`, caja());
@@ -322,8 +368,21 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
   const contenido = leerContenido(entrada);
   // El tema de la campaña pisa al de la marca, campo por campo.
   const pal = resolverPaleta(combinarTema(opts.temaMarca, contenido.tema));
-  const ctx: Ctx = { pal, doc: contenido.estilos, muestraCarrito: !!opts.muestraCarrito };
-  const cuerpo = (contenido.bloques ?? [])
+  const ctx: Ctx = {
+    pal,
+    doc: contenido.estilos,
+    muestraCarrito: !!opts.muestraCarrito,
+    nombreCuenta: opts.nombreCuenta,
+  };
+  // El encabezado se saca de la lista y se dibuja arriba de la tarjeta, que es
+  // donde estuvo siempre. `leerContenido` ya garantiza que hay uno solo y que
+  // está primero, pero se busca por tipo igual: el camino rápido del
+  // normalizador no re-acomoda un documento que ya está en la versión actual, y
+  // el renderer no puede depender de eso para no dibujar dos cabeceras.
+  const bloques = contenido.bloques ?? [];
+  const cabecera = bloques.find((b) => b.tipo === "encabezado");
+  const cuerpo = bloques
+    .filter((b) => b.tipo !== "encabezado")
     .map((b) => renderBloque(b, ctx))
     .join("\n");
   const preheader = opts.preheader
@@ -345,11 +404,8 @@ ${cabeza(pal)}
 <body style="margin:0;padding:0;background:${pal.fondo};font-family:${pal.fuente}">
   ${preheader}
 ${apertura(pal)}
-    <!-- Encabezado de marca -->
-    <div style="text-align:center;padding:8px 0 16px">
-      <span style="font-size:18px;font-weight:700;letter-spacing:1px;color:${tonosSobre(pal.fondo).texto}">${esc(opts.nombreCuenta.toUpperCase())}</span>
-      <div style="width:40px;height:3px;background:${pal.acento};margin:10px auto 0;border-radius:2px"></div>
-    </div>
+    <!-- Encabezado de marca (bloque; se puede editar o borrar) -->
+    ${cabecera ? renderBloque(cabecera, ctx) : ""}
     <!-- Cuerpo -->
     <div style="${cajaCuerpo};overflow:hidden">
       <div style="height:12px"></div>
@@ -366,7 +422,7 @@ ${cierre}
 }
 
 /** Un bloque, en texto. `null` = no aporta nada legible (imágenes sueltas, etc.). */
-function bloqueATexto(b: Bloque): string | null {
+function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
   const link = (texto: string, url?: string) => (url ? `${texto}: ${url}` : texto);
   /** "PRINT CASE (iPhone 11 · Marrón, 2 u.) — 7490". Mismo dato que la línea HTML. */
   const lineaTexto = (p: ProductoEmail) => {
@@ -376,6 +432,12 @@ function bloqueATexto(b: Bloque): string | null {
     return `${p.nombre}${detalle.length ? ` (${detalle.join(", ")})` : ""}${precio ? ` — ${fmtPrecio(precio)}` : ""}`;
   };
   switch (b.tipo) {
+    case "encabezado": {
+      // El logo no aporta nada en texto plano, pero el nombre de la marca sí:
+      // es el primer renglón, igual que cuando lo escribía el shell.
+      const nombre = b.texto?.trim() || opts.nombreCuenta;
+      return b.mayusculas === false ? nombre : nombre.toUpperCase();
+    }
     case "titulo":
       return b.texto;
     case "texto":
@@ -429,14 +491,18 @@ function bloqueATexto(b: Bloque): string | null {
  */
 export function renderEmailTexto(entrada: ContenidoCampania, opts: RenderOpts): string {
   const contenido = leerContenido(entrada);
-  const cuerpo = (contenido.bloques ?? [])
-    .map(bloqueATexto)
+  // Mismo criterio que el HTML: el encabezado va primero, esté donde esté en la
+  // lista. Si alguien lo borró, el mail arranca directo por el contenido.
+  const bloques = contenido.bloques ?? [];
+  const cuerpo = [
+    ...bloques.filter((b) => b.tipo === "encabezado").slice(0, 1),
+    ...bloques.filter((b) => b.tipo !== "encabezado"),
+  ]
+    .map((b) => bloqueATexto(b, opts))
     .filter((t): t is string => !!t && t.trim() !== "")
     .join("\n\n");
 
   return [
-    opts.nombreCuenta.toUpperCase(),
-    "",
     cuerpo,
     "",
     "—",

@@ -47,7 +47,11 @@ export function AutomationEditor({
   const [sending, startSend] = useTransition();
   const [toggling, startToggle] = useTransition();
 
-  const payload = () => ({ id, nombre, asunto, preheader, esperaHoras, capDias, contenido: { bloques, tema } });
+  // El contenido ENTERO, no `{ bloques, tema }`: enumerar los campos a mano
+  // hacía que la versión del esquema y los estilos de documento se perdieran en
+  // cada guardado, y el mail salía distinto de lo que mostraba el editor.
+  const contenido = (): ContenidoCampania => ({ ...initial.contenido, bloques, tema });
+  const payload = () => ({ id, nombre, asunto, preheader, esperaHoras, capDias, contenido: contenido() });
 
   const guardar = () => startSave(async () => { await guardarAutomation(payload()); setMsg("Guardado ✓"); setTimeout(() => setMsg(null), 2000); });
   const prueba = () => startSend(async () => { await guardarAutomation(payload()); const r = await enviarPruebaAutomation(id, pruebaEmail); setMsg(r.ok ? `Prueba enviada ✓` : `Error: ${r.error}`); setTimeout(() => setMsg(null), 4000); });
@@ -105,6 +109,7 @@ export function AutomationEditor({
         tema={tema}
         onTemaChange={setTema}
         temaMarca={temaMarca}
+        base={initial.contenido}
       />
 
       {soloLectura ? (

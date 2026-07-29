@@ -80,8 +80,18 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
   const [saving, startSave] = useTransition();
   const [sending, startSend] = useTransition();
 
+  /**
+   * El contenido ENTERO, con lo que el editor edita pisado encima.
+   *
+   * Escribir `{ bloques, tema }` a mano perdía en cada guardado todo lo que el
+   * editor todavía no muestra —la versión del esquema y los estilos de
+   * documento— y el mail salía distinto de lo que se veía en pantalla. Es el
+   * mismo bug que ya se cerró del lado del envío de automations.
+   */
+  const contenido = (): ContenidoCampania => ({ ...initial.contenido, bloques, tema });
+
   const previewHtml = renderEmailHtml(
-    { bloques, tema },
+    contenido(),
     { preheader, unsubscribeUrl: "#", nombreCuenta, muestraCarrito: true, temaMarca },
   );
 
@@ -91,7 +101,7 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
     asunto,
     preheader,
     destino,
-    contenido: { bloques, tema },
+    contenido: contenido(),
     asuntoB: abActivo ? asuntoB : "",
     abTestPct: abActivo ? abPct : null,
   });
@@ -256,7 +266,7 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
         </div>
 
         {/* Bloques */}
-        <BloquesList bloques={bloques} onChange={setBloques} />
+        <BloquesList bloques={bloques} onChange={setBloques} nombreCuenta={nombreCuenta} />
         <TemaSelector
           tema={tema}
           onChange={setTema}
@@ -279,7 +289,9 @@ export function CampaniaEditor({ id, nombreCuenta, initial, listas, segmentos, e
             onClick={async () => {
               const n = prompt("Nombre de la plantilla:", nombre);
               if (n === null) return;
-              await guardarComoPlantilla(n, { bloques });
+              // Con el tema adentro: una plantilla guardada sin él se veía de
+              // un color en la campaña y de otro al reusarla.
+              await guardarComoPlantilla(n, contenido());
               setMsg("Plantilla guardada ✓");
               setTimeout(() => setMsg(null), 2000);
             }}

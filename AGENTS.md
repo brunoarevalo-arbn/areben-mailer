@@ -58,6 +58,7 @@ node --import tsx scripts/probar-esquema.ts    # el Json de bloques migra sin pe
 node --import tsx scripts/probar-estilos.ts    # la cascada respeta el orden y no inyecta
 node --import tsx scripts/probar-render.ts     # golden: el mail no cambió sin querer
 node --import tsx scripts/probar-html.ts       # VML, media queries, tracking, peso
+node --import tsx scripts/probar-encabezado.ts # el link de baja no se puede borrar
 ```
 
 ⚠️ `probar-render.ts` compara contra `scripts/fixtures/render-golden.json`. Si el
@@ -168,6 +169,24 @@ uno roto. Lo verifica `probar-html.ts` recorriendo las etiquetas con `class`.
 - El corte responsive es **el ancho del mail**, no 600px fijos.
 - ⛔ Prohibido: `position` (Gmail lo elimina), `flex`/`grid`/`float`, `box-shadow`,
   `calc()`, `rem`/`em`, base64.
+
+### El encabezado es un bloque; el pie no
+
+El nombre de la marca que va arriba de todo es el bloque `encabezado`: se edita,
+se cambia por un logo y se puede borrar. Tres cosas que no son obvias:
+
+- **Se dibuja FUERA de la tarjeta de contenido**, sobre el fondo de página —
+  donde estuvo siempre. Por eso hay **uno solo y va primero**: `leerContenido` lo
+  acomoda y `renderEmailHtml` lo saca de la lista antes de recorrer el cuerpo.
+- **`texto` vacío = el nombre de la cuenta**, resuelto al renderizar. Que el
+  default sea vacío y no el nombre copiado adentro es lo que deja compartir una
+  plantilla entre marcas sin que la bienvenida de Zattia salga firmada por BDI.
+- **La migración v2→v3 se lo materializa a todo documento que no lo tenga.** Sin
+  eso, cada campaña y plantilla ya guardada habría salido sin cabecera.
+
+**El pie NO es un bloque y no va a serlo**: lleva el link de baja, que es
+obligatorio y no puede depender de que nadie lo borre. `probar-encabezado.ts`
+fija que aparece en el 100% de los renders, con la lista de bloques que sea.
 
 **Modo oscuro: solo declarado, no implementado.** Van `color-scheme` y
 `supported-color-schemes` para que Apple Mail no invierta a la fuerza, pero **no

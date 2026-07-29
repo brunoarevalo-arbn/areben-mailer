@@ -1,12 +1,10 @@
 "use client";
 
-import { nuevoBloque, type Bloque } from "@/lib/email/render";
+import { nuevoBloque, TIPOS_BLOQUE, type Bloque } from "@/lib/email/render";
 import { ProductosBlock } from "@/components/ProductosBlock";
 import { AISoonButton } from "@/components/ui/AISoonButton";
 import { inputClass } from "@/lib/ui";
 import { ChevronUp, ChevronDown, X } from "lucide-react";
-
-const TIPOS = ["hero", "seccion", "cupon", "titulo", "texto", "boton", "imagen", "productos", "carrito", "columnas", "video", "redes", "divisor", "espaciador"] as const;
 
 const selectClass = `${inputClass} py-1.5`;
 const alignSelect = (value: "left" | "center", onChange: (v: "left" | "center") => void) => (
@@ -31,17 +29,32 @@ const colorInput = (value: string, onChange: (v: string) => void, label: string)
 export function BloquesList({
   bloques,
   onChange,
+  nombreCuenta = "",
 }: {
   bloques: Bloque[];
   onChange: (b: Bloque[]) => void;
+  /** Solo para mostrarlo de placeholder en el encabezado: lo resuelve el render. */
+  nombreCuenta?: string;
 }) {
+  // El encabezado es chapa del mail, no contenido: se dibuja fuera de la
+  // tarjeta, hay uno solo y va primero. Por eso no se ofrece dos veces en la
+  // paleta y no se puede mover — el renderer lo va a poner arriba igual, y una
+  // flecha que no hace nada es peor que no tenerla.
+  const hayEncabezado = bloques.some((b) => b.tipo === "encabezado");
+  const fijoArriba = bloques[0]?.tipo === "encabezado";
+  const disponibles = TIPOS_BLOQUE.filter((t) => t !== "encabezado" || !hayEncabezado);
+
   const setBloque = (i: number, patch: Partial<Bloque>) =>
     onChange(bloques.map((b, j) => (j === i ? ({ ...b, ...patch } as Bloque) : b)));
-  const addBloque = (tipo: Bloque["tipo"]) => onChange([...bloques, nuevoBloque(tipo)]);
+  const addBloque = (tipo: Bloque["tipo"]) =>
+    // El encabezado entra arriba de todo, que es el único lugar donde existe.
+    onChange(tipo === "encabezado" ? [nuevoBloque(tipo), ...bloques] : [...bloques, nuevoBloque(tipo)]);
   const delBloque = (i: number) => onChange(bloques.filter((_, j) => j !== i));
   const moveBloque = (i: number, dir: -1 | 1) => {
     const j = i + dir;
     if (j < 0 || j >= bloques.length) return;
+    // Nadie pasa por encima del encabezado.
+    if (fijoArriba && (i === 0 || j === 0)) return;
     const copy = [...bloques];
     [copy[i], copy[j]] = [copy[j], copy[i]];
     onChange(copy);
@@ -58,11 +71,64 @@ export function BloquesList({
           <div className="mb-2 flex items-center justify-between">
             <span className="text-xs font-medium uppercase tracking-wide text-subtle">{b.tipo}</span>
             <div className="flex gap-1 text-muted">
-              <button onClick={() => moveBloque(i, -1)} className="px-1 hover:text-foreground"><ChevronUp className="h-4 w-4" aria-hidden /></button>
-              <button onClick={() => moveBloque(i, 1)} className="px-1 hover:text-foreground"><ChevronDown className="h-4 w-4" aria-hidden /></button>
+              {b.tipo !== "encabezado" && (
+                <>
+                  <button onClick={() => moveBloque(i, -1)} className="px-1 hover:text-foreground"><ChevronUp className="h-4 w-4" aria-hidden /></button>
+                  <button onClick={() => moveBloque(i, 1)} className="px-1 hover:text-foreground"><ChevronDown className="h-4 w-4" aria-hidden /></button>
+                </>
+              )}
               <button onClick={() => delBloque(i)} className="px-1 text-danger-foreground hover:opacity-70"><X className="h-4 w-4" aria-hidden /></button>
             </div>
           </div>
+          {b.tipo === "encabezado" && (
+            <div className="space-y-2">
+              <select
+                className={`${selectClass} max-w-52`}
+                value={b.variante ?? "texto"}
+                onChange={(e) => setBloque(i, { variante: e.target.value as "texto" | "logo" })}
+              >
+                <option value="texto">Nombre de la marca</option>
+                <option value="logo">Logo</option>
+              </select>
+              {b.variante === "logo" ? (
+                <div className="space-y-2">
+                  <input className={inputClass} value={b.logo ?? ""} placeholder="URL del logo (https://…)" onChange={(e) => setBloque(i, { logo: e.target.value })} />
+                  <label className="flex items-center gap-2 text-xs text-muted">
+                    Ancho
+                    <input
+                      type="range"
+                      min={40}
+                      max={400}
+                      step={10}
+                      value={b.logoAncho ?? 140}
+                      onChange={(e) => setBloque(i, { logoAncho: Number(e.target.value) })}
+                      className="flex-1 accent-accent"
+                    />
+                    <span className="w-12 tabular-nums text-foreground">{b.logoAncho ?? 140}px</span>
+                  </label>
+                  <p className="text-xs text-subtle">Sin logo cargado se muestra el nombre.</p>
+                </div>
+              ) : (
+                <>
+                  <input className={inputClass} value={b.texto ?? ""} placeholder={nombreCuenta} onChange={(e) => setBloque(i, { texto: e.target.value })} />
+                  <p className="text-xs text-subtle">Vacío = el nombre de la marca. Dejalo así para que la plantilla sirva en cualquier tienda.</p>
+                </>
+              )}
+              <input className={inputClass} value={b.url ?? ""} placeholder="Link al tocarlo (opcional)" onChange={(e) => setBloque(i, { url: e.target.value })} />
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-1.5 text-xs text-muted">
+                  <input type="checkbox" checked={b.linea !== false} onChange={(e) => setBloque(i, { linea: e.target.checked })} />
+                  Barrita de color debajo
+                </label>
+                {b.variante !== "logo" && (
+                  <label className="flex items-center gap-1.5 text-xs text-muted">
+                    <input type="checkbox" checked={b.mayusculas !== false} onChange={(e) => setBloque(i, { mayusculas: e.target.checked })} />
+                    En mayúsculas
+                  </label>
+                )}
+              </div>
+            </div>
+          )}
           {(b.tipo === "titulo" || b.tipo === "texto") && (
             <div className="space-y-2">
               <textarea className={inputClass} rows={b.tipo === "texto" ? 3 : 1} value={b.texto} onChange={(e) => setBloque(i, { texto: e.target.value })} />
@@ -177,7 +243,7 @@ export function BloquesList({
         </div>
       ))}
       <div className="flex flex-wrap gap-2 pt-1">
-        {TIPOS.map((t) => (
+        {disponibles.map((t) => (
           <button key={t} onClick={() => addBloque(t)} className="rounded-lg border border-border-strong px-2.5 py-1 text-xs text-muted hover:bg-surface-muted">
             + {t}
           </button>

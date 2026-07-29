@@ -5,6 +5,7 @@
 import { renderEmailHtml, renderEmailTexto, nuevoBloque, TIPOS_BLOQUE } from "../lib/email/render";
 import { inyectarTracking } from "../lib/email/tracking";
 import { CLASES } from "../lib/email/shell";
+import { V_ACTUAL } from "../lib/email/esquema";
 import { PRESETS } from "../lib/plantillas/presets";
 import type { ContenidoCampania } from "../lib/email/render";
 
@@ -132,11 +133,20 @@ titulo("Lo que no puede faltar nunca");
 {
   // Un tipo nuevo que se olvide de `bloqueATexto` tiene que fallar acá, no
   // salir con la parte de texto vacía —que es señal de spam clásica.
+  //
+  // Se compara contra el mail SIN ese bloque, no contra un separador fijo: el
+  // pie ya trae un "—" siempre, así que buscarlo daba verde para cualquier
+  // tipo, aportara texto o no.
+  // Con `v` puesta: un contenido sin versión pasa por la migración, que le
+  // materializa el encabezado, y entonces el bloque `encabezado` no se
+  // distinguiría del mail vacío.
+  const base = { v: V_ACTUAL, bloques: [] } as unknown as ContenidoCampania;
+  const vacio = renderEmailTexto(base, OPTS);
   const sinTexto = TIPOS_BLOQUE.filter((t) => {
     const b = nuevoBloque(t);
     // Los que no aportan texto legible a propósito.
     if (["espaciador", "imagen", "carrito", "productos", "columnas", "video", "redes"].includes(t)) return false;
-    return !renderEmailTexto({ bloques: [b] } as ContenidoCampania, OPTS).includes("—");
+    return renderEmailTexto({ ...base, bloques: [b] }, OPTS) === vacio;
   });
   ok(sinTexto.length === 0, "todo tipo con contenido aporta algo a la parte de texto", sinTexto.join(", "));
 }

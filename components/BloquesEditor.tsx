@@ -1,6 +1,6 @@
 "use client";
 
-import { renderEmailHtml, type Bloque } from "@/lib/email/render";
+import { renderEmailHtml, type Bloque, type ContenidoCampania } from "@/lib/email/render";
 import { BloquesList } from "@/components/BloquesList";
 import { TemaSelector } from "@/components/TemaSelector";
 import type { Tema } from "@/lib/email/tema";
@@ -13,6 +13,7 @@ export function BloquesEditor({
   tema,
   onTemaChange,
   temaMarca,
+  base,
 }: {
   bloques: Bloque[];
   onChange: (b: Bloque[]) => void;
@@ -21,16 +22,23 @@ export function BloquesEditor({
   tema?: Tema;
   onTemaChange?: (t: Tema | undefined) => void;
   temaMarca?: Tema | null;
+  /**
+   * El contenido completo del que salieron `bloques` y `tema`. El preview lo
+   * usa de base para no perder lo que el editor todavía no muestra (versión del
+   * esquema, estilos de documento) y mostrar así el mail que de verdad va a
+   * salir, no una versión recortada.
+   */
+  base?: ContenidoCampania;
 }) {
   const previewHtml = renderEmailHtml(
-    { bloques, tema },
+    { ...base, bloques, tema },
     { preheader, unsubscribeUrl: "#", nombreCuenta, muestraCarrito: true, temaMarca },
   );
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="space-y-6">
-        <BloquesList bloques={bloques} onChange={onChange} />
+        <BloquesList bloques={bloques} onChange={onChange} nombreCuenta={nombreCuenta} />
         {onTemaChange && (
           <TemaSelector
             tema={tema}

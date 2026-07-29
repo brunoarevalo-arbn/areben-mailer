@@ -58,6 +58,40 @@ export interface BloqueBase {
 
 export type Bloque = BloqueBase &
   (
+    /**
+     * La cabecera de marca. Es el único bloque que se dibuja **fuera** de la
+     * tarjeta de contenido, apoyado sobre el fondo de la página — que es
+     * exactamente donde estuvo siempre, cuando lo escribía el shell a mano.
+     *
+     * Hay **uno solo por mail** y va primero: `leerContenido` lo acomoda y
+     * `renderEmailHtml` lo saca de la lista antes de dibujar el cuerpo.
+     */
+    | {
+        tipo: "encabezado";
+        /** `"logo"` cae a texto si `logo` está vacío. */
+        variante?: "texto" | "logo";
+        /**
+         * Vacío = el nombre de la cuenta.
+         *
+         * Que el default sea "vacío" y no "el nombre copiado adentro" es lo que
+         * permite que un preset se comparta entre marcas sin que la bienvenida
+         * de Zattia salga firmada por BDI. La marca se resuelve al renderizar.
+         */
+        texto?: string;
+        logo?: string;
+        /** Ancho del logo en px (40 – ancho útil del mail). */
+        logoAncho?: number;
+        /** A dónde lleva el click. Vacío = sin link. */
+        url?: string;
+        /** La barrita de acento debajo. Ausente = sí, que es lo que había. */
+        linea?: boolean;
+        /**
+         * Ausente = sí. Va acá y no en `estilo.titulo.mayusculas` a propósito:
+         * esto se aplica en JS sobre el string, y `text-transform` lo aplica el
+         * cliente de mail —que en Outlook no es confiable.
+         */
+        mayusculas?: boolean;
+      }
     | { tipo: "titulo"; texto: string; align?: "left" | "center" }
     | { tipo: "texto"; texto: string; align?: "left" | "center" }
     | { tipo: "boton"; texto: string; url: string; align?: "left" | "center"; full?: boolean }
@@ -85,6 +119,7 @@ export type TipoBloque = Bloque["tipo"];
 
 /** Todos los tipos que existen. El editor arma su paleta con esto. */
 export const TIPOS_BLOQUE = [
+  "encabezado",
   "hero", "seccion", "cupon", "titulo", "texto", "boton", "imagen",
   "productos", "carrito", "columnas", "video", "redes", "divisor", "espaciador",
 ] as const satisfies readonly TipoBloque[];
@@ -133,6 +168,9 @@ export function nuevoId(): string {
 export function nuevoBloque(tipo: TipoBloque): Bloque {
   const id = nuevoId();
   switch (tipo) {
+    // Nace SIN texto: vacío significa "el nombre de esta cuenta", y así el
+    // bloque es el mismo para las tres marcas y para el comerciante que venga.
+    case "encabezado": return { id, tipo, variante: "texto", texto: "", url: "" };
     case "titulo": return { id, tipo, texto: "Título", align: "left" };
     case "texto": return { id, tipo, texto: "Escribí tu mensaje. Podés usar ${contacto.nombre}.", align: "left" };
     case "boton": return { id, tipo, texto: "Ver más", url: "", align: "left", full: false };
