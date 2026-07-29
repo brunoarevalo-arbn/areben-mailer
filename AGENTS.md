@@ -65,6 +65,7 @@ node --import tsx scripts/probar-imagenes.ts   # permisos, multi-tenant y SVG de
 node --import tsx scripts/probar-marca.ts      # la marca de TN no se guarda adentro del Json
 node --import tsx scripts/probar-panel-estilo.ts # ningún control del panel está desconectado
 node --import tsx scripts/probar-presets.ts    # ninguna plantilla prearmada tiene un botón que no lleva a nada
+node --import tsx scripts/probar-import.ts     # la supresión de un import es de una sola vía
 ```
 
 ⚠️ `probar-render.ts` compara contra `scripts/fixtures/render-golden.json`. Si el
@@ -331,6 +332,39 @@ hay que pasarle `token` a `put()`.
   correo que ya está en la casilla de otra persona. La UI avisa; no hay borrado
   masivo.
 
+## Importar contactos de afuera (`lib/contactos/importar.ts`)
+
+La mecánica de "traer una lista que vivía en otro proveedor". Hoy la usa
+`scripts/importar-nuby-perfit.ts` (la migración de Perfit, que se corre a mano y
+una sola vez); está en `lib/` porque es la misma que necesita `importarCSV` de
+`/contactos`, y escribirla dos veces es garantizar que se porten distinto.
+
+- ⛔ **La supresión es de UNA SOLA VÍA.** Un mail que aparece como baja, rebote o
+  queja en cualquier archivo queda suprimido aunque también esté en la lista de
+  altas, y **un contacto ya suprimido no vuelve a `ACTIVO` porque aparezca en un
+  CSV**. Es lo único que frena a los 638 rebotados que estaban `ACTIVO` en BDI
+  porque los había traído el sync de Tiendanube: sin eso el primer envío propio
+  arranca con 3,8% de rebote y AWS revisa arriba de 5%.
+- ⚠️ **El consentimiento de un import sale de la pertenencia al archivo, no del
+  campo.** `tn_accepts_marketing` es el espejo del casillero de Tiendanube y
+  viene `false`/vacío para gente que sí se anotó en un pop-up. En BDI eran 4.423
+  suscriptores con el campo vacío que hubieran quedado **invisibles para
+  siempre**: la audiencia exige `tnAcceptsMkt: true` (`lib/campanias.ts:21`) y el
+  default de la columna es `false`.
+- 🔴 **Quien compró sin tildar el casillero y no se anotó en ningún lado se queda
+  en `false`** — 1.376 casos en BDI, decidido el 29-jul-2026. Que el proveedor
+  anterior les haya mandado igual no es consentimiento.
+- ⚠️ **Los export vienen en ISO-8859-1, separados por `;`.** Leerlos como UTF-8
+  mete "Ludueña" roto en la base y sale roto en el mail. Y la columna se busca
+  **por nombre de header**, nunca por posición: el export de bajas de una campaña
+  agrega `Acción` y `Fecha Acción` adelante.
+- **El export de bajas trae un registro por EVENTO**, así que la misma casilla
+  aparece dos veces. La dedup corre dentro de cada archivo y entre archivos.
+- ⚠️ **Los segmentos no saben filtrar por `Contacto.custom`** (ver `CAMPOS` en
+  `lib/segmentos.ts`): lo que tiene que poder mandarse va a una **lista**, no a
+  `custom`. Por eso el script crea `Perfit — abrieron 2026` con los 800 que
+  tenían actividad registrada, en vez de guardar la fecha y esperar segmentarla.
+
 ## Auth y permisos
 
 - Sesión: cookie `session` firmada (jose). `proxy.ts` hace el chequeo optimista
@@ -387,3 +421,12 @@ temprano cuesta varias veces su tamaño.
   ensayo comparativo y el webhook de Resend.
 - **Verificar en browser lo de permisos** con el usuario EDITOR de prueba: las
   4 fases están deployadas pero solo se probaron por script.
+- **El import de Perfit está escrito y verificado en dry-run, sin aplicar.**
+  `scripts/importar-nuby-perfit.ts` con los tres CSV de `~/Downloads` (29-jul):
+  15.834 mails únicos, **650 a suprimir (638 de ellos hoy `ACTIVO` en la base)**,
+  4.249 contactos nuevos, 127 que pasan a aceptar marketing y 1.376 que quedan
+  afuera a propósito. Falta correrlo con `--aplicar`, que escribe en producción.
+- **El primer envío propio ya tiene forma**: la lista `Perfit — abrieron 2026`
+  (800 contactos que abrieron la última campaña) va sola y primero. Después
+  `Nuby — suscriptores` por tramos. La lista completa tiene 6,9% de apertura y
+  6,7% de rebote medidos en Perfit: es un histórico frío y no se manda de una.
