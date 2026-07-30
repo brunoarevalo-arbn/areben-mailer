@@ -11,6 +11,14 @@
 //          node --import tsx --env-file=.env scripts/crear-automations-marca.ts --cuenta=zattia
 //
 // Idempotente: si la marca ya tiene esa automation, no la duplica ni la pisa.
+//
+// 🔴 PERO "idempotente" acá significa "no pisa lo que existe", NO "respeta lo
+//    que borraste". El 30-jul-2026 se borró a propósito la Bienvenida de
+//    `NUEVO_CLIENTE` de Zattia (`scripts/borrar-automation.ts`): esa marca capta
+//    por pop-up y tener las dos bienvenidas es lo que le manda dos mails al mismo
+//    lead. Correr esto de nuevo sobre `--cuenta=zattia` la **vuelve a crear**.
+//    Si lo corrés, mirá la salida: un `+` en una marca donde no esperabas nada es
+//    una decisión que se está deshaciendo sola.
 import { prisma } from '../lib/prisma.ts';
 import { type Trigger } from '../lib/automations.ts';
 import { presetDeTrigger } from '../lib/plantillas/presets.ts';
