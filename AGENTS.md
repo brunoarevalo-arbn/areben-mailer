@@ -128,10 +128,12 @@ Tres estados, no dos (`lib/email/proveedor.ts`):
 - La vista `/envio` muestra el estado real del gate y del proveedor sin entrar a Vercel.
 
 **Proveedor:** se elige con `EMAIL_PROVIDER` (`ses` | `resend` | `sendgrid`;
-default `ses`). En producción está en **`resend`**, pero **la decisión tomada el
-29-jul-2026 es arrancar el envío propio por SES**: está aprobado (50k/día) y toda
-la base cuesta menos de un dólar, contra USD 20/mes de Resend Pro. ⚠️ El `.env`
-local **no** define `EMAIL_PROVIDER`, así que localmente cae a SES.
+default `ses`). **Producción está en `ses` desde el 30-jul-2026** (env cambiada +
+redeploy, verificado con el ensayo de volumen: los message id salen con formato
+de SES, `0100019f…-000000`, y no el UUID pelado de Resend). Está aprobado
+(50k/día) y toda la base cuesta menos de un dólar, contra USD 20/mes de Resend
+Pro. ⚠️ El `.env` local **no** define `EMAIL_PROVIDER`, así que localmente cae a
+SES también.
 
 **Resend no se da de baja**: el plan free (100 mails/día, 3.000/mes) cuesta cero y
 es la red de seguridad **medida** — el 28-jul la misma casilla de Hotmail cayó en
