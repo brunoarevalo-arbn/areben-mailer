@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { autorizar, chequear } from "@/lib/auth";
 import { getIdentityStatus } from "@/lib/email/proveedores/ses";
 import { leerStore } from "@/lib/tn/client";
-import { configConTienda, marcaDe } from "@/lib/marca";
+import { configConTienda, leerConfigCuenta, marcaDe } from "@/lib/marca";
 import type { Tema } from "@/lib/email/tema";
 
 export async function crearRemitente(input: {
@@ -183,6 +183,31 @@ export async function guardarHtmlCrudoHabilitado(habilitado: boolean) {
  * guarda es `direccionOculta` (ausente = se muestra) y el dato de TN queda en
  * el config intacto para poder volver atrás.
  */
+/**
+ * Guarda un domicilio propio para el pie, distinto del que trae Tiendanube.
+ *
+ * Lo que TN devuelve es el domicilio **fiscal** de la empresa, y una tienda
+ * puede querer mostrar otra cosa. Se guarda en `direccionPropia` y no pisando
+ * `direccion`: así "Traer de mi tienda" —que se corre para actualizar el logo—
+ * no se lleva puesto el texto elegido, y **vaciar este campo vuelve solo al de
+ * Tiendanube** sin tener que ir a buscarlo.
+ */
+export async function guardarDireccionPropia(texto: string) {
+  const chk = await chequear("remitentes");
+  if (!chk.ok) return chk;
+  const { cuenta } = chk.ctx;
+
+  const limpio = texto.trim().slice(0, 200);
+  const config = (cuenta.config as Prisma.JsonObject) ?? {};
+  const nuevo: Prisma.JsonObject = { ...config };
+  if (limpio) nuevo.direccionPropia = limpio;
+  else delete nuevo.direccionPropia;
+
+  await prisma.cuenta.update({ where: { id: cuenta.id }, data: { config: nuevo } });
+  revalidatePath("/remitentes");
+  return { ok: true as const, direccion: limpio || leerConfigCuenta(cuenta.config).direccion || "" };
+}
+
 export async function guardarDireccionOculta(oculta: boolean) {
   const chk = await chequear("remitentes");
   if (!chk.ok) return chk;

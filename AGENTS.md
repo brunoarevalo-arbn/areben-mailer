@@ -329,8 +329,12 @@ en **`Cuenta.config`** (Json libre — sin columna nueva: la base es compartida)
 - ⚠️ **El merge nunca pisa el resto del `config`** — ahí viven `tema` y
   `lastSyncContactos`. Va siempre por `configConTienda()`, y un campo que TN
   devuelve vacío no borra el que ya estaba.
-- **El domicilio del pie se puede apagar** (`config.direccionOculta`, checkbox en
-  `/remitentes`). La clave es "ocultar" y no "mostrar" para que una cuenta que no
+- **El domicilio del pie se puede editar y apagar** (`/remitentes`). Lo que trae
+  TN es el domicilio **fiscal** (`config.direccion`); el que escribe el
+  comerciante vive aparte en **`config.direccionPropia`** y le gana. Son dos
+  claves y no una porque "Traer de mi tienda" se corre para actualizar el logo y
+  pisaría el texto elegido; así, además, vaciar el campo vuelve solo al de TN.
+- **Se puede apagar** (`config.direccionOculta`, checkbox en `/remitentes`). La clave es "ocultar" y no "mostrar" para que una cuenta que no
   la tiene siga saliendo con domicilio: al revés, un default nuevo cambiaría el
   pie de todas las marcas existentes. **El dato no se borra** —"Traer de mi
   tienda" lo reescribe igual, y así se puede volver atrás con un click—: el

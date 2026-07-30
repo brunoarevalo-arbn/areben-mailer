@@ -42,6 +42,7 @@ export default async function RemitentesPage() {
         marca={marcaDe(cuenta)}
         conectada={!!cuenta.tnStoreId}
         direccion={config.direccion}
+        direccionPropia={config.direccionPropia}
         direccionOculta={!!config.direccionOculta}
       />
     </div>

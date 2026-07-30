@@ -28,6 +28,18 @@ export interface ConfigCuenta {
   /** Razón social y domicilio, para el pie del mail. Lo trae TN. */
   direccion?: string;
   /**
+   * El domicilio escrito a mano en `/remitentes`. Si está, **le gana** al que
+   * trae Tiendanube.
+   *
+   * Va en su propia clave y no pisando `direccion` a propósito: lo de TN es el
+   * domicilio FISCAL de la empresa, y una tienda puede querer mostrar su local,
+   * su casilla o solo la ciudad. Con una sola clave, "Traer de mi tienda"
+   * —que se corre para actualizar el logo— borraría el texto elegido sin
+   * avisar; con dos, traer la marca no puede pisar lo que escribió una persona,
+   * y vaciar esto vuelve solo al de Tiendanube.
+   */
+  direccionPropia?: string;
+  /**
    * ¿Esconder el domicilio del pie? Ausente = se muestra, que es como se portó
    * siempre.
    *
@@ -81,6 +93,7 @@ export function leerConfigCuenta(valor: unknown): ConfigCuenta {
     url: txt(c.url)?.replace(/\/+$/, ""),
     idioma: txt(c.idioma),
     direccion: txt(c.direccion),
+    direccionPropia: txt(c.direccionPropia),
     direccionOculta: c.direccionOculta === true,
     lastSyncContactos: txt(c.lastSyncContactos),
     marcaSync: txt(c.marcaSync),
@@ -101,7 +114,8 @@ export function marcaDe(cuenta: { nombre: string; config: unknown }): Marca {
     // El filtro vive acá y no en el renderer: `marcaDe` es la única puerta por
     // la que la marca llega a los ocho call sites que dibujan un mail, así que
     // apagado acá queda apagado en el envío, en el preview y en las pruebas.
-    direccionPostal: c.direccionOculta ? undefined : c.direccion,
+    // Y el domicilio escrito a mano le gana al que trajo Tiendanube.
+    direccionPostal: c.direccionOculta ? undefined : c.direccionPropia ?? c.direccion,
     temaMarca,
     permiteHtmlCrudo: c.htmlCrudoHabilitado,
   };

@@ -216,5 +216,43 @@ titulo("Mostrar el domicilio es una decisión de la marca");
   ok(vieja.direccionPostal === "CALLE FALSA 123", "una cuenta vieja no cambia de comportamiento");
 }
 
+// ─── El domicilio se puede escribir a mano ──────────────────────────────────
+titulo("El domicilio del pie se puede cambiar, y traer la marca no lo pisa");
+{
+  const FISCAL = "AREBEN COMERCIAL S. R. L. · PJE HUTCHINSON 3869";
+  const PROPIO = "Zattia · Córdoba, Argentina";
+
+  const m = marcaDe({ nombre: "Zattia", config: { direccion: FISCAL, direccionPropia: PROPIO } });
+  ok(m.direccionPostal === PROPIO, "el escrito a mano le gana al fiscal que trajo TN");
+
+  const solo = marcaDe({ nombre: "Zattia", config: { direccion: FISCAL } });
+  ok(solo.direccionPostal === FISCAL, "sin uno propio sale el de Tiendanube");
+
+  const vacio = marcaDe({ nombre: "Zattia", config: { direccion: FISCAL, direccionPropia: "   " } });
+  ok(vacio.direccionPostal === FISCAL, "vaciarlo vuelve al de Tiendanube (no deja el pie mudo)");
+
+  // 🔴 La razón de que sean dos claves y no una: "Traer de mi tienda" se corre
+  // para actualizar el logo, y no puede llevarse puesto el texto elegido.
+  const despues = configConTienda(
+    { direccion: FISCAL, direccionPropia: PROPIO },
+    normalizarStore({
+      name: { es: "Zattia" },
+      logo: "//cdn/zattia.png",
+      url_with_protocol: "https://zattia.com.ar",
+      business_name: "AREBEN COMERCIAL S. R. L.",
+      business_address: "OTRA CALLE 999",
+    } as Parameters<typeof normalizarStore>[0]),
+    "2026-07-30T00:00:00.000Z",
+  );
+  ok(despues.direccionPropia === PROPIO, "traer la marca NO pisa el domicilio escrito a mano");
+  ok(
+    marcaDe({ nombre: "Zattia", config: despues }).direccionPostal === PROPIO,
+    "…y el pie sigue saliendo con el propio",
+  );
+
+  const oculto = marcaDe({ nombre: "Zattia", config: { direccionPropia: PROPIO, direccionOculta: true } });
+  ok(oculto.direccionPostal === undefined, "el interruptor apaga también al escrito a mano");
+}
+
 console.log(fallas === 0 ? "\n✅ Marca OK\n" : `\n❌ ${fallas} fallas\n`);
 process.exit(fallas === 0 ? 0 : 1);

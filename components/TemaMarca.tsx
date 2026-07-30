@@ -8,10 +8,12 @@ import type { Tema } from "@/lib/email/tema";
 import type { Marca } from "@/lib/marca";
 import {
   guardarDireccionOculta,
+  guardarDireccionPropia,
   guardarHtmlCrudoHabilitado,
   guardarTemaMarca,
   traerMarcaDeTienda,
 } from "@/app/(app)/remitentes/actions";
+import { Input } from "@/components/ui/Input";
 
 // Aspecto por defecto de los mails de la marca.
 //
@@ -43,14 +45,17 @@ export function TemaMarca({
   marca: marcaInicial,
   conectada,
   direccion,
+  direccionPropia,
   direccionOculta: ocultaInicial,
 }: {
   inicial: Tema | undefined;
   marca: Marca;
   /** ¿La cuenta tiene tienda de Tiendanube vinculada? Sin eso no hay de dónde traer. */
   conectada: boolean;
-  /** El domicilio tal como está guardado, se muestre o no. Ver el comentario de la página. */
+  /** El domicilio que trajo Tiendanube, se muestre o no. Ver el comentario de la página. */
   direccion: string | undefined;
+  /** El escrito a mano, si lo hay. Le gana al de arriba. */
+  direccionPropia: string | undefined;
   direccionOculta: boolean;
 }) {
   const [tema, setTema] = useState<Tema | undefined>(inicial);
@@ -62,10 +67,15 @@ export function TemaMarca({
   const [htmlCrudo, setHtmlCrudo] = useState<boolean>(!!marcaInicial.permiteHtmlCrudo);
   const [guardandoHtml, startHtml] = useTransition();
   const [msgHtml, setMsgHtml] = useState<string | null>(null);
-  const [dir, setDir] = useState<string | undefined>(direccion);
+  const [dirTienda, setDirTienda] = useState<string | undefined>(direccion);
+  const [dirPropia, setDirPropia] = useState<string>(direccionPropia ?? "");
   const [dirOculta, setDirOculta] = useState<boolean>(ocultaInicial);
   const [guardandoDir, startDir] = useTransition();
   const [msgDir, setMsgDir] = useState<string | null>(null);
+
+  // Lo que va a salir en el pie: lo escrito a mano si lo hay, si no lo de TN.
+  const dir = dirPropia.trim() || dirTienda;
+  const dirSucia = dirPropia.trim() !== (direccionPropia ?? "").trim();
 
   const sucio = JSON.stringify(tema ?? {}) !== JSON.stringify(inicial ?? {});
   const previewHtml = renderEmailHtml(
@@ -96,10 +106,18 @@ export function TemaMarca({
       const r = await traerMarcaDeTienda();
       if (!r.ok) return setMsgMarca(r.error ?? "No se pudo.");
       setMarca(r.marca);
-      // ⚠️ `r.marca.direccionPostal` viene vacía si el domicilio está oculto —
-      // no es que TN no lo haya traído. En ese caso se deja el que ya estaba.
-      if (r.marca.direccionPostal) setDir(r.marca.direccionPostal);
+      // ⚠️ `r.marca.direccionPostal` viene vacía si el domicilio está oculto, y
+      // trae el propio si hay uno escrito a mano — no es el dato de TN. En los
+      // dos casos se deja el que ya estaba.
+      if (r.marca.direccionPostal && !dirPropia.trim() && !dirOculta) setDirTienda(r.marca.direccionPostal);
       setMsgMarca(r.marca.logoCuenta ? "Listo: logo, sitio y datos de tu tienda." : "Listo, pero tu tienda no tiene logo cargado en Tiendanube.");
+    });
+
+  const guardarDireccion = () =>
+    startDir(async () => {
+      const r = await guardarDireccionPropia(dirPropia);
+      if (!r.ok) return setMsgDir(r.error ?? "No se pudo guardar.");
+      setMsgDir(dirPropia.trim() ? "Guardado." : "Listo: vuelve el de Tiendanube.");
     });
 
   const cambiarDireccion = (mostrar: boolean) => {
@@ -165,29 +183,53 @@ export function TemaMarca({
               <dt className="w-20 shrink-0 text-subtle">Sitio</dt>
               <dd className="min-w-0 flex-1 truncate text-muted">{marca.urlCuenta || "—"}</dd>
             </div>
-            <div className="flex items-center gap-2">
-              <dt className="w-20 shrink-0 text-subtle">Pie</dt>
-              <dd className="min-w-0 flex-1 truncate text-muted">{dir || "—"}</dd>
-            </div>
           </dl>
-          <label className="mt-3 flex items-start gap-2 border-t border-border pt-3">
-            <input
-              type="checkbox"
-              checked={!dirOculta}
-              disabled={guardandoDir || !dir}
-              onChange={(e) => cambiarDireccion(e.target.checked)}
-              className="mt-0.5 accent-accent"
-            />
-            <span className="text-xs">
-              <span className="font-medium text-foreground">Mostrar el domicilio en el pie</span>
-              <p className="mt-1 text-muted">
-                Es obligatorio para los mails que llegan a Estados Unidos y una de las señales que
-                miran los filtros de spam. Si lo apagás, el pie queda con el nombre de la marca y el
-                link de baja.
-              </p>
-              {msgDir && <p className="mt-1 text-danger-foreground">{msgDir}</p>}
-            </span>
-          </label>
+
+          {/* El domicilio del pie: el de TN es el FISCAL, y no siempre es el que
+              la tienda quiere mostrar. Se puede escribir otro; vaciarlo vuelve
+              al de Tiendanube sin tener que ir a buscarlo. */}
+          <div className="mt-3 border-t border-border pt-3">
+            <div className="text-xs font-medium text-foreground">Domicilio del pie</div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Input
+                value={dirPropia}
+                onChange={(e) => {
+                  setDirPropia(e.target.value);
+                  setMsgDir(null);
+                }}
+                placeholder={dirTienda || "Sin domicilio cargado"}
+                disabled={guardandoDir || dirOculta}
+                fullWidth
+                className="min-w-0 flex-1"
+              />
+              <Button variant="secondary" onClick={guardarDireccion} disabled={!dirSucia || guardandoDir}>
+                {guardandoDir ? "Guardando…" : "Guardar"}
+              </Button>
+            </div>
+            <p className="mt-1.5 text-xs text-muted">
+              {dirPropia.trim()
+                ? "Vaciá el campo para volver al de Tiendanube."
+                : `Vacío usa el de Tiendanube: ${dirTienda || "todavía no lo trajiste"}.`}
+            </p>
+            <label className="mt-2 flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={!dirOculta}
+                disabled={guardandoDir || !dir}
+                onChange={(e) => cambiarDireccion(e.target.checked)}
+                className="mt-0.5 accent-accent"
+              />
+              <span className="text-xs">
+                <span className="font-medium text-foreground">Mostrarlo en el pie</span>
+                <p className="mt-1 text-muted">
+                  Es obligatorio para los mails que llegan a Estados Unidos y una de las señales que
+                  miran los filtros de spam. Si lo apagás, el pie queda con el nombre de la marca y
+                  el link de baja.
+                </p>
+              </span>
+            </label>
+            {msgDir && <p className="mt-1 text-xs text-muted">{msgDir}</p>}
+          </div>
           {msgMarca && <p className="mt-2 text-xs text-muted">{msgMarca}</p>}
         </div>
 
