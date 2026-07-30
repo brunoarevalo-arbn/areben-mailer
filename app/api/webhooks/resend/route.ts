@@ -34,8 +34,20 @@ function firmaValida(raw: string, headers: Headers, secret: string): boolean {
 export async function POST(req: Request) {
   const raw = await req.text();
 
+  // 🔴 FALLA CERRADO, igual que el SNS de SES. Esta ruta es pública
+  // (`PUBLIC_PREFIXES` en proxy.ts) y lo único que hace es SUPRIMIR contactos.
+  //
+  // Hasta el 30-jul-2026 el chequeo era `if (secret && !firmaValida(…))`: sin la
+  // env cargada —que era el estado real, porque el webhook nunca se dio de alta—
+  // un POST anónimo con `{"type":"email.bounced","data":{"to":[…]}}` suprimía a
+  // quien quisiera. Y la supresión es **de una sola vía** por diseño: no vuelve
+  // ni re-importando el CSV (ver lib/contactos/importar.ts).
+  //
+  // 503 y no 401 a propósito: Svix reintenta ante 5xx, así que los eventos que
+  // lleguen antes de que la env esté puesta no se pierden.
   const secret = process.env.RESEND_WEBHOOK_SECRET;
-  if (secret && !firmaValida(raw, req.headers, secret)) {
+  if (!secret) return new Response("webhook sin secret configurado", { status: 503 });
+  if (!firmaValida(raw, req.headers, secret)) {
     return new Response("firma inválida", { status: 401 });
   }
 

@@ -14,12 +14,14 @@ interface EventoSendGrid {
 }
 
 export async function POST(req: Request) {
+  // 🔴 FALLA CERRADO — mismo motivo que el de Resend: ruta pública que solo sabe
+  // suprimir contactos, y la supresión no tiene vuelta atrás. Sin el token
+  // configurado no se procesa nada.
   const token = process.env.SENDGRID_WEBHOOK_TOKEN;
-  if (token) {
-    const url = new URL(req.url);
-    if (url.searchParams.get("token") !== token) {
-      return new Response("no autorizado", { status: 401 });
-    }
+  if (!token) return new Response("webhook sin token configurado", { status: 503 });
+  const url = new URL(req.url);
+  if (url.searchParams.get("token") !== token) {
+    return new Response("no autorizado", { status: 401 });
   }
 
   let eventos: EventoSendGrid[];

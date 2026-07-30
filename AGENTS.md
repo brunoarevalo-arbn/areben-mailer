@@ -52,6 +52,7 @@ Auditorías que valen como test (no hay suite de tests):
 node --import tsx scripts/auditar-permisos.ts  # toda action declara su permiso
 node --import tsx scripts/probar-permisos.ts   # invariantes de la matriz
 node --import tsx scripts/probar-gate.ts       # el gate no se abre solo
+node --import tsx scripts/probar-webhooks.ts   # los webhooks de rebotes fallan CERRADO
 node --import tsx scripts/probar-carrito.ts    # el carrito de muestra no sale en un envío real
 node --import tsx scripts/probar-bienvenida.ts # el cupón del pop-up entra, y el placeholder nunca sale
 node --import tsx scripts/probar-productos-dinamicos.ts # la consulta se guarda, los productos no
@@ -418,6 +419,26 @@ temprano cuesta varias veces su tamaño.
   es "cambió el tema" sino **"¿vamos a volver a abrir los mismos archivos?"**.
   Donde más rinde es justo después de resolver un bug difícil: ese contexto es
   casi todo intento fallido. Dentro de una tarea sin terminar va `/compact`.
+
+## Los webhooks de rebotes fallan CERRADO
+
+`/api/webhooks/{resend,sendgrid}` y `/api/ses/sns` son **públicos** (`PUBLIC_PREFIXES`)
+y lo único que saben hacer es **suprimir contactos** — que es de una sola vía: un
+suprimido no vuelve a `ACTIVO` ni re-importando el CSV.
+
+⚠️ **Sin la env de autenticación cargada, los handlers devuelven 503 y no procesan
+nada.** Hasta el 30-jul-2026 hacían `if (secret) { verificar }`, así que sin la env
+—el estado real, porque el webhook nunca se había dado de alta— un POST anónimo con
+`{"type":"email.bounced","data":{"to":[…]}}` quemaba a quien quisiera.
+
+503 y no 401 a propósito: Svix reintenta ante 5xx, así que los eventos que lleguen
+antes de que la env esté puesta no se pierden. Lo fija `scripts/probar-webhooks.ts`,
+verificado que se pone **rojo** si se restaura la forma vieja.
+
+**Alta del webhook de Resend**: `POST https://api.resend.com/webhooks` con
+`{endpoint, events:["email.bounced","email.complained"]}` devuelve el `signing_secret`.
+⚠️ **La `RESEND_API_KEY` del `.env` es de solo-envío** (`restricted_api_key`): para
+esto hace falta una key **Full access**.
 
 ## La bienvenida de los leads de pop-up
 
