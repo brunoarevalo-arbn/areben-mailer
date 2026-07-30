@@ -53,6 +53,7 @@ node --import tsx scripts/auditar-permisos.ts  # toda action declara su permiso
 node --import tsx scripts/probar-permisos.ts   # invariantes de la matriz
 node --import tsx scripts/probar-gate.ts       # el gate no se abre solo
 node --import tsx scripts/probar-carrito.ts    # el carrito de muestra no sale en un envío real
+node --import tsx scripts/probar-bienvenida.ts # el cupón del pop-up entra, y el placeholder nunca sale
 node --import tsx scripts/probar-productos-dinamicos.ts # la consulta se guarda, los productos no
 node --env-file=.env --import tsx scripts/verificar-productos-tn.ts # ↑ pero contra la API real de TN
 node --import tsx scripts/probar-tema.ts       # un tema no deja el mail ilegible
@@ -418,12 +419,40 @@ temprano cuesta varias veces su tamaño.
   Donde más rinde es justo después de resolver un bug difícil: ese contexto es
   casi todo intento fallido. Dentro de una tarea sin terminar va `/compact`.
 
+## La bienvenida de los leads de pop-up
+
+Un lead de Resorty **no crea un cliente en Tiendanube**, así que nunca pasaba por
+`app/api/tn/eventos/route.ts` —el único lugar que creaba `AutomationRun`— y no
+recibía nada. Desde el 30-jul-2026 lo encola **Resorty**: `dispararBienvenida()`
+en `areben-popups/lib/mailer.ts`, por SQL crudo, llamada desde `/api/lead`
+después de crear el cupón.
+
+- **Una bienvenida es una sola vez en la vida del contacto.** Ese camino mira si
+  hubo *algún* run, sin ventana. ⚠️ Es más estricto que el del webhook de TN, que
+  re-dispara pasados `capDias` — son dos criterios distintos a propósito.
+- `triggerData` trae `{ origen:'popup', campaniaId, cupon, vence, condiciones,
+  prizeLabel }`, y **`lib/email/cupon-trigger.ts`** (puro) lo resuelve contra el
+  bloque `cupon`: con código lo pisa, **sin código elimina el bloque**, y un run
+  del webhook de TN no se toca.
+- 🔴 **Sin cupón el bloque se va entero.** Dejar el `BIENVENIDA10` del preset es
+  mandar un código que no existe en TN. Es el caso del backfill.
+- `scripts/backfill-bienvenida.ts` para los leads históricos: `--marca=` y
+  `--dry-run` por default. ⚠️ **El gate tiene que estar en `real` antes**, o los
+  runs se marcan `ENVIADO/"dry-run"` y se queman sin reintento.
+- ⚠️ **Ninguna de las 4 bienvenidas declara el bloque `cupon`** (verificado el
+  30-jul). Hasta que se agregue desde `/automations`, el mail sale sin cupón.
+
 ## Estado del trabajo
 
 - **Nada está enviando hoy.** El gate está cerrado y ninguna automation está
   prendida en producción — prenderlas se hace **desde la UI**, que es lo que
   registra el webhook en Tiendanube (un `UPDATE` a mano deja la automation
   activa y sorda).
+- 🔴 **BDI tiene la Bienvenida DUPLICADA** (`cmrwf6j3m…` de 3 bloques y
+  `cms6kpmqg…` de 4), las dos `PAUSADO` con el mismo asunto. Medido: activar las
+  dos encola **354 runs sobre 177 leads** = dos mails por persona.
+- **BDI no tiene fila en `Remitente`** ⇒ sale con el default de `SES_FROM_EMAIL`.
+  Zattia sí (`info@zattia.com.ar`).
 - **Proveedor sin decidir.** Resend está activo; SES quedó aprobado. Falta el
   ensayo comparativo y el webhook de Resend.
 - **Verificar en browser lo de permisos** con el usuario EDITOR de prueba: las

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ProductoEmail } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
+import { aplicarCuponDelTrigger, type TriggerPopup } from "@/lib/email/cupon-trigger";
 import { sendEmail } from "@/lib/email/enviar";
 import { destinatarioPermitido } from "@/lib/email/proveedor";
 import { inyectarTracking } from "@/lib/email/tracking";
@@ -37,7 +38,7 @@ export async function GET(req: Request) {
       continue;
     }
 
-    const td = run.triggerData as {
+    const td = run.triggerData as TriggerPopup & {
       checkoutId?: string; abandonedUrl?: string; productos?: ProductoEmail[]; restantes?: number;
     };
     const esCarrito = automation.trigger === "CARRITO_ABANDONADO";
@@ -81,6 +82,14 @@ export async function GET(req: Request) {
         bloques.push({ tipo: "carrito", items: td.productos, restantes: td.restantes ?? 0 });
       }
     }
+
+    // Bienvenida de pop-up: el código real que el visitante acabó de sacar en
+    // Resorty, en el bloque `cupon` que el autor puso donde quiso.
+    //
+    // Va antes de resolver los productos dinámicos porque puede SACAR un bloque,
+    // y no tiene sentido resolverle una consulta a TN a un bloque que no va a
+    // salir. Ver el porqué de cada camino en lib/email/cupon-trigger.ts.
+    bloques = aplicarCuponDelTrigger(bloques, td);
 
     // Productos automáticos: lo mismo que hace la cola de campañas, pero acá el
     // caché de `resolverProductosDinamicos` pesa más todavía. Este cron corre
