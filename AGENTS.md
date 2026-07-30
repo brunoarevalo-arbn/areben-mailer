@@ -55,7 +55,7 @@ node --import tsx scripts/probar-permisos.ts   # invariantes de la matriz
 node --import tsx scripts/probar-gate.ts       # el gate no se abre solo
 node --import tsx scripts/probar-webhooks.ts   # los webhooks de rebotes fallan CERRADO
 node --import tsx scripts/probar-carrito.ts    # el carrito de muestra no sale en un envío real
-node --import tsx scripts/probar-bienvenida.ts # el cupón del pop-up entra, y el placeholder nunca sale
+node --import tsx scripts/probar-bienvenida.ts # el cupón del pop-up entra, el placeholder nunca sale, y NUEVO_SUSCRIPTOR no lo alcanza ningún evento de TN
 node --import tsx scripts/probar-productos-dinamicos.ts # la consulta se guarda, los productos no
 node --env-file=.env --import tsx scripts/verificar-productos-tn.ts # ↑ pero contra la API real de TN
 node --import tsx scripts/probar-tema.ts       # un tema no deja el mail ilegible
@@ -458,6 +458,37 @@ recibía nada. Desde el 30-jul-2026 lo encola **Resorty**: `dispararBienvenida()
 en `areben-popups/lib/mailer.ts`, por SQL crudo, llamada desde `/api/lead`
 después de crear el cupón.
 
+### El trigger `NUEVO_SUSCRIPTOR` ("alguien se anotó a la lista")
+
+Cuarto valor de `TriggerTipo` (30-jul-2026, `scripts/add-trigger-suscriptor.ts`).
+Existe porque `NUEVO_CLIENTE` mezcla dos públicos que no tienen nada que ver: el
+que se anota en un pop-up y el que compra por primera vez.
+
+- **Se llama por el EVENTO, no por el widget**, y no `LEAD_POPUP`: la fuente vive
+  en `triggerData.origen`. Ya hay una segunda superficie de captura viva —los
+  formularios `/f/[slug]`, que todavía no encolan runs— y con el widget en el
+  nombre cada una pediría un valor de enum nuevo, que es DDL + deploy y **no se
+  puede sacar**.
+- **`TRIGGER_EVENT` no lo incluye** ⇒ es *incapaz* de dispararse desde el webhook
+  de TN. No hay que filtrar en ningún lado: no hay evento que lo alcance. Lo fija
+  `probar-bienvenida.ts`. Su contracara está en `toggleAutomation`, que **no
+  llama a Tiendanube** cuando el trigger no tiene evento.
+- **Por eso su preset trae el bloque `cupon` de fábrica y el de `NUEVO_CLIENTE`
+  no puede**: un run de `NUEVO_SUSCRIPTOR` siempre viene de una captura, así que
+  `aplicarCuponDelTrigger` o pisa el código o borra el bloque — el placeholder no
+  llega nunca a una casilla. En `NUEVO_CLIENTE` el webhook deja el bloque intacto
+  y saldría `BIENVENIDA10`, que no existe en TN.
+- 🔴 **Su saludo NO usa `${contacto.nombre}`.** El pop-up simple pide solo el
+  mail: al 30-jul los 22 leads de Zattia no tienen nombre y el merge tag se
+  reemplaza por vacío ⇒ "¡Hola ! 👋" al 100% del público de ese trigger.
+- **`aplicarCuponDelTrigger` pregunta si HAY `origen`, nunca si vale `"popup"`.**
+  Con el literal hardcodeado, un lead de formulario caería en la rama del webhook.
+- `dispararBienvenida()` y `backfill-bienvenida.ts` miran **los dos** triggers.
+  ⚠️ Prender una bienvenida de cada uno le manda **dos mails** al mismo lead.
+- 🔴 **El orden no se altera: enum a la base → DEPLOY (los DOS repos) → recién
+  ahí tocar la fila de una automation.** Al revés, la Prisma de producción no
+  conoce el valor y revienta al LEER esa fila: se cae `/automations` en vivo.
+
 - **Una bienvenida es una sola vez en la vida del contacto.** Ese camino mira si
   hubo *algún* run, sin ventana. ⚠️ Es más estricto que el del webhook de TN, que
   re-dispara pasados `capDias` — son dos criterios distintos a propósito.
@@ -470,8 +501,10 @@ después de crear el cupón.
 - `scripts/backfill-bienvenida.ts` para los leads históricos: `--marca=` y
   `--dry-run` por default. ⚠️ **El gate tiene que estar en `real` antes**, o los
   runs se marcan `ENVIADO/"dry-run"` y se queman sin reintento.
-- ⚠️ **Ninguna de las 4 bienvenidas declara el bloque `cupon`** (verificado el
-  30-jul). Hasta que se agregue desde `/automations`, el mail sale sin cupón.
+- ⚠️ **Ninguna de las 4 bienvenidas viejas declara el bloque `cupon`** (verificado
+  el 30-jul). Hasta que se agregue desde `/automations`, ese mail sale sin cupón.
+  La forma nueva de resolverlo es crear la de **`NUEVO_SUSCRIPTOR`**, que ya nace
+  con el bloque puesto y con un saludo que funciona sin nombre.
 
 ## Estado del trabajo
 
