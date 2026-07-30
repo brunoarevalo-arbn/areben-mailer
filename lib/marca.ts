@@ -27,6 +27,19 @@ export interface ConfigCuenta {
   idioma?: string;
   /** Razón social y domicilio, para el pie del mail. Lo trae TN. */
   direccion?: string;
+  /**
+   * ¿Esconder el domicilio del pie? Ausente = se muestra, que es como se portó
+   * siempre.
+   *
+   * El flag es "ocultar" y no "mostrar" a propósito: con la pregunta al revés,
+   * las cuentas que ya existen —que no tienen la clave— pasarían a mandar sin
+   * domicilio de un día para el otro por un default.
+   *
+   * ⚠️ No borra `direccion`: "Traer de mi tienda" la vuelve a escribir en cada
+   * corrida, así que vaciar el dato no alcanzaría para que deje de salir. Y
+   * guardarla igual deja volver atrás con un click.
+   */
+  direccionOculta?: boolean;
   /** Cuándo se sincronizaron los contactos por última vez. */
   lastSyncContactos?: string;
   /** Cuándo se trajeron los datos de la tienda por última vez. */
@@ -68,6 +81,7 @@ export function leerConfigCuenta(valor: unknown): ConfigCuenta {
     url: txt(c.url)?.replace(/\/+$/, ""),
     idioma: txt(c.idioma),
     direccion: txt(c.direccion),
+    direccionOculta: c.direccionOculta === true,
     lastSyncContactos: txt(c.lastSyncContactos),
     marcaSync: txt(c.marcaSync),
     htmlCrudoHabilitado: c.htmlCrudoHabilitado === true,
@@ -84,7 +98,10 @@ export function marcaDe(cuenta: { nombre: string; config: unknown }): Marca {
     nombreCuenta: cuenta.nombre,
     logoCuenta: c.logo,
     urlCuenta: c.url,
-    direccionPostal: c.direccion,
+    // El filtro vive acá y no en el renderer: `marcaDe` es la única puerta por
+    // la que la marca llega a los ocho call sites que dibujan un mail, así que
+    // apagado acá queda apagado en el envío, en el preview y en las pruebas.
+    direccionPostal: c.direccionOculta ? undefined : c.direccion,
     temaMarca,
     permiteHtmlCrudo: c.htmlCrudoHabilitado,
   };

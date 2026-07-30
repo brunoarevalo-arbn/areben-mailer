@@ -185,5 +185,36 @@ titulo("El domicilio de la tienda va al pie");
   ok(html.includes(BAJA), "y el link de baja sigue estando");
 }
 
+// ─── El domicilio se puede apagar, el link de baja no ───────────────────────
+titulo("Mostrar el domicilio es una decisión de la marca");
+{
+  const DIR = "AREBEN COMERCIAL S. R. L. · PJE HUTCHINSON 3869";
+  const con = marcaDe({ nombre: "Marca Uno", config: { direccion: DIR } });
+  ok(con.direccionPostal === DIR, "sin la clave, el domicilio sale como salió siempre");
+
+  const sin = marcaDe({ nombre: "Marca Uno", config: { direccion: DIR, direccionOculta: true } });
+  ok(sin.direccionPostal === undefined, "con `direccionOculta` no llega al renderer");
+
+  // 🔴 Apagarlo no puede llevarse puesto el dato: "Traer de mi tienda" lo
+  // reescribe en cada corrida, así que borrarlo no serviría de nada, y hay que
+  // poder volver a prenderlo sin ir a buscar el domicilio otra vez.
+  ok(
+    leerConfigCuenta({ direccion: DIR, direccionOculta: true }).direccion === DIR,
+    "…pero el domicilio sigue guardado en el config",
+  );
+
+  const html = render({ v: V_ACTUAL, bloques: [] }, sin);
+  ok(!html.includes("PJE HUTCHINSON"), "el pie sale sin domicilio");
+  ok(html.includes("Marca Uno"), "con el nombre de la marca");
+  // El link de baja NO es negociable: por eso el pie no es un bloque.
+  ok(html.includes(BAJA), "y con el link de baja, que no se puede apagar");
+}
+{
+  // El default importa: las cuentas que ya existen no tienen la clave, y no
+  // pueden empezar a mandar sin domicilio por un cambio de código.
+  const vieja = marcaDe({ nombre: "Marca Uno", config: { direccion: "CALLE FALSA 123" } });
+  ok(vieja.direccionPostal === "CALLE FALSA 123", "una cuenta vieja no cambia de comportamiento");
+}
+
 console.log(fallas === 0 ? "\n✅ Marca OK\n" : `\n❌ ${fallas} fallas\n`);
 process.exit(fallas === 0 ? 0 : 1);

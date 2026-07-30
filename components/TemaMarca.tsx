@@ -6,7 +6,12 @@ import { Button } from "@/components/ui/Button";
 import { renderEmailHtml, type Bloque } from "@/lib/email/render";
 import type { Tema } from "@/lib/email/tema";
 import type { Marca } from "@/lib/marca";
-import { guardarHtmlCrudoHabilitado, guardarTemaMarca, traerMarcaDeTienda } from "@/app/(app)/remitentes/actions";
+import {
+  guardarDireccionOculta,
+  guardarHtmlCrudoHabilitado,
+  guardarTemaMarca,
+  traerMarcaDeTienda,
+} from "@/app/(app)/remitentes/actions";
 
 // Aspecto por defecto de los mails de la marca.
 //
@@ -37,11 +42,16 @@ export function TemaMarca({
   inicial,
   marca: marcaInicial,
   conectada,
+  direccion,
+  direccionOculta: ocultaInicial,
 }: {
   inicial: Tema | undefined;
   marca: Marca;
   /** ¿La cuenta tiene tienda de Tiendanube vinculada? Sin eso no hay de dónde traer. */
   conectada: boolean;
+  /** El domicilio tal como está guardado, se muestre o no. Ver el comentario de la página. */
+  direccion: string | undefined;
+  direccionOculta: boolean;
 }) {
   const [tema, setTema] = useState<Tema | undefined>(inicial);
   const [marca, setMarca] = useState<Marca>(marcaInicial);
@@ -52,12 +62,20 @@ export function TemaMarca({
   const [htmlCrudo, setHtmlCrudo] = useState<boolean>(!!marcaInicial.permiteHtmlCrudo);
   const [guardandoHtml, startHtml] = useTransition();
   const [msgHtml, setMsgHtml] = useState<string | null>(null);
+  const [dir, setDir] = useState<string | undefined>(direccion);
+  const [dirOculta, setDirOculta] = useState<boolean>(ocultaInicial);
+  const [guardandoDir, startDir] = useTransition();
+  const [msgDir, setMsgDir] = useState<string | null>(null);
 
   const sucio = JSON.stringify(tema ?? {}) !== JSON.stringify(inicial ?? {});
   const previewHtml = renderEmailHtml(
     { bloques: MUESTRA, tema },
     {
       ...marca,
+      // El preview tiene que responder al checkbox en el acto: `marca` llega del
+      // servidor ya filtrada, así que el pie del ejemplo se arma con el dato
+      // crudo y la decisión de acá.
+      direccionPostal: dirOculta ? undefined : dir,
       // El tema guardado NO va de default acá: es justo lo que se está
       // editando. Si fuera también el default, sacarle un color en el selector
       // no se vería —lo taparía el que ya está en la base—.
@@ -78,8 +96,23 @@ export function TemaMarca({
       const r = await traerMarcaDeTienda();
       if (!r.ok) return setMsgMarca(r.error ?? "No se pudo.");
       setMarca(r.marca);
+      // ⚠️ `r.marca.direccionPostal` viene vacía si el domicilio está oculto —
+      // no es que TN no lo haya traído. En ese caso se deja el que ya estaba.
+      if (r.marca.direccionPostal) setDir(r.marca.direccionPostal);
       setMsgMarca(r.marca.logoCuenta ? "Listo: logo, sitio y datos de tu tienda." : "Listo, pero tu tienda no tiene logo cargado en Tiendanube.");
     });
+
+  const cambiarDireccion = (mostrar: boolean) => {
+    setDirOculta(!mostrar);
+    setMsgDir(null);
+    startDir(async () => {
+      const r = await guardarDireccionOculta(!mostrar);
+      if (!r.ok) {
+        setDirOculta(mostrar);
+        setMsgDir(r.error ?? "No se pudo guardar.");
+      }
+    });
+  };
 
   const cambiarHtmlCrudo = (v: boolean) => {
     setHtmlCrudo(v);
@@ -134,9 +167,27 @@ export function TemaMarca({
             </div>
             <div className="flex items-center gap-2">
               <dt className="w-20 shrink-0 text-subtle">Pie</dt>
-              <dd className="min-w-0 flex-1 truncate text-muted">{marca.direccionPostal || "—"}</dd>
+              <dd className="min-w-0 flex-1 truncate text-muted">{dir || "—"}</dd>
             </div>
           </dl>
+          <label className="mt-3 flex items-start gap-2 border-t border-border pt-3">
+            <input
+              type="checkbox"
+              checked={!dirOculta}
+              disabled={guardandoDir || !dir}
+              onChange={(e) => cambiarDireccion(e.target.checked)}
+              className="mt-0.5 accent-accent"
+            />
+            <span className="text-xs">
+              <span className="font-medium text-foreground">Mostrar el domicilio en el pie</span>
+              <p className="mt-1 text-muted">
+                Es obligatorio para los mails que llegan a Estados Unidos y una de las señales que
+                miran los filtros de spam. Si lo apagás, el pie queda con el nombre de la marca y el
+                link de baja.
+              </p>
+              {msgDir && <p className="mt-1 text-danger-foreground">{msgDir}</p>}
+            </span>
+          </label>
           {msgMarca && <p className="mt-2 text-xs text-muted">{msgMarca}</p>}
         </div>
 

@@ -329,6 +329,16 @@ en **`Cuenta.config`** (Json libre — sin columna nueva: la base es compartida)
 - ⚠️ **El merge nunca pisa el resto del `config`** — ahí viven `tema` y
   `lastSyncContactos`. Va siempre por `configConTienda()`, y un campo que TN
   devuelve vacío no borra el que ya estaba.
+- **El domicilio del pie se puede apagar** (`config.direccionOculta`, checkbox en
+  `/remitentes`). La clave es "ocultar" y no "mostrar" para que una cuenta que no
+  la tiene siga saliendo con domicilio: al revés, un default nuevo cambiaría el
+  pie de todas las marcas existentes. **El dato no se borra** —"Traer de mi
+  tienda" lo reescribe igual, y así se puede volver atrás con un click—: el
+  filtro vive en `marcaDe()`, la única puerta por la que la marca llega a los
+  ocho call sites del renderer. ⚠️ El domicilio del remitente es obligatorio
+  bajo CAN-SPAM para lo que entra a EE.UU. y una señal que miran los filtros:
+  apagarlo es decisión del comerciante. **El link de baja no se puede apagar** —
+  por eso el pie no es un bloque.
 
 ## Biblioteca de imágenes (Vercel Blob)
 

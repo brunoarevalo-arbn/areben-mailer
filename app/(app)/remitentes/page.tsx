@@ -4,7 +4,7 @@ import { getCuentaActiva } from "@/lib/cuenta";
 import { RemitentesManager } from "@/components/RemitentesManager";
 import { TemaMarca } from "@/components/TemaMarca";
 import { temaDe } from "@/lib/email/tema";
-import { marcaDe } from "@/lib/marca";
+import { leerConfigCuenta, marcaDe } from "@/lib/marca";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +24,11 @@ export default async function RemitentesPage() {
     },
   });
 
+  // 🔴 La dirección va aparte de `marcaDe`: ahí ya viene filtrada por el toggle,
+  // así que "oculta" y "no hay dato" llegarían iguales y el checkbox no sabría
+  // qué mostrar. El componente necesita el dato crudo Y la decisión.
+  const config = leerConfigCuenta(cuenta.config);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -32,7 +37,13 @@ export default async function RemitentesPage() {
         subtitle={`Desde qué dirección envía ${cuenta.nombre}. El dominio debe estar verificado en SES.`}
       />
       <RemitentesManager marca={cuenta.nombre} remitentes={remitentes} />
-      <TemaMarca inicial={temaDe(cuenta.config)} marca={marcaDe(cuenta)} conectada={!!cuenta.tnStoreId} />
+      <TemaMarca
+        inicial={temaDe(cuenta.config)}
+        marca={marcaDe(cuenta)}
+        conectada={!!cuenta.tnStoreId}
+        direccion={config.direccion}
+        direccionOculta={!!config.direccionOculta}
+      />
     </div>
   );
 }

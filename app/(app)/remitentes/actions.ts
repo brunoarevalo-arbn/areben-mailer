@@ -173,3 +173,27 @@ export async function guardarHtmlCrudoHabilitado(habilitado: boolean) {
   revalidatePath("/remitentes");
   return { ok: true as const };
 }
+
+/**
+ * Muestra o esconde el domicilio postal en el pie de los mails de esta cuenta.
+ *
+ * ⚠️ El domicilio del remitente es requisito de CAN-SPAM para lo que entra a
+ * Estados Unidos y una de las señales que miran los filtros: apagarlo es una
+ * decisión del comerciante, no un default nuestro. Por eso la clave que se
+ * guarda es `direccionOculta` (ausente = se muestra) y el dato de TN queda en
+ * el config intacto para poder volver atrás.
+ */
+export async function guardarDireccionOculta(oculta: boolean) {
+  const chk = await chequear("remitentes");
+  if (!chk.ok) return chk;
+  const { cuenta } = chk.ctx;
+
+  const config = (cuenta.config as Prisma.JsonObject) ?? {};
+  const nuevo: Prisma.JsonObject = { ...config };
+  if (oculta) nuevo.direccionOculta = true;
+  else delete nuevo.direccionOculta;
+
+  await prisma.cuenta.update({ where: { id: cuenta.id }, data: { config: nuevo } });
+  revalidatePath("/remitentes");
+  return { ok: true as const };
+}
