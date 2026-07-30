@@ -68,6 +68,7 @@ node --import tsx scripts/probar-marca.ts      # la marca de TN no se guarda ade
 node --import tsx scripts/probar-panel-estilo.ts # ningún control del panel está desconectado
 node --import tsx scripts/probar-presets.ts    # ninguna plantilla prearmada tiene un botón que no lleva a nada
 node --import tsx scripts/probar-import.ts     # la supresión de un import es de una sola vía
+node --import tsx scripts/probar-tramos.ts     # el ramp no pierde ni duplica a nadie, y Microsoft va último
 ```
 
 ⚠️ `probar-render.ts` compara contra `scripts/fixtures/render-golden.json`. Si el
@@ -507,5 +508,15 @@ después de crear el cupón.
   clicks**, que no se falsifican por prefetch. Falta exportarlos de Perfit.
 - ⚠️ **El motor manda a una lista o segmento COMPLETO**: no hay "mandale a 500 de
   estos 5.280", y los segmentos no filtran por dominio ni por cantidad (ver
-  `CAMPOS` en `lib/segmentos.ts`). Para escalonar hacen falta **listas por tramo**,
-  que es la misma pieza que después necesita la cuarentena del SaaS.
+  `CAMPOS` en `lib/segmentos.ts`). Escalonar es **fabricar listas**:
+  `scripts/listas-por-tramo.ts` (dry-run por default) parte una lista en tramos de
+  un solo buzón siguiendo una escalera de volumen, con `lib/contactos/tramos.ts`
+  como parte pura. Es la misma pieza que después necesita la cuarentena del SaaS.
+  - **Nadie se re-asigna**: quien ya está en un tramo del prefijo no entra en otro,
+    así que re-correrlo cuando la lista crece solo agrega tramos al final. Eso es
+    lo que impide mandar dos veces.
+  - **La audiencia sale de `MANDABLE`** (`lib/campanias.ts`), la misma constante que
+    usa la campaña: dos criterios serían un tramo que promete 500 y un envío de 430.
+  - Medido el 30-jul-2026 con el script: `Nuby — suscriptores` son 5.280 mandables
+    (87,4% Gmail) y `Perfit — abrieron 2026` 685, de los cuales **74 también están
+    en Nuby** — por eso existe `--excluir`.

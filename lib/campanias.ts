@@ -2,6 +2,14 @@ import { prisma } from "@/lib/prisma";
 import { reglasToWhere, type Reglas } from "@/lib/segmentos";
 
 /**
+ * Un contacto es mandable si está ACTIVO y aceptó marketing. Vive acá y en un
+ * solo lugar porque lo usan dos cosas que tienen que coincidir: la audiencia de
+ * una campaña y los tramos del ramp (`scripts/listas-por-tramo.ts`). Si el tramo
+ * usara otro criterio, prometería 500 y el motor mandaría 430 sin decir por qué.
+ */
+export const MANDABLE = { estado: "ACTIVO", tnAcceptsMkt: true } as const;
+
+/**
  * Contactos elegibles de una campaña: del destino (lista o segmento),
  * activos y que aceptan marketing. Devuelve null si el segmento no existe.
  */
@@ -18,7 +26,7 @@ export async function contactosElegibles(
     destinoWhere = reglasToWhere(seg.reglas as unknown as Reglas);
   }
   return prisma.contacto.findMany({
-    where: { cuentaId, estado: "ACTIVO", tnAcceptsMkt: true, ...destinoWhere },
+    where: { cuentaId, ...MANDABLE, ...destinoWhere },
     select: { id: true, email: true },
   });
 }
