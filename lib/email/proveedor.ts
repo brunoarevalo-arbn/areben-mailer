@@ -102,7 +102,7 @@ export interface SendArgs {
   unsubscribeUrl?: string;
   /** Dirección Reply-To opcional. */
   replyTo?: string;
-  /** Remitente de la marca (fallback a SES_FROM_EMAIL si no se pasa). */
+  /** Remitente de la marca. Sin esto no se manda: no hay fallback global. */
   fromEmail?: string;
   fromName?: string;
 }
@@ -132,11 +132,31 @@ export class EmailError extends Error {
   }
 }
 
-/** Arma el `Nombre <email>` a partir del remitente de la marca o el default. */
+export const MSG_SIN_REMITENTE =
+  'La marca no tiene remitente propio cargado. Se carga en /remitentes: sin eso el mail saldría firmado por otra marca.';
+
+/**
+ * Arma el `Nombre <email>` a partir del remitente de la marca.
+ *
+ * ⛔ **No hay fallback, y es a propósito.** Hasta el 30-jul-2026 esto caía a
+ * `SES_FROM_EMAIL` cuando la marca no tenía fila en `Remitente`, y esa env es
+ * **una sola para todo el proyecto**: valía `info@bdiaccesorios.com.ar`, así que
+ * un mail de Stunned o de Resorty Lab habría salido firmado por BDI. No fallaba
+ * —salía mal, que es peor—, y del lado de quien lo recibe es un mail de una
+ * marca que nunca conoció.
+ *
+ * Es el mismo criterio que ya rige en `presets.ts` y en el bloque `encabezado`:
+ * nada de una marca se hornea como default de otra. Una marca sin remitente no
+ * manda; el arreglo es cargarlo, no adivinarlo.
+ *
+ * Esto es la última línea: los llamadores frenan antes (ver `enviarCampania`,
+ * `toggleAutomation` y `procesarLote`) para no encolar envíos que nacen
+ * condenados. Si igual se llega hasta acá, cortar es lo correcto.
+ */
 export function armarFrom(args: SendArgs): { email: string; nombre: string } {
-  const email = args.fromEmail ?? process.env.SES_FROM_EMAIL!;
-  const nombre = args.fromName ?? process.env.SES_FROM_NAME ?? '';
-  return { email, nombre };
+  const email = args.fromEmail?.trim();
+  if (!email) throw new EmailError(MSG_SIN_REMITENTE);
+  return { email, nombre: args.fromName?.trim() ?? '' };
 }
 
 /** Headers de baja one-click (RFC 8058). Los soportan los tres proveedores. */

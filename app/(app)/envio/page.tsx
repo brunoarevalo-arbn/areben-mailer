@@ -168,12 +168,14 @@ export default async function EnvioPage() {
               <Dato label="Responder a">{d.remitente.responderA ?? "—"}</Dato>
             </>
           ) : (
-            <>
-              <p className="text-sm text-muted">
-                La marca no tiene remitente propio: sale por el fallback de env.
+            <div className="text-sm text-danger-foreground">
+              <div className="font-medium">Esta marca no puede enviar.</div>
+              <p className="text-xs text-muted mt-1">
+                No tiene remitente propio, y no hay default: un mail sin remitente de la marca
+                saldría firmado por otra. Se carga en <code className="text-foreground">/remitentes</code>{" "}
+                y con eso queda habilitada.
               </p>
-              <Dato label="Fallback">{d.remitenteFallback ?? "sin definir"}</Dato>
-            </>
+            </div>
           )}
         </Card>
       </div>

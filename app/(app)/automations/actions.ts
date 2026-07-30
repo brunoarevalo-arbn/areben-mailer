@@ -8,6 +8,7 @@ import { leerContenido } from "@/lib/email/esquema";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { marcaDe } from "@/lib/marca";
 import { sendEmail } from "@/lib/email/enviar";
+import { MSG_SIN_REMITENTE } from "@/lib/email/proveedor";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { type Trigger } from "@/lib/automations";
 import { presetDeTrigger } from "@/lib/plantillas/presets";
@@ -78,6 +79,12 @@ export async function toggleAutomation(id: string) {
   // que aparezca un admin.
   const auth = await chequear(nuevoEstado === "ACTIVO" ? "enviar" : "editar");
   if (!auth.ok) return { ok: false, error: auth.error };
+
+  // Encender sin remitente dejaría la automation disparando runs que el cron no
+  // puede mandar: se acumularían PENDIENTE hasta que alguien mire. Pausar nunca
+  // se frena — la acción segura no se bloquea por un dato que falta.
+  if (nuevoEstado === "ACTIVO" && !(await getRemitenteEnvio(cuenta.id)))
+    return { ok: false, error: `${cuenta.nombre}: ${MSG_SIN_REMITENTE}` };
 
   if (nuevoEstado === "ACTIVO" && cuenta.tnStoreId && cuenta.tnToken) {
     const event = TRIGGER_EVENT[a.trigger];

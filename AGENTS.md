@@ -69,6 +69,7 @@ node --import tsx scripts/probar-panel-estilo.ts # ningún control del panel est
 node --import tsx scripts/probar-presets.ts    # ninguna plantilla prearmada tiene un botón que no lleva a nada
 node --import tsx scripts/probar-import.ts     # la supresión de un import es de una sola vía
 node --import tsx scripts/probar-tramos.ts     # el ramp no pierde ni duplica a nadie, y Microsoft va último
+node --import tsx scripts/probar-remitente.ts  # una marca sin remitente propio NO manda (no hay fallback)
 ```
 
 ⚠️ `probar-render.ts` compara contra `scripts/fixtures/render-golden.json`. Si el
@@ -473,8 +474,19 @@ después de crear el cupón.
 - 🔴 **BDI tiene la Bienvenida DUPLICADA** (`cmrwf6j3m…` de 3 bloques y
   `cms6kpmqg…` de 4), las dos `PAUSADO` con el mismo asunto. Medido: activar las
   dos encola **354 runs sobre 177 leads** = dos mails por persona.
-- **BDI no tiene fila en `Remitente`** ⇒ sale con el default de `SES_FROM_EMAIL`.
-  Zattia sí (`info@zattia.com.ar`).
+- 🔴 **Una marca sin fila en `Remitente` NO manda** (30-jul-2026). Antes caía al
+  default de `SES_FROM_EMAIL`, que es **uno solo para todo el proyecto**
+  (`info@bdiaccesorios.com.ar`): un mail de Stunned o de Resorty Lab salía
+  firmado por BDI. No fallaba, salía mal. El fallback se sacó de `armarFrom()`
+  y hay guardas antes de encolar (`enviarCampania`, `promoverGanador`,
+  `toggleAutomation`) para no descubrirlo con 5.000 envíos en curso.
+  - **Nada se marca FALLIDO por esto.** `procesarLote` corta antes del loop y
+    devuelve `bloqueado`; el cron de automations deja el run **PENDIENTE**.
+    `FALLIDO` es terminal y sin reintento: quemaría un tramo entero —o la única
+    bienvenida que un contacto recibe en su vida— por un dato de diez segundos.
+  - Hoy **solo Zattia** tiene remitente (`info@zattia.com.ar`). BDI, Stunned,
+    Resorty Lab y la cuenta de QA no ⇒ **BDI no puede enviar hasta cargarlo**,
+    con `scripts/set-remitente.ts` o desde `/remitentes`.
 - **Proveedor sin decidir.** Resend está activo; SES quedó aprobado. Falta el
   ensayo comparativo y el webhook de Resend.
 - **Verificar en browser lo de permisos** con el usuario EDITOR de prueba: las

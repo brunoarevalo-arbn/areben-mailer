@@ -38,6 +38,16 @@ export async function GET(req: Request) {
       continue;
     }
 
+    // Sin remitente propio esta marca no manda (ver `armarFrom`). Se saltea el
+    // run **dejándolo PENDIENTE**, no FALLIDO: una bienvenida es una sola vez en
+    // la vida del contacto, así que quemarla por un dato que falta sería perderla
+    // para siempre. Cargado el remitente, el cron los toma en la corrida siguiente.
+    const rem = await getRemitenteEnvio(automation.cuentaId);
+    if (!rem) {
+      saltados++;
+      continue;
+    }
+
     const td = run.triggerData as TriggerPopup & {
       checkoutId?: string; abandonedUrl?: string; productos?: ProductoEmail[]; restantes?: number;
     };
@@ -142,7 +152,6 @@ export async function GET(req: Request) {
     let texto = aplicarMergeTags(renderEmailTexto({ ...contenido, bloques }, opts), contacto);
     if (esCarrito) texto = texto.replaceAll("${cart.url}", td.abandonedUrl ?? "#");
 
-    const rem = await getRemitenteEnvio(automation.cuentaId);
     try {
       const res = await sendEmail({
         to: contacto.email,
@@ -150,9 +159,9 @@ export async function GET(req: Request) {
         html,
         text: texto,
         unsubscribeUrl: unsubUrl,
-        fromEmail: rem?.email,
-        fromName: rem?.nombre,
-        replyTo: rem?.responderA ?? undefined,
+        fromEmail: rem.email,
+        fromName: rem.nombre,
+        replyTo: rem.responderA ?? undefined,
       });
       await prisma.$transaction([
         prisma.automationRun.update({ where: { id: run.id }, data: { estado: "ENVIADO", sesMessageId: res.messageId } }),

@@ -11,7 +11,12 @@ import { getRemitenteEnvio } from "@/lib/remitentes";
 import { contactosElegibles, crearEnvios } from "@/lib/campanias";
 import { arrancarCola } from "@/lib/email/cola";
 import { after } from "next/server";
-import { destinatarioPermitido, modoEnvio, MSG_ENVIO_BLOQUEADO } from "@/lib/email/proveedor";
+import {
+  destinatarioPermitido,
+  modoEnvio,
+  MSG_ENVIO_BLOQUEADO,
+  MSG_SIN_REMITENTE,
+} from "@/lib/email/proveedor";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -102,6 +107,12 @@ export async function enviarCampania(id: string) {
   if (modo === "bloqueado")
     return { ok: false, error: `${MSG_ENVIO_BLOQUEADO} Mientras tanto usá "Enviar prueba".` };
 
+  // Sin remitente propio no se manda, y se avisa ACÁ: llegar a `armarFrom` con
+  // 5.000 envíos ya encolados sería descubrirlo cuando la campaña está en curso.
+  const remitente = await getRemitenteEnvio(cuenta.id);
+  if (!remitente)
+    return { ok: false, error: `${cuenta.nombre}: ${MSG_SIN_REMITENTE}` };
+
   const esAB = campania.abTestPct != null;
   if (esAB && !campania.asuntoB) return { ok: false, error: "Falta el asunto B" };
 
@@ -156,6 +167,9 @@ export async function promoverGanador(id: string, ganador: "A" | "B") {
   if (ganador !== "A" && ganador !== "B") return { ok: false, error: "Ganador inválido" };
   const modo = modoEnvio();
   if (modo === "bloqueado") return { ok: false, error: MSG_ENVIO_BLOQUEADO };
+  // Promover manda al holdout entero: mismo chequeo que enviar.
+  if (!(await getRemitenteEnvio(cuenta.id)))
+    return { ok: false, error: `${cuenta.nombre}: ${MSG_SIN_REMITENTE}` };
 
   const todos = await contactosElegibles(cuenta.id, campania);
   if (todos === null) return { ok: false, error: "Segmento no encontrado" };

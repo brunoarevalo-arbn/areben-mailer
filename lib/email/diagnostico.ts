@@ -33,7 +33,11 @@ export interface DiagnosticoEnvio {
   rebotes: EstadoRebotes;
   remitente: { nombre: string; email: string; responderA: string | null } | null;
   /** El fallback por env cuando la marca no tiene remitente propio. */
-  remitenteFallback: string | null;
+  /**
+   * ⚠️ `remitente: null` ya no es "sale por el default de env": es **esta marca
+   * no puede mandar**. El fallback global se sacó el 30-jul-2026 porque firmaba
+   * los mails de una marca con la dirección de otra.
+   */
 }
 
 function estadoRebotes(proveedor: string | null): EstadoRebotes {
@@ -91,6 +95,5 @@ export async function getDiagnosticoEnvio(cuentaId: string): Promise<Diagnostico
     listaEnsayo: modo === 'ensayo' ? listaEnsayo() : [],
     rebotes: estadoRebotes(proveedor),
     remitente: rem,
-    remitenteFallback: rem ? null : process.env.SES_FROM_EMAIL ?? null,
   };
 }

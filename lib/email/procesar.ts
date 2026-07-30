@@ -5,7 +5,7 @@ import { resolverProductosDinamicos } from "./productos-dinamicos";
 import { marcaDe } from "@/lib/marca";
 import { inyectarTracking } from "@/lib/email/tracking";
 import { sendEmail, esThrottle } from "@/lib/email/enviar";
-import { destinatarioPermitido, modoEnvio } from "@/lib/email/proveedor";
+import { destinatarioPermitido, modoEnvio, MSG_SIN_REMITENTE } from "@/lib/email/proveedor";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 
 const BATCH = 20;
@@ -15,6 +15,12 @@ export interface ResultadoLote {
   fallidos: number;
   restantes: number;
   throttled: boolean;
+  /**
+   * Motivo por el que el lote no pudo ni empezar. Distinto de `throttled`: acá
+   * no hay nada que esperar, hace falta que una persona arregle algo. Los
+   * envíos quedan ENCOLADO y salen solos cuando se arregla.
+   */
+  bloqueado?: string;
 }
 
 /**
@@ -32,7 +38,18 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
 
   const appUrl = process.env.APP_URL ?? "";
   const contenido = leerContenido(campania.contenido);
+
+  // Sin remitente propio la marca no manda (ver `armarFrom`). Se corta ACÁ,
+  // antes del loop, y NO se marca nada FALLIDO: `FALLIDO` es terminal y sin
+  // reintento, así que quemaría a los 500 de un tramo por un dato que se carga
+  // en diez segundos. Todo queda ENCOLADO y el cron los manda solo cuando el
+  // remitente exista.
   const rem = await getRemitenteEnvio(campania.cuentaId);
+  if (!rem) {
+    console.log(JSON.stringify({ ev: "lote-bloqueado", motivo: "sin-remitente", campaniaId }));
+    const restantes = await prisma.envio.count({ where: { campaniaId, estado: "ENCOLADO" } });
+    return { enviados: 0, fallidos: 0, restantes, throttled: false, bloqueado: MSG_SIN_REMITENTE };
+  }
 
   // Los productos automáticos se resuelven ACÁ, **antes** del loop: una vez por
   // lote de 20 y no una vez por destinatario. Adentro del loop, los 16.800
@@ -92,9 +109,9 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
         html,
         text: texto,
         unsubscribeUrl: unsubUrl,
-        fromEmail: rem?.email,
-        fromName: rem?.nombre,
-        replyTo: rem?.responderA ?? undefined,
+        fromEmail: rem.email,
+        fromName: rem.nombre,
+        replyTo: rem.responderA ?? undefined,
       });
       await prisma.envio.update({
         where: { id: envio.id },

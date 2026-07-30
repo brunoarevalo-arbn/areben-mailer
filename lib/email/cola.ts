@@ -33,7 +33,7 @@ export interface ResultadoCola {
   lotes: number;
   /** true si quedó trabajo pendiente y hay que volver a invocar. */
   continuar: boolean;
-  motivo: "sin-trabajo" | "terminada" | "sin-tiempo" | "throttled" | "lease-ajeno";
+  motivo: "sin-trabajo" | "terminada" | "sin-tiempo" | "throttled" | "lease-ajeno" | "bloqueado";
 }
 
 /**
@@ -118,6 +118,14 @@ export async function procesarCola(): Promise<ResultadoCola> {
 
       if (r.restantes === 0) {
         motivo = "terminada";
+        break;
+      }
+      // Falta algo que solo arregla una persona (hoy: la marca sin remitente).
+      // No es `throttled`: esperar no lo resuelve, y reintentar los 45s de
+      // presupuesto contra la misma pared es quemar la invocación entera. Los
+      // envíos quedan ENCOLADO y el cron los retoma cuando esté cargado.
+      if (r.bloqueado) {
+        motivo = "bloqueado";
         break;
       }
       if (Date.now() - t0 > PRESUPUESTO_MS) {
