@@ -11,7 +11,14 @@ import type { Bloque } from "./bloques";
 
 /** Lo que `areben-popups` deja en `AutomationRun.triggerData` (ver `lib/mailer.ts` de ese repo). */
 export interface TriggerPopup {
-  /** `"popup"` solo cuando el run lo encoló Resorty. Ausente = webhook de Tiendanube. */
+  /**
+   * De qué superficie de captura vino: `"popup"` (Resorty) y, cuando existan,
+   * `"formulario"` y las que sigan. **Ausente = webhook de Tiendanube.**
+   *
+   * 🔴 Lo que se pregunta es si HAY `origen`, nunca si vale `"popup"`: con el
+   * literal hardcodeado, un lead de formulario caería en la rama del webhook y
+   * saldría con el placeholder de la plantilla.
+   */
   origen?: string;
   campaniaId?: string;
   cupon?: string | null;
@@ -26,21 +33,26 @@ export interface TriggerPopup {
  *
  * Tres caminos, y el del medio es el que importa:
  *
- * 1. Run del webhook de TN (sin `origen`) → **no se toca nada**. El que escribió
- *    un código estático a mano lo sigue viendo. Compatibilidad hacia atrás.
- * 2. Lead de pop-up **sin** cupón (el backfill de los históricos, o un
- *    `crearCupon` que falló) → **se elimina el bloque**. 🔴 Dejar el placeholder
- *    del preset —`BIENVENIDA10`— sería mandarle a un cliente un código que no
- *    existe en Tiendanube: lo tipea en el checkout, no anda, y el mail queda
- *    peor que si no hubiera traído cupón.
- * 3. Lead de pop-up con cupón → se pisa el código y el texto.
+ * 1. Run del webhook de TN (**sin `origen`**) → **no se toca nada**. El que
+ *    escribió un código estático a mano lo sigue viendo. Compatibilidad hacia
+ *    atrás.
+ * 2. Lead de una captura nuestra **sin** cupón (el backfill de los históricos, o
+ *    un `crearCupon` que falló) → **se elimina el bloque**. 🔴 Dejar el
+ *    placeholder del preset —`BIENVENIDA10`— sería mandarle a un cliente un
+ *    código que no existe en Tiendanube: lo tipea en el checkout, no anda, y el
+ *    mail queda peor que si no hubiera traído cupón.
+ * 3. Lead de una captura nuestra con cupón → se pisa el código y el texto.
+ *
+ * La pregunta es **"¿vino de una captura nuestra?"** (hay `origen`), no "¿vino
+ * de un pop-up?". Todo lo que capturamos pasa por acá con su `origen` puesto, y
+ * lo único sin `origen` es Tiendanube.
  *
  * El `texto` se pisa con `prizeLabel` cuando vino, porque es **lo que la persona
  * realmente vio ganar**: en una ruleta el texto del bloque ("10% en tu primera
  * compra") puede no tener nada que ver con el premio que salió.
  */
 export function aplicarCuponDelTrigger(bloques: Bloque[], td: TriggerPopup): Bloque[] {
-  if (td.origen !== "popup") return bloques;
+  if (!td.origen) return bloques;
   if (!td.cupon) return bloques.filter((b) => b.tipo !== "cupon");
 
   const codigo = td.cupon;

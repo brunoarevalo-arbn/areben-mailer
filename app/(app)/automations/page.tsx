@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Hand, ShoppingBag, ShoppingCart } from "lucide-react";
+import { Hand, MailPlus, ShoppingBag, ShoppingCart } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -13,6 +13,7 @@ const TRIGGER_LABEL: Record<string, string> = {
   NUEVO_CLIENTE: "Nuevo cliente",
   COMPRA: "Compra pagada",
   CARRITO_ABANDONADO: "Carrito abandonado",
+  NUEVO_SUSCRIPTOR: "Nuevo suscriptor",
 };
 
 export default async function AutomationsPage() {
@@ -35,7 +36,7 @@ export default async function AutomationsPage() {
       />
 
       {/* Presets */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <div className="flex items-center gap-2 font-medium text-foreground">
             <Hand className="h-5 w-5 text-accent" aria-hidden />
@@ -43,6 +44,19 @@ export default async function AutomationsPage() {
           </div>
           <p className="mt-1 text-sm text-muted">Se envía cuando un cliente nuevo se registra en tu tienda.</p>
           <form action={crearAutomation.bind(null, "NUEVO_CLIENTE")} className="mt-3">
+            <button className="rounded-xl bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover">Crear</button>
+          </form>
+        </Card>
+        {/* Se anotó ≠ compró. Son dos públicos distintos y por eso son dos
+            tarjetas: el de arriba dejó su nombre en el checkout, el de acá
+            escribió solo su mail en un pop-up y trae un cupón que ya ganó. */}
+        <Card>
+          <div className="flex items-center gap-2 font-medium text-foreground">
+            <MailPlus className="h-5 w-5 text-accent" aria-hidden />
+            Bienvenida a la lista
+          </div>
+          <p className="mt-1 text-sm text-muted">Se envía cuando alguien se anota en un pop-up o formulario, con el cupón que ganó.</p>
+          <form action={crearAutomation.bind(null, "NUEVO_SUSCRIPTOR")} className="mt-3">
             <button className="rounded-xl bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover">Crear</button>
           </form>
         </Card>

@@ -1,4 +1,4 @@
-// Deja las tres automations creadas (y PAUSADAS) en cada marca.
+// Deja las cuatro automations creadas (y PAUSADAS) en cada marca.
 //
 // Estaban a medias: BDI sin post-compra, Zattia solo con bienvenida, Stunned
 // sin nada. Tenerlas creadas no envía nada —el disparo depende de activarlas—
@@ -16,7 +16,12 @@ import { type Trigger } from '../lib/automations.ts';
 import { presetDeTrigger } from '../lib/plantillas/presets.ts';
 import { getRemitenteEnvio } from '../lib/remitentes.ts';
 
-const TRIGGERS: Trigger[] = ['NUEVO_CLIENTE', 'COMPRA', 'CARRITO_ABANDONADO'];
+// ⚠️ `NUEVO_SUSCRIPTOR` deja una SEGUNDA bienvenida en la marca, para el público
+// del pop-up: saludo que funciona sin nombre y bloque de cupón, que es lo que la
+// de `NUEVO_CLIENTE` no puede tener. Nace PAUSADA como el resto. 🔴 Prender las
+// dos a la vez le manda DOS mails al mismo lead de pop-up — `dispararBienvenida()`
+// encola un run por cada automation activa de los dos triggers.
+const TRIGGERS: Trigger[] = ['NUEVO_CLIENTE', 'COMPRA', 'CARRITO_ABANDONADO', 'NUEVO_SUSCRIPTOR'];
 const soloCuenta = process.argv.find((a) => a.startsWith('--cuenta='))?.split('=')[1];
 
 async function main() {

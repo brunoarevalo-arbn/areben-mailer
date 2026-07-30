@@ -89,7 +89,7 @@ titulo("Cada preset va donde corresponde");
   ok(galeria.length >= 10, `la galería tiene ${galeria.length} plantillas`);
   ok(galeria.every((p) => p.asunto === ""), "una plantilla de campaña no trae asunto: se escribe al armarla");
 
-  const triggers: Trigger[] = ["NUEVO_CLIENTE", "COMPRA", "CARRITO_ABANDONADO"];
+  const triggers: Trigger[] = ["NUEVO_CLIENTE", "COMPRA", "CARRITO_ABANDONADO", "NUEVO_SUSCRIPTOR"];
   for (const t of triggers) {
     const p = presetDeTrigger(t, ZATTIA);
     ok(!!p.asunto, `${t}: trae asunto`, "vino vacío");
@@ -98,6 +98,28 @@ titulo("Cada preset va donde corresponde");
   // La bienvenida saluda con el nombre de quien la crea. Es el caso que motivó
   // todo esto, así que se mira el string entero y no que "tenga asunto".
   ok(presetDeTrigger("NUEVO_CLIENTE", ZATTIA).asunto.includes("Zattia"), "la bienvenida saluda por la marca correcta");
+
+  // 🔴 El saludo de `NUEVO_SUSCRIPTOR` tiene que funcionar SIN nombre. El pop-up
+  // simple pide solo el mail, así que el merge tag se reemplaza por string vacío
+  // y el mail sale "¡Hola ! 👋" — al 100% del público de ese trigger, no a un
+  // borde. Medido en Zattia el 30-jul-2026: 22 de 22 leads de pop-up sin nombre.
+  {
+    const p = presetDeTrigger("NUEVO_SUSCRIPTOR", ZATTIA);
+    const todo = `${p.asunto} ${JSON.stringify(p.contenido)}`;
+    ok(!todo.includes("${contacto.nombre}"), "NUEVO_SUSCRIPTOR: el saludo NO usa el nombre (los leads de pop-up no tienen)");
+    ok(
+      p.contenido.bloques.some((b) => b.tipo === "cupon"),
+      "NUEVO_SUSCRIPTOR: trae el bloque de cupón (acá es seguro: el run siempre viene de una captura)",
+    );
+  }
+  // La contracara: en `NUEVO_CLIENTE` el bloque `cupon` NO puede venir de
+  // fábrica. Ese trigger también dispara con el webhook `customer/created`, y
+  // ahí `aplicarCuponDelTrigger` deja el bloque intacto ⇒ saldría el placeholder
+  // de la plantilla, un código que no existe en Tiendanube.
+  ok(
+    !presetDeTrigger("NUEVO_CLIENTE", ZATTIA).contenido.bloques.some((b) => b.tipo === "cupon"),
+    "NUEVO_CLIENTE: NO trae bloque de cupón (dispara desde el webhook y el código saldría muerto)",
+  );
 }
 
 // ─── Ids ─────────────────────────────────────────────────────────────────────

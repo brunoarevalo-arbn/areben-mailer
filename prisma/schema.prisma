@@ -57,9 +57,14 @@ model Plantilla {
 // ─────────────────────────────────────────────────────────────
 
 enum TriggerTipo {
-  NUEVO_CLIENTE      // customer/created → bienvenida
+  NUEVO_CLIENTE      // customer/created → bienvenida al que se registra en la tienda
   COMPRA             // order/paid → post-compra
   CARRITO_ABANDONADO // checkout/created + condición (no compró)
+  // Alguien se anotó a la lista (pop-up, formulario). ⚠️ NO tiene evento de TN
+  // en TRIGGER_EVENT: es incapaz de dispararse desde el webhook. Lo encolan las
+  // superficies de captura, y la fuente viaja en `triggerData.origen`.
+  // Agregado por scripts/add-trigger-suscriptor.ts (SQL crudo, nunca db push).
+  NUEVO_SUSCRIPTOR
 }
 
 enum EstadoAutomation {

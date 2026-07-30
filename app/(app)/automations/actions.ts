@@ -86,8 +86,13 @@ export async function toggleAutomation(id: string) {
   if (nuevoEstado === "ACTIVO" && !(await getRemitenteEnvio(cuenta.id)))
     return { ok: false, error: `${cuenta.nombre}: ${MSG_SIN_REMITENTE}` };
 
-  if (nuevoEstado === "ACTIVO" && cuenta.tnStoreId && cuenta.tnToken) {
-    const event = TRIGGER_EVENT[a.trigger];
+  // ⚠️ `event` puede no existir: `NUEVO_SUSCRIPTOR` no sale de ningún evento de
+  // Tiendanube —lo encola quien captura el lead— y sin la guarda esto le pediría
+  // a TN un webhook con `event: undefined`. Es la contracara de que ese trigger
+  // sea *incapaz* de dispararse desde el webhook: tampoco tiene que darlo de
+  // alta.
+  const event = TRIGGER_EVENT[a.trigger];
+  if (nuevoEstado === "ACTIVO" && event && cuenta.tnStoreId && cuenta.tnToken) {
     await ensureEventoWebhook(cuenta.tnStoreId, cuenta.tnToken, process.env.APP_URL ?? "", event).catch(() => {});
   }
 

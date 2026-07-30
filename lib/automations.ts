@@ -1,6 +1,12 @@
 import { leerConfigCuenta } from "./marca";
 
-export type Trigger = "NUEVO_CLIENTE" | "COMPRA" | "CARRITO_ABANDONADO";
+// ⚠️ `NUEVO_SUSCRIPTOR` es el único que NO tiene evento de Tiendanube detrás
+// (ver `TRIGGER_EVENT` en `lib/tn/eventos.ts`): lo encola quien captura el lead
+// —Resorty hoy, los formularios `/f/[slug]` mañana— y no el webhook. Lo que
+// nombra es el evento ("alguien se anotó"), no el widget: la fuente viaja en
+// `triggerData.origen`, así que una superficie nueva no pide un valor de enum
+// nuevo (que es DDL + deploy y no se puede sacar).
+export type Trigger = "NUEVO_CLIENTE" | "COMPRA" | "CARRITO_ABANDONADO" | "NUEVO_SUSCRIPTOR";
 
 /**
  * Sitio público de la marca, para los links de los presets. Sale de

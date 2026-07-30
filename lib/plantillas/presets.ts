@@ -471,6 +471,36 @@ const DEFS: readonly DefPreset[] = [
     }),
   },
   {
+    id: "auto-suscriptor",
+    nombre: "Bienvenida a la lista",
+    descripcion: "Sale sola cuando alguien se anota en un pop-up o formulario, con el cupón que ganó.",
+    trigger: "NUEVO_SUSCRIPTOR",
+    esperaHoras: 0,
+    arma: ({ marca, tienda }) => ({
+      asunto: `¡Gracias por sumarte a ${marca}! 🎉`,
+      bloques: [
+        // 🔴 SIN `${contacto.nombre}`, y no es un olvido. El pop-up SIMPLE pide
+        // solo el mail, así que el 100% de los leads de Zattia no tiene nombre y
+        // el merge tag se reemplaza por string vacío (`lib/email/render.ts`):
+        // les llegaría "¡Hola ! 👋". El saludo de este trigger tiene que
+        // funcionar vacío — es la diferencia de público con `NUEVO_CLIENTE`,
+        // donde el que se registra en la tienda sí dejó su nombre.
+        { tipo: "titulo", texto: "¡Gracias por sumarte! 👋" },
+        { tipo: "texto", texto: "Ya estás en la lista: vas a ser de los primeros en enterarte de las novedades y las promos." },
+        // El bloque `cupon` acá es SEGURO, y esa es media razón de que el
+        // trigger exista. Un run de `NUEVO_SUSCRIPTOR` siempre viene de una
+        // captura nuestra ⇒ `aplicarCuponDelTrigger` o pisa el código con el
+        // real de Tiendanube, o **elimina el bloque entero**. El texto de abajo
+        // no llega nunca a una casilla tal cual está.
+        // (En `NUEVO_CLIENTE` no se puede: ese trigger también dispara con el
+        // webhook `customer/created`, donde el bloque queda intacto y saldría un
+        // código que no existe en TN.)
+        { tipo: "cupon", texto: "Tu cupón de bienvenida", codigo: "TUCUPON", ...cta("Usar el cupón", tienda) },
+        ...botonSi("Ver la tienda", tienda),
+      ],
+    }),
+  },
+  {
     id: "auto-compra",
     nombre: "Gracias por tu compra",
     descripcion: "Sale sola una hora después de que se paga un pedido.",

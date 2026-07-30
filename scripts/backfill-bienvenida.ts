@@ -40,8 +40,16 @@ async function main() {
 
   // Se exige `asunto` porque el procesador saltea el run que no lo tenga: sin
   // esto encolaríamos runs que nacen muertos.
+  // Los dos triggers, igual que `dispararBienvenida()` en areben-popups: si acá
+  // mirara uno solo, el backfill y el camino en vivo encolarían cosas distintas
+  // para el mismo lead.
   const autos = await prisma.automation.findMany({
-    where: { cuentaId: cuenta.id, trigger: 'NUEVO_CLIENTE', estado: 'ACTIVO', asunto: { not: null } },
+    where: {
+      cuentaId: cuenta.id,
+      trigger: { in: ['NUEVO_CLIENTE', 'NUEVO_SUSCRIPTOR'] },
+      estado: 'ACTIVO',
+      asunto: { not: null },
+    },
   });
 
   console.log(`\n▶ ${cuenta.nombre} — ${autos.length} bienvenida(s) ACTIVA(s)`);

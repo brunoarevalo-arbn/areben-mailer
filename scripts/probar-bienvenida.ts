@@ -8,6 +8,7 @@
 // Correr:  node --import tsx scripts/probar-bienvenida.ts
 import { aplicarCuponDelTrigger } from '../lib/email/cupon-trigger.ts';
 import { renderEmailHtml, type Bloque } from '../lib/email/render.ts';
+import { TRIGGER_EVENT, EVENT_TRIGGER } from '../lib/tn/eventos.ts';
 
 const OPTS = { unsubscribeUrl: '#', nombreCuenta: 'BDI' };
 
@@ -81,7 +82,40 @@ const html = (bloques: Bloque[]) => renderEmailHtml({ bloques }, OPTS);
   ok(!html(r).includes('<script>'), 'un código con HTML adentro sale escapado');
 }
 
-// ─── 6. Un mail sin bloque `cupon` no se rompe ───────────────────────────────
+// ─── 6. La pregunta es "¿vino de una captura?", no "¿vino de un pop-up?" ─────
+// 🔴 Hasta el 30-jul-2026 esto preguntaba `td.origen !== 'popup'`. Los
+// formularios `/f/[slug]` son la segunda superficie de captura y todavía no
+// encolan runs; el día que lo hagan, con el literal hardcodeado caerían en la
+// rama del webhook de TN y le mandarían a cada lead el placeholder de la
+// plantilla — un código que no existe en Tiendanube. Se prueba con un `origen`
+// que hoy nadie escribe a propósito: el que se rompe es el futuro.
+{
+  const conCupon = aplicarCuponDelTrigger(base(), { origen: 'formulario', cupon: 'Z-9F3K' });
+  const h = html(conCupon);
+  ok(h.includes('Z-9F3K'), 'otra superficie de captura: el código real también se pisa');
+  ok(!h.includes('BIENVENIDA10'), 'otra superficie de captura: el placeholder tampoco sobrevive');
+
+  const sinCupon = aplicarCuponDelTrigger(base(), { origen: 'formulario' });
+  ok(!sinCupon.some((b) => b.tipo === 'cupon'), 'otra superficie SIN cupón: el bloque se elimina igual');
+}
+// Y la contracara: sin `origen` sigue siendo el webhook, y no se toca nada.
+// Un `origen: ''` cuenta como ausente — un string vacío no es una superficie.
+{
+  const r = aplicarCuponDelTrigger(base(), { origen: '', cupon: 'X' });
+  ok(html(r).includes('BIENVENIDA10'), 'origen vacío: se trata como el webhook y el código estático queda');
+}
+
+// ─── 7. `NUEVO_SUSCRIPTOR` no puede dispararse desde Tiendanube ──────────────
+// Es lo que hace que el trigger no necesite un filtro en ningún lado: el
+// webhook resuelve evento → trigger con este mapa, y el que no está no existe.
+// Si alguien le agrega un evento acá, esta invariante se pone roja el mismo día.
+{
+  ok(!('NUEVO_SUSCRIPTOR' in TRIGGER_EVENT), 'NUEVO_SUSCRIPTOR no mapea a ningún evento de Tiendanube');
+  ok(!Object.values(EVENT_TRIGGER).includes('NUEVO_SUSCRIPTOR'), 'ningún evento de TN resuelve a NUEVO_SUSCRIPTOR');
+  ok(TRIGGER_EVENT.NUEVO_CLIENTE === 'customer/created', 'NUEVO_CLIENTE sí sigue colgando de customer/created');
+}
+
+// ─── 8. Un mail sin bloque `cupon` no se rompe ───────────────────────────────
 // Es el caso REAL de hoy: ninguna de las 4 bienvenidas declara el bloque.
 {
   const sinBloque: Bloque[] = [{ tipo: 'titulo', texto: 'Hola' }];
