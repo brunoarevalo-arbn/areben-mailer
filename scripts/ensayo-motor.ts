@@ -51,6 +51,26 @@ async function preparar(runId: string, cuantos: number) {
     create: { slug: SLUG_QA, nombre: 'QA · Ensayo del motor (borrar)' },
   });
 
+  // La cuenta descartable necesita su remitente descartable: desde el 30-jul-2026
+  // una marca sin fila en `Remitente` no manda, y `--limpiar` borra la cuenta (y
+  // el remitente, por cascada) ⇒ el ensayo se auto-bloqueaba en la corrida
+  // siguiente. Va el de SES_FROM_EMAIL porque el From tiene que ser un dominio
+  // verificado en SES, y no se hardcodea la dirección de ninguna marca.
+  const fromQa = process.env.SES_FROM_EMAIL;
+  if (!fromQa) throw new Error('Falta SES_FROM_EMAIL: es el remitente de la cuenta de QA');
+  await prisma.remitente.upsert({
+    where: { cuentaId_email: { cuentaId: cuenta.id, email: fromQa } },
+    create: {
+      cuentaId: cuenta.id,
+      nombre: 'QA Areben',
+      email: fromQa,
+      dominio: fromQa.split('@')[1],
+      estado: 'AUTENTICADO',
+      esPrincipal: true,
+    },
+    update: { esPrincipal: true },
+  });
+
   const lista = await prisma.lista.create({
     data: { cuentaId: cuenta.id, nombre: `Ensayo motor ${runId}` },
   });
