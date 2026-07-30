@@ -148,7 +148,7 @@ async function main() {
   const ajenos = contactos.filter((c) => !destinatarioPermitido(c.email));
   if (ajenos.length) throw new Error(`Destinatarios no permitidos: ${ajenos.map((c) => c.email).join(', ')}`);
 
-  await crearEnvios(campania.id, contactos, null);
+  await crearEnvios(campania.cuentaId, campania.id, contactos, null);
   await prisma.campania.update({ where: { id: campania.id }, data: { estado: 'ENVIANDO' } });
 
   const appUrl = process.env.APP_URL;

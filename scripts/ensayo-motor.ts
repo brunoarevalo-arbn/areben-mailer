@@ -217,7 +217,7 @@ async function main() {
     where: { cuentaId: cuenta.id, email: { startsWith: `success+motor-${runId}-` } },
     select: { id: true },
   });
-  await crearEnvios(campania.id, contactos, null);
+  await crearEnvios(cuenta.id, campania.id, contactos, null);
 
   const encolados = await verificarGuardas(cuenta.id, campania.id);
   console.log(`   guardas OK · ${encolados} envío(s) encolado(s)\n`);

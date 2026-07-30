@@ -246,7 +246,7 @@ async function main() {
   console.log('1. Preparando datos de prueba…');
   const { cuenta, campania } = await preparar(runId);
   const contactos = await prisma.contacto.findMany({ where: { cuentaId: cuenta.id }, select: { id: true } });
-  await crearEnvios(campania.id, contactos, null);
+  await crearEnvios(cuenta.id, campania.id, contactos, null);
 
   console.log('2. Verificando guardas…');
   const total = await verificarGuardas(cuenta.id, campania.id);

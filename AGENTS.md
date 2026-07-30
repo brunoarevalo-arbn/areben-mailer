@@ -49,6 +49,7 @@ node --env-file=.env scripts/<x>.ts           # cualquier script (Node stripea l
 Auditorías que valen como test (no hay suite de tests):
 
 ```bash
+npx tsc --noEmit                               # ⚠️ los scripts NO los mira `next build`
 node --import tsx scripts/auditar-permisos.ts  # toda action declara su permiso
 node --import tsx scripts/probar-permisos.ts   # invariantes de la matriz
 node --import tsx scripts/probar-gate.ts       # el gate no se abre solo
@@ -76,6 +77,11 @@ node --import tsx scripts/probar-remitente.ts  # una marca sin remitente propio 
 HTML cambió **a propósito**, se bendice con `--capturar` y el golden se commitea
 **junto** con el cambio, así el diff del commit muestra qué se movió en el mail.
 Nunca "para que pase".
+
+⚠️ **`next build` typechequea lo que la app importa, no `scripts/`.** El 30-jul-2026
+tres scripts (`ensayo-motor`, `ensayo-campania`, `ses-e2e-supresion`) llamaban a
+`crearEnvios` con la firma vieja —sin el `cuentaId` que ganó adelante— y reventaban
+recién al correrlos. `npx tsc --noEmit` los agarra a todos; corrélo antes de pushear.
 
 ⚠️ **`.github/workflows/permisos.yml` está en `.git/info/exclude` y nunca corrió
 en CI** (falta el scope `workflow` en el token). Correr esos cinco scripts a mano
