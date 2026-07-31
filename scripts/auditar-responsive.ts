@@ -53,8 +53,7 @@ interface Hallazgo {
  * que se rompe sola es una lista que se termina borrando entera.
  */
 const PENDIENTES = new Set<string>([
-  // ── Tanda 2a — el encabezado que comparten las 16 páginas
-  '5:components/ui/PageHeader.tsx',
+  // ── Tanda 2a — ✅ VACIADA: PageHeader ya apila abajo de `sm`.
   // ── Tanda 2b — los campos suben a 16px. Son DOS familias de estilo:
   //    la de lib/ui.ts y la de components/ui/, más los que están escritos inline.
   '2:lib/ui.ts',
