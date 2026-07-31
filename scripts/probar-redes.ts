@@ -7,7 +7,7 @@
 // ya no se puede corregir.
 //
 //   node --import tsx scripts/probar-redes.ts
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { renderEmailHtml } from "../lib/email/render";
 import { REDES, redConIcono } from "../lib/email/redes";
 import type { Bloque } from "../lib/email/bloques";
@@ -32,6 +32,15 @@ console.log("\n1) 🔴 Cada red de la lista TIENE su archivo");
 for (const r of REDES) {
   ok(existsSync(`public/redes/${r.slug}.png`), `public/redes/${r.slug}.png existe (${r.nombre})`);
 }
+
+console.log("\n1-bis) 🔴 …y los sirve el servidor SIN sesión");
+// Costó un 307 en producción: el matcher del proxy solo excluye `_next/static`,
+// así que todo lo que vive en `public/` pasa por el chequeo de sesión y rebota
+// al login. Un destinatario no tiene sesión ⇒ el icono es una imagen rota para
+// el 100% de los que reciben el mail, y ya no se puede corregir.
+const proxy = readFileSync("proxy.ts", "utf8");
+const prefijos = proxy.slice(proxy.indexOf("PUBLIC_PREFIXES"), proxy.indexOf("export async function proxy"));
+ok(/['"]\/redes\/['"]/.test(prefijos), "'/redes/' está en PUBLIC_PREFIXES del proxy");
 
 console.log("\n2) Una red conocida sale como icono");
 const h1 = html([{ red: "Instagram", url: "https://instagram.com/zattia_co" }], HOST);

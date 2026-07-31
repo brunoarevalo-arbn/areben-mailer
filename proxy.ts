@@ -16,6 +16,12 @@ const PUBLIC_PREFIXES = [
   '/api/campanias/procesar-cola', // worker de la cola de envío (protegido por CRON_SECRET)
   '/baja', // desuscripción: la abren destinatarios sin login
   '/f/', // formularios de captura públicos (single opt-in)
+  // 🔴 Iconos de redes que van DENTRO del mail. El matcher de abajo solo excluye
+  // `_next/static`, así que lo que vive en `public/` pasa por acá igual y sin
+  // esta línea rebota al login con un 307: en un cliente de mail eso es una
+  // imagen rota para TODOS los destinatarios, y no se puede corregir después de
+  // enviado. Son PNG estáticos, no dicen nada de nadie.
+  '/redes/',
 ];
 
 export async function proxy(req: NextRequest) {
