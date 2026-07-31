@@ -219,6 +219,20 @@ export type Bloque = BloqueBase &
         fondoImagen?: string;
         /** Alto aproximado en px, solo con `fondoImagen`. Outlook no mide el texto. */
         alto?: number;
+        /**
+         * Cuánto se oscurece la foto de fondo para que el texto se lea, 0-100.
+         * Solo con `fondoImagen`. Pinta una capa del color `bg` ENCIMA de la
+         * imagen — el mismo mecanismo que el `veloOpacidad` del pop-up de
+         * Resorty, y por la misma razón: sin él, un título claro sobre una foto
+         * clara no se lee. Es lo que hizo descartar esta portada en Zattia.
+         *
+         * 🔴 **El default es 0 y no puede ser otra cosa.** Cualquier valor
+         * distinto le cambiaría el aspecto a toda portada con foto de fondo que
+         * ya esté guardada, sin que nadie toque nada. La opinión ("55 se ve
+         * bien") vive en el editor, en el momento en que alguien ELIGE poner la
+         * foto de fondo; en el documento vive el dato, y ausente = como estaba.
+         */
+        velo?: number;
       }
     | { tipo: "seccion"; bg: string; titulo: string; texto: string; botonTexto: string; botonUrl: string }
     | { tipo: "cupon"; texto: string; codigo: string; botonTexto: string; botonUrl: string }

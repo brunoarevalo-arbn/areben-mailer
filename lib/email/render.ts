@@ -26,6 +26,49 @@ const esc = (s: string) =>
 const nl = (s: string) => esc(s).replace(/\n/g, "<br>");
 
 /**
+ * Un color de la base a `rgba(...)`, para poder pintarlo semitransparente.
+ *
+ * ⚠️ **NO escapa: parsea.** `esc()` no escapa comillas, así que un color con una
+ * comilla adentro se escaparía del atributo `style="…"`. Acá lo único que sale
+ * son números que salieron de un `parseInt` propio: si la entrada no es un hex
+ * de 3 o 6 dígitos —un `rgb()`, un nombre de color, basura, un intento de
+ * inyección— se cae a negro, que es un velo válido y no rompe nada. Es la misma
+ * postura que `hex()` y `px()` en `estilos.ts`.
+ */
+function rgba(color: string, alfa: number): string {
+  const c = canal(color);
+  const [r, g, b] = c ?? [0, 0, 0];
+  const a = Math.min(1, Math.max(0, alfa));
+  return `rgba(${r},${g},${b},${a.toFixed(2)})`;
+}
+
+/** `#f0a` / `#ff00aa` → `[255, 0, 170]`. `null` si no es un hex. */
+function canal(color: string): [number, number, number] | null {
+  const h = String(color ?? "").trim().replace(/^#/, "");
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return null;
+  return [full.slice(0, 2), full.slice(2, 4), full.slice(4, 6)].map((x) => parseInt(x, 16)) as [number, number, number];
+}
+
+/**
+ * Un color que se puede escribir adentro de un `style="…"` sin miedo.
+ *
+ * 🔴 **`esc()` NO alcanza para un color y nunca alcanzó**: no escapa comillas,
+ * así que un `bg` como `#fff" onload="alert(1)` —que llega crudo del Json del
+ * bloque, no de la cascada de estilos, que sí lo sanea— cierra el atributo y lo
+ * que sigue son atributos del `<div>`. Es la regla que AGENTS.md ya pedía
+ * ("ningún string del Json llega al HTML sin pasar por `hex()`, `px()` o un
+ * enum") y que estos cuatro call sites se venían salteando.
+ *
+ * Devuelve el hex normalizado, o `respaldo` si la entrada no es un hex.
+ */
+function colorCss(color: string | undefined, respaldo: string): string {
+  const c = canal(color ?? "");
+  if (!c) return respaldo;
+  return `#${c.map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/**
  * Todo lo que un bloque necesita para dibujarse.
  *
  * Reemplaza al par `(pal, muestraCarrito)` que se venía pasando suelto: ahora
@@ -436,9 +479,25 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       if (b.fondoImagen) {
         const alto = Math.min(600, Math.max(120, Math.round(b.alto ?? 280)));
         const estiloCaja = `${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}`;
+        // El velo: una capa del color `bg` encima de la foto, para que el texto
+        // se lea. Sin esto, un título claro sobre una foto clara desaparece —
+        // es exactamente lo que hizo descartar esta portada en Zattia.
+        //
+        // Va como CAPA de `background-image` y no como un div encima: un mail no
+        // puede usar `position`, así que superponer dos elementos no es una
+        // opción. Es el mismo truco que el pop-up de Resorty.
+        //
+        // 💡 De paso arregla una mentira vieja: el contraste del título se
+        // calcula contra `bg`, pero lo que había atrás era la FOTO. Con el velo
+        // del color `bg`, el fondo real se parece a lo que el cálculo supone.
+        const velo = Math.min(100, Math.max(0, Math.round(b.velo ?? 0)));
+        const capaVelo = velo > 0 ? `linear-gradient(${rgba(bg, velo / 100)},${rgba(bg, velo / 100)}),` : "";
+        // `background-color` de respaldo: si la imagen no carga —Outlook con las
+        // imágenes bloqueadas, un 404— el texto queda sobre el color y no sobre
+        // el blanco de la tarjeta, que es donde hoy se volvía invisible.
         return `<!--[if mso]>
 <v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:${pal.ancho}px;height:${alto}px">
-<v:fill type="frame" src="${esc(b.fondoImagen)}" color="${esc(bg)}" />
+<v:fill type="frame" src="${esc(b.fondoImagen)}" color="${colorCss(bg, pal.tarjeta)}"${velo > 0 ? ` opacity="${(1 - velo / 100).toFixed(2)}"` : ""} />
 <v:textbox inset="0,0,0,0">
 <div style="${estiloCaja}">
 ${interior}
@@ -447,14 +506,14 @@ ${interior}
 </v:rect>
 <![endif]-->
 <!--[if !mso]><!-->
-<div style="background-image:url(${esc(b.fondoImagen)});background-size:cover;background-position:center;min-height:${px(alto)};${estiloCaja}">
+<div style="background-color:${colorCss(bg, pal.tarjeta)};background-image:${capaVelo}url(${esc(b.fondoImagen)});background-size:cover;background-position:center;min-height:${px(alto)};${estiloCaja}">
 ${interior}
 </div>
 <!--<![endif]-->`;
       }
 
       const img = b.imagen ? `<img src="${esc(b.imagen)}" alt="" style="width:100%;display:block;margin:0${extra(t0, ["radio", "align", "color", "tamano"])}" />` : "";
-      const cajaHtml = interior ? `<div style="background:${esc(bg)};${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}">${interior}</div>` : "";
+      const cajaHtml = interior ? `<div style="background:${colorCss(bg, pal.tarjeta)};${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}">${interior}</div>` : "";
       return `${img}${cajaHtml}`;
     }
     case "seccion": {
@@ -463,7 +522,7 @@ ${interior}
       const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h2${clase(...clasesTitulo(x))} style="margin:0 0 8px;font-size:${px(x.tamano ?? 22)};line-height:${x.interlinea ?? 1.3};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.titulo)}</h2>`; })() : "";
       const tx = b.texto ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 16px;font-size:${px(x.tamano ?? 16)};line-height:${x.interlinea ?? 1.6};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${nl(b.texto)}</p>`; })() : "";
       const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
-      return `<div style="background:${esc(bg)};${padCss(c.padY ?? 32, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}">${t}${tx}${btn}</div>`;
+      return `<div style="background:${colorCss(bg, pal.tarjeta)};${padCss(c.padY ?? 32, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}">${t}${tx}${btn}</div>`;
     }
     case "cupon": {
       const c = caja();

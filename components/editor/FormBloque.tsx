@@ -168,8 +168,14 @@ export function FormBloque({
             fullWidth
             value={conFondo ? "fondo" : "arriba"}
             onChange={(e) => {
-              if (e.target.value === "fondo") set({ fondoImagen: b.fondoImagen || b.imagen || "", imagen: "" });
-              else set({ imagen: b.imagen || b.fondoImagen || "", fondoImagen: undefined });
+              // 🔴 El velo arranca en 55 SOLO acá, en el momento en que alguien
+              // elige poner la foto de fondo. En el documento el default es 0
+              // (ver `bloques.ts`): si el default viviera allá, toda portada con
+              // foto ya guardada cambiaría de aspecto sola el día del deploy.
+              // La opinión va en el editor, el dato en el Json.
+              if (e.target.value === "fondo") {
+                set({ fondoImagen: b.fondoImagen || b.imagen || "", imagen: "", velo: b.velo ?? 55 });
+              } else set({ imagen: b.imagen || b.fondoImagen || "", fondoImagen: undefined });
             }}
           >
             <option value="arriba">Arriba del texto</option>
@@ -179,6 +185,12 @@ export function FormBloque({
             <>
               <ImagenDrop value={b.fondoImagen ?? ""} onChange={(fondoImagen) => set({ fondoImagen })} placeholder="URL de la imagen de fondo" />
               <Rango label="Alto aproximado" value={b.alto ?? 280} onChange={(alto) => set({ alto })} min={120} max={500} step={10} />
+              <Rango label="Cuánto se tapa la foto" value={b.velo ?? 0} onChange={(velo) => set({ velo })} min={0} max={90} step={5} />
+              <p className="text-xs text-subtle">
+                Pinta encima el color de &ldquo;Fondo del texto&rdquo;, para que el título se lea: con un
+                fondo oscuro la <b>oscurece</b>, con uno claro la <b>aclara</b>. En 0 el texto va
+                directo sobre la foto.
+              </p>
               <p className="text-xs text-subtle">
                 Outlook no puede medir cuánto ocupa el texto: si es largo, puede quedar apretado.
                 Subí el alto si hace falta.
