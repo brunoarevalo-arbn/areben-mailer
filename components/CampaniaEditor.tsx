@@ -295,7 +295,10 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
           >
             Guardar como plantilla
           </Button>
-          <input className={`${inputClass} max-w-56`} value={pruebaEmail} onChange={(e) => setPruebaEmail(e.target.value)} placeholder="email de prueba" />
+          {/* En celular el campo se lleva la línea entera: con `max-w-56` fijo
+              quedaba a media línea y "Enviar prueba" arrancaba a su lado, medio
+              cortado. Arriba de `sm` vuelve a los 224px de siempre. */}
+          <input className={`${inputClass} sm:max-w-56`} value={pruebaEmail} onChange={(e) => setPruebaEmail(e.target.value)} placeholder="email de prueba" />
           <Button variant="accent" onClick={prueba} disabled={sending}>
             {sending ? "Enviando…" : "Enviar prueba"}
           </Button>
@@ -311,7 +314,7 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
               Elegí el asunto que mejor rindió y mandalo al resto de la lista (~{abInfo!.holdout.toLocaleString("es-AR")} contactos).
               Las aperturas se van cargando con el tiempo — recargá para ver el dato actualizado.
             </p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {(["A", "B"] as const).map((v) => {
                 const d = v === "A" ? abInfo!.a : abInfo!.b;
                 const t = tasa(d.aperturas, d.enviados);

@@ -199,7 +199,7 @@ export function FormularioEditor({ listas, publicUrl, initial }: Props) {
               <input
                 readOnly
                 value={publicUrl}
-                className="flex-1 rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm text-foreground"
+                className="min-w-0 flex-1 rounded-xl border border-border bg-surface-muted px-3 py-2 text-base text-foreground lg:text-sm"
               />
               <CopyButton text={publicUrl} />
               <a
@@ -225,7 +225,7 @@ export function FormularioEditor({ listas, publicUrl, initial }: Props) {
               readOnly
               value={iframe}
               rows={3}
-              className="w-full rounded-xl border border-border bg-surface-muted px-3 py-2 font-mono text-xs text-foreground"
+              className="w-full rounded-xl border border-border bg-surface-muted px-3 py-2 font-mono text-base text-foreground lg:text-xs"
             />
           </div>
         </Card>

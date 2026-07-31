@@ -5,6 +5,8 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   size?: 'sm' | 'md' | 'lg';
   children: React.ReactNode;
   isLoading?: boolean;
+  /** Ocupa el ancho del contenedor. Espeja la API que ya tienen los campos. */
+  fullWidth?: boolean;
 }
 
 export function Button({
@@ -13,10 +15,16 @@ export function Button({
   className = '',
   disabled,
   isLoading,
+  fullWidth = false,
   children,
   ...props
 }: ButtonProps) {
-  const baseClasses = 'inline-flex items-center justify-center font-medium rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring focus:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed';
+  // `min-h-11` (44px) es el mínimo táctil de Apple y Google. Va acá y no en cada
+  // variante porque el botón ya es `inline-flex items-center justify-center`:
+  // crece la CAJA y el contenido queda centrado, así que no se toca ni el
+  // padding ni la letra ni ninguna de las cinco variantes. En `lg` se apaga y el
+  // escritorio queda idéntico — con el mouse, un `size="sm"` de 27px se acierta.
+  const baseClasses = 'inline-flex min-h-11 lg:min-h-0 items-center justify-center font-medium rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring focus:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed';
 
   const variants = {
     primary: 'bg-primary text-primary-foreground hover:bg-primary-hover',
@@ -34,7 +42,7 @@ export function Button({
 
   return (
     <button
-      className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${fullWidth ? 'w-full' : ''} ${className}`}
       disabled={disabled || isLoading}
       {...props}
     >

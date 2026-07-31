@@ -34,6 +34,7 @@ export function CambiarMiPassword() {
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Input
           label="Actual"
+          fullWidth
           type="password"
           autoComplete="current-password"
           value={actual}
@@ -41,6 +42,7 @@ export function CambiarMiPassword() {
         />
         <Input
           label="Nueva"
+          fullWidth
           type="password"
           autoComplete="new-password"
           hint="Mínimo 8 caracteres"
@@ -50,9 +52,9 @@ export function CambiarMiPassword() {
         <div className="flex items-end">
           <Button
             variant="primary"
+            fullWidth
             onClick={guardar}
             disabled={pending || !actual || !nueva}
-            className="w-full"
           >
             {pending ? "Guardando…" : "Cambiar"}
           </Button>

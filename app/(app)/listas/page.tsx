@@ -34,7 +34,7 @@ export default async function ListasPage() {
           // 343px un input de ancho automático dejaba el "Crear" pegado al
           // borde y el placeholder cortado.
           <form action={crearLista} className="flex w-full gap-2 sm:w-auto">
-            <input name="nombre" placeholder="Nueva lista" className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-foreground placeholder:text-subtle outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-ring/30 sm:w-auto" />
+            <input name="nombre" placeholder="Nueva lista" className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-base text-foreground placeholder:text-subtle outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-ring/30 sm:w-auto lg:py-2.5 lg:text-sm" />
             <button type="submit" className="shrink-0 rounded-xl bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover">Crear</button>
           </form>
         }

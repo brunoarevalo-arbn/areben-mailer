@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { tapTarget } from "@/lib/ui";
 import {
   crearRemitente,
   eliminarRemitente,
@@ -147,7 +148,10 @@ function RemitenteRow({ r }: { r: Remitente }) {
         {nota && <div className="mt-1 text-xs text-muted">{nota}</div>}
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* `flex-wrap`: a 343px el badge + "Verificar" + "Hacer principal" + el
+          tacho suman más de una línea y sin envolver se comprimen hasta cortar
+          el texto de los botones. */}
+      <div className="flex flex-wrap items-center gap-2">
         <Badge variant={est.variant}>{est.label}</Badge>
 
         <Button
@@ -187,7 +191,7 @@ function RemitenteRow({ r }: { r: Remitente }) {
           <button
             type="submit"
             aria-label="Eliminar"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-danger-foreground"
+            className={`flex ${tapTarget} h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-danger-foreground`}
           >
             <Trash2 className="h-4 w-4" aria-hidden />
           </button>

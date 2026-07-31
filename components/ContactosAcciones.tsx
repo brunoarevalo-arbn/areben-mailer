@@ -5,7 +5,7 @@ import { sincronizarContactosTN, importarCSV } from "@/app/(app)/contactos/actio
 import { Button } from "@/components/ui/Button";
 import { usePermisos } from "@/components/PermisosProvider";
 import { RefreshCw, Plug } from "lucide-react";
-import { campoBase } from "@/lib/ui";
+import { campoBase, tapTarget } from "@/lib/ui";
 
 interface Lista {
   id: string;
@@ -60,7 +60,7 @@ export function ContactosAcciones({
           ) : (
             <a
               href={tnAuthUrl}
-              className="inline-flex items-center justify-center rounded-xl bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+              className={`inline-flex ${tapTarget} items-center justify-center rounded-xl bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover`}
             >
               <Plug className="mr-1.5 h-4 w-4" aria-hidden />
               Conectar Tiendanube de {marca}
@@ -87,8 +87,11 @@ export function ContactosAcciones({
             Pegá un email por línea (o <code>email,nombre</code>). Se marcan como que aceptan marketing.
           </div>
           <textarea className={`${campoBase} w-full font-mono`} rows={5} value={csv} onChange={(e) => setCsv(e.target.value)} placeholder="juan@mail.com,Juan Pérez&#10;ana@mail.com" />
-          <div className="flex items-center gap-2">
-            <select className={campoBase} value={listaId} onChange={(e) => setListaId(e.target.value)}>
+          {/* `flex-wrap` + `min-w-0`: el <select> de listas crece con el nombre
+              más largo, y sin envolver empujaba a "Importar" fuera de la tarjeta
+              a 343px. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <select className={`${campoBase} min-w-0 max-w-full`} value={listaId} onChange={(e) => setListaId(e.target.value)}>
               <option value="">Sin lista (solo crear)</option>
               {listas.map((l) => <option key={l.id} value={l.id}>{l.nombre}</option>)}
             </select>

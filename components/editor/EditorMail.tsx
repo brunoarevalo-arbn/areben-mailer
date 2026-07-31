@@ -16,6 +16,7 @@ import { AISoonButton } from "@/components/ui/AISoonButton";
 import { usePermisos } from "@/components/PermisosProvider";
 import type { Marca } from "@/lib/marca";
 import type { Historial, OpcionesSet } from "@/components/editor/useHistorial";
+import { tapTarget } from "@/lib/ui";
 import { Palette, Redo2, Undo2 } from "lucide-react";
 
 /**
@@ -182,7 +183,7 @@ export function EditorMail({
                 disabled={!historial.puedeDeshacer}
                 title="Deshacer (⌘Z)"
                 aria-label="Deshacer"
-                className="rounded-lg border border-border p-1.5 text-muted transition-colors hover:text-foreground disabled:opacity-30"
+                className={`flex ${tapTarget} items-center justify-center rounded-lg border border-border p-1.5 text-muted transition-colors hover:text-foreground disabled:opacity-30`}
               >
                 <Undo2 className="h-4 w-4" aria-hidden />
               </button>
@@ -192,7 +193,7 @@ export function EditorMail({
                 disabled={!historial.puedeRehacer}
                 title="Rehacer (⇧⌘Z)"
                 aria-label="Rehacer"
-                className="rounded-lg border border-border p-1.5 text-muted transition-colors hover:text-foreground disabled:opacity-30"
+                className={`flex ${tapTarget} items-center justify-center rounded-lg border border-border p-1.5 text-muted transition-colors hover:text-foreground disabled:opacity-30`}
               >
                 <Redo2 className="h-4 w-4" aria-hidden />
               </button>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
+import { tapTarget } from '@/lib/ui';
 
 // Toggle de tema: escribe la cookie `theme` (para el SSR sin flash en la próxima
 // carga) y togglea la clase .dark en <html> para feedback inmediato.
@@ -26,7 +27,7 @@ export function ThemeToggle() {
       type="button"
       onClick={toggle}
       aria-label={dark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
-      className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+      className={`flex ${tapTarget} h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-foreground`}
     >
       {/* Evita mismatch de hidratación: no muestra ícono hasta montar */}
       {mounted ? (

@@ -6,7 +6,7 @@ import { guardarSegmento, contarSegmento } from "@/app/(app)/segmentos/actions";
 import { Button } from "@/components/ui/Button";
 import { usePermisos } from "@/components/PermisosProvider";
 import { X } from "lucide-react";
-import { campoBase } from "@/lib/ui";
+import { campoBase, tapTarget } from "@/lib/ui";
 
 
 function campoDef(campo: CondCampo) {
@@ -106,7 +106,7 @@ export function SegmentoBuilder({
                   {["ACTIVO", "BAJA", "REBOTADO", "SPAM"].map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               )}
-              <button onClick={() => setConds((cs) => cs.filter((_, j) => j !== i))} className="px-2 text-danger-foreground hover:opacity-70"><X className="h-4 w-4" aria-hidden /></button>
+              <button onClick={() => setConds((cs) => cs.filter((_, j) => j !== i))} aria-label="Quitar condición" className={`inline-flex ${tapTarget} items-center justify-center px-2 text-danger-foreground hover:opacity-70`}><X className="h-4 w-4" aria-hidden /></button>
             </div>
           );
         })}
@@ -116,10 +116,14 @@ export function SegmentoBuilder({
         </button>
       </div>
 
-      <div className="flex items-center gap-3 rounded-xl border border-accent-subtle-foreground/30 bg-accent-subtle p-4">
+      {/* `flex-wrap`: a 343px "Contactos que matchean:" + el número + "Guardar"
+          no entran en una línea, y sin envolver el botón se comprime hasta
+          partir la palabra. El `ml-auto` sigue valiendo envuelto: cuando el
+          bloque de acciones cae solo a la segunda línea, queda a la derecha. */}
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-accent-subtle-foreground/30 bg-accent-subtle p-4">
         <div className="text-sm text-muted">Contactos que matchean:</div>
         <div className="text-2xl font-semibold tabular-nums text-foreground">{count === null ? "…" : count.toLocaleString("es-AR")}</div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           {msg && <span className="text-sm text-muted">{msg}</span>}
           <Button variant="primary" onClick={guardar} disabled={saving || soloLectura} title={soloLectura ? `Tu usuario es de solo lectura.` : undefined}>
             {saving ? "Guardando…" : "Guardar"}

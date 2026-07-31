@@ -6,6 +6,7 @@ import {
   type ValorColor,
 } from "@/lib/email/estilos";
 import type { Paleta } from "@/lib/email/tema";
+import { campoCompacto } from "@/lib/ui";
 import { Pipette, RotateCcw } from "lucide-react";
 
 /**
@@ -205,7 +206,7 @@ export function ControlEnum<T extends string | number>({
     <label className="block">
       <span className="mb-1 block text-xs font-semibold text-muted">{label}</span>
       <select
-        className="w-full rounded-lg border border-border-strong bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-accent focus:ring-2 focus:ring-ring/30"
+        className={`w-full ${campoCompacto}`}
         value={valor === undefined ? "" : String(valor)}
         onChange={(e) => {
           const v = e.target.value;

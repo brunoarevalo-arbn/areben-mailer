@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
 import { ContactosAcciones } from "@/components/ContactosAcciones";
 import { authorizeUrl } from "@/lib/tn/client";
+import { tapTarget } from "@/lib/ui";
 import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -82,7 +83,7 @@ export default async function ContactosPage({
           name="q"
           defaultValue={q ?? ""}
           placeholder="Buscar por email o nombre…"
-          className="w-full max-w-md rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-foreground placeholder:text-subtle outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-ring/30"
+          className="w-full max-w-md rounded-xl border border-border bg-surface px-3 py-3 text-base text-foreground placeholder:text-subtle outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-ring/30 lg:py-2.5 lg:text-sm"
         />
         <button
           type="submit"
@@ -145,7 +146,7 @@ export default async function ContactosPage({
             <a
               href={linkPage(page - 1)}
               aria-disabled={page <= 1}
-              className={`rounded-xl border border-border px-3 py-1.5 text-foreground transition-colors ${
+              className={`inline-flex ${tapTarget} items-center rounded-xl border border-border px-3 py-1.5 text-foreground transition-colors ${
                 page <= 1 ? "pointer-events-none opacity-40" : "hover:bg-surface-muted hover:border-border-strong"
               }`}
             >
@@ -154,7 +155,7 @@ export default async function ContactosPage({
             <a
               href={linkPage(page + 1)}
               aria-disabled={page >= totalPages}
-              className={`rounded-xl border border-border px-3 py-1.5 text-foreground transition-colors ${
+              className={`inline-flex ${tapTarget} items-center rounded-xl border border-border px-3 py-1.5 text-foreground transition-colors ${
                 page >= totalPages ? "pointer-events-none opacity-40" : "hover:bg-surface-muted hover:border-border-strong"
               }`}
             >

@@ -20,7 +20,7 @@ export function Textarea({
   const reactId = React.useId();
   const fieldId = id ?? reactId;
   const descId = error ? `${reactId}-err` : hint ? `${reactId}-hint` : undefined;
-  const baseClasses = 'border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-subtle transition-colors focus:outline-none disabled:bg-surface-muted disabled:cursor-not-allowed';
+  const baseClasses = 'border rounded-xl px-3 py-3 lg:py-2.5 text-base lg:text-sm text-foreground placeholder:text-subtle transition-colors focus:outline-none disabled:bg-surface-muted disabled:cursor-not-allowed';
   const stateClasses = error
     ? 'border-red-300 focus:border-red-400 focus:ring-2 focus:ring-red-400/30'
     : 'border-border focus:border-accent focus:ring-2 focus:ring-ring/30';

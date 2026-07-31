@@ -110,19 +110,23 @@ export function UsuariosManager({
       <Card>
         <div className="text-sm font-medium text-foreground">Sumar a alguien a {marca}</div>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
+          {/* `fullWidth`: sin él el campo mide su ancho intrínseco y en una celda
+              de grilla de 343px queda a media caja, con el label suelto al lado. */}
           <Input
             label="Email"
+            fullWidth
             placeholder="nombre@arebensrl.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
           <Input
             label="Nombre"
+            fullWidth
             placeholder="Opcional"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
           />
-          <Select label="Rol" value={rol} onChange={(e) => setRol(e.target.value as Rol)}>
+          <Select label="Rol" fullWidth value={rol} onChange={(e) => setRol(e.target.value as Rol)}>
             {ROLES.map((r) => (
               <option key={r} value={r}>
                 {ROL_LABEL[r]}
@@ -130,7 +134,7 @@ export function UsuariosManager({
             ))}
           </Select>
           <div className="flex items-end">
-            <Button variant="accent" onClick={crear} disabled={pending || !email.trim()} className="w-full">
+            <Button variant="accent" fullWidth onClick={crear} disabled={pending || !email.trim()}>
               <Plus className="mr-1.5 h-4 w-4" aria-hidden />
               {pending ? "Creando…" : "Crear"}
             </Button>
@@ -183,7 +187,10 @@ export function UsuariosManager({
                   </div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-2">
+                {/* `shrink-0` sin `flex-wrap` era un desborde asegurado: el
+                    <select> de rol más los cuatro botones de ícono no entran en
+                    343px y `shrink-0` prohíbe justamente que se achiquen. */}
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
                   <Select
                     value={u.rol}
                     disabled={soyYo || pending}

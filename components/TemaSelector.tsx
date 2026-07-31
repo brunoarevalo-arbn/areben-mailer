@@ -2,7 +2,7 @@
 
 import { FUENTES, FUENTE_LABEL, resolverPaleta, type Tema } from "@/lib/email/tema";
 import { Card } from "@/components/ui/Card";
-import { inputClass } from "@/lib/ui";
+import { campoCompacto } from "@/lib/ui";
 import { RotateCcw } from "lucide-react";
 
 // Selector de aspecto del mail.
@@ -12,7 +12,10 @@ import { RotateCcw } from "lucide-react";
 // aproximación. Es la razón por la que este control puede existir sin tener que
 // mantener dos versiones del diseño.
 
-const selectClass = `${inputClass} py-1.5`;
+// ⚠️ Era `${inputClass} py-1.5`, y ese `py-1.5` no ganaba por estar último en el
+// string: entre dos utilidades de la misma propiedad decide el orden del CSS que
+// escribe Tailwind, no el del className. `campoCompacto` ya trae UN solo `py`.
+const selectClass = `w-full ${campoCompacto}`;
 
 /** El punto de partida decide los colores de texto; el resto se retoca encima. */
 const BASES = [

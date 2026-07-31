@@ -30,6 +30,21 @@ const SUELTOS = ['lib/ui.ts'];
 /** 375px de pantalla menos los 32 de padding lateral del layout en celular. */
 const ANCHO_MAXIMO = 343;
 
+/**
+ * Las dos utilidades de letra que quedan abajo de los 16px que pide iOS.
+ *
+ * `text-xs` entró el 31-jul-2026: la regla miraba solo `text-sm` y se le pasaba
+ * el textarea del código para embeber de `FormularioEditor`, que estaba en 12px
+ * —o sea, peor—. Lo que se exige es un `text-base` al lado; el `lg:` que lo
+ * devuelve al tamaño de escritorio es libre.
+ *
+ * ⚠️ Lo que NO ve: un campo sin ninguna clase de tamaño. Ahí manda el default
+ * del navegador (13,33px en un `<select>` de Chrome) y también zoomearía, pero
+ * exigirlo marcaría los checkbox, los `type="color"` y los `type="range"`, que
+ * no abren teclado y no zoomean nunca.
+ */
+const CHICO = /\btext-(?:sm|xs)\b/;
+
 /** El string de campo de `lib/ui.ts`. Tiene que existir en un solo lugar. */
 const CAMPO_LIB = 'rounded-lg border border-border-strong bg-background';
 
@@ -54,18 +69,10 @@ interface Hallazgo {
  */
 const PENDIENTES = new Set<string>([
   // ── Tanda 2a — ✅ VACIADA: PageHeader ya apila abajo de `sm`.
-  // ── Tanda 2b — los campos suben a 16px. Son DOS familias de estilo:
-  //    la de lib/ui.ts y la de components/ui/, más los que están escritos inline.
-  '2:lib/ui.ts',
-  '2:components/ui/Input.tsx',
-  '2:components/ui/Select.tsx',
-  '2:components/ui/Textarea.tsx',
-  '2:app/(app)/contactos/page.tsx',
-  '2:app/(app)/listas/page.tsx',
-  '2:components/FormularioEditor.tsx',
-  '2:components/editor/ControlEstilo.tsx',
-  //    El mismo string de campoBase pero con py-1.5: no colapsa solo.
-  '3:components/editor/ControlEstilo.tsx',
+  // ── Tanda 2b — ✅ VACIADA: las dos familias de campo y los cuatro inline
+  //    están en 16px, y el `py-1.5` copiado de ControlEstilo salió a
+  //    `campoCompacto`. Las reglas 2 y 3 quedaron sin deuda: de acá en más
+  //    cualquier hallazgo suyo es NUEVO y hace fallar el script.
   // ── Tanda 3 — las dos tablas pasan a TablaResponsive
   '4:app/(app)/page.tsx',
   '4:app/(app)/contactos/page.tsx',
@@ -104,12 +111,18 @@ const push = (regla: number, archivo: string, linea: number, detalle: string) =>
 for (const archivo of [...DIRS.flatMap((d) => archivos(d)), ...SUELTOS]) {
   const src = readFileSync(archivo, 'utf8');
 
-  // `campoBase` no es un <input>: es el string del que salen ~20. Se mira aparte
-  // o la regla 2 no lo vería nunca.
+  // Las constantes de `lib/ui.ts` no son un <input>: son los strings de los que
+  // salen ~20. Se miran aparte o la regla 2 no las vería nunca.
+  //
+  // ⚠️ Se recorren TODAS y no solo `campoBase`: el 31-jul-2026 el string se
+  // partió en un tronco (`campoSinAlto`) más dos variantes de alto, y un regex
+  // anclado en el nombre `campoBase` habría dejado de encontrar nada y cantado
+  // victoria en silencio. Comillas y backticks porque las variantes son
+  // template literals.
   if (archivo === 'lib/ui.ts') {
-    for (const m of src.matchAll(/export const campoBase =\s*\n?\s*"([^"]*)"/g)) {
-      if (/\btext-sm\b/.test(m[1]) && !/\btext-base\b/.test(m[1])) {
-        push(2, archivo, lineaDe(src, m.index!), 'campoBase en text-sm');
+    for (const m of src.matchAll(/const \w+ =\s*\n?\s*[`"]([^`"]*)[`"]/g)) {
+      if (CHICO.test(m[1]) && !/\btext-base\b/.test(m[1])) {
+        push(2, archivo, lineaDe(src, m.index!), 'constante de campo en letra chica');
       }
     }
   }
@@ -127,8 +140,8 @@ for (const archivo of [...DIRS.flatMap((d) => archivos(d)), ...SUELTOS]) {
   // que parsear JSX (los `=>` de los onChange rompen cualquier regex de tag).
   if (CAMPOS_UI.includes(archivo)) {
     for (const m of src.matchAll(/const baseClasses = '([^']*)'/g)) {
-      if (/\btext-sm\b/.test(m[1]) && !/\btext-base\b/.test(m[1])) {
-        push(2, archivo, lineaDe(src, m.index!), 'baseClasses en text-sm');
+      if (CHICO.test(m[1]) && !/\btext-base\b/.test(m[1])) {
+        push(2, archivo, lineaDe(src, m.index!), 'baseClasses en letra chica');
       }
     }
   }
@@ -137,11 +150,11 @@ for (const archivo of [...DIRS.flatMap((d) => archivos(d)), ...SUELTOS]) {
     const cn = ventana.match(/className=(?:\{([^}]*(?:\}[^}]*)?)\}|"([^"]*)")/);
     if (!cn) continue;
     const expr = cn[1] ?? cn[2] ?? '';
-    const heredaDeLib = /\b(campoBase|inputClass)\b/.test(expr);
+    const heredaDeLib = /\b(campoBase|inputClass|campoCompacto)\b/.test(expr);
     const declaraOk = /\btext-base\b/.test(expr);
-    const declaraChico = /\btext-sm\b/.test(expr);
+    const declaraChico = CHICO.test(expr);
     if (!heredaDeLib && !declaraOk && declaraChico) {
-      push(2, archivo, lineaDe(src, m.index!), `<${m[1]}> en text-sm`);
+      push(2, archivo, lineaDe(src, m.index!), `<${m[1]}> en letra chica`);
     }
   }
 
