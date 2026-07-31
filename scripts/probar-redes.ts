@@ -8,6 +8,7 @@
 //
 //   node --import tsx scripts/probar-redes.ts
 import { existsSync, readFileSync } from "node:fs";
+import sharp from "sharp";
 import { renderEmailHtml } from "../lib/email/render";
 import { REDES, redConIcono } from "../lib/email/redes";
 import type { Bloque } from "../lib/email/bloques";
@@ -80,5 +81,35 @@ ok(srcs.length === REDES.length, `dibuja los ${REDES.length} iconos`);
 ok(srcs.every((s) => s.startsWith("https://")), "todos los src son absolutos y https");
 ok(!srcs.some((s) => s.includes("//redes")), "ninguno quedó con doble barra");
 
-console.log(fallos === 0 ? "\n✅ Todo verde\n" : `\n❌ ${fallos} fallo(s)\n`);
-process.exit(fallos === 0 ? 0 : 1);
+// Va al final y en una función porque necesita `await` (tsx compila este script
+// a CJS y no admite await de nivel superior).
+async function transparenciaReal() {
+  console.log("\n7) 🔴 Los archivos tienen transparencia DE VERDAD");
+  // Los PNG de banco de imágenes traen el damero DIBUJADO en gris en vez de un
+  // canal alfa. Sobre la tarjeta blanca de Zattia se ve idéntico, y aparece como
+  // un cuadrado sucio en cualquier marca con otro fondo — o sea, se descubre en
+  // el mail de OTRO comerciante. Pasó con Instagram y TikTok el 31-jul-2026.
+  //
+  // ⚠️ `metadata().hasAlpha` MIENTE con los PNG de paleta: devuelve `false` con
+  // la transparencia intacta. La única prueba que no miente es componer el icono
+  // sobre un color y mirar una esquina.
+  for (const r of REDES) {
+    const p = `public/redes/${r.slug}.png`;
+    if (!existsSync(p)) continue;
+    const compuesto = await sharp({
+      create: { width: 96, height: 96, channels: 3, background: { r: 255, g: 0, b: 255 } },
+    })
+      .composite([{ input: await sharp(p).resize(96, 96).toBuffer() }])
+      .raw()
+      .toBuffer();
+    ok(
+      compuesto[0] === 255 && compuesto[1] === 0 && compuesto[2] === 255,
+      `${r.slug}.png: la esquina es transparente, no un fondo pegado`,
+    );
+  }
+}
+
+transparenciaReal().then(() => {
+  console.log(fallos === 0 ? "\n✅ Todo verde\n" : `\n❌ ${fallos} fallo(s)\n`);
+  process.exit(fallos === 0 ? 0 : 1);
+});
