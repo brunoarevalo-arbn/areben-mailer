@@ -7,13 +7,15 @@
 // vez (ver `auditar-permisos.ts`, del que este script copia la forma).
 //
 // Correr:  node --import tsx scripts/auditar-responsive.ts
-// Sale con código 1 si aparece una violación NUEVA (sirve para CI).
+// Sale con código 1 si aparece CUALQUIER violación.
 //
-// ⚠️ PENDIENTES es la deuda que ya existía cuando se escribió el auditor. Se
-// imprime como aviso y NO hace fallar: si fallara desde el día uno, el script
-// nacería en rojo y nadie lo correría. Cada tanda del plan responsive vacía un
-// pedazo, y el contador de pendientes es el progreso. Cuando quede en cero, se
-// borra la lista y el auditor pasa a ser puramente preventivo.
+// ⚠️ Nació con una lista `PENDIENTES` —la deuda que ya existía el día que se
+// escribió— que se imprimía como aviso y no hacía fallar: si hubiera fallado
+// desde el día uno, el script nacía en rojo y nadie lo corría. Las tandas 2a a 4
+// la vaciaron entera y el 31-jul-2026 se borró: **el auditor es puramente
+// preventivo y cualquier hallazgo, de cualquiera de las seis reglas, lo pone en
+// rojo**. Si algún día tenta volver a poner una lista así, pensalo dos veces: es
+// deuda que nace con permiso.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -61,30 +63,6 @@ interface Hallazgo {
   linea: number;
   detalle: string;
 }
-
-/**
- * Deuda conocida al 31-jul-2026, por `regla:archivo`. Se lleva por archivo y no
- * por línea a propósito: las líneas se mueven con cualquier edición y una lista
- * que se rompe sola es una lista que se termina borrando entera.
- */
-const PENDIENTES = new Set<string>([
-  // ── Tanda 2a — ✅ VACIADA: PageHeader ya apila abajo de `sm`.
-  // ── Tanda 2b — ✅ VACIADA: las dos familias de campo y los cuatro inline
-  //    están en 16px, y el `py-1.5` copiado de ControlEstilo salió a
-  //    `campoCompacto`. Las reglas 2 y 3 quedaron sin deuda: de acá en más
-  //    cualquier hallazgo suyo es NUEVO y hace fallar el script.
-  // ── Tanda 3 — ✅ VACIADA: las dos tablas pasan por TablaResponsive, así que
-  //    la regla 4 quedó sin deuda y cualquier `<table>` nuevo hace fallar.
-  // ── Tanda 4 — ✅ VACIADA: el borrar de la biblioteca y el "+" entre bloques
-  //    tienen camino táctil, y la miniatura de plantillas mide su tarjeta en
-  //    vez de llevar el ancho clavado en una clase. Las reglas 1 y 6 quedaron
-  //    sin deuda.
-  //
-  // 🎉 **La lista quedó VACÍA.** De acá en más el auditor es puramente
-  // preventivo: cualquier hallazgo de cualquiera de las seis reglas es NUEVO y
-  // hace fallar el script. Si algún día hace falta volver a agregar algo acá,
-  // pensalo dos veces: es deuda que nace con permiso.
-]);
 
 const REGLAS: Record<number, string> = {
   1: 'ancho fijo mayor al de un celular',
@@ -201,33 +179,12 @@ for (const archivo of [...DIRS.flatMap((d) => archivos(d)), ...SUELTOS]) {
   }
 }
 
-const clave = (h: Hallazgo) => `${h.regla}:${h.archivo}`;
-const nuevos = hallazgos.filter((h) => !PENDIENTES.has(clave(h)));
-const viejos = hallazgos.filter((h) => PENDIENTES.has(clave(h)));
-
-if (viejos.length) {
-  const porRegla = new Map<number, number>();
-  for (const h of viejos) porRegla.set(h.regla, (porRegla.get(h.regla) ?? 0) + 1);
-  console.log(`\n⏳ Deuda conocida — ${viejos.length} caso(s) en ${new Set(viejos.map(clave)).size} archivo(s):`);
-  for (const [regla, n] of [...porRegla].sort((a, b) => a[0] - b[0])) {
-    console.log(`   regla ${regla} · ${REGLAS[regla]} → ${n}`);
-  }
-}
-
-// Un pendiente que ya no aparece es una tanda terminada: hay que sacarlo de la
-// lista o el auditor deja de proteger ese archivo en silencio.
-const resueltos = [...PENDIENTES].filter((k) => !hallazgos.some((h) => clave(h) === k));
-if (resueltos.length) {
-  console.log(`\n🧹 ${resueltos.length} pendiente(s) ya resuelto(s) — sacalos de PENDIENTES:`);
-  for (const k of resueltos) console.log(`   ${k}`);
-}
-
-if (nuevos.length) {
+if (hallazgos.length) {
   console.table(
-    nuevos.map((h) => ({ regla: h.regla, qué: REGLAS[h.regla], archivo: `${h.archivo}:${h.linea}`, detalle: h.detalle })),
+    hallazgos.map((h) => ({ regla: h.regla, qué: REGLAS[h.regla], archivo: `${h.archivo}:${h.linea}`, detalle: h.detalle })),
   );
-  console.error(`\n❌ ${nuevos.length} violación(es) NUEVA(s) de responsive.\n`);
+  console.error(`\n❌ ${hallazgos.length} violación(es) de responsive.\n`);
   process.exit(1);
 }
 
-console.log(`\n✅ Sin violaciones nuevas (${hallazgos.length} caso(s) conocido(s) pendientes).\n`);
+console.log('\n✅ Sin violaciones de responsive.\n');

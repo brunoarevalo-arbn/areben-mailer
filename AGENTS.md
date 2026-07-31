@@ -51,6 +51,7 @@ Auditorías que valen como test (no hay suite de tests):
 ```bash
 npx tsc --noEmit                               # ⚠️ los scripts NO los mira `next build`
 node --import tsx scripts/auditar-permisos.ts  # toda action declara su permiso
+node --import tsx scripts/auditar-responsive.ts # el panel no vuelve a nacer solo-para-escritorio
 node --import tsx scripts/probar-permisos.ts   # invariantes de la matriz
 node --import tsx scripts/probar-gate.ts       # el gate no se abre solo
 node --import tsx scripts/probar-webhooks.ts   # los webhooks de rebotes fallan CERRADO
@@ -400,6 +401,70 @@ una sola vez); está en `lib/` porque es la misma que necesita `importarCSV` de
   `lib/segmentos.ts`): lo que tiene que poder mandarse va a una **lista**, no a
   `custom`. Por eso el script crea `Perfit — abrieron 2026` con los 800 que
   tenían actividad registrada, en vez de guardar la fecha y esperar segmentarla.
+
+## El panel se usa con el dedo
+
+Hasta el 31-jul-2026 el panel no tenía **una sola media query propia**: ni un
+`hidden md:block`, ni `matchMedia`, ni un evento `touch*`. Se volvió responsive
+en cinco tandas. El público no es solo Bruno: es el comerciante de Tiendanube,
+así que la vara es **"que esté bueno en el celular"**, no "que no se rompa".
+Piso declarado **375px**, y de ahí se estira. **Tablet no es un objetivo**: hay
+un solo set de cortes. Lo custodia `auditar-responsive.ts` (seis reglas), que
+está **en cero** y de acá en más pone en rojo cualquier hallazgo.
+
+- 🔴 **El corte del shell es `lg` (1024) y no se mueve.** Medido: con el sidebar
+  de 240px clavado, un viewport de 640 o de 768 le deja al contenido **menos
+  ancho que el celular que supuestamente mejora** (352 y 480 contra 343). Abajo
+  de `lg` el sidebar es un cajón. ⛔ Su transform va con **`max-lg:`, nunca en
+  `lg`**: un `transform` en el `<aside>` crea un containing block y el
+  `fixed inset-0` de `BrandSwitcher` pasaría a medir el sidebar ⇒ el dropdown
+  dejaría de cerrarse en escritorio.
+- **Los campos van a 16px abajo de `lg`** (`text-base lg:text-sm`, o las
+  constantes de `lib/ui.ts`): con menos de 16, **iOS Safari zoomea solo al
+  enfocar** y el usuario queda con la página corrida. ⚠️ Eso **no se reproduce
+  en Chrome DevTools** — o se prueba en un iPhone o se confía en la regla 2 del
+  auditor. ⚠️ Hay **dos familias de estilo de campo** (`lib/ui.ts` con
+  `rounded-lg`, y `components/ui/{Input,Select,Textarea}` con `rounded-xl`):
+  unificarlas es un cambio estético de toda la app y se decidió **no** hacerlo.
+- **Toda tabla pasa por `components/ui/TablaResponsive.tsx`**: una sola
+  definición de columnas que se dibuja como `<table>` en `lg` y como tarjetas
+  abajo. Un `<table>` suelto esconde columnas en el celular sin avisar, y por eso
+  la regla 4 lo frena. ⚠️ La tarjeta esconde **una sola cosa: un par cuyo valor
+  es "—"**, y mira el valor renderizado, **nunca el rol**: una columna no puede
+  desaparecer del celular, que es justo para lo que existe el componente.
+- **El editor (`/campanias/[id]`) corta por `@container`, no por el viewport**:
+  la pregunta es "¿entran tres columnas en el espacio REAL del editor?", y con el
+  `max-w-6xl` del layout un viewport de 1280 deja 976px, donde las tres columnas
+  dejan el formulario inservible. Abajo de 66rem de contenedor va **una vista a la
+  vez** (Bloques / Editar / Vista previa). 🔴 **`container-type` implica
+  `contain: layout`**, así que el `@container` es el bloque de referencia de todo
+  `position: fixed` que cuelgue adentro: por eso `ImagenPicker` dibuja su modal
+  con un **portal a `document.body`**. Y 🔴 **un track de grilla con máximo FIJO
+  se sirve antes de que el `1fr` reparta** — van dos `1fr` para que ninguna
+  columna mate de hambre a la otra.
+- ⚠️ **Lo táctil cuelga de `lg` (el viewport); la grilla, del contenedor.** Son
+  preguntas distintas. A 1280 el editor apila pero hay un mouse, y ahí el hover
+  es lo correcto.
+- ⛔ **El toggle Escritorio/Celular de `PreviewMail` es del MAIL, no del panel**:
+  muestra cómo se ve el correo en el teléfono de quien lo recibe. No se elimina
+  al hacer responsive el panel — son dos cosas que no tienen nada que ver. Y
+  ⛔ **`lib/email/**` no se toca**: los mails ya son responsive contra su propio
+  ancho.
+- **El drag & drop de bloques sigue sin andar con el dedo** y es a propósito: los
+  eventos `drag*` de HTML5 **no se disparan en ningún navegador móvil**. El
+  camino táctil son las **flechas ↑↓**, que ya existían y son también el camino
+  de teclado; por eso el `GripVertical` se esconde abajo de `lg` (prometía algo
+  que no pasa). Migrar a Pointer Events entra por `onReorder(desde, hasta)` y es
+  **Etapa 2**, junto con sacar el editor del `max-w-6xl`.
+
+⚠️ **Para medir anchos hay que montar un iframe del mismo origen**: el viewport
+de la pestaña de Chrome queda clavado en 1440 y `resize_window` no lo mueve.
+🔴 Adentro de un iframe las transiciones CSS quedan `running` para siempre — el
+drawer mide `translate:-100%` con la clase `translate-x-0` ya puesta; se destraba
+con `d.getAnimations().forEach(a => a.finish())` y **no es un bug del código**.
+⚠️ Y un iframe con `srcDoc` y `sandbox=""` sale **en blanco en una captura de
+pantalla completa** aunque esté pintando perfecto: se verifica con zoom sobre la
+región.
 
 ## Auth y permisos
 
