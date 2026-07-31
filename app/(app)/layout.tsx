@@ -27,8 +27,11 @@ export default async function AppLayout({
           usuario={{ nombre, email }}
           rol={rol}
         />
-        <main className="flex-1 min-w-0 overflow-auto">
-          <div className="mx-auto max-w-6xl px-8 py-8">{children}</div>
+        {/* `pt-14` deja lugar a la barra fija de celular, que en `lg` no existe. */}
+        <main className="flex-1 min-w-0 overflow-auto pt-14 lg:pt-0">
+          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+            {children}
+          </div>
         </main>
       </div>
     </PermisosProvider>
