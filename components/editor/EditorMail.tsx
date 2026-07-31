@@ -200,7 +200,7 @@ export function EditorMail({
   const anchoMail = pal.ancho;
 
   /** Abajo del corte se muestra UNA columna; arriba, las tres. */
-  const soloSi = (v: VistaMovil) => (vistaMovil === v ? "" : "@max-[62rem]:hidden");
+  const soloSi = (v: VistaMovil) => (vistaMovil === v ? "" : "@max-[66rem]:hidden");
 
   return (
     // 🔴 `@container` y no un breakpoint de viewport, porque el editor **nunca
@@ -209,9 +209,17 @@ export function EditorMail({
     // dos columnas fijas se comen 632: la del medio —donde están TODOS los
     // formularios— nacía con 344px. El contenedor mide lo que hay de verdad.
     //
-    // 62rem = 992px es dónde la del medio pasa a tener ~360: 260 + 340 de las
-    // fijas más 32 de gaps. Con el `max-w-6xl` del layout eso cae recién a
-    // 1296px de viewport, y sacar el editor de ese `max-w` es la Etapa 2.
+    // 66rem = 1056px es dónde la del medio y el preview llegan a **382px cada
+    // uno**: 260 de la lista más 32 de gaps, y el resto partido al medio entre
+    // los dos `1fr`. Medido, no supuesto — el 62rem del plan daba 350 y el
+    // primer corte que probé, 240.
+    //
+    // ⚠️ Con el `max-w-6xl` del layout eso cae recién a **1360px de viewport**,
+    // así que una pantalla de 1280 ahora ve UNA vista a la vez en vez de tres
+    // columnas. Es a propósito: a 1280 el espacio real es 976 y ahí las tres
+    // columnas no existen sin que la del medio quede inservible. Lo que devuelve
+    // 1280 al modo de tres columnas es sacar el editor del `max-w-6xl`, que es
+    // la Etapa 2.
     //
     // ⚠️ `container-type` implica `contain: layout`, así que este div es el
     // bloque de referencia de todo `position: fixed` que cuelgue adentro. Por
@@ -254,7 +262,7 @@ export function EditorMail({
           Desaparece en cuanto las tres columnas entran juntas — con el MISMO
           corte que la grilla, o queda un tramo donde el selector no está y el
           layout sigue apilado. */}
-      <div className="grid grid-cols-3 gap-1 rounded-lg border border-border p-0.5 @[62rem]:hidden">
+      <div className="grid grid-cols-3 gap-1 rounded-lg border border-border p-0.5 @[66rem]:hidden">
         {VISTAS.map(({ v, label }) => (
           <button
             key={v}
@@ -274,8 +282,16 @@ export function EditorMail({
 
       {/* 260px y no 220: con 220 la lista mostraba "Carrit…" y "Espa…", y el
           mapa del mail existe justamente para saber qué bloque es cuál sin
-          abrirlo. El ancho sale de la columna del medio, que tiene aire. */}
-      <div className="grid grid-cols-1 gap-4 @[62rem]:grid-cols-[260px_minmax(0,1fr)_minmax(340px,460px)]">
+          abrirlo.
+
+          🔴 El preview pasó de `minmax(340px,460px)` a `minmax(340px,1fr)`, y
+          esa es la mitad que faltaba del arreglo. Un track con máximo FIJO se
+          sirve primero y el `1fr` del medio se queda con las sobras: medido en
+          prod, con las tres columnas recién entrando la del medio nacía con
+          **240px** — peor que los 344 que este cambio venía a arreglar. Con dos
+          `1fr` el espacio libre se parte al medio y ninguna de las dos puede
+          matar de hambre a la otra. */}
+      <div className="grid grid-cols-1 gap-4 @[66rem]:grid-cols-[260px_minmax(0,1fr)_minmax(340px,1fr)]">
         {/* Columna 1 · el mapa del mail */}
         <div className={`space-y-2 rounded-xl border border-border bg-surface p-3 shadow-sm ${soloSi("lista")}`}>
           <button
@@ -397,7 +413,7 @@ export function EditorMail({
           // quedara en `xl:` el preview se volvería pegajoso mientras todavía
           // está apilado abajo de las otras dos columnas, y "pegado arriba"
           // adentro de una pila es un cuadro que tapa el formulario.
-          className={`@[62rem]:sticky @[62rem]:top-6 h-fit ${soloSi("preview")}`}
+          className={`@[66rem]:sticky @[66rem]:top-6 h-fit ${soloSi("preview")}`}
         />
       </div>
     </div>
