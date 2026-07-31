@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { Hand, MailPlus, ShoppingBag, ShoppingCart } from "lucide-react";
+import { Hand, MailPlus, ShoppingBag, ShoppingCart, type LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
+import { automationDelTrigger, type Trigger } from "@/lib/automations";
+import { TRIGGERS_UI } from "./presets-ui";
 import { crearAutomation } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +17,17 @@ const TRIGGER_LABEL: Record<string, string> = {
   CARRITO_ABANDONADO: "Carrito abandonado",
   NUEVO_SUSCRIPTOR: "Nuevo suscriptor",
 };
+
+// `Record` completo y no un mapa suelto: un trigger nuevo sin icono no compila.
+const ICONO: Record<Trigger, LucideIcon> = {
+  NUEVO_CLIENTE: Hand,
+  NUEVO_SUSCRIPTOR: MailPlus,
+  COMPRA: ShoppingBag,
+  CARRITO_ABANDONADO: ShoppingCart,
+};
+
+const BOTON =
+  "inline-block rounded-xl bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover";
 
 export default async function AutomationsPage() {
   const cuenta = await getCuentaActiva();
@@ -35,51 +48,36 @@ export default async function AutomationsPage() {
         subtitle="Emails que se envían solos cuando pasa algo en tu tienda."
       />
 
-      {/* Presets */}
+      {/* Presets. La tarjeta de un trigger que YA tiene automation no ofrece
+          crear otra: el disparador manda todas las que matcheen, así que la
+          segunda es un segundo mail a la misma persona. La guarda de verdad está
+          en `crearAutomation` —esta página puede estar cacheada—, pero un botón
+          que dice "Crear" y no crea nada es peor que uno que dice "Editar". */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <div className="flex items-center gap-2 font-medium text-foreground">
-            <Hand className="h-5 w-5 text-accent" aria-hidden />
-            Bienvenida
-          </div>
-          <p className="mt-1 text-sm text-muted">Se envía cuando un cliente nuevo se registra en tu tienda.</p>
-          <form action={crearAutomation.bind(null, "NUEVO_CLIENTE")} className="mt-3">
-            <button className="rounded-xl bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover">Crear</button>
-          </form>
-        </Card>
-        {/* Se anotó ≠ compró. Son dos públicos distintos y por eso son dos
-            tarjetas: el de arriba dejó su nombre en el checkout, el de acá
-            escribió solo su mail en un pop-up y trae un cupón que ya ganó. */}
-        <Card>
-          <div className="flex items-center gap-2 font-medium text-foreground">
-            <MailPlus className="h-5 w-5 text-accent" aria-hidden />
-            Bienvenida a la lista
-          </div>
-          <p className="mt-1 text-sm text-muted">Se envía cuando alguien se anota en un pop-up o formulario, con el cupón que ganó.</p>
-          <form action={crearAutomation.bind(null, "NUEVO_SUSCRIPTOR")} className="mt-3">
-            <button className="rounded-xl bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover">Crear</button>
-          </form>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-2 font-medium text-foreground">
-            <ShoppingBag className="h-5 w-5 text-accent" aria-hidden />
-            Post-compra
-          </div>
-          <p className="mt-1 text-sm text-muted">Se envía cuando se paga un pedido (agradecimiento).</p>
-          <form action={crearAutomation.bind(null, "COMPRA")} className="mt-3">
-            <button className="rounded-xl bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover">Crear</button>
-          </form>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-2 font-medium text-foreground">
-            <ShoppingCart className="h-5 w-5 text-accent" aria-hidden />
-            Carrito abandonado
-          </div>
-          <p className="mt-1 text-sm text-muted">Recupera ventas: incluye el link al carrito y los productos que dejó.</p>
-          <form action={crearAutomation.bind(null, "CARRITO_ABANDONADO")} className="mt-3">
-            <button className="rounded-xl bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover">Crear</button>
-          </form>
-        </Card>
+        {TRIGGERS_UI.map(({ trigger, titulo, texto }) => {
+          const ya = automationDelTrigger(automations, trigger);
+          const Icono = ICONO[trigger];
+          return (
+            <Card key={trigger}>
+              <div className="flex items-center gap-2 font-medium text-foreground">
+                <Icono className="h-5 w-5 text-accent" aria-hidden />
+                {titulo}
+              </div>
+              <p className="mt-1 text-sm text-muted">{texto}</p>
+              {ya ? (
+                <div className="mt-3">
+                  <Link href={`/automations/${ya.id}`} className={BOTON}>
+                    Editar
+                  </Link>
+                </div>
+              ) : (
+                <form action={crearAutomation.bind(null, trigger)} className="mt-3">
+                  <button className={BOTON}>Crear</button>
+                </form>
+              )}
+            </Card>
+          );
+        })}
       </div>
 
       {/* Activas / creadas */}

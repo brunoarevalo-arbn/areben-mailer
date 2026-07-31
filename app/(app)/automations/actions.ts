@@ -10,13 +10,30 @@ import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { sendEmail } from "@/lib/email/enviar";
 import { MSG_SIN_REMITENTE } from "@/lib/email/proveedor";
 import { getRemitenteEnvio } from "@/lib/remitentes";
-import { type Trigger } from "@/lib/automations";
+import { automationDelTrigger, type Trigger } from "@/lib/automations";
 import { presetDeTrigger } from "@/lib/plantillas/presets";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function crearAutomation(trigger: Trigger) {
   const { cuenta } = await autorizar("editar");
+
+  // Una automation por trigger y por cuenta. El disparador manda TODAS las que
+  // matcheen, así que dos activas con el mismo trigger son dos mails a la misma
+  // persona — y una bienvenida es una sola vez en la vida del contacto.
+  //
+  // La guarda va acá y no solo en la tarjeta de `/automations`: la página puede
+  // estar desactualizada, o alguien hace doble click. Redirige a la que ya
+  // existe en vez de fallar, que es lo que quien apretó "Crear" venía a hacer.
+  // Fue lo que duplicó la bienvenida de Zattia el 31-jul-2026: entrar a la
+  // pantalla "a ver cómo era" y apretar el botón.
+  const existentes = await prisma.automation.findMany({
+    where: { cuentaId: cuenta.id, trigger },
+    select: { id: true, trigger: true, createdAt: true },
+  });
+  const ya = automationDelTrigger(existentes, trigger);
+  if (ya) redirect(`/automations/${ya.id}`);
+
   const rem = await getRemitenteEnvio(cuenta.id);
   const p = presetDeTrigger(trigger, cuenta, rem?.email);
   const a = await prisma.automation.create({

@@ -9,6 +9,33 @@ import { leerConfigCuenta } from "./marca";
 export type Trigger = "NUEVO_CLIENTE" | "COMPRA" | "CARRITO_ABANDONADO" | "NUEVO_SUSCRIPTOR";
 
 /**
+ * Qué hacer cuando alguien pide la automation de un trigger: llevarlo a la que
+ * ya existe, o crearla.
+ *
+ * 🔴 Es puro y lo usan LOS DOS lados —la tarjeta de `/automations` y la action
+ * `crearAutomation`— a propósito. El disparador manda **todas** las automations
+ * que matcheen el trigger, así que una segunda fila con el mismo trigger es un
+ * segundo mail a la misma persona; y una bienvenida es una sola vez en la vida
+ * del contacto. Con el criterio escrito dos veces, alcanza con que uno de los
+ * dos se quede viejo para que el bug vuelva.
+ *
+ * Devuelve el id de la existente —no un booleano— porque quien apretó el botón
+ * viene a editar esa: fallar sería correcto y además inútil.
+ *
+ * ⚠️ La más VIEJA cuando hay varias. Las duplicadas que ya existían (BDI tuvo
+ * dos bienvenidas) se resuelven a la que la gente venía editando, no a la que
+ * creó el accidente.
+ */
+export function automationDelTrigger<T extends { id: string; trigger: string; createdAt: Date }>(
+  existentes: T[],
+  trigger: Trigger,
+): T | undefined {
+  return existentes
+    .filter((a) => a.trigger === trigger)
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+}
+
+/**
  * Sitio público de la marca, para los links de los presets. Sale de
  * `config.url` si está cargada y, si no, del dominio del remitente — que para
  * las tres marcas coincide con el de la tienda.

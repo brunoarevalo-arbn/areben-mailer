@@ -73,6 +73,7 @@ node --import tsx scripts/probar-tramos.ts     # el ramp no pierde ni duplica a 
 node --import tsx scripts/probar-remitente.ts  # una marca sin remitente propio NO manda (no hay fallback)
 node --import tsx scripts/probar-tracking.ts   # los links del mail cuelgan del dominio de la marca, y un valor basura cae al fallback
 node --import tsx scripts/probar-redes.ts      # cada red de la lista tiene su PNG; lo que no tiene icono sale en texto, nunca roto
+node --import tsx scripts/probar-automations.ts # una automation por trigger: dos son dos mails a la misma persona
 ```
 
 ⚠️ `probar-render.ts` compara contra `scripts/fixtures/render-golden.json`. Si el
@@ -528,9 +529,19 @@ que se anota en un pop-up y el que compra por primera vez.
   prendida en producción — prenderlas se hace **desde la UI**, que es lo que
   registra el webhook en Tiendanube (un `UPDATE` a mano deja la automation
   activa y sorda).
-- 🔴 **BDI tiene la Bienvenida DUPLICADA** (`cmrwf6j3m…` de 3 bloques y
-  `cms6kpmqg…` de 4), las dos `PAUSADO` con el mismo asunto. Medido: activar las
-  dos encola **354 runs sobre 177 leads** = dos mails por persona.
+- ✅ **Ya no se pueden duplicar** (31-jul-2026). BDI llegó a tener dos bienvenidas
+  (`cmrwf6j3m…` y `cms6kpmqg…`) porque `/automations` dibujaba "Crear" siempre,
+  sin mirar si ya había una con ese trigger; activar las dos encolaba **354 runs
+  sobre 177 leads** = dos mails por persona. Hoy la tarjeta de un trigger que ya
+  tiene automation dice **"Editar"**, y `crearAutomation` **redirige a la
+  existente en vez de insertar** — la guarda del servidor es la que vale, porque
+  la página puede estar cacheada o alguien hace doble click. Los dos lados
+  deciden con **la misma función pura**, `automationDelTrigger` (`lib/automations.ts`),
+  que ante duplicadas viejas devuelve **la más vieja**. Lo fija
+  `probar-automations.ts`, verificado en rojo contra la forma anterior.
+  ⚠️ No hay índice único en la base a propósito: dos carritos abandonados con
+  esperas distintas (1 h y 24 h) es un caso legítimo, y un `@@unique` es DDL que
+  después no se saca.
 - 🔴 **Una marca sin fila en `Remitente` NO manda** (30-jul-2026). Antes caía al
   default de `SES_FROM_EMAIL`, que es **uno solo para todo el proyecto**
   (`info@bdiaccesorios.com.ar`): un mail de Stunned o de Resorty Lab salía
