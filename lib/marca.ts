@@ -62,6 +62,61 @@ export interface ConfigCuenta {
    * no un default para cualquier marca nueva.
    */
   htmlCrudoHabilitado?: boolean;
+  /**
+   * Dominio propio del que cuelgan los links de los mails de esta marca
+   * (`https://links.zattia.com.ar`), sin barra final. Ausente = `APP_URL`.
+   *
+   * POR QUÉ EXISTE: los links de un mail no van derecho a la tienda, pasan por
+   * el redirect que cuenta los clicks. Con un solo dominio para todas las
+   * marcas, un mail firmado por Zattia sale con 18 links a `*.vercel.app` — un
+   * dominio prestado, compartido con miles de apps, que no coincide con el que
+   * firma el mail. Es una de las señales que miran los filtros, y la pagamos en
+   * TODOS los envíos reales de TODAS las marcas.
+   *
+   * ⚠️ Esto NO es marca (no se dibuja): es de dónde cuelgan los links. Por eso
+   * no sale por `marcaDe()` ni entra en `RenderOpts` — si viajara ahí, el
+   * preview del editor lo pediría sin tener para qué.
+   */
+  dominioEnvio?: string;
+}
+
+/**
+ * Normaliza un dominio de envío escrito a mano. Devuelve `undefined` si no es
+ * usable, y ESO ES LO IMPORTANTE: un valor basura acá no rompe una imagen,
+ * rompe **todos** los links del mail —incluido el de baja— en correos que ya
+ * están en casillas ajenas y no se pueden corregir. Ante la duda, `undefined`
+ * ⇒ el llamador cae a `APP_URL` y el mail sale como salía ayer.
+ *
+ * Acepta `links.zattia.com.ar` o `https://links.zattia.com.ar/` y devuelve
+ * siempre `https://links.zattia.com.ar`.
+ */
+export function normalizarDominioEnvio(valor: unknown): string | undefined {
+  const s = (typeof valor === "string" ? valor : "").trim().toLowerCase();
+  if (!s) return undefined;
+  // `http://` no se acepta y no se "arregla" a https: un link de mail que
+  // arranca en texto plano es degradable, y acá lo que se degrada es el link de
+  // baja de una campaña entera.
+  if (/^http:\/\//.test(s)) return undefined;
+  const host = s.replace(/^https:\/\//, "").replace(/\/+$/, "");
+  // Un hostname y nada más: sin path, sin query, sin puerto, sin credenciales,
+  // sin espacios. Todo eso entra al `href` de un mail, donde no hay forma de
+  // escapar de un error después de mandarlo.
+  if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(host)) return undefined;
+  // Sin punto no hay dominio público ("localhost", "intranet"): un mail que ya
+  // salió con eso adentro es un link muerto en la casilla de otra persona.
+  if (!host.includes(".")) return undefined;
+  return `https://${host}`;
+}
+
+/**
+ * De dónde cuelgan los links de los mails de esta cuenta.
+ *
+ * El fallback va por parámetro y no leyendo `process.env` acá porque este
+ * archivo lo importa también el cliente (ver el aviso de arriba). Los cinco
+ * call sites que arman un mail pasan su `APP_URL`.
+ */
+export function hostDeEnvio(cuenta: { config: unknown }, fallback: string): string {
+  return leerConfigCuenta(cuenta.config).dominioEnvio ?? fallback;
 }
 
 /**
@@ -98,6 +153,9 @@ export function leerConfigCuenta(valor: unknown): ConfigCuenta {
     lastSyncContactos: txt(c.lastSyncContactos),
     marcaSync: txt(c.marcaSync),
     htmlCrudoHabilitado: c.htmlCrudoHabilitado === true,
+    // Se re-valida al LEER, no solo al guardar: el config es un Json libre que
+    // también tocan scripts y podría entrar editado a mano.
+    dominioEnvio: normalizarDominioEnvio(c.dominioEnvio),
   };
 }
 

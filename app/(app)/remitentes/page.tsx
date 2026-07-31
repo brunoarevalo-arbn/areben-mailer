@@ -44,6 +44,8 @@ export default async function RemitentesPage() {
         direccion={config.direccion}
         direccionPropia={config.direccionPropia}
         direccionOculta={!!config.direccionOculta}
+        dominioEnvio={config.dominioEnvio}
+        appUrl={process.env.APP_URL ?? ""}
       />
     </div>
   );

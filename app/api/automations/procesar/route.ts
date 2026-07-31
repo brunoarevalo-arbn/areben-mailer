@@ -8,7 +8,7 @@ import { destinatarioPermitido } from "@/lib/email/proveedor";
 import { inyectarTracking } from "@/lib/email/tracking";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { tnGet } from "@/lib/tn/client";
-import { marcaDe } from "@/lib/marca";
+import { marcaDe, hostDeEnvio } from "@/lib/marca";
 
 export const maxDuration = 60;
 const BATCH = 30;
@@ -129,7 +129,11 @@ export async function GET(req: Request) {
       create: { cuentaId: automation.cuentaId, contactoId: contacto.id, automationRunId: run.id },
     });
 
-    const unsubUrl = `${appUrl}/baja?c=${contacto.id}`;
+    // 🔴 Por RUN y no una vez arriba: este lote mezcla automations de marcas
+    // distintas, y cada una tiene su propio dominio de links. Calcularlo fuera
+    // del loop haría que el mail de Zattia saliera con el dominio de BDI.
+    const host = hostDeEnvio(automation.cuenta, appUrl);
+    const unsubUrl = `${host}/baja?c=${contacto.id}`;
     const opts = {
       preheader: automation.preheader ?? undefined,
       unsubscribeUrl: unsubUrl,
@@ -147,7 +151,7 @@ export async function GET(req: Request) {
     if (esCarrito) html = html.replaceAll("${cart.url}", td.abandonedUrl ?? "#");
     // El tracking va al final: sobre el HTML ya resuelto, para que envuelva
     // también los links que salieron de los merge tags y del carrito.
-    if (appUrl) html = inyectarTracking(html, envio.id, appUrl);
+    if (host) html = inyectarTracking(html, envio.id, host);
     // Parte text/plain: un mail solo-HTML es señal de spam, sobre todo en Outlook.
     let texto = aplicarMergeTags(renderEmailTexto({ ...contenido, bloques }, opts), contacto);
     if (esCarrito) texto = texto.replaceAll("${cart.url}", td.abandonedUrl ?? "#");

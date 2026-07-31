@@ -5,7 +5,7 @@ import { autorizar, chequear } from "@/lib/auth";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
-import { marcaDe } from "@/lib/marca";
+import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { sendEmail } from "@/lib/email/enviar";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { contactosElegibles, crearEnvios } from "@/lib/campanias";
@@ -228,9 +228,12 @@ export async function enviarPrueba(id: string, emailDestino: string) {
   // donde MÁS importa: si el mail de prueba saliera sin el bloque, la conclusión
   // sería "no anda" cuando en el envío real habría salido bien.
   const productosDinamicos = await resolverProductosDinamicos(contenido.bloques, cuenta);
+  // Del dominio de la marca, igual que el envío real: la prueba existe para
+  // juzgar el mail que va a salir, links incluidos.
+  const unsubPrueba = `${hostDeEnvio(cuenta, process.env.APP_URL ?? "")}/baja?token=preview`;
   const opts = {
     preheader: campania.preheader ?? undefined,
-    unsubscribeUrl: `${process.env.APP_URL}/baja?token=preview`,
+    unsubscribeUrl: unsubPrueba,
     productosDinamicos,
     // La prueba tiene que salir con el MISMO aspecto que el envío real: mismo
     // tema, mismo logo, mismo pie.
@@ -249,7 +252,7 @@ export async function enviarPrueba(id: string, emailDestino: string) {
       subject: `[PRUEBA] ${campania.asunto}`,
       html: htmlFinal,
       text: textoFinal,
-      unsubscribeUrl: `${process.env.APP_URL}/baja?token=preview`,
+      unsubscribeUrl: unsubPrueba,
       fromEmail: rem?.email,
       fromName: rem?.nombre,
       replyTo: rem?.responderA ?? undefined,

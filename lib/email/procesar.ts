@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags } from "@/lib/email/render";
 import { leerContenido } from "./esquema";
 import { resolverProductosDinamicos } from "./productos-dinamicos";
-import { marcaDe } from "@/lib/marca";
+import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { inyectarTracking } from "@/lib/email/tracking";
 import { sendEmail, esThrottle } from "@/lib/email/enviar";
 import { destinatarioPermitido, modoEnvio, MSG_SIN_REMITENTE } from "@/lib/email/proveedor";
@@ -36,7 +36,11 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
   });
   if (!campania) return null;
 
-  const appUrl = process.env.APP_URL ?? "";
+  // 🔴 Los links del MAIL cuelgan del dominio de la marca; el resto de la app
+  // sigue en `APP_URL`. No son la misma cosa: `arrancarCola` (el fetch del
+  // servidor a sí mismo) y la URL que se le registra a Tiendanube tienen que
+  // seguir apuntando al dominio del proyecto o se rompen el motor y el webhook.
+  const appUrl = hostDeEnvio(campania.cuenta, process.env.APP_URL ?? "");
   const contenido = leerContenido(campania.contenido);
 
   // Sin remitente propio la marca no manda (ver `armarFrom`). Se corta ACÁ,

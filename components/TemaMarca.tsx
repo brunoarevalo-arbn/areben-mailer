@@ -9,6 +9,7 @@ import type { Marca } from "@/lib/marca";
 import {
   guardarDireccionOculta,
   guardarDireccionPropia,
+  guardarDominioEnvio,
   guardarHtmlCrudoHabilitado,
   guardarTemaMarca,
   traerMarcaDeTienda,
@@ -47,6 +48,8 @@ export function TemaMarca({
   direccion,
   direccionPropia,
   direccionOculta: ocultaInicial,
+  dominioEnvio,
+  appUrl,
 }: {
   inicial: Tema | undefined;
   marca: Marca;
@@ -57,6 +60,10 @@ export function TemaMarca({
   /** El escrito a mano, si lo hay. Le gana al de arriba. */
   direccionPropia: string | undefined;
   direccionOculta: boolean;
+  /** Dominio propio de los links, si esta marca cargó uno. */
+  dominioEnvio: string | undefined;
+  /** El de la app, que es lo que se usa cuando la marca no tiene el suyo. */
+  appUrl: string;
 }) {
   const [tema, setTema] = useState<Tema | undefined>(inicial);
   const [marca, setMarca] = useState<Marca>(marcaInicial);
@@ -72,6 +79,13 @@ export function TemaMarca({
   const [dirOculta, setDirOculta] = useState<boolean>(ocultaInicial);
   const [guardandoDir, startDir] = useTransition();
   const [msgDir, setMsgDir] = useState<string | null>(null);
+  // Se muestra sin el `https://` porque es lo que la persona escribe y lo que
+  // ve en Cloudflare; la acción lo normaliza igual.
+  const [dom, setDom] = useState<string>((dominioEnvio ?? "").replace(/^https:\/\//, ""));
+  const [domGuardado, setDomGuardado] = useState<string | undefined>(dominioEnvio);
+  const [verificando, startDom] = useTransition();
+  const [msgDom, setMsgDom] = useState<string | null>(null);
+  const [domOk, setDomOk] = useState<boolean>(false);
 
   // Lo que va a salir en el pie: lo escrito a mano si lo hay, si no lo de TN.
   const dir = dirPropia.trim() || dirTienda;
@@ -131,6 +145,15 @@ export function TemaMarca({
       }
     });
   };
+
+  const guardarDominio = () =>
+    startDom(async () => {
+      const r = await guardarDominioEnvio(dom);
+      setDomOk(!!r.ok);
+      if (!r.ok) return setMsgDom(r.error ?? "No se pudo guardar.");
+      setDomGuardado(r.dominio || undefined);
+      setMsgDom(r.mensaje ?? "Guardado.");
+    });
 
   const cambiarHtmlCrudo = (v: boolean) => {
     setHtmlCrudo(v);
@@ -229,6 +252,53 @@ export function TemaMarca({
               </span>
             </label>
             {msgDir && <p className="mt-1 text-xs text-muted">{msgDir}</p>}
+          </div>
+
+          {/* De dónde cuelgan los links del mail. No es marca (no se dibuja),
+              pero se carga acá porque es la misma pregunta que el remitente:
+              con qué cara sale el mail. */}
+          <div className="mt-3 border-t border-border pt-3">
+            <div className="text-xs font-medium text-foreground">Dominio de los links</div>
+            <p className="mt-1 text-xs text-muted">
+              Los links del mail pasan por un redirect para contar los clicks. Con un dominio propio
+              salen a nombre de tu marca en vez del de la app, que es una de las señales que miran
+              los filtros de spam.
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Input
+                value={dom}
+                onChange={(e) => {
+                  setDom(e.target.value);
+                  setMsgDom(null);
+                }}
+                placeholder="links.tumarca.com.ar"
+                disabled={verificando}
+                fullWidth
+                className="min-w-0 flex-1"
+              />
+              <Button
+                variant="secondary"
+                onClick={guardarDominio}
+                disabled={verificando || dom.trim() === (domGuardado ?? "").replace(/^https:\/\//, "")}
+              >
+                {verificando ? "Verificando…" : "Verificar y guardar"}
+              </Button>
+            </div>
+            <p className="mt-1.5 text-xs text-muted">
+              Hoy tus links salen así:{" "}
+              <span className="break-all font-mono text-subtle">
+                {domGuardado ?? appUrl}/api/track/click/…
+              </span>
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              Necesita un CNAME apuntando a <span className="font-mono">cname.vercel-dns.com</span>{" "}
+              (sin proxy) y el dominio dado de alta en Vercel. Se verifica antes de guardar, así que
+              si falta alguno de los dos te lo avisa en vez de romper los mails. Vaciarlo vuelve al
+              dominio de la app.
+            </p>
+            {msgDom && (
+              <p className={`mt-1 text-xs ${domOk ? "text-muted" : "text-danger-foreground"}`}>{msgDom}</p>
+            )}
           </div>
           {msgMarca && <p className="mt-2 text-xs text-muted">{msgMarca}</p>}
         </div>

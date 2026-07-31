@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { autorizar, chequear } from "@/lib/auth";
 import { getIdentityStatus } from "@/lib/email/proveedores/ses";
 import { leerStore } from "@/lib/tn/client";
-import { configConTienda, leerConfigCuenta, marcaDe } from "@/lib/marca";
+import { configConTienda, leerConfigCuenta, marcaDe, normalizarDominioEnvio } from "@/lib/marca";
 import type { Tema } from "@/lib/email/tema";
 
 export async function crearRemitente(input: {
@@ -206,6 +206,73 @@ export async function guardarDireccionPropia(texto: string) {
   await prisma.cuenta.update({ where: { id: cuenta.id }, data: { config: nuevo } });
   revalidatePath("/remitentes");
   return { ok: true as const, direccion: limpio || leerConfigCuenta(cuenta.config).direccion || "" };
+}
+
+/**
+ * Guarda el dominio propio del que cuelgan los links de los mails de esta marca.
+ *
+ * Vaciarlo vuelve a `APP_URL`, que es como se portó siempre — por eso no hay
+ * "apagar": el campo vacío ES el estado anterior.
+ *
+ * 🔴 **Se verifica contra el dominio antes de guardarlo, y no es opcional.** El
+ * alta son dos pasos en dos lugares distintos (CNAME en Cloudflare + dominio en
+ * Vercel) y el DNS resuelve desde el primero, así que hay una ventana donde
+ * `dig` dice que está y el navegador ve un 404. Un dominio guardado en esa
+ * ventana no rompe una imagen: manda TODOS los links del mail muertos —el de
+ * baja incluido— a casillas ajenas donde ya no hay corrección posible. El
+ * chequeo hace imposible el orden equivocado.
+ */
+export async function guardarDominioEnvio(valor: string) {
+  const chk = await chequear("remitentes");
+  if (!chk.ok) return chk;
+  const { cuenta } = chk.ctx;
+
+  const config = (cuenta.config as Prisma.JsonObject) ?? {};
+  const nuevo: Prisma.JsonObject = { ...config };
+
+  if (!valor.trim()) {
+    delete nuevo.dominioEnvio;
+    await prisma.cuenta.update({ where: { id: cuenta.id }, data: { config: nuevo } });
+    revalidatePath("/remitentes");
+    return { ok: true as const, dominio: "", mensaje: "Listo: los links vuelven al dominio de la app." };
+  }
+
+  const dominio = normalizarDominioEnvio(valor);
+  if (!dominio) {
+    return {
+      ok: false as const,
+      error: "Tiene que ser un dominio solo, con https y sin barras (ej: links.zattia.com.ar).",
+    };
+  }
+
+  // El que prueba es el prefijo del que van a colgar el pixel y los clicks, no
+  // la home: es lo único que responde la pregunta que importa.
+  try {
+    const res = await fetch(`${dominio}/api/track/ping`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
+    });
+    const cuerpo = res.ok ? (await res.text()).trim() : "";
+    if (cuerpo !== "areben-mailer") {
+      return {
+        ok: false as const,
+        error:
+          res.status === 404
+            ? `${dominio} resuelve pero todavía no está dado de alta en Vercel para este proyecto.`
+            : `${dominio} contestó ${res.status} y no parece ser esta app. Revisá el alta en Vercel.`,
+      };
+    }
+  } catch {
+    return {
+      ok: false as const,
+      error: `No se pudo llegar a ${dominio}. Revisá el CNAME en Cloudflare (nube gris) y el alta en Vercel.`,
+    };
+  }
+
+  nuevo.dominioEnvio = dominio;
+  await prisma.cuenta.update({ where: { id: cuenta.id }, data: { config: nuevo } });
+  revalidatePath("/remitentes");
+  return { ok: true as const, dominio, mensaje: "Verificado y guardado. Los mails nuevos usan este dominio." };
 }
 
 export async function guardarDireccionOculta(oculta: boolean) {

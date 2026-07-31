@@ -6,7 +6,7 @@ import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
-import { marcaDe } from "@/lib/marca";
+import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { sendEmail } from "@/lib/email/enviar";
 import { MSG_SIN_REMITENTE } from "@/lib/email/proveedor";
 import { getRemitenteEnvio } from "@/lib/remitentes";
@@ -117,7 +117,9 @@ export async function enviarPruebaAutomation(id: string, email: string) {
   // Ídem campañas: la prueba resuelve los productos automáticos. El `carrito`
   // no, y está bien — en una prueba no hay carrito abandonado que mostrar.
   const productosDinamicos = await resolverProductosDinamicos(contenido.bloques, cuenta);
-  const unsubscribeUrl = `${process.env.APP_URL}/baja?token=preview`;
+  // La prueba tiene que colgar del mismo dominio que el envío real: si no, se
+  // estaría juzgando un mail con otros links que el que va a salir.
+  const unsubscribeUrl = `${hostDeEnvio(cuenta, process.env.APP_URL ?? "")}/baja?token=preview`;
   const opts = {
     preheader: a.preheader ?? undefined,
     unsubscribeUrl,
