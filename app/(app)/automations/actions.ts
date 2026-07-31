@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { autorizar, chequear, getAuth } from "@/lib/auth";
 import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
-import { renderEmailHtml, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
+import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { marcaDe } from "@/lib/marca";
@@ -117,21 +117,31 @@ export async function enviarPruebaAutomation(id: string, email: string) {
   // Ídem campañas: la prueba resuelve los productos automáticos. El `carrito`
   // no, y está bien — en una prueba no hay carrito abandonado que mostrar.
   const productosDinamicos = await resolverProductosDinamicos(contenido.bloques, cuenta);
-  const html = aplicarMergeTags(
-    renderEmailHtml(contenido, {
-      preheader: a.preheader ?? undefined,
-      unsubscribeUrl: `${process.env.APP_URL}/baja?token=preview`,
-      productosDinamicos,
-      ...marcaDe(cuenta),
-    }),
-    { nombre: nombre ?? "", email: destino },
-  );
+  const unsubscribeUrl = `${process.env.APP_URL}/baja?token=preview`;
+  const opts = {
+    preheader: a.preheader ?? undefined,
+    unsubscribeUrl,
+    productosDinamicos,
+    ...marcaDe(cuenta),
+  };
+  const destinatario = { nombre: nombre ?? "", email: destino };
+  const html = aplicarMergeTags(renderEmailHtml(contenido, opts), destinatario);
+  // Ídem la prueba de campañas: la parte text/plain y el header
+  // `List-Unsubscribe` no son cosméticos, son dos de las señales que mira el
+  // filtro. Sin ellos la prueba salía MEJOR clasificada como spam que el envío
+  // real, así que no servía para juzgar nada — que es justamente para lo que
+  // existe. Lo pagó la primera prueba de la bienvenida de Zattia (31-jul-2026):
+  // cayó en "no deseado" mandando desde un dominio con DKIM, SPF alineado y
+  // DMARC en orden.
+  const texto = aplicarMergeTags(renderEmailTexto(contenido, opts), destinatario);
   const rem = await getRemitenteEnvio(cuenta.id);
   try {
     const res = await sendEmail({
       to: destino,
       subject: `[PRUEBA] ${a.asunto}`,
       html,
+      text: texto,
+      unsubscribeUrl,
       fromEmail: rem?.email,
       fromName: rem?.nombre,
       replyTo: rem?.responderA ?? undefined,
