@@ -328,9 +328,14 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const tTitulo = e("titulo");
       const tCuerpo = e("cuerpo");
 
+      // El `alt` sale del título de la columna. No es accesibilidad de manual:
+      // **Outlook bloquea las imágenes por defecto**, así que con `alt=""` esa
+      // celda queda literalmente vacía y el mail se lee partido. Si la columna no
+      // tiene título se deja vacío a propósito — ahí la imagen sí es decorativa y
+      // un alt inventado sería ruido para un lector de pantalla.
       const celdaImagen = (c: Columna, pct: number) =>
         c.imagen
-          ? `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px"><a href="${esc(c.url || "#")}"><img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:${px(tImg.radio ?? 8)};display:block" alt="" /></a></td>`
+          ? `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px"><a href="${esc(c.url || "#")}"><img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:${px(tImg.radio ?? 8)};display:block" alt="${esc(c.titulo ?? "")}" /></a></td>`
           : `<td width="${pct}%"></td>`;
 
       const celdaTexto = (c: Columna, pct: number) => {
