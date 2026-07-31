@@ -9,8 +9,8 @@ import { guardarAutomation, enviarPruebaAutomation, toggleAutomation } from "@/a
 import { Button } from "@/components/ui/Button";
 import { usePermisos } from "@/components/PermisosProvider";
 import { Pause, Play } from "lucide-react";
+import { campoBase } from "@/lib/ui";
 
-const input = "rounded-lg border border-border-strong bg-background text-foreground placeholder:text-subtle px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-ring/30";
 
 export function AutomationEditor({
   id,
@@ -62,12 +62,12 @@ export function AutomationEditor({
         </div>
         <label className="flex items-center gap-1 text-sm text-foreground">
           <span className="text-muted">esperar</span>
-          <input type="number" className={`${input} w-16`} value={esperaHoras} onChange={(e) => setEsperaHoras(Number(e.target.value))} />
+          <input type="number" className={`${campoBase} w-16`} value={esperaHoras} onChange={(e) => setEsperaHoras(Number(e.target.value))} />
           <span className="text-muted">horas</span>
         </label>
         <label className="flex items-center gap-1 text-sm text-foreground">
           <span className="text-muted">no repetir por</span>
-          <input type="number" className={`${input} w-16`} value={capDias} onChange={(e) => setCapDias(Number(e.target.value))} />
+          <input type="number" className={`${campoBase} w-16`} value={capDias} onChange={(e) => setCapDias(Number(e.target.value))} />
           <span className="text-muted">días</span>
         </label>
         <Button
@@ -86,16 +86,16 @@ export function AutomationEditor({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <label className="block text-sm">
           <span className="text-muted">Nombre</span>
-          <input className={`${input} w-full`} value={nombre} onChange={(e) => setNombre(e.target.value)} />
+          <input className={`${campoBase} w-full`} value={nombre} onChange={(e) => setNombre(e.target.value)} />
         </label>
         <label className="block text-sm sm:col-span-2">
           <span className="text-muted">Asunto</span>
-          <input className={`${input} w-full`} value={asunto} onChange={(e) => setAsunto(e.target.value)} />
+          <input className={`${campoBase} w-full`} value={asunto} onChange={(e) => setAsunto(e.target.value)} />
         </label>
       </div>
       <label className="block text-sm">
         <span className="text-muted">Preheader</span>
-        <input className={`${input} w-full`} value={preheader} onChange={(e) => setPreheader(e.target.value)} />
+        <input className={`${campoBase} w-full`} value={preheader} onChange={(e) => setPreheader(e.target.value)} />
       </label>
 
       <EditorMail
@@ -117,7 +117,7 @@ export function AutomationEditor({
         <Button variant="primary" onClick={guardar} disabled={saving}>
           {saving ? "Guardando…" : "Guardar"}
         </Button>
-        <input className={`${input} max-w-56`} value={pruebaEmail} onChange={(e) => setPruebaEmail(e.target.value)} />
+        <input className={`${campoBase} max-w-56`} value={pruebaEmail} onChange={(e) => setPruebaEmail(e.target.value)} />
         <Button variant="accent" onClick={prueba} disabled={sending}>
           {sending ? "Enviando…" : "Enviar prueba"}
         </Button>

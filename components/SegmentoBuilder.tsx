@@ -6,8 +6,8 @@ import { guardarSegmento, contarSegmento } from "@/app/(app)/segmentos/actions";
 import { Button } from "@/components/ui/Button";
 import { usePermisos } from "@/components/PermisosProvider";
 import { X } from "lucide-react";
+import { campoBase } from "@/lib/ui";
 
-const input = "rounded-lg border border-border-strong bg-background text-foreground placeholder:text-subtle px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-ring/30";
 
 function campoDef(campo: CondCampo) {
   return CAMPOS.find((c) => c.campo === campo)!;
@@ -62,14 +62,14 @@ export function SegmentoBuilder({
       <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
         <label className="block text-sm">
           <span className="text-muted">Nombre del segmento</span>
-          <input className={`${input} mt-1 w-full`} value={nombre} onChange={(e) => setNombre(e.target.value)} />
+          <input className={`${campoBase} mt-1 w-full`} value={nombre} onChange={(e) => setNombre(e.target.value)} />
         </label>
       </div>
 
       <div className="space-y-3 rounded-xl border border-border bg-surface p-4 shadow-sm">
         <div className="flex items-center gap-2 text-sm">
           <span className="text-muted">Cumplir</span>
-          <select className={input} value={op} onChange={(e) => setOp(e.target.value as "AND" | "OR")}>
+          <select className={campoBase} value={op} onChange={(e) => setOp(e.target.value as "AND" | "OR")}>
             <option value="AND">TODAS las condiciones</option>
             <option value="OR">CUALQUIER condición</option>
           </select>
@@ -79,30 +79,30 @@ export function SegmentoBuilder({
           const def = campoDef(c.campo);
           return (
             <div key={i} className="flex flex-wrap items-center gap-2">
-              <select className={input} value={c.campo} onChange={(e) => cambiarCampo(i, e.target.value as CondCampo)}>
+              <select className={campoBase} value={c.campo} onChange={(e) => cambiarCampo(i, e.target.value as CondCampo)}>
                 {CAMPOS.map((cd) => (
                   <option key={cd.campo} value={cd.campo}>{cd.label}</option>
                 ))}
               </select>
-              <select className={input} value={c.op} onChange={(e) => setCond(i, { op: e.target.value })}>
+              <select className={campoBase} value={c.op} onChange={(e) => setCond(i, { op: e.target.value })}>
                 {def.ops.map((o) => (
                   <option key={o.op} value={o.op}>{o.label}</option>
                 ))}
               </select>
               {def.tipo === "num" && (
-                <input type="number" className={`${input} w-28`} value={Number(c.valor)} onChange={(e) => setCond(i, { valor: Number(e.target.value) })} />
+                <input type="number" className={`${campoBase} w-28`} value={Number(c.valor)} onChange={(e) => setCond(i, { valor: Number(e.target.value) })} />
               )}
               {def.tipo === "dias" && (
-                <input type="number" className={`${input} w-24`} value={Number(c.valor)} onChange={(e) => setCond(i, { valor: Number(e.target.value) })} />
+                <input type="number" className={`${campoBase} w-24`} value={Number(c.valor)} onChange={(e) => setCond(i, { valor: Number(e.target.value) })} />
               )}
               {def.tipo === "bool" && (
-                <select className={input} value={String(c.valor)} onChange={(e) => setCond(i, { valor: e.target.value === "true" })}>
+                <select className={campoBase} value={String(c.valor)} onChange={(e) => setCond(i, { valor: e.target.value === "true" })}>
                   <option value="true">Sí</option>
                   <option value="false">No</option>
                 </select>
               )}
               {def.tipo === "estado" && (
-                <select className={input} value={String(c.valor)} onChange={(e) => setCond(i, { valor: e.target.value })}>
+                <select className={campoBase} value={String(c.valor)} onChange={(e) => setCond(i, { valor: e.target.value })}>
                   {["ACTIVO", "BAJA", "REBOTADO", "SPAM"].map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               )}

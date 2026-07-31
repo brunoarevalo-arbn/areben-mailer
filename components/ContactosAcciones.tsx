@@ -5,6 +5,7 @@ import { sincronizarContactosTN, importarCSV } from "@/app/(app)/contactos/actio
 import { Button } from "@/components/ui/Button";
 import { usePermisos } from "@/components/PermisosProvider";
 import { RefreshCw, Plug } from "lucide-react";
+import { campoBase } from "@/lib/ui";
 
 interface Lista {
   id: string;
@@ -46,7 +47,6 @@ export function ContactosAcciones({
   const { puede, soloLectura } = usePermisos();
   const puedeIntegrar = puede("integrar");
 
-  const input = "rounded-lg border border-border-strong bg-background text-foreground placeholder:text-subtle px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-ring/30";
 
   return (
     <div className="space-y-3">
@@ -86,9 +86,9 @@ export function ContactosAcciones({
           <div className="text-sm text-muted">
             Pegá un email por línea (o <code>email,nombre</code>). Se marcan como que aceptan marketing.
           </div>
-          <textarea className={`${input} w-full font-mono`} rows={5} value={csv} onChange={(e) => setCsv(e.target.value)} placeholder="juan@mail.com,Juan Pérez&#10;ana@mail.com" />
+          <textarea className={`${campoBase} w-full font-mono`} rows={5} value={csv} onChange={(e) => setCsv(e.target.value)} placeholder="juan@mail.com,Juan Pérez&#10;ana@mail.com" />
           <div className="flex items-center gap-2">
-            <select className={input} value={listaId} onChange={(e) => setListaId(e.target.value)}>
+            <select className={campoBase} value={listaId} onChange={(e) => setListaId(e.target.value)}>
               <option value="">Sin lista (solo crear)</option>
               {listas.map((l) => <option key={l.id} value={l.id}>{l.nombre}</option>)}
             </select>

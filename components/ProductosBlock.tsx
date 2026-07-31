@@ -3,8 +3,8 @@
 import { useState } from "react";
 import type { ProductoEmail } from "@/lib/email/render";
 import { X } from "lucide-react";
+import { campoBase } from "@/lib/ui";
 
-const input = "rounded-lg border border-border-strong bg-background text-foreground placeholder:text-subtle px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-ring/30";
 
 export function ProductosBlock({
   items,
@@ -52,7 +52,7 @@ export function ProductosBlock({
       {/* Buscador */}
       <div className="flex gap-2">
         <input
-          className={`${input} flex-1`}
+          className={`${campoBase} flex-1`}
           value={q}
           placeholder="Buscar productos en tu tienda…"
           onChange={(e) => setQ(e.target.value)}
