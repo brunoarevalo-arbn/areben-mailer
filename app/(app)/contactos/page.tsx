@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { TablaResponsive } from "@/components/ui/TablaResponsive";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
@@ -100,40 +101,56 @@ export default async function ContactosPage({
         />
       ) : (
         <Card padding="none">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-surface-muted text-left text-muted">
-                  <th className="px-4 py-3 font-medium">Email</th>
-                  <th className="px-4 py-3 font-medium">Nombre</th>
-                  <th className="px-4 py-3 font-medium">Estado</th>
-                  <th className="px-4 py-3 font-medium">Marketing</th>
-                  <th className="px-4 py-3 font-medium text-right">Gastado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {contactos.map((c) => (
-                  <tr key={c.id} className="border-b border-border last:border-0 hover:bg-surface-muted">
-                    <td className="px-4 py-2.5 font-medium text-foreground">{c.email}</td>
-                    <td className="px-4 py-2.5 text-muted">{c.nombre ?? "—"}</td>
-                    <td className="px-4 py-2.5">
-                      <Badge variant={estadoBadge[c.estado] ?? "default"}>{c.estado}</Badge>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {c.tnAcceptsMkt ? (
-                        <Badge variant="success">acepta</Badge>
-                      ) : (
-                        <Badge variant="default">no</Badge>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-muted">
-                      {c.tnTotalGastado ? `$${Number(c.tnTotalGastado).toLocaleString("es-AR")}` : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <TablaResponsive
+            label="Contactos"
+            filas={contactos}
+            clave={(c) => c.id}
+            columnas={[
+              {
+                key: "email",
+                header: "Email",
+                movil: "titulo",
+                clase: "font-medium text-foreground",
+                celda: (c) => c.email,
+              },
+              // El nombre queda como columna propia y no como subtítulo: así el
+              // escritorio no pierde un encabezado, y en la tarjeta se lee como
+              // un dato más del contacto (la mitad de la base no lo tiene).
+              {
+                key: "nombre",
+                header: "Nombre",
+                clase: "text-muted",
+                celda: (c) => c.nombre ?? "—",
+              },
+              {
+                key: "estado",
+                header: "Estado",
+                celda: (c) => (
+                  <Badge variant={estadoBadge[c.estado] ?? "default"}>{c.estado}</Badge>
+                ),
+              },
+              {
+                key: "marketing",
+                header: "Marketing",
+                celda: (c) =>
+                  c.tnAcceptsMkt ? (
+                    <Badge variant="success">acepta</Badge>
+                  ) : (
+                    <Badge variant="default">no</Badge>
+                  ),
+              },
+              {
+                key: "gastado",
+                header: "Gastado",
+                align: "right",
+                clase: "text-muted",
+                celda: (c) =>
+                  c.tnTotalGastado
+                    ? `$${Number(c.tnTotalGastado).toLocaleString("es-AR")}`
+                    : "—",
+              },
+            ]}
+          />
         </Card>
       )}
 

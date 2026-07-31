@@ -10,6 +10,7 @@ import {
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { TablaResponsive } from "@/components/ui/TablaResponsive";
 import { EnviosChart, type PuntoSerie } from "@/components/EnviosChart";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
@@ -305,62 +306,70 @@ export default async function Home() {
               Ver todas →
             </Link>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-muted border-b border-border">
-                  <th className="px-6 py-2.5 font-medium">Campaña</th>
-                  <th className="px-6 py-2.5 font-medium">Estado</th>
-                  <th className="px-6 py-2.5 font-medium text-right">Enviados</th>
-                  <th className="px-6 py-2.5 font-medium text-right">Aperturas</th>
-                  <th className="px-6 py-2.5 font-medium text-right">Clicks</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ultimas.map((c) => {
-                  const env = enviadosMap[c.id] ?? 0;
-                  const abr = aperturasMap[c.id] ?? 0;
-                  const clk = clicksMap[c.id] ?? 0;
+          <TablaResponsive
+            label="Últimas campañas"
+            filas={ultimas}
+            clave={(c) => c.id}
+            columnas={[
+              {
+                key: "nombre",
+                header: "Campaña",
+                movil: "titulo",
+                celda: (c) => (
+                  <Link
+                    href={`/campanias/${c.id}`}
+                    className="font-medium text-foreground hover:text-accent"
+                  >
+                    {c.nombre}
+                  </Link>
+                ),
+              },
+              {
+                key: "asunto",
+                header: "Asunto",
+                movil: "subtitulo",
+                celda: (c) => c.asunto || "Sin asunto",
+              },
+              {
+                key: "estado",
+                header: "Estado",
+                celda: (c) => {
                   const est = ESTADO_CAMPANIA[c.estado] ?? {
                     label: c.estado,
                     variant: "default" as const,
                   };
                   return (
-                    <tr
-                      key={c.id}
-                      className="border-b border-border last:border-0 hover:bg-surface-muted/60 transition-colors"
-                    >
-                      <td className="px-6 py-3">
-                        <Link
-                          href={`/campanias/${c.id}`}
-                          className="font-medium text-foreground hover:text-accent"
-                        >
-                          {c.nombre}
-                        </Link>
-                        <div className="text-xs text-subtle truncate max-w-xs">
-                          {c.asunto || "Sin asunto"}
-                        </div>
-                      </td>
-                      <td className="px-6 py-3">
-                        <Badge variant={est.variant} size="sm">
-                          {est.label}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-3 text-right tabular-nums text-foreground">
-                        {env.toLocaleString("es-AR")}
-                      </td>
-                      <td className="px-6 py-3 text-right tabular-nums text-muted">
-                        {env ? pct(abr, env) : "—"}
-                      </td>
-                      <td className="px-6 py-3 text-right tabular-nums text-muted">
-                        {env ? pct(clk, env) : "—"}
-                      </td>
-                    </tr>
+                    <Badge variant={est.variant} size="sm">
+                      {est.label}
+                    </Badge>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
+                },
+              },
+              {
+                key: "enviados",
+                header: "Enviados",
+                align: "right",
+                clase: "text-foreground",
+                celda: (c) => (enviadosMap[c.id] ?? 0).toLocaleString("es-AR"),
+              },
+              {
+                key: "aperturas",
+                header: "Aperturas",
+                align: "right",
+                clase: "text-muted",
+                celda: (c) =>
+                  enviadosMap[c.id] ? pct(aperturasMap[c.id] ?? 0, enviadosMap[c.id]) : "—",
+              },
+              {
+                key: "clicks",
+                header: "Clicks",
+                align: "right",
+                clase: "text-muted",
+                celda: (c) =>
+                  enviadosMap[c.id] ? pct(clicksMap[c.id] ?? 0, enviadosMap[c.id]) : "—",
+              },
+            ]}
+          />
         </Card>
       ) : (
         <Card>

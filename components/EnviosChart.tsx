@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface PuntoSerie {
   dia: string; // YYYY-MM-DD (UTC)
@@ -15,12 +15,23 @@ const SERIES = [
   { key: "clk", label: "Clicks", color: "var(--chart-clk)" },
 ] as const;
 
-// Geometría del viewBox (el SVG escala al ancho del contenedor).
-const W = 720;
+// Geometría del viewBox.
+//
+// 🔴 **El ancho del viewBox es el ancho MEDIDO del contenedor, no una constante**,
+// así que una unidad de viewBox es un píxel de pantalla. Con los 720 fijos que
+// había antes, en un celular el SVG se dibujaba a 343px y todo lo que adentro
+// está declarado en unidades se achicaba con él: el `fontSize={10}` de los ejes
+// terminaba midiendo **5,2px reales**, que no se lee. Escalar el dibujo está
+// bien; escalar la tipografía, no.
 const H = 200;
 const PAD = { t: 12, r: 10, b: 22, l: 34 };
-const innerW = W - PAD.l - PAD.r;
 const innerH = H - PAD.t - PAD.b;
+
+/** El ancho de arranque, antes de que el `ResizeObserver` mida por primera vez. */
+const W_INICIAL = 720;
+
+/** Abajo de esto, tres fechas en el eje X; arriba, cinco. */
+const ANCHO_EJE_DENSO = 480;
 
 const fmtDia = (iso: string) => {
   const [, m, d] = iso.split("-");
@@ -30,7 +41,23 @@ const nf = (n: number) => n.toLocaleString("es-AR");
 
 export function EnviosChart({ data }: { data: PuntoSerie[] }) {
   const [hover, setHover] = useState<number | null>(null);
+  const cont = useRef<HTMLDivElement>(null);
+  const [W, setW] = useState(W_INICIAL);
 
+  // El mismo patrón que `PreviewMail`: medir el contenedor y redibujar cuando
+  // cambia. No alcanza con leerlo una vez — el sidebar aparece a 1024 y le
+  // cambia el ancho al contenido sin que la ventana cambie de tamaño.
+  useEffect(() => {
+    const el = cont.current;
+    if (!el) return;
+    const medir = () => setW(el.clientWidth || W_INICIAL);
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const innerW = W - PAD.l - PAD.r;
   const n = data.length;
   const max = Math.max(1, ...data.flatMap((p) => [p.env, p.abr, p.clk]));
   const x = (i: number) => PAD.l + (n <= 1 ? 0 : (i * innerW) / (n - 1));
@@ -46,15 +73,30 @@ export function EnviosChart({ data }: { data: PuntoSerie[] }) {
 
   // Ticks del eje Y (0, mitad, máximo).
   const yTicks = [0, Math.round(max / 2), max];
-  // Etiquetas de eje X (primero, mitad, último).
-  const xTicksIdx = n <= 1 ? [0] : [0, Math.floor((n - 1) / 2), n - 1];
+  // Etiquetas de eje X. **Los 30 puntos se quedan los 30** —es una tendencia, y
+  // recortarla a 7 le cambia la forma a la curva—; lo que se ajusta al ancho es
+  // cuántas fechas se escriben abajo, que es lo único que se pisa.
+  const nTicks = W < ANCHO_EJE_DENSO ? 3 : 5;
+  const xTicksIdx =
+    n <= 1
+      ? [0]
+      : [
+          ...new Set(
+            Array.from({ length: nTicks }, (_, k) =>
+              Math.round((k * (n - 1)) / (nTicks - 1)),
+            ),
+          ),
+        ];
 
   const totals = SERIES.map((s) => ({
     ...s,
     total: data.reduce((acc, p) => acc + p[s.key], 0),
   }));
 
-  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
+  // Pointer y no mouse: el mismo handler cubre dedo, mouse y lápiz, y los tres
+  // traen `clientX`. ⛔ Nada de `touch-action: none` — mataría el scroll
+  // vertical de la página justo arriba del gráfico.
+  const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const frac = (e.clientX - rect.left) / rect.width;
     const i = Math.max(0, Math.min(n - 1, Math.round(frac * (n - 1))));
@@ -62,7 +104,10 @@ export function EnviosChart({ data }: { data: PuntoSerie[] }) {
   };
 
   const hp = hover != null ? data[hover] : null;
-  const hoverLeftPct = hover != null && n > 1 ? (x(hover) / W) * 100 : 0;
+  // El tooltip se ancla a una ESQUINA, del lado contrario al punto: siguiendo al
+  // cursor con `left:N%` + `-translate-x-1/2` se cortaba contra el borde en el
+  // primer y el último punto, que en 343px es la mitad del gráfico.
+  const tooltipDerecha = hover != null && x(hover) < W / 2;
 
   return (
     <div>
@@ -78,7 +123,7 @@ export function EnviosChart({ data }: { data: PuntoSerie[] }) {
         <span className="ml-auto text-xs text-subtle">Últimos 30 días</span>
       </div>
 
-      <div className="relative">
+      <div className="relative" ref={cont}>
         <svg
           viewBox={`0 0 ${W} ${H}`}
           className="w-full"
@@ -86,8 +131,10 @@ export function EnviosChart({ data }: { data: PuntoSerie[] }) {
           preserveAspectRatio="none"
           role="img"
           aria-label="Envíos, aperturas y clicks por día en los últimos 30 días"
-          onMouseMove={onMove}
-          onMouseLeave={() => setHover(null)}
+          onPointerMove={onMove}
+          onPointerDown={onMove}
+          onPointerLeave={() => setHover(null)}
+          onPointerCancel={() => setHover(null)}
         >
           {/* Grilla horizontal recesiva + etiquetas Y */}
           {yTicks.map((v) => (
@@ -162,8 +209,9 @@ export function EnviosChart({ data }: { data: PuntoSerie[] }) {
         {/* Tooltip */}
         {hp && (
           <div
-            className="pointer-events-none absolute top-0 z-10 -translate-x-1/2 rounded-lg border border-border bg-surface px-3 py-2 shadow-md"
-            style={{ left: `${hoverLeftPct}%` }}
+            className={`pointer-events-none absolute top-0 z-10 rounded-lg border border-border bg-surface px-3 py-2 shadow-md ${
+              tooltipDerecha ? "right-0" : "left-0"
+            }`}
           >
             <div className="mb-1 text-xs font-medium text-foreground">{fmtDia(hp.dia)}</div>
             {SERIES.map((s) => (

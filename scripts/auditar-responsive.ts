@@ -73,9 +73,8 @@ const PENDIENTES = new Set<string>([
   //    están en 16px, y el `py-1.5` copiado de ControlEstilo salió a
   //    `campoCompacto`. Las reglas 2 y 3 quedaron sin deuda: de acá en más
   //    cualquier hallazgo suyo es NUEVO y hace fallar el script.
-  // ── Tanda 3 — las dos tablas pasan a TablaResponsive
-  '4:app/(app)/page.tsx',
-  '4:app/(app)/contactos/page.tsx',
+  // ── Tanda 3 — ✅ VACIADA: las dos tablas pasan por TablaResponsive, así que
+  //    la regla 4 quedó sin deuda y cualquier `<table>` nuevo hace fallar.
   // ── Tanda 4 — el editor: lo que hoy solo existe con el mouse encima,
   //    y la miniatura de plantillas con su escala clavada.
   '6:components/editor/ImagenPicker.tsx',
