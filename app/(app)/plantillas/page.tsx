@@ -9,7 +9,7 @@ import { presetsGaleria } from "@/lib/plantillas/presets";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { renderEmailHtml, aplicarMergeTags } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
-import { marcaDe } from "@/lib/marca";
+import { marcaDe, hostDeEnvio } from "@/lib/marca";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +51,7 @@ export default async function PlantillasPage() {
   ]);
 
   const marca = marcaDe(cuenta);
-  const opts = { unsubscribeUrl: "#", ...marca };
+  const opts = { unsubscribeUrl: "#", assetsBase: hostDeEnvio(cuenta, process.env.APP_URL ?? ""), ...marca };
   const ejemplo = { nombre: "Ana", email: "ana@ejemplo.com" };
   const vista = (c: Parameters<typeof renderEmailHtml>[0]) =>
     aplicarMergeTags(renderEmailHtml(c, opts), ejemplo);

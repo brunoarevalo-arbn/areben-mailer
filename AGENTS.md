@@ -71,6 +71,8 @@ node --import tsx scripts/probar-presets.ts    # ninguna plantilla prearmada tie
 node --import tsx scripts/probar-import.ts     # la supresión de un import es de una sola vía
 node --import tsx scripts/probar-tramos.ts     # el ramp no pierde ni duplica a nadie, y Microsoft va último
 node --import tsx scripts/probar-remitente.ts  # una marca sin remitente propio NO manda (no hay fallback)
+node --import tsx scripts/probar-tracking.ts   # los links del mail cuelgan del dominio de la marca, y un valor basura cae al fallback
+node --import tsx scripts/probar-redes.ts      # cada red de la lista tiene su PNG; lo que no tiene icono sale en texto, nunca roto
 ```
 
 ⚠️ `probar-render.ts` compara contra `scripts/fixtures/render-golden.json`. Si el

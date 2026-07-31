@@ -96,6 +96,9 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
       preheader: campania.preheader ?? undefined,
       unsubscribeUrl: unsubUrl,
       productosDinamicos,
+      // Los iconos de `redes` salen del mismo host que los links, no de una
+      // constante: un mail de Zattia trae sus iconos de links.zattia.com.ar.
+      assetsBase: appUrl,
       ...marcaDe(campania.cuenta),
     };
     let html = renderEmailHtml(contenido, opts);

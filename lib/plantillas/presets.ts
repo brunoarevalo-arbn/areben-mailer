@@ -103,9 +103,13 @@ const botonSi = (texto: string, url: string, align: "left" | "center" = "left"):
  */
 const redes: Bloque = {
   tipo: "redes",
+  // Las tres que tienen icono (ver `lib/email/redes.ts`). Antes estaba Facebook,
+  // que no lo tiene: cargarle la URL habría dejado el nombre en texto al lado de
+  // dos iconos. Una red sin archivo se puede seguir escribiendo a mano —sale en
+  // texto, que es el fallback— pero no la ofrecemos de fábrica.
   links: [
     { red: "Instagram", url: "" },
-    { red: "Facebook", url: "" },
+    { red: "TikTok", url: "" },
     { red: "WhatsApp", url: "" },
   ],
 };

@@ -41,7 +41,9 @@ export function PreviewMail({
   anchoMail: number;
   className?: string;
 }) {
-  const [movil, setMovil] = useState(false);
+  // Arranca en CELULAR a propósito: es donde el mail se lee de verdad, así que
+  // es el default que empuja a diseñar para ahí. Escritorio queda a un click.
+  const [movil, setMovil] = useState(true);
   const [caja, setCaja] = useState({ w: 0, h: 0 });
   const cont = useRef<HTMLDivElement>(null);
 
@@ -96,6 +98,13 @@ export function PreviewMail({
       renderEmailHtml(contenidoDif, {
         preheader: preheaderDif,
         unsubscribeUrl: "#",
+        // Los iconos de `redes` necesitan URL absoluta (el iframe va con
+        // `srcDoc`, así que una relativa no resuelve contra ningún origen). Se
+        // usa el del propio panel y no el dominio de la marca a propósito: son
+        // los MISMOS archivos, el preview se ve igual, y evita enhebrar la prop
+        // por los tres editores. Lo que el preview promete es el aspecto, no la
+        // URL — esa la decide `hostDeEnvio` al enviar.
+        assetsBase: typeof window === "undefined" ? "" : window.location.origin,
         // El carrito se dibuja con productos de muestra SOLO acá. El bloque
         // guardado sigue vacío: si trajera datos, una automation se los mandaría
         // a un cliente real.
@@ -150,10 +159,20 @@ export function PreviewMail({
         </div>
       </div>
 
-      <div
-        ref={cont}
-        className="h-[70vh] w-full overflow-hidden rounded-xl border border-border bg-white"
-      >
+      {/* Dos divs y no uno: el de afuera es el que MIDE (y el que observa el
+          ResizeObserver), el de adentro es el que se achica al ancho real del
+          mail. Con uno solo, cambiarle el ancho al elemento observado lo hace
+          re-medir y dispararse para siempre.
+
+          El de adentro mide `anchoMarco * escala` y va centrado. Sin eso, en
+          celular el iframe queda en 375px dentro de una caja de ~460 y esos 85px
+          sobrantes se ven como un borde blanco a la derecha — que es lo que se
+          veía y parecía "que no actualiza". */}
+      <div ref={cont} className="flex h-[70vh] w-full justify-center">
+        <div
+          className="h-full overflow-hidden rounded-xl border border-border bg-white"
+          style={{ width: caja.w ? anchoMarco * escala : "100%" }}
+        >
         <iframe
           title="Vista previa del mail"
           // `sandbox=""` sin permisos: el contenido sale de un Json que puede
@@ -171,6 +190,7 @@ export function PreviewMail({
             border: 0,
           }}
         />
+        </div>
       </div>
     </div>
   );

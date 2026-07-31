@@ -11,6 +11,7 @@ import {
 } from "./estilos";
 import { cabeza, apertura, cierre, botonVml, clase, clasesDe, CLASES } from "./shell";
 import { claveProductos } from "./bloques";
+import { redConIcono, urlIcono } from "./redes";
 import type { Bloque, Columna, ContenidoCampania, ProductoEmail, TipoBloque } from "./bloques";
 
 // Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
@@ -42,6 +43,8 @@ interface Ctx extends CtxEstilo {
   /** Logo y sitio de la marca (`Cuenta.config`, los trae TN). Ídem: defaults. */
   logoCuenta: string;
   urlCuenta: string;
+  /** De dónde salen los iconos de `redes`. Ver `RenderOpts.assetsBase`. */
+  assetsBase: string;
   /**
    * ¿Esta CUENTA puede usar el bloque `html`? No es el permiso del usuario que
    * edita —al enviar no hay usuario, solo cuenta—. Ausente/`false` = el bloque
@@ -193,7 +196,9 @@ function estProducto(tipo: TipoBloque, rolNombre: RolEstilo, ctx: Ctx, propio: E
 /** Render de una grilla de productos, reutilizable (ej. email de carrito abandonado). */
 export function renderProductosHtml(items: ProductoEmail[], tema?: Tema): string {
   const pal = resolverPaleta(tema);
-  const ctx: Ctx = { pal, muestraCarrito: false, nombreCuenta: "", logoCuenta: "", urlCuenta: "", permiteHtmlCrudo: false };
+  // `assetsBase` vacío: esto dibuja una grilla de productos, que no tiene
+  // iconos. Vacío es el valor seguro — el bloque `redes` cae al texto.
+  const ctx: Ctx = { pal, muestraCarrito: false, nombreCuenta: "", logoCuenta: "", urlCuenta: "", permiteHtmlCrudo: false, assetsBase: "" };
   return renderProductos(items, pal, estProducto("productos", "cuerpo", ctx, undefined));
 }
 
@@ -359,9 +364,26 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     }
     case "redes": {
       const t = e("cuerpo");
+      // El icono mide lo que mida el texto, ×2. Así la perilla de tamaño del
+      // panel sigue haciendo algo en este bloque (lo exige `probar-panel-estilo`)
+      // y no hace falta un control nuevo solo para las redes.
+      const lado = Math.round((t.tamano ?? 14) * 2);
       return pad(`<div style="text-align:center;margin:16px 0">${(b.links ?? [])
         .filter((l) => l.url)
-        .map((l) => `<a href="${esc(l.url)}" style="display:inline-block;margin:0 8px;color:${t.color};font-size:${px(t.tamano ?? 14)};text-decoration:none${extra(t, ["color", "tamano", "align", "subrayado"])}">${esc(l.red)}</a>`)
+        .map((l) => {
+          const red = redConIcono(l.red);
+          const src = red && urlIcono(ctx.assetsBase, red);
+          // 🔴 Con icono o con texto, NUNCA con una imagen rota: si la red no
+          // está en la lista o no hay `assetsBase`, sale el nombre — que es
+          // exactamente lo que este bloque dibujó siempre.
+          const dentro = src
+            // `width`/`height` como ATRIBUTOS además del style: Outlook ignora
+            // las medidas en CSS y dibujaría el PNG a 96px, que es el triple.
+            // `display:block` mata el hueco que el baseline le deja debajo.
+            ? `<img src="${esc(src)}" width="${lado}" height="${lado}" alt="${esc(red!.nombre)}" style="width:${px(lado)};height:${px(lado)};display:block;border:0" />`
+            : `<span style="color:${t.color};font-size:${px(t.tamano ?? 14)}${extra(t, ["color", "tamano", "align", "subrayado"])}">${esc(l.red)}</span>`;
+          return `<a href="${esc(l.url)}" style="display:inline-block;margin:0 8px;text-decoration:none">${dentro}</a>`;
+        })
         .join("")}</div>`, caja());
     }
     case "menu": {
@@ -480,6 +502,21 @@ export interface RenderOpts {
    * ⛔ Nunca en un envío real. En el envío, un carrito sin items no se dibuja.
    */
   muestraCarrito?: boolean;
+  /**
+   * De dónde cuelgan los archivos estáticos que van DENTRO del mail (hoy, los
+   * iconos de `redes`). Sin barra final.
+   *
+   * Es el mismo host del que cuelgan los links —`hostDeEnvio(cuenta, APP_URL)`—
+   * y no una constante: un mail de Zattia tiene que traer sus iconos de
+   * `links.zattia.com.ar`, no de un dominio ajeno. Viaja por `RenderOpts` y no
+   * adentro del documento por lo mismo que el logo: el Json se comparte entre
+   * marcas y no puede llevar la infraestructura adentro.
+   *
+   * 🔴 **Ausente = no se dibuja ningún icono, se dibuja el texto.** Un `<img>`
+   * con `src` relativo o vacío es una imagen rota en la casilla de otra persona;
+   * el nombre en texto es lo que hacía este bloque desde siempre y no falla.
+   */
+  assetsBase?: string;
   /** Tema por defecto de la marca (`Cuenta.config.tema`). Lo pisa el de la campaña. */
   temaMarca?: Tema | null;
   /**
@@ -520,6 +557,7 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
     logoCuenta: opts.logoCuenta?.trim() ?? "",
     urlCuenta: opts.urlCuenta?.trim() ?? "",
     permiteHtmlCrudo: !!opts.permiteHtmlCrudo,
+    assetsBase: opts.assetsBase?.trim().replace(/\/+$/, "") ?? "",
   };
   // El encabezado se saca de la lista y se dibuja arriba de la tarjeta, que es
   // donde estuvo siempre. `leerContenido` ya garantiza que hay uno solo y que

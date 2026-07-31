@@ -119,11 +119,13 @@ export async function enviarPruebaAutomation(id: string, email: string) {
   const productosDinamicos = await resolverProductosDinamicos(contenido.bloques, cuenta);
   // La prueba tiene que colgar del mismo dominio que el envío real: si no, se
   // estaría juzgando un mail con otros links que el que va a salir.
-  const unsubscribeUrl = `${hostDeEnvio(cuenta, process.env.APP_URL ?? "")}/baja?token=preview`;
+  const hostPrueba = hostDeEnvio(cuenta, process.env.APP_URL ?? "");
+  const unsubscribeUrl = `${hostPrueba}/baja?token=preview`;
   const opts = {
     preheader: a.preheader ?? undefined,
     unsubscribeUrl,
     productosDinamicos,
+    assetsBase: hostPrueba,
     ...marcaDe(cuenta),
   };
   const destinatario = { nombre: nombre ?? "", email: destino };

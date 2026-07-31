@@ -1,0 +1,75 @@
+// Los iconos de redes: que se dibujen, y sobre todo que NUNCA se dibuje una
+// imagen rota.
+//
+// El modo de falla que se cubre acá no se ve en desarrollo: un `<img>` con una
+// URL que no existe se ve igual que un icono que todavía no cargó, y recién
+// aparece como un cuadradito roto en la casilla de otra persona, en un mail que
+// ya no se puede corregir.
+//
+//   node --import tsx scripts/probar-redes.ts
+import { existsSync } from "node:fs";
+import { renderEmailHtml } from "../lib/email/render";
+import { REDES, redConIcono } from "../lib/email/redes";
+import type { Bloque } from "../lib/email/bloques";
+
+let fallos = 0;
+function ok(cond: boolean, que: string) {
+  if (cond) console.log(`  ✓ ${que}`);
+  else {
+    console.log(`  ✗ ${que}`);
+    fallos++;
+  }
+}
+
+const HOST = "https://links.zattia.com.ar";
+const OPTS = { unsubscribeUrl: "#", nombreCuenta: "Zattia" };
+const html = (links: { red: string; url: string }[], assetsBase?: string) =>
+  renderEmailHtml({ bloques: [{ tipo: "redes", links } as Bloque] }, { ...OPTS, assetsBase });
+
+console.log("\n1) 🔴 Cada red de la lista TIENE su archivo");
+// Es la invariante que hace imposible el cuadradito roto. Si alguien agrega una
+// red a REDES y se olvida del PNG, esto se pone rojo el mismo día.
+for (const r of REDES) {
+  ok(existsSync(`public/redes/${r.slug}.png`), `public/redes/${r.slug}.png existe (${r.nombre})`);
+}
+
+console.log("\n2) Una red conocida sale como icono");
+const h1 = html([{ red: "Instagram", url: "https://instagram.com/zattia_co" }], HOST);
+ok(h1.includes(`src="${HOST}/redes/instagram.png"`), "el src cuelga del host que se le pasó");
+ok(h1.includes('alt="Instagram"'), "lleva alt (Outlook bloquea imágenes: el alt es lo único que se ve)");
+ok(/<img[^>]*\bwidth="\d+"[^>]*\bheight="\d+"/.test(h1), "width/height como ATRIBUTOS, no solo en el style (Outlook ignora el CSS)");
+ok(h1.includes('href="https://instagram.com/zattia_co"'), "el link sigue estando");
+
+console.log("\n3) El nombre se reconoce escrito de cualquier forma");
+// El campo era texto libre antes del selector: en la base ya hay variantes.
+for (const v of ["instagram", "INSTAGRAM", " Instagram ", "TikTok", "tiktok", "WhatsApp", "whatsapp"]) {
+  ok(!!redConIcono(v), `reconoce "${v}"`);
+}
+
+console.log("\n4) 🔴 Lo que no tiene icono NO emite una imagen");
+const h2 = html([{ red: "Facebook", url: "https://facebook.com/x" }], HOST);
+ok(!h2.includes("<img"), "una red sin archivo no emite <img>");
+ok(h2.includes("Facebook"), "…sale el nombre en texto, que es lo que hacía antes");
+
+const h3 = html([{ red: "Instagram", url: "https://instagram.com/x" }]);
+ok(!h3.includes("<img"), "sin assetsBase tampoco emite <img>");
+ok(h3.includes("Instagram"), "…también cae al texto");
+
+const h4 = html([{ red: "Instagram", url: "https://instagram.com/x" }], "   ");
+ok(!h4.includes("<img"), "un assetsBase en blanco no emite <img>");
+
+console.log("\n5) Sin URL la red no se dibuja");
+const h5 = html([{ red: "Instagram", url: "" }], HOST);
+ok(!h5.includes("<img"), "sin URL no hay icono");
+ok(!h5.includes("instagram.com"), "sin URL no hay link");
+
+console.log("\n6) Ningún src queda relativo ni a medio armar");
+// Un src relativo no resuelve en un cliente de mail: no hay página base.
+const todos = html(REDES.map((r) => ({ red: r.nombre, url: "https://x.com/y" })), HOST);
+const srcs = [...todos.matchAll(/<img[^>]*src="([^"]*)"/g)].map((m) => m[1]);
+ok(srcs.length === REDES.length, `dibuja los ${REDES.length} iconos`);
+ok(srcs.every((s) => s.startsWith("https://")), "todos los src son absolutos y https");
+ok(!srcs.some((s) => s.includes("//redes")), "ninguno quedó con doble barra");
+
+console.log(fallos === 0 ? "\n✅ Todo verde\n" : `\n❌ ${fallos} fallo(s)\n`);
+process.exit(fallos === 0 ? 0 : 1);

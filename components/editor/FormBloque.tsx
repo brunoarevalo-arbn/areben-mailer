@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import type { Marca } from "@/lib/marca";
+import { REDES, redConIcono } from "@/lib/email/redes";
 import { X } from "lucide-react";
 
 /**
@@ -365,13 +366,36 @@ export function FormBloque({
         <div className="space-y-2">
           {b.links.map((l, k) => (
             <div key={k} className="flex items-end gap-2">
-              <Input
-                label={k === 0 ? "Red" : undefined}
-                className="w-28"
-                value={l.red}
-                placeholder="Instagram"
-                onChange={(e) => set({ links: b.links.map((x, j) => (j === k ? { ...x, red: e.target.value } : x)) })}
-              />
+              {/* Selector y no texto libre: el icono se resuelve por el nombre,
+                  así que "IG" o "insta" quedarían sin dibujar. La opción "Otra"
+                  deja escribir una red sin icono — sale en texto, como antes. */}
+              {redConIcono(l.red) || !l.red ? (
+                <Select
+                  label={k === 0 ? "Red" : undefined}
+                  className="w-32"
+                  value={redConIcono(l.red)?.nombre ?? ""}
+                  onChange={(e) =>
+                    set({ links: b.links.map((x, j) => (j === k ? { ...x, red: e.target.value } : x)) })
+                  }
+                >
+                  <option value="">Elegí una…</option>
+                  {REDES.map((r) => (
+                    <option key={r.slug} value={r.nombre}>
+                      {r.nombre}
+                    </option>
+                  ))}
+                  <option value="Otra">Otra (sin icono)</option>
+                </Select>
+              ) : (
+                <Input
+                  label={k === 0 ? "Red" : undefined}
+                  className="w-32"
+                  value={l.red}
+                  placeholder="Nombre"
+                  hint={k === b.links.length - 1 ? "Sin icono: sale el nombre en texto." : undefined}
+                  onChange={(e) => set({ links: b.links.map((x, j) => (j === k ? { ...x, red: e.target.value } : x)) })}
+                />
+              )}
               <Input
                 label={k === 0 ? "URL" : undefined}
                 fullWidth

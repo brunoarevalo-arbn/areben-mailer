@@ -230,11 +230,13 @@ export async function enviarPrueba(id: string, emailDestino: string) {
   const productosDinamicos = await resolverProductosDinamicos(contenido.bloques, cuenta);
   // Del dominio de la marca, igual que el envío real: la prueba existe para
   // juzgar el mail que va a salir, links incluidos.
-  const unsubPrueba = `${hostDeEnvio(cuenta, process.env.APP_URL ?? "")}/baja?token=preview`;
+  const hostPrueba = hostDeEnvio(cuenta, process.env.APP_URL ?? "");
+  const unsubPrueba = `${hostPrueba}/baja?token=preview`;
   const opts = {
     preheader: campania.preheader ?? undefined,
     unsubscribeUrl: unsubPrueba,
     productosDinamicos,
+    assetsBase: hostPrueba,
     // La prueba tiene que salir con el MISMO aspecto que el envío real: mismo
     // tema, mismo logo, mismo pie.
     ...marcaDe(cuenta),

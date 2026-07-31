@@ -138,6 +138,8 @@ export async function GET(req: Request) {
       preheader: automation.preheader ?? undefined,
       unsubscribeUrl: unsubUrl,
       productosDinamicos,
+      // Ídem campañas: del host de ESTA marca, que en este loop cambia por run.
+      assetsBase: host,
       ...marcaDe(automation.cuenta),
     };
     // Se pasa el contenido ENTERO con los bloques pisados, no `{ bloques, tema }`.
