@@ -111,10 +111,16 @@ model AutomationRun {
   sesMessageId String?
   createdAt    DateTime   @default(now())
 
+  /// Arriendo del run: quién lo toma es el único que le manda el mail. Sin esto,
+  /// dos invocaciones simultáneas del procesador mandan el mismo mail dos veces.
+  /// Ver `lib/email/runs.ts` y `scripts/add-run-lease.ts`.
+  procesandoHasta DateTime?
+
   /// El mail que salió de este run. Es donde viven su apertura y sus clicks.
   envio Envio?
 
   @@index([estado, proximoAt])
+  @@index([estado, procesandoHasta])
   @@index([automationId, contactoId, createdAt])
 }
 

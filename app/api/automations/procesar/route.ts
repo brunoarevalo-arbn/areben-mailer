@@ -9,6 +9,7 @@ import { inyectarTracking } from "@/lib/email/tracking";
 import { getRemitenteEnvio } from "@/lib/remitentes";
 import { tnGet } from "@/lib/tn/client";
 import { marcaDe, hostDeEnvio } from "@/lib/marca";
+import { tomarRuns, soltarRun } from "@/lib/email/runs";
 
 export const maxDuration = 60;
 const BATCH = 30;
@@ -21,11 +22,21 @@ export async function GET(req: Request) {
 
   const appUrl = process.env.APP_URL ?? "";
 
-  const runs = await prisma.automationRun.findMany({
-    where: { estado: "PENDIENTE", proximoAt: { lte: new Date() } },
-    take: BATCH,
-    include: { automation: { include: { cuenta: true } }, contacto: true },
-  });
+  // 🔴 EL LOTE SE ARRIENDA, NO SE LEE. Hasta el 31-jul-2026 esto era un
+  // `findMany` de los `PENDIENTE`, y el run se marcaba `ENVIADO` recién después
+  // de que SES aceptara el mail: dos invocaciones simultáneas se llevaban los
+  // mismos 30 runs y **mandaban el mail dos veces a la misma persona**. Con el
+  // cron como único llamador nunca se vio —corre solo—, pero Resorty ahora
+  // pincha este endpoint en cada lead para que la bienvenida no espere al cron,
+  // y dos leads en el mismo segundo alcanzan. Ver `lib/email/runs.ts`.
+  const ids = await tomarRuns(BATCH);
+  const runs = ids.length
+    ? await prisma.automationRun.findMany({
+        where: { id: { in: ids } },
+        orderBy: { proximoAt: "asc" },
+        include: { automation: { include: { cuenta: true } }, contacto: true },
+      })
+    : [];
 
   let enviados = 0, saltados = 0, fallidos = 0;
 
@@ -44,6 +55,10 @@ export async function GET(req: Request) {
     // para siempre. Cargado el remitente, el cron los toma en la corrida siguiente.
     const rem = await getRemitenteEnvio(automation.cuentaId);
     if (!rem) {
+      // Se suelta el arriendo: es el único camino que deja el run `PENDIENTE` a
+      // propósito, y sin esto quedaría invisible los 5 minutos del lease aunque
+      // el remitente se cargue en el segundo siguiente.
+      await soltarRun(run.id);
       saltados++;
       continue;
     }
