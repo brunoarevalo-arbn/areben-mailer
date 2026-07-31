@@ -155,8 +155,19 @@ export function EnviosChart({ data }: { data: PuntoSerie[] }) {
           ))}
 
           {/* Etiquetas X */}
+          {/* ⚠️ Las de las puntas se anclan al costado, no al centro: centrada,
+              la última fecha arranca en `W - PAD.r` y se le va la mitad afuera
+              del viewBox, que la recorta. Con el ancho clavado en 720 pasaba
+              igual, solo que a 5px de letra no se notaba. */}
           {xTicksIdx.map((i) => (
-            <text key={i} x={x(i)} y={H - 6} textAnchor="middle" fontSize={10} fill="var(--subtle)">
+            <text
+              key={i}
+              x={x(i)}
+              y={H - 6}
+              textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"}
+              fontSize={10}
+              fill="var(--subtle)"
+            >
               {fmtDia(data[i].dia)}
             </text>
           ))}
