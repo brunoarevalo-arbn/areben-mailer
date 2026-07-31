@@ -72,6 +72,25 @@ export function TablaResponsive<T>({
   // la celda del título.
   const enTabla = columnas.filter((c) => c.movil !== 'subtitulo');
 
+  /**
+   * En la tarjeta, un par cuyo valor es un guion no se dibuja.
+   *
+   * En una tabla el "—" es necesario: la celda existe igual y vacía se leería
+   * como un error de carga. En una tarjeta la celda no existe, así que
+   * "Nombre —" y "Gastado —" son dos renglones que ocupan lugar para decir que
+   * no hay nada. En `/contactos` eso es la mitad de la base (el pop-up de Nuby
+   * pedía solo el mail), o sea la mitad de cada tarjeta en 343px.
+   *
+   * ⛔ Es lo ÚNICO que la tarjeta esconde y solo mira el valor renderizado: una
+   * columna nunca desaparece por su rol, que es lo que este componente existe
+   * para impedir.
+   */
+  const metasDe = (fila: T) =>
+    metas.filter((c) => {
+      const v = c.celda(fila);
+      return !(typeof v === 'string' && (v.trim() === '' || v.trim() === '—'));
+    });
+
   const subtitulosDe = (fila: T) =>
     subtitulos.map((c) => (
       <div key={c.key} className="text-xs text-subtle truncate max-w-xs">
@@ -123,13 +142,13 @@ export function TablaResponsive<T>({
           <li key={clave(fila)} className="px-4 py-3">
             <div className="font-medium text-foreground">{colTitulo.celda(fila)}</div>
             {subtitulosDe(fila)}
-            {metas.length > 0 && (
+            {metasDe(fila).length > 0 && (
               // `<dl>` y no divs sueltos: son pares etiqueta/valor de verdad, y
               // así un lector de pantalla los lee apareados en vez de como una
               // sopa de palabras. Los `<div>` que agrupan cada par son HTML
               // válido adentro de un `<dl>`.
               <dl className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
-                {metas.map((c) => (
+                {metasDe(fila).map((c) => (
                   <div key={c.key} className="flex items-center gap-1.5">
                     <dt className="text-subtle">{c.header}</dt>
                     <dd className="font-medium tabular-nums text-foreground">
