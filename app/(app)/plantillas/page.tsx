@@ -10,33 +10,9 @@ import { getRemitenteEnvio } from "@/lib/remitentes";
 import { renderEmailHtml, aplicarMergeTags } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
 import { marcaDe, hostDeEnvio } from "@/lib/marca";
+import { MiniaturaMail } from "@/components/MiniaturaMail";
 
 export const dynamic = "force-dynamic";
-
-/**
- * La miniatura es el mail de verdad, renderizado y escalado.
- *
- * No es una captura ni un dibujo aparte: es `renderEmailHtml` con la marca de
- * esta cuenta puesta. Una galería que muestre una versión genérica miente sobre
- * lo que va a salir, y el comerciante lo descubre después de elegir.
- */
-function Miniatura({ titulo, html }: { titulo: string; html: string }) {
-  return (
-    <div className="h-56 overflow-hidden border-b border-border bg-white">
-      <iframe
-        title={titulo}
-        // `sandbox=""` sin `allow-same-origin`: el srcDoc hereda el origen del
-        // panel, y `esc()` no escapa comillas. Sin esto, un texto guardado puede
-        // ejecutar JS con la sesión de quien mira.
-        sandbox=""
-        srcDoc={html}
-        className="pointer-events-none h-[560px] w-[400px] origin-top-left"
-        style={{ transform: "scale(0.68)" }}
-        tabIndex={-1}
-      />
-    </div>
-  );
-}
 
 export default async function PlantillasPage() {
   const cuenta = await getCuentaActiva();
@@ -82,7 +58,7 @@ export default async function PlantillasPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {previews.map(({ preset, html }) => (
             <Card key={preset.id} padding="none" className="overflow-hidden">
-              <Miniatura titulo={preset.nombre} html={html} />
+              <MiniaturaMail titulo={preset.nombre} html={html} />
               <div className="p-4">
                 <div className="font-medium text-foreground">{preset.nombre}</div>
                 <div className="mt-1 text-xs text-muted">{preset.descripcion}</div>
@@ -120,7 +96,7 @@ export default async function PlantillasPage() {
               <Card key={p.id} padding="none" className="overflow-hidden">
                 {/* Misma miniatura que las prearmadas: un diseño guardado se
                     reconoce mirándolo, no leyendo "8 bloques". */}
-                <Miniatura titulo={p.nombre} html={p.html} />
+                <MiniaturaMail titulo={p.nombre} html={p.html} />
                 <div className="p-4">
                   <div className="truncate font-medium text-foreground" title={p.nombre}>
                     {p.nombre}

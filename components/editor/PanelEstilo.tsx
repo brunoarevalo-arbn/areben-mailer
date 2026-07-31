@@ -7,6 +7,8 @@ import {
 import { FUENTES, FUENTE_LABEL, type Paleta } from "@/lib/email/tema";
 import type { TipoBloque } from "@/lib/email/render";
 import { ControlBool, ControlColor, ControlEnum, ControlNumero } from "@/components/editor/ControlEstilo";
+import { tapTarget } from "@/lib/ui";
+import { ChevronDown } from "lucide-react";
 
 /**
  * La pestaña **Estilo**: una capa de la cascada, editable rol por rol.
@@ -153,18 +155,49 @@ export function PanelEstilo({
     onChange(Object.keys(out).length ? out : undefined);
   };
 
+  /**
+   * Los roles que de verdad se van a dibujar, ya sin los que quedaron vacíos.
+   *
+   * Se calcula antes del `map` y no adentro porque el "abierto" es el PRIMERO
+   * QUE SE VE: con el índice del `lista.map`, un rol cuyos controles son todos
+   * avanzados —invisible para quien no tiene el permiso— se lleva el `open` y el
+   * panel abre cerrado entero.
+   */
+  const secciones = lista
+    .map((rol) => ({ rol, visibles: (propsDeRol(tipo, rol) as readonly Prop[]).filter((k) => avanzado || !CAMPO[k].avanzado) }))
+    .filter((s) => s.visibles.length);
+
   return (
+    // Un `<details>` por rol, y NO abajo de un breakpoint: cinco roles por seis
+    // a dieciocho propiedades en una sola columna continua también son malos a
+    // 1440. Va nativo —cero estado, cero JS— porque un acordeón de verdad ya
+    // viene correcto de teclado y de lector de pantalla, y porque el `open` del
+    // DOM no vuelve atrás cuando React re-renderiza por una tecla del formulario.
+    //
+    // ⛔ No se reusa `pestana`: eso es un binario entre dos paneles que se
+    // excluyen (Contenido / Estilo). Los roles son de 1 a 5 y son ADITIVOS —
+    // querés el color del título Y el del cuerpo abiertos a la vez.
     <div className="space-y-4">
-      {lista.map((rol) => {
-        const props = propsDeRol(tipo, rol) as readonly Prop[];
-        const visibles = props.filter((k) => avanzado || !CAMPO[k].avanzado);
-        if (!visibles.length) return null;
+      {secciones.map(({ rol, visibles }, i) => {
         const propio = valor?.[rol];
         const res = resolver(rol);
 
         return (
-          <div key={rol} className="space-y-3 border-t border-border pt-3 first:border-0 first:pt-0">
-            <div className="text-xs font-semibold uppercase tracking-wide text-subtle">{ROL_LABEL[rol]}</div>
+          <details
+            key={rol}
+            // `open` como valor fijo se comporta como un "abierto de fábrica":
+            // React lo compara contra su propio render anterior, no contra el
+            // DOM, así que cerrar uno a mano no se deshace en el próximo render.
+            open={i === 0}
+            className="group border-t border-border pt-3 first:border-0 first:pt-0"
+          >
+            <summary
+              className={`flex ${tapTarget} cursor-pointer list-none items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-subtle [&::-webkit-details-marker]:hidden`}
+            >
+              {ROL_LABEL[rol]}
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-180" aria-hidden />
+            </summary>
+            <div className="space-y-3 pt-3">
             {visibles.map((k) => {
               const def = CAMPO[k];
               const bruto = propio?.[k];
@@ -221,7 +254,8 @@ export function PanelEstilo({
                   );
               }
             })}
-          </div>
+            </div>
+          </details>
         );
       })}
     </div>

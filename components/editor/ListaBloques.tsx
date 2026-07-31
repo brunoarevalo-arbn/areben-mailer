@@ -21,10 +21,23 @@ import {
  * solo contenedor, que es el caso que `draggable` resuelve bien; `@dnd-kit` son
  * tres paquetes y ~40 KB en un bundle que ya lleva el renderer entero.
  *
- * ⚠️ El costo de eso es que **no anda con touch**: el editor es de escritorio y
- * las flechas ↑↓ cubren el táctil y el teclado. La API de acá afuera es
+ * ⚠️ El costo de eso es que **no anda con touch**: los eventos `drag*` de HTML5
+ * no se disparan en ningún navegador de celular. El camino táctil son las
+ * flechas ↑↓, que también son el camino de teclado. La API de acá afuera es
  * `onReorder(desde, hasta)` justamente para que cambiar el motor de arrastre sea
  * reemplazar este archivo y nada más.
+ *
+ * 🔴 **Por eso el `GripVertical` se esconde abajo de `lg`**: promete arrastrar y
+ * arrastrar no anda con el dedo. Es una mentira de 24px, y encima 24px que a
+ * 375px hacen falta para que el nombre del bloque no quede en "Carrit…".
+ *
+ * ⚠️ Las tres decisiones táctiles de este archivo (el grip, el "+" entre
+ * bloques y las acciones de fila) cuelgan de **`lg`, el viewport**, y no del
+ * `@container` con el que `EditorMail` acomoda sus columnas. Son preguntas
+ * distintas: "¿entran tres columnas en este espacio?" la contesta el contenedor,
+ * "¿esto se toca con el dedo?" la contesta la pantalla. A 1280 el editor apila
+ * —el espacio real no da— pero hay un mouse, y ahí el hover sigue siendo el
+ * comportamiento correcto.
  */
 
 const ICONO: Record<TipoBloque, typeof Type> = {
@@ -47,6 +60,17 @@ const ICONO: Record<TipoBloque, typeof Type> = {
   espaciador: MoveVertical,
   html: Code2,
 };
+
+/**
+ * Las acciones de fila, tocables: 44px de alto y 36 de ancho abajo de `lg`.
+ *
+ * ⚠️ 36 de ancho y no los 44 de `tapTarget`, a propósito: son CUATRO botones
+ * pegados, y a 44 se comen 176 de los ~303px que mide la fila a 375px — el
+ * nombre del bloque quedaría en "Product…" y esta lista existe justamente para
+ * reconocerlo sin abrirlo. El ALTO, que es la dimensión que se falla al tocar
+ * una fila de una lista vertical, sí es el de la guía.
+ */
+const accionFila = "max-lg:flex max-lg:h-11 max-lg:w-9 max-lg:items-center max-lg:justify-center";
 
 /** Una línea de contexto para reconocer el bloque sin abrirlo. */
 function resumen(b: Bloque): string {
@@ -174,15 +198,20 @@ export function ListaBloques({
   const hueco = (i: number) => {
     return (
       <li key={`h${i}`}>
-        <div className="group flex h-2 items-center justify-center">
+        {/* Abajo de `lg` el hueco crece a 32px y el botón a 44: con el dedo no
+            hay dónde "pasar por encima", así que un separador de 8px con el
+            botón en `opacity-0` es un lugar de inserción que no existe. */}
+        <div className="group flex h-2 items-center justify-center max-lg:h-8">
           {arrastrando === null && !soloLectura && (
             <button
               type="button"
               onClick={() => setPaletaEn((p) => (p === i ? null : i))}
               aria-label="Insertar un bloque acá"
               aria-expanded={paletaEn === i}
-              className={`flex h-4 w-full items-center justify-center transition-opacity ${
-                paletaEn === i ? "opacity-100" : "opacity-0 group-hover:opacity-60 focus-visible:opacity-100"
+              className={`flex h-4 w-full items-center justify-center transition-opacity max-lg:h-11 ${
+                paletaEn === i
+                  ? "opacity-100"
+                  : "opacity-0 group-hover:opacity-60 focus-visible:opacity-100 max-lg:opacity-60"
               }`}
             >
               <span className="h-px flex-1 bg-accent" />
@@ -269,7 +298,7 @@ export function ListaBloques({
                     }`}
                   />
                 )}
-                <span className={`shrink-0 ${movible ? "cursor-grab text-subtle" : "text-transparent"}`}>
+                <span className={`shrink-0 max-lg:hidden ${movible ? "cursor-grab text-subtle" : "text-transparent"}`}>
                   <GripVertical className="h-4 w-4" aria-hidden />
                 </span>
                 <Icono className={`h-4 w-4 shrink-0 ${sel ? "text-accent-subtle-foreground" : "text-muted"}`} aria-hidden />
@@ -289,8 +318,15 @@ export function ListaBloques({
                   // —y con `focus-within`, o serían inalcanzables por teclado,
                   // que es justo lo que las flechas ↑↓ vienen a resolver—. En la
                   // fila elegida quedan siempre, que es donde uno está.
+                  //
+                  // 🔴 Abajo de `lg` están SIEMPRE, en todas las filas. Un
+                  // `opacity-0` no saca a un botón del alcance del dedo: seguía
+                  // recibiendo el toque, invisible. Y no alcanza con dejarlas
+                  // en la fila elegida, porque en celular tocar una fila salta
+                  // al panel de propiedades — nunca se vería la fila elegida
+                  // con sus acciones al lado.
                   <span
-                    className={`flex shrink-0 items-center text-muted transition-opacity focus-within:opacity-100 group-hover:opacity-100 ${
+                    className={`flex shrink-0 items-center text-muted transition-opacity focus-within:opacity-100 group-hover:opacity-100 max-lg:opacity-100 ${
                       sel ? "opacity-100" : "opacity-0"
                     }`}
                   >
@@ -301,7 +337,7 @@ export function ListaBloques({
                           onClick={(e) => { e.stopPropagation(); onReorder(i, i - 1); }}
                           disabled={i <= primerLibre}
                           aria-label="Subir"
-                          className="px-0.5 transition-colors hover:text-foreground disabled:opacity-25"
+                          className={`px-0.5 transition-colors hover:text-foreground disabled:opacity-25 ${accionFila}`}
                         >
                           <ChevronUp className="h-4 w-4" aria-hidden />
                         </button>
@@ -310,7 +346,7 @@ export function ListaBloques({
                           onClick={(e) => { e.stopPropagation(); onReorder(i, i + 1); }}
                           disabled={i >= bloques.length - 1}
                           aria-label="Bajar"
-                          className="px-0.5 transition-colors hover:text-foreground disabled:opacity-25"
+                          className={`px-0.5 transition-colors hover:text-foreground disabled:opacity-25 ${accionFila}`}
                         >
                           <ChevronDown className="h-4 w-4" aria-hidden />
                         </button>
@@ -320,7 +356,7 @@ export function ListaBloques({
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onDuplicar(i); }}
                       aria-label="Duplicar"
-                      className="px-0.5 transition-colors hover:text-foreground"
+                      className={`px-0.5 transition-colors hover:text-foreground ${accionFila}`}
                     >
                       <Copy className="h-3.5 w-3.5" aria-hidden />
                     </button>
@@ -328,7 +364,7 @@ export function ListaBloques({
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onBorrar(i); }}
                       aria-label="Eliminar"
-                      className="px-0.5 text-danger-foreground transition-opacity hover:opacity-70"
+                      className={`px-0.5 text-danger-foreground transition-opacity hover:opacity-70 ${accionFila}`}
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden />
                     </button>
@@ -380,7 +416,7 @@ function Paleta({
             key={t}
             type="button"
             onClick={() => onElegir(t)}
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs text-muted transition-colors hover:bg-surface hover:text-foreground"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs text-muted transition-colors hover:bg-surface hover:text-foreground max-lg:min-h-11"
           >
             <Icono className="h-3.5 w-3.5 shrink-0" aria-hidden />
             <span className="truncate">{ETIQUETA_BLOQUE[t]}</span>

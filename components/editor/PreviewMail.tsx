@@ -168,7 +168,16 @@ export function PreviewMail({
           celular el iframe queda en 375px dentro de una caja de ~460 y esos 85px
           sobrantes se ven como un borde blanco a la derecha — que es lo que se
           veía y parecía "que no actualiza". */}
-      <div ref={cont} className="flex h-[70vh] w-full justify-center">
+      {/* 🔴 `dvh` y no `vh`. En iOS Safari `vh` es el viewport GRANDE —el que
+          queda cuando la barra de direcciones se esconde—, así que un 70vh se
+          mete abajo del chrome del navegador y el mail se lee cortado. `dvh`
+          sigue al alto real y se ajusta solo cuando la barra aparece o se va.
+          Las 13rem son el encabezado, la barra de acciones, el selector de
+          vista y la fila de "Vista previa"; el `min-h-96` es el piso para una
+          pantalla corta. Arriba del corte vuelve al 70vh de siempre, y va con
+          el MISMO `@[62rem]` de la grilla: acá "una sola vista" quiere decir
+          "el mail ocupa la pantalla", no "hay una pantalla chica". */}
+      <div ref={cont} className="flex h-[calc(100dvh-13rem)] min-h-96 w-full justify-center @[62rem]:h-[70vh]">
         <div
           className="h-full overflow-hidden rounded-xl border border-border bg-white"
           style={{ width: caja.w ? anchoMarco * escala : "100%" }}

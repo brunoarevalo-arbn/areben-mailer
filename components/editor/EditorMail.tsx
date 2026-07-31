@@ -57,6 +57,15 @@ function rolesDe(b: Bloque): readonly RolEstilo[] {
 /** Los roles que tiene sentido fijar para todo el mail de una sola vez. */
 const ROLES_DOC: readonly RolEstilo[] = ["titulo", "subtitulo", "cuerpo", "boton", "nota"];
 
+/** Cuál de las tres columnas se está mirando cuando no entran las tres. */
+type VistaMovil = "lista" | "panel" | "preview";
+
+const VISTAS: readonly { v: VistaMovil; label: string }[] = [
+  { v: "lista", label: "Bloques" },
+  { v: "panel", label: "Editar" },
+  { v: "preview", label: "Vista previa" },
+];
+
 /**
  * El editor de mails, entero. Lo comparten campañas, automations y plantillas.
  *
@@ -99,6 +108,9 @@ export function EditorMail({
   const bloques = contenido.bloques ?? [];
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
   const [pestana, setPestana] = useState<"contenido" | "estilo">("contenido");
+  // Cuál de las tres columnas se muestra cuando NO entran las tres. Arranca en
+  // la lista: el mapa del mail es desde donde se elige qué tocar.
+  const [vistaMovil, setVistaMovil] = useState<VistaMovil>("lista");
   // El panel avanzado cuelga del ROL, no de `localStorage`: es lo que permite
   // empaquetarlo en un plan y bajarle el ruido a quien no lo necesita.
   const { puede } = usePermisos();
@@ -106,6 +118,20 @@ export function EditorMail({
 
   const seleccionado = bloques.find((b) => b.id === seleccionadoId) ?? null;
   const setBloques = (bs: Bloque[], o?: OpcionesSet) => onChange({ ...contenido, bloques: bs }, o);
+
+  /**
+   * Elegir qué se edita **y** llevar la vista hasta el formulario.
+   *
+   * Con las tres columnas apiladas, tocar un bloque y quedarse en la lista deja
+   * el control que se quiere girar a dos pantallas de scroll del mail que se
+   * está mirando — que es exactamente el valor entero de este editor. En
+   * escritorio la segunda mitad no se nota: la vista elegida se ignora cuando
+   * las tres columnas entran juntas.
+   */
+  const elegir = (id: string | null) => {
+    setSeleccionadoId(id);
+    setVistaMovil("panel");
+  };
 
   const editar = (patch: Partial<Bloque>) =>
     setBloques(bloques.map((b) => (b.id === seleccionadoId ? ({ ...b, ...patch } as Bloque) : b)));
@@ -118,7 +144,9 @@ export function EditorMail({
     // por si el bloque entra desde otro lado.
     copia.splice(tipo === "encabezado" ? 0 : i, 0, nuevo);
     setBloques(copia, { marcar: true });
-    if (nuevo.id) setSeleccionadoId(nuevo.id);
+    // Un bloque recién insertado nace vacío: quedarse en la lista mirándolo es
+    // el único caso en el que la vista de celular no serviría para nada.
+    if (nuevo.id) elegir(nuevo.id);
   };
 
   const duplicar = (i: number) => {
@@ -171,8 +199,25 @@ export function EditorMail({
   const pal = resolverPaleta({ ...(marca.temaMarca ?? {}), ...(contenido.tema ?? {}) });
   const anchoMail = pal.ancho;
 
+  /** Abajo del corte se muestra UNA columna; arriba, las tres. */
+  const soloSi = (v: VistaMovil) => (vistaMovil === v ? "" : "@max-[62rem]:hidden");
+
   return (
-    <div className="space-y-3">
+    // 🔴 `@container` y no un breakpoint de viewport, porque el editor **nunca
+    // tuvo el ancho de la pantalla**. El `xl:` de antes disparaba a 1280, pero
+    // ahí el espacio real es 1280 − 240 (sidebar) − 64 (padding) = 976, y las
+    // dos columnas fijas se comen 632: la del medio —donde están TODOS los
+    // formularios— nacía con 344px. El contenedor mide lo que hay de verdad.
+    //
+    // 62rem = 992px es dónde la del medio pasa a tener ~360: 260 + 340 de las
+    // fijas más 32 de gaps. Con el `max-w-6xl` del layout eso cae recién a
+    // 1296px de viewport, y sacar el editor de ese `max-w` es la Etapa 2.
+    //
+    // ⚠️ `container-type` implica `contain: layout`, así que este div es el
+    // bloque de referencia de todo `position: fixed` que cuelgue adentro. Por
+    // eso `ImagenPicker` dibuja su modal con un portal a `document.body`: sin
+    // eso, la biblioteca de imágenes se abriría adentro de una columna.
+    <div className="@container space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1">
           {historial && !soloLectura && (
@@ -203,15 +248,39 @@ export function EditorMail({
         <AISoonButton label="Redactar con IA" />
       </div>
 
+      {/* Una vista a la vez, no tres apiladas. Apiladas son dos pantallas de
+          scroll entre el control que se gira y el mail que se mira, y el valor
+          entero de este editor es que el preview ES el mail que va a salir.
+          Desaparece en cuanto las tres columnas entran juntas — con el MISMO
+          corte que la grilla, o queda un tramo donde el selector no está y el
+          layout sigue apilado. */}
+      <div className="grid grid-cols-3 gap-1 rounded-lg border border-border p-0.5 @[62rem]:hidden">
+        {VISTAS.map(({ v, label }) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setVistaMovil(v)}
+            aria-pressed={vistaMovil === v}
+            className={`${tapTarget} rounded-md px-2 py-2 text-sm transition-colors ${
+              vistaMovil === v
+                ? "bg-accent-subtle font-medium text-accent-subtle-foreground"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* 260px y no 220: con 220 la lista mostraba "Carrit…" y "Espa…", y el
           mapa del mail existe justamente para saber qué bloque es cuál sin
           abrirlo. El ancho sale de la columna del medio, que tiene aire. */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)_minmax(340px,460px)]">
+      <div className="grid grid-cols-1 gap-4 @[62rem]:grid-cols-[260px_minmax(0,1fr)_minmax(340px,460px)]">
         {/* Columna 1 · el mapa del mail */}
-        <div className="space-y-2 rounded-xl border border-border bg-surface p-3 shadow-sm">
+        <div className={`space-y-2 rounded-xl border border-border bg-surface p-3 shadow-sm ${soloSi("lista")}`}>
           <button
             type="button"
-            onClick={() => setSeleccionadoId(null)}
+            onClick={() => elegir(null)}
             className={`flex w-full items-center gap-2 rounded-lg border px-2 py-2 text-sm transition-colors ${
               seleccionadoId === null
                 ? "border-accent bg-accent-subtle font-medium text-accent-subtle-foreground"
@@ -225,7 +294,7 @@ export function EditorMail({
             <ListaBloques
               bloques={bloques}
               seleccionadoId={seleccionadoId}
-              onSeleccionar={setSeleccionadoId}
+              onSeleccionar={elegir}
               onReorder={mover}
               onDuplicar={duplicar}
               onBorrar={borrar}
@@ -239,7 +308,7 @@ export function EditorMail({
         {/* Columna 2 · el panel de propiedades. Sin nada elegido muestra el
             diseño del mail, que ya trae su propia tarjeta. */}
         {seleccionado ? (
-          <div className="space-y-3 rounded-xl border border-border bg-surface p-4 shadow-sm">
+          <div className={`space-y-3 rounded-xl border border-border bg-surface p-4 shadow-sm ${soloSi("panel")}`}>
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-foreground">{ETIQUETA_BLOQUE[seleccionado.tipo]}</h3>
               <div className="flex items-center gap-1 rounded-lg border border-border p-0.5">
@@ -284,7 +353,7 @@ export function EditorMail({
             </fieldset>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className={`space-y-4 ${soloSi("panel")}`}>
             <TemaSelector
               tema={contenido.tema}
               onChange={setTema}
@@ -324,7 +393,11 @@ export function EditorMail({
           marca={marca}
           preheader={preheader}
           anchoMail={anchoMail}
-          className="xl:sticky xl:top-6 h-fit"
+          // El `sticky` se mueve con la grilla, no con el viewport: si se
+          // quedara en `xl:` el preview se volvería pegajoso mientras todavía
+          // está apilado abajo de las otras dos columnas, y "pegado arriba"
+          // adentro de una pila es un cuadro que tapa el formulario.
+          className={`@[62rem]:sticky @[62rem]:top-6 h-fit ${soloSi("preview")}`}
         />
       </div>
     </div>

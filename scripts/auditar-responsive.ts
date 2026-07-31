@@ -75,11 +75,15 @@ const PENDIENTES = new Set<string>([
   //    cualquier hallazgo suyo es NUEVO y hace fallar el script.
   // ── Tanda 3 — ✅ VACIADA: las dos tablas pasan por TablaResponsive, así que
   //    la regla 4 quedó sin deuda y cualquier `<table>` nuevo hace fallar.
-  // ── Tanda 4 — el editor: lo que hoy solo existe con el mouse encima,
-  //    y la miniatura de plantillas con su escala clavada.
-  '6:components/editor/ImagenPicker.tsx',
-  '6:components/editor/ListaBloques.tsx',
-  '1:app/(app)/plantillas/page.tsx',
+  // ── Tanda 4 — ✅ VACIADA: el borrar de la biblioteca y el "+" entre bloques
+  //    tienen camino táctil, y la miniatura de plantillas mide su tarjeta en
+  //    vez de llevar el ancho clavado en una clase. Las reglas 1 y 6 quedaron
+  //    sin deuda.
+  //
+  // 🎉 **La lista quedó VACÍA.** De acá en más el auditor es puramente
+  // preventivo: cualquier hallazgo de cualquiera de las seis reglas es NUEVO y
+  // hace fallar el script. Si algún día hace falta volver a agregar algo acá,
+  // pensalo dos veces: es deuda que nace con permiso.
 ]);
 
 const REGLAS: Record<number, string> = {

@@ -6,8 +6,10 @@
 // un mail con fotos propias no dependa de tenerlas ya publicadas en otro lado.
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Trash2, Upload, X } from "lucide-react";
 import { formatoBytes, subirImagen, type ImagenMailDto, type TotalImagenes } from "@/lib/imagenes";
+import { tapTarget } from "@/lib/ui";
 
 export function ImagenPicker({
   onElegir,
@@ -86,7 +88,19 @@ export function ImagenPicker({
     setTotal((t) => ({ archivos: t.archivos - 1, bytes: t.bytes - img.bytes }));
   };
 
-  return (
+  // 🔴 El modal se dibuja en `document.body`, no donde está escrito.
+  //
+  // El editor pasó a ser un `@container` (las tres columnas se acomodan contra
+  // el espacio que tienen, no contra el viewport), y `container-type` implica
+  // `contain: layout`: el contenedor se vuelve el bloque de referencia de todo
+  // `position: fixed` que cuelgue adentro. Sin el portal, este `fixed inset-0`
+  // dejaría de medir la pantalla y pasaría a medir la columna del editor: la
+  // biblioteca se abriría adentro de un panel de 340px. Es exactamente la
+  // regresión del `BrandSwitcher` de la tanda 1, del otro lado.
+  //
+  // Nunca se dibuja en el servidor —solo existe después de un click—, así que
+  // el guardia de `document` es formal y no hace falta ningún estado montado.
+  const modal = (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCerrar}>
       <div
         className="flex max-h-[80vh] w-full max-w-3xl flex-col rounded-xl border border-border bg-surface shadow-lg"
@@ -146,10 +160,14 @@ export function ImagenPicker({
                       </div>
                     </div>
                   </button>
+                  {/* Con el dedo no hay "pasar el mouse por encima": abajo de
+                      `lg` el botón está siempre y mide 44px, o borrar una
+                      imagen es una acción que en un celular NO EXISTE. Lo
+                      exige la regla 6 de `auditar-responsive.ts`. */}
                   <button
                     onClick={() => borrar(img)}
                     title="Borrar de la biblioteca"
-                    className="absolute right-1.5 top-1.5 rounded-md bg-surface/90 p-1 text-muted opacity-0 transition-opacity hover:text-danger-foreground group-hover:opacity-100"
+                    className={`absolute right-1.5 top-1.5 flex ${tapTarget} items-center justify-center rounded-md bg-surface/90 p-1 text-muted opacity-0 transition-opacity hover:text-danger-foreground group-hover:opacity-100 max-lg:opacity-100`}
                   >
                     <Trash2 className="h-3.5 w-3.5" aria-hidden />
                   </button>
@@ -173,4 +191,6 @@ export function ImagenPicker({
       </div>
     </div>
   );
+
+  return typeof document === "undefined" ? modal : createPortal(modal, document.body);
 }
