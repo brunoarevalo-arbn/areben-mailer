@@ -57,6 +57,19 @@ export interface ConsultaProductos {
 }
 
 /**
+ * Cuántas tarjetas por fila en el CELULAR. En escritorio siempre son dos.
+ *
+ * ⚠️ **Ausente = 1**, que es como se vieron todos los mails hasta el 1-ago-2026:
+ * la grilla se dibuja de a dos y la clase `m-col` la apila en el corte móvil.
+ * Cualquier otro default le cambiaría el aspecto en el teléfono a toda campaña y
+ * plantilla ya guardada sin que nadie las toque — el mismo motivo por el que el
+ * `velo` de la portada arranca en 0. La opinión ("de a dos entra el doble de
+ * producto en la misma pantalla") vive en el editor, que nace los bloques
+ * nuevos en 2; en el documento vive el dato.
+ */
+export type PorFilaMovil = 1 | 2;
+
+/**
  * La consulta, hecha texto.
  *
  * Vive acá —en el archivo puro— para que el preview del editor y el envío usen
@@ -141,7 +154,7 @@ export type Bloque = BloqueBase &
     | { tipo: "texto"; texto: string; align?: "left" | "center" }
     | { tipo: "boton"; texto: string; url: string; align?: "left" | "center"; full?: boolean }
     | { tipo: "imagen"; url: string; alt?: string }
-    | { tipo: "productos"; items: ProductoEmail[] }
+    | { tipo: "productos"; items: ProductoEmail[]; movil?: PorFilaMovil }
     /**
      * La grilla de `productos`, pero guardando **la consulta y no los productos**.
      *
@@ -161,6 +174,8 @@ export type Bloque = BloqueBase &
         categoriaId?: string;
         /** Cuántos mostrar (2 a 6). La grilla es de a dos: un par se ve mejor. */
         n?: number;
+        /** Cuántos por fila en el celular. Ausente = 1. Ver `PorFilaMovil`. */
+        movil?: PorFilaMovil;
         /**
          * ⛔ **Acá no hay `items`, y es la decisión de diseño del bloque.**
          *
@@ -342,11 +357,14 @@ export function nuevoBloque(tipo: TipoBloque): Bloque {
     case "texto": return { id, tipo, texto: "Escribí tu mensaje. Podés usar ${contacto.nombre}.", align: "left" };
     case "boton": return { id, tipo, texto: "Ver más", url: "", align: "left", full: false };
     case "imagen": return { id, tipo, url: "", alt: "" };
-    case "productos": return { id, tipo, items: [] };
+    // `movil: 2` acá y no como default del tipo: un bloque NUEVO nace de a dos
+    // por fila en el celular —entra el doble de producto en la misma pantalla y
+    // se comparan de un vistazo—, pero los mails ya guardados siguen apilando.
+    case "productos": return { id, tipo, items: [], movil: 2 };
     // Nace en "los más vendidos" y no en "una categoría": es la única fuente que
     // ya devuelve algo sin que haya que elegir nada, así que el bloque se ve
     // funcionando en el preview desde el segundo cero.
-    case "productos-dinamicos": return { id, tipo, fuente: "destacados", n: 4 };
+    case "productos-dinamicos": return { id, tipo, fuente: "destacados", n: 4, movil: 2 };
     // Nace vacío A PROPÓSITO: si trajera productos de ejemplo, una automation
     // guardada con ellos se los mandaría a un cliente real. La muestra del
     // editor la pone el preview (`muestraCarrito`), no el dato.

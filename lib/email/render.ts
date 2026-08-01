@@ -12,12 +12,12 @@ import {
 import { cabeza, apertura, cierre, botonVml, clase, clasesDe, CLASES } from "./shell";
 import { claveProductos } from "./bloques";
 import { redConIcono, urlIcono } from "./redes";
-import type { Bloque, Columna, ContenidoCampania, ProductoEmail, TipoBloque } from "./bloques";
+import type { Bloque, Columna, ContenidoCampania, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
 
 // Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
 // sin ciclo) pero se re-exportan desde acá: media app importa `Bloque` y
 // `nuevoBloque` de "@/lib/email/render" y no hay razón para hacerla cambiar.
-export type { Bloque, BloqueBase, TipoBloque, ContenidoCampania, ProductoEmail, Columna } from "./bloques";
+export type { Bloque, BloqueBase, TipoBloque, ContenidoCampania, ProductoEmail, Columna, PorFilaMovil } from "./bloques";
 export { nuevoBloque, duplicarBloque, nuevoId, TIPOS_BLOQUE, ETIQUETA_BLOQUE } from "./bloques";
 
 const esc = (s: string) =>
@@ -155,8 +155,12 @@ function detalleHtml(p: ProductoEmail, e: EstiloResuelto): string {
     : "";
 }
 
-function renderCard(p: ProductoEmail, pal: Paleta, eTexto: EstiloResuelto, eNota: EstiloResuelto, eImg: EstiloResuelto): string {
-  return `<td width="50%" valign="top"${clase(CLASES.col)} style="padding:8px">
+function renderCard(p: ProductoEmail, pal: Paleta, eTexto: EstiloResuelto, eNota: EstiloResuelto, eImg: EstiloResuelto, dosEnMovil: boolean): string {
+  // La única diferencia entre una y dos por fila en el celular es CUÁL de las dos
+  // clases lleva la celda: `m-col` la apila y `m-col2` la deja en la mitad. El
+  // `width="50%"` inline —el layout de escritorio— es el mismo en los dos casos,
+  // que es la regla del shell: la clase solo puede ser un override.
+  return `<td width="50%" valign="top"${clase(dosEnMovil ? CLASES.col2 : CLASES.col)} style="padding:8px">
     <a href="${esc(p.url)}" style="text-decoration:none;color:inherit">
       <img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:${px(eImg.radio ?? 8)};display:block" />
       <div style="margin-top:8px;font-size:${px(eTexto.tamano ?? 14)};color:${eTexto.color}${extra(eTexto, ["tamano", "color"])}">${esc(p.nombre)}</div>
@@ -237,20 +241,29 @@ function estProducto(tipo: TipoBloque, rolNombre: RolEstilo, ctx: Ctx, propio: E
 }
 
 /** Render de una grilla de productos, reutilizable (ej. email de carrito abandonado). */
-export function renderProductosHtml(items: ProductoEmail[], tema?: Tema): string {
+export function renderProductosHtml(items: ProductoEmail[], tema?: Tema, movil?: PorFilaMovil): string {
   const pal = resolverPaleta(tema);
   // `assetsBase` vacío: esto dibuja una grilla de productos, que no tiene
   // iconos. Vacío es el valor seguro — el bloque `redes` cae al texto.
   const ctx: Ctx = { pal, muestraCarrito: false, nombreCuenta: "", logoCuenta: "", urlCuenta: "", permiteHtmlCrudo: false, assetsBase: "" };
-  return renderProductos(items, pal, estProducto("productos", "cuerpo", ctx, undefined));
+  return renderProductos(items, pal, estProducto("productos", "cuerpo", ctx, undefined), movil);
 }
 
-function renderProductos(items: ProductoEmail[], pal: Paleta, e: EstProducto): string {
+/**
+ * La grilla: filas de a dos tarjetas.
+ *
+ * `movil` decide qué pasa en el teléfono y **ausente es 1**, apilada, que es
+ * como salieron todos los mails hasta ahora (ver `PorFilaMovil`). La fila impar
+ * se completa con una celda vacía en los dos casos: con dos por fila, un hueco
+ * a la derecha es exactamente lo que corresponde ver.
+ */
+function renderProductos(items: ProductoEmail[], pal: Paleta, e: EstProducto, movil?: PorFilaMovil): string {
   if (items.length === 0) return "";
+  const dos = movil === 2;
   const filas: string[] = [];
   for (let i = 0; i < items.length; i += 2) {
-    const a = renderCard(items[i], pal, e.nombre, e.nota, e.img);
-    const b = items[i + 1] ? renderCard(items[i + 1], pal, e.nombre, e.nota, e.img) : `<td width="50%"></td>`;
+    const a = renderCard(items[i], pal, e.nombre, e.nota, e.img, dos);
+    const b = items[i + 1] ? renderCard(items[i + 1], pal, e.nombre, e.nota, e.img, dos) : `<td width="50%"></td>`;
     filas.push(`<tr>${a}${b}</tr>`);
   }
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px">${filas.join("")}</table>`;
@@ -339,7 +352,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       return pad(`<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" style="max-width:100%;height:auto;border-radius:${px(t.radio ?? 8)};margin:8px 0 16px;display:block${extra(t, ["radio", "align", "tamano", "color"])}" />`, caja());
     }
     case "productos":
-      return pad(renderProductos(b.items ?? [], pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo)), caja());
+      return pad(renderProductos(b.items ?? [], pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil), caja());
     // Se dibuja igual que `productos` —es la misma grilla— y la diferencia entera
     // está en de dónde salen los productos: el bloque guarda la consulta y la
     // respuesta llega por `opts`, resuelta contra la tienda minutos antes.
@@ -349,7 +362,10 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     // vez de con un hueco. Mismo criterio que el carrito vacío.
     case "productos-dinamicos": {
       const items = ctx.productosDinamicos?.[claveProductos(b)] ?? [];
-      return pad(renderProductos(items, pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo)), caja());
+      // ⚠️ `movil` NO entra en `claveProductos`: es cómo se dibuja la grilla, no
+      // qué se le pide a Tiendanube. Si entrara, dos bloques con la misma
+      // consulta y distinto layout costarían dos llamadas a TN.
+      return pad(renderProductos(items, pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil), caja());
     }
     case "carrito": {
       // Sin items no se inventa nada: si el carrito llegó vacío, el bloque

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ETIQUETA_FUENTE, type FuenteProductos } from "@/lib/email/bloques";
+import { ETIQUETA_FUENTE, type FuenteProductos, type PorFilaMovil } from "@/lib/email/bloques";
 import { Select } from "@/components/ui/Select";
 import { Rango } from "@/components/editor/Rango";
+import { PorFilaMovilControl } from "@/components/editor/PorFilaMovilControl";
 
 /**
  * Los controles del bloque de productos automáticos.
@@ -26,12 +27,14 @@ export function ProductosDinamicosBlock({
   fuente,
   categoriaId,
   n,
+  movil,
   onChange,
 }: {
   fuente: FuenteProductos;
   categoriaId?: string;
   n?: number;
-  onChange: (cambio: { fuente?: FuenteProductos; categoriaId?: string; n?: number }) => void;
+  movil?: PorFilaMovil;
+  onChange: (cambio: { fuente?: FuenteProductos; categoriaId?: string; n?: number; movil?: PorFilaMovil }) => void;
 }) {
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [error, setError] = useState("");
@@ -103,6 +106,8 @@ export function ProductosDinamicosBlock({
         max={6}
         sufijo=""
       />
+
+      <PorFilaMovilControl movil={movil} onChange={(m) => onChange({ movil: m })} />
 
       <p className="text-sm leading-relaxed text-muted">
         Los productos se buscan en tu tienda <strong>cada vez que el mail sale</strong>, no

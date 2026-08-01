@@ -22,6 +22,15 @@ import { px, type EstiloResuelto } from "./estilos";
 export const CLASES = {
   /** Celda que en el celular pasa a ocupar el ancho completo. */
   col: "m-col",
+  /**
+   * Celda que en el celular SIGUE midiendo la mitad: dos tarjetas por fila.
+   *
+   * Existe sobre todo para *no* llevar `m-col` — la grilla ya se dibuja de a dos
+   * `<td width="50%">` y lo único que la apila es esa clase. Lo que sí hace la
+   * regla es achicar el margen lateral: a 375px cada tarjeta queda en ~171px, y
+   * los 8px de cada lado se le notan a la foto.
+   */
+  col2: "m-col2",
   /** Contenedor con margen lateral: se achica en pantalla chica. */
   pad: "m-pad",
   /**
@@ -83,6 +92,7 @@ export function cabeza(pal: Paleta): string {
   @media only screen and (max-width:${corte}px){
     .${CLASES.full}{width:100%!important}
     .${CLASES.col}{display:block!important;width:100%!important;max-width:100%!important}
+    .${CLASES.col2}{padding-left:4px!important;padding-right:4px!important}
     .${CLASES.pad}{padding-left:20px!important;padding-right:20px!important}
     .${CLASES.titulo}{font-size:22px!important}
     .${CLASES.subtitulo}{font-size:19px!important}

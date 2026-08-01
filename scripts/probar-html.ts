@@ -3,6 +3,7 @@
 //   node --import tsx scripts/probar-html.ts
 
 import { renderEmailHtml, renderEmailTexto, nuevoBloque, TIPOS_BLOQUE } from "../lib/email/render";
+import { claveProductos } from "../lib/email/bloques";
 import { inyectarTracking } from "../lib/email/tracking";
 import { CLASES } from "../lib/email/shell";
 import { V_ACTUAL } from "../lib/email/esquema";
@@ -83,13 +84,34 @@ titulo("Responsive");
   ok(TODO.includes("@media only screen and (max-width:"), "hay media query");
   ok((TODO.match(/<style>/g) ?? []).length === 1, "un solo bloque <style>");
 
-  const grilla = render({
-    bloques: [{ tipo: "productos", items: [
-      { nombre: "A", precio: "1000", imagen: "https://x/a.jpg", url: "https://x/a" },
-      { nombre: "B", precio: "2000", imagen: "https://x/b.jpg", url: "https://x/b" },
-    ] }],
+  // Los dos layouts de la grilla en el celular. `movil` ausente = apila, que es
+  // como salieron todos los mails hasta el 1-ago-2026: si esto se pusiera en
+  // verde con el campo ausente, un default nuevo le habría cambiado el aspecto
+  // en el teléfono a toda campaña ya guardada sin que nadie la toque.
+  const ITEMS = [
+    { nombre: "A", precio: "1000", imagen: "https://x/a.jpg", url: "https://x/a" },
+    { nombre: "B", precio: "2000", imagen: "https://x/b.jpg", url: "https://x/b" },
+  ];
+  const grilla = render({ bloques: [{ tipo: "productos", items: ITEMS }] });
+  ok(grilla.includes(`class="${CLASES.col}"`), "sin `movil`, la grilla de productos apila en el celular");
+
+  const grillaDos = render({ bloques: [{ tipo: "productos", items: ITEMS, movil: 2 }] });
+  ok(grillaDos.includes(`class="${CLASES.col2}"`), "con `movil:2` la celda lleva la clase de dos por fila");
+  ok(!grillaDos.includes(`class="${CLASES.col}"`), "y NO lleva la que apila: con las dos, la grilla se apilaría igual");
+  ok(grillaDos.includes(`.${CLASES.col2}{`), "la media query define la regla de dos por fila");
+  // El layout de escritorio no cambia en ninguno de los dos: es lo que ve
+  // Outlook, que descarta el <style> entero.
+  ok((grillaDos.match(/<td width="50%"/g) ?? []).length === 2, "en escritorio siguen siendo dos celdas de la mitad");
+
+  // El bloque dinámico dibuja LA MISMA grilla, así que tiene que respetar
+  // `movil` igual. Se le pasan los productos ya resueltos por `opts`, que es por
+  // donde viajan de verdad: adentro del bloque no hay items ni puede haberlos.
+  const bDin = { tipo: "productos-dinamicos" as const, fuente: "destacados" as const, n: 2, movil: 2 as const };
+  const dinamica = renderEmailHtml({ bloques: [bDin] } as ContenidoCampania, {
+    ...OPTS,
+    productosDinamicos: { [claveProductos(bDin)]: ITEMS },
   });
-  ok(grilla.includes(`class="${CLASES.col}"`), "la grilla de productos apila en el celular");
+  ok(dinamica.includes(`class="${CLASES.col2}"`), "el bloque dinámico también respeta `movil`");
 
   const cols = render({ bloques: [{ tipo: "columnas", izq: { imagen: "https://x/a.jpg", url: "#" }, der: { imagen: "https://x/b.jpg", url: "#" } }] });
   ok(cols.includes(`class="${CLASES.col}"`), "las columnas apilan en el celular");

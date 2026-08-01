@@ -194,6 +194,33 @@ for (const p of presetsPara({ nombre: "Marca Uno", config: { url: "https://uno.c
   ok(conProductos.length === 0, `preset "${p.id}": el bloque dinámico no trae productos`);
 }
 
+// ─── El layout móvil de la grilla sobrevive a la ida y vuelta ────────────────
+//
+// `movil` es un campo que `sanearBloque` no enumera: pasa porque el bloque se
+// copia entero con spread. Si algún día alguien cambiara ese saneo por una lista
+// blanca de campos, el mail seguiría guardándose "de a dos" en el editor y
+// saldría apilado, **solo en el envío** — que es exactamente el modo de falla
+// que la regla 6 de AGENTS existe para evitar.
+titulo("La grilla se acuerda de cuántos productos por fila van en el celular");
+{
+  const c = leerContenido({
+    v: V_ACTUAL,
+    bloques: [
+      { tipo: "encabezado" },
+      { tipo: "productos", items: [], movil: 2 },
+      { tipo: "productos-dinamicos", fuente: "destacados", n: 4, movil: 2 },
+    ],
+  });
+  const bs = cuerpo(c) as Extract<Bloque, { tipo: "productos" | "productos-dinamicos" }>[];
+  ok(bs[0]?.movil === 2, "el bloque de productos elegidos a mano conserva `movil`");
+  ok(bs[1]?.movil === 2, "el bloque dinámico conserva `movil`");
+
+  // Y lo de siempre sigue como estaba: sin el campo, apila.
+  const viejo = leerContenido({ bloques: [{ tipo: "productos", items: [] }] });
+  const b = cuerpo(viejo)[0] as Extract<Bloque, { tipo: "productos" }>;
+  ok(b.movil === undefined, "un documento viejo NO gana el campo al migrar (ausente = apila)");
+}
+
 // ─── El carrito no se llena solo ─────────────────────────────────────────────
 titulo("La migración no le inventa productos al carrito");
 {

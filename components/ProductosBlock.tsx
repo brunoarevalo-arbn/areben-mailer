@@ -1,17 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import type { ProductoEmail } from "@/lib/email/render";
+import type { PorFilaMovil, ProductoEmail } from "@/lib/email/render";
 import { X } from "lucide-react";
 import { campoBase } from "@/lib/ui";
+import { PorFilaMovilControl } from "@/components/editor/PorFilaMovilControl";
 
 
 export function ProductosBlock({
   items,
+  movil,
   onChange,
+  onMovil,
 }: {
   items: ProductoEmail[];
+  movil?: PorFilaMovil;
   onChange: (items: ProductoEmail[]) => void;
+  onMovil: (movil: PorFilaMovil) => void;
 }) {
   const [q, setQ] = useState("");
   const [resultados, setResultados] = useState<ProductoEmail[]>([]);
@@ -75,6 +80,10 @@ export function ProductosBlock({
           ))}
         </div>
       )}
+
+      {/* Cómo se acomoda la grilla en el teléfono. Va último: primero se eligen
+          los productos, después se decide cómo se ven. */}
+      <PorFilaMovilControl movil={movil} onChange={onMovil} />
     </div>
   );
 }

@@ -142,7 +142,13 @@ const DEFS: readonly DefPreset[] = [
         { tipo: "texto", texto: "Hola ${contacto.nombre}, esto es lo que más está saliendo esta semana 👇", align: "left" },
         // El bloque que justifica que este mailer viva sobre Tiendanube: la
         // plantilla se arma una vez y sale distinta cada vez que se manda.
-        { tipo: "productos-dinamicos", fuente: "destacados", n: 4 },
+        //
+        // `movil: 2` en TODAS las grillas de los presets, igual que en
+        // `nuevoBloque`: lo que se arma hoy nace de a dos por fila en el
+        // teléfono. Un preset se instancia en el momento, no es un documento
+        // guardado, así que acá no hay nada que "cambiar sin que nadie toque"
+        // — el default ausente sigue existiendo para los mails ya guardados.
+        { tipo: "productos-dinamicos", fuente: "destacados", n: 4, movil: 2 },
         ...botonSi("Ver todo el catálogo", tienda, "center"),
         aire(8),
         {
@@ -173,7 +179,7 @@ const DEFS: readonly DefPreset[] = [
         { tipo: "texto", texto: "Hola ${contacto.nombre}, esto es lo que entró desde la última vez que te escribimos.", align: "left" },
         // `recientes`, no `destacados`: es la fuente que hace que esta misma
         // plantilla sirva todos los meses sin que nadie la abra.
-        { tipo: "productos-dinamicos", fuente: "recientes", n: 4 },
+        { tipo: "productos-dinamicos", fuente: "recientes", n: 4, movil: 2 },
         ...botonSi("Ver todo lo nuevo", tienda, "center"),
         redes,
       ],
@@ -190,7 +196,7 @@ const DEFS: readonly DefPreset[] = [
         { tipo: "texto", texto: "Hola ${contacto.nombre}, mirá lo que tenemos disponible ahora.", align: "center" },
         // Seis: tres filas de a dos. La grilla apila de a pares, así que un
         // número impar deja un hueco en la última fila.
-        { tipo: "productos-dinamicos", fuente: "destacados", n: 6 },
+        { tipo: "productos-dinamicos", fuente: "destacados", n: 6, movil: 2 },
         ...botonSi("Ver la tienda completa", tienda, "center"),
         redes,
       ],
@@ -215,7 +221,7 @@ const DEFS: readonly DefPreset[] = [
         { tipo: "titulo", texto: "Lo que está en oferta", align: "center" },
         // La fuente `oferta` la filtra el mailer, no TN: la API no sabe
         // responder "dame lo rebajado".
-        { tipo: "productos-dinamicos", fuente: "oferta", n: 4 },
+        { tipo: "productos-dinamicos", fuente: "oferta", n: 4, movil: 2 },
         {
           tipo: "seccion",
           bg: "#faf7f0",
@@ -301,7 +307,7 @@ const DEFS: readonly DefPreset[] = [
         { tipo: "texto", texto: "Hola ${contacto.nombre}, esto es lo que estabas esperando. Mirá los detalles:", align: "left" },
         { tipo: "imagen", url: "", alt: "Foto del producto" },
         { tipo: "titulo", texto: "Conocé la colección", align: "center" },
-        { tipo: "productos-dinamicos", fuente: "recientes", n: 4 },
+        { tipo: "productos-dinamicos", fuente: "recientes", n: 4, movil: 2 },
         ...botonSi("Ver toda la colección", tienda, "center"),
         redes,
       ],
@@ -350,7 +356,7 @@ const DEFS: readonly DefPreset[] = [
           ...sinBoton,
         },
         { tipo: "titulo", texto: "Con esto también combina", align: "center" },
-        { tipo: "productos-dinamicos", fuente: "destacados", n: 2 },
+        { tipo: "productos-dinamicos", fuente: "destacados", n: 2, movil: 2 },
         ...botonSi("Seguir mirando", tienda, "center"),
         redes,
       ],
@@ -374,7 +380,7 @@ const DEFS: readonly DefPreset[] = [
         { tipo: "texto", texto: "Hola ${contacto.nombre}, te dejamos un descuento para volver a empezar.", align: "center" },
         { tipo: "cupon", texto: "15% en tu próxima compra", codigo: "VOLVE15", ...cta("Usar el cupón", tienda) },
         { tipo: "titulo", texto: "Esto entró mientras no estabas", align: "center" },
-        { tipo: "productos-dinamicos", fuente: "recientes", n: 4 },
+        { tipo: "productos-dinamicos", fuente: "recientes", n: 4, movil: 2 },
         redes,
       ],
     }),

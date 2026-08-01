@@ -244,7 +244,14 @@ export function FormBloque({
       );
 
     case "productos":
-      return <ProductosBlock items={b.items} onChange={(items) => set({ items })} />;
+      return (
+        <ProductosBlock
+          items={b.items}
+          movil={b.movil}
+          onChange={(items) => set({ items })}
+          onMovil={(movil) => set({ movil })}
+        />
+      );
 
     case "productos-dinamicos":
       return (
@@ -252,6 +259,7 @@ export function FormBloque({
           fuente={b.fuente}
           categoriaId={b.categoriaId}
           n={b.n}
+          movil={b.movil}
           // `items` no se toca nunca desde acá: el bloque guarda la consulta y
           // los productos los pone quien envía. Si el editor los escribiera, una
           // plantilla compartida saldría con los productos de otra tienda.
