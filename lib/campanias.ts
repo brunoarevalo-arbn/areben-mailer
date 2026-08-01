@@ -12,6 +12,18 @@ export const MANDABLE = { estado: "ACTIVO", tnAcceptsMkt: true } as const;
 /**
  * Contactos elegibles de una campaña: del destino (lista o segmento),
  * activos y que aceptan marketing. Devuelve null si el segmento no existe.
+ *
+ * ⚠️ **Sin destino son CERO elegibles, no una excepción.** El `else` de abajo
+ * daba por hecho que si no hay lista hay segmento, y con los dos en null hacía
+ * `findFirst({ where: { id: null } })`, que Prisma rechaza. No es teórico: una
+ * campaña con A/B y todavía sin destino —el estado natural de un borrador que se
+ * está armando— **rompía la pantalla del editor entera**, porque
+ * `/campanias/[id]` llama acá para calcular el holdout del A/B. El editor no
+ * abría, así que tampoco se podía elegir el destino que lo habría arreglado.
+ *
+ * Cero y no `null`: `null` significa "el segmento que pide no existe", que es
+ * otra cosa y sus llamadores la muestran como error. Los dos caminos que envían
+ * ya cortan antes con "Falta el destino", así que nada empieza a mandar por esto.
  */
 export async function contactosElegibles(
   cuentaId: string,
@@ -20,8 +32,10 @@ export async function contactosElegibles(
   let destinoWhere;
   if (campania.listaId) {
     destinoWhere = { listas: { some: { listaId: campania.listaId } } };
+  } else if (!campania.segmentoId) {
+    return [];
   } else {
-    const seg = await prisma.segmento.findFirst({ where: { id: campania.segmentoId!, cuentaId } });
+    const seg = await prisma.segmento.findFirst({ where: { id: campania.segmentoId, cuentaId } });
     if (!seg) return null;
     destinoWhere = reglasToWhere(seg.reglas as unknown as Reglas);
   }
