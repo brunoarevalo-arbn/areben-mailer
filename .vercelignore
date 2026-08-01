@@ -1,0 +1,7 @@
+# El deploy sube el DIRECTORIO, no el commit (`vercel --prod --yes` se corre a mano), así que
+# todo lo que esté acá viaja en cada deploy. `docs/referencias/` son capturas de mails de
+# referencia —van a ser decenas de imágenes— y el build no las necesita.
+#
+# ⚠️ Solo `docs/`. Excluir `*.md` de un saque tentaba, pero son unas decenas de KB y el riesgo
+# de dejar afuera algo que el build sí lea no vale ese ahorro.
+docs/

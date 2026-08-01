@@ -348,6 +348,17 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       return pad(`<div style="text-align:${b.align ?? t.align ?? "left"};margin:8px 0 20px">${botonAnchor(b.texto, b.url, t, pal, b.full)}</div>`, caja());
     }
     case "imagen": {
+      // Sin URL no se dibuja nada. Un `<img src="">` no es una imagen vacía: el
+      // cliente de mail resuelve el src contra el documento y muestra el ícono
+      // de imagen rota, en la casilla de otra persona y sin arreglo posible.
+      // `nuevoBloque("imagen")` nace con `url: ""`, así que alcanzaba con
+      // agregar el bloque y no completarlo — y cuatro presets de la galería
+      // salían así hasta el 1-ago-2026.
+      //
+      // Es el mismo criterio que ya tenían `video` (que guarda por `b.imagen`),
+      // `carrito` y `productos-dinamicos`: un bloque sin contenido desaparece en
+      // vez de mandar un hueco. `imagen` era el único que faltaba.
+      if (!b.url) return "";
       const t = e("imagen");
       return pad(`<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" style="max-width:100%;height:auto;border-radius:${px(t.radio ?? 8)};margin:8px 0 16px;display:block${extra(t, ["radio", "align", "tamano", "color"])}" />`, caja());
     }

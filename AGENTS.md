@@ -236,6 +236,15 @@ Entra cuando los bloques emitan sus propias clases de tema.
 
 ## Las plantillas que vienen con la app (`lib/plantillas/presets.ts`)
 
+📗 **Las reglas de qué plantilla puede entrar a la galería viven en `PLANTILLAS.md`**, junto
+con el vocabulario de diseño y el backlog del motor. Leerlo antes de sumar o tocar un preset.
+
+`presets.ts` es el **archivo público**: tipos, helpers (`cta`, `botonSi`, `sinBoton`,
+`redes`, `aire`), la composición de `DEFS` y la API. Los presets en sí viven en
+`lib/plantillas/familias/*.ts`, uno por familia. ⚠️ **No se convierte en `presets/index.ts`**:
+`scripts/fix-automations-marca.ts` y `scripts/crear-automations-marca.ts` lo importan con
+extensión explícita (`'../lib/plantillas/presets.ts'`) y se romperían.
+
 Un solo archivo con **los presets de campaña y los de automation**, un solo tipo
 `Preset` y una sola forma de instanciarlos: `presetsPara(cuenta, remitenteEmail)`.
 Hasta F6 eran dos tipos en dos archivos y solo el de automations se resolvía
@@ -493,6 +502,10 @@ comerciantes.
 
 ## Documentos largos (no los leas salvo que el tema sea ese)
 
+- `PLANTILLAS.md` — el acumulador de la galería: el ritual de cada tanda de referencias,
+  las reglas de qué plantilla puede entrar, el vocabulario de diseño (✅/🟡/🔴) y el
+  backlog del motor. **Se lee entero antes de tocar `lib/plantillas/`**; es el único de
+  los cuatro que sí conviene abrir completo.
 - `SES-ESTADO.md` — 22 KB: estado de SES/Resend, DNS, DKIM, MAIL FROM, webhooks.
   Leerlo antes de tocar deliverability o DNS.
 - `MODELO-DE-NEGOCIO.md` — 25 KB: precios, GTM, combo con Resorty.

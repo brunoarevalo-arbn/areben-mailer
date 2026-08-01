@@ -375,7 +375,10 @@ export function nuevoBloque(tipo: TipoBloque): Bloque {
     case "menu": return { id, tipo, links: [{ texto: "Inicio", url: "" }, { texto: "Tienda", url: "" }] };
     case "divisor": return { id, tipo };
     case "espaciador": return { id, tipo, alto: 24 };
-    case "hero": return { id, tipo, imagen: "", titulo: "Título principal", subtitulo: "Un subtítulo que acompaña", botonTexto: "Ver más", botonUrl: "", bg: "#ffffff" };
+    // `bg` vacío y no "#ffffff": el renderer cae a `pal.tarjeta`, que en un mail
+    // claro se ve idéntico y en uno oscuro **no es un parche blanco**. Un hero
+    // nuevo tiene que verse bien en el tema que tenga la marca, no en el claro.
+    case "hero": return { id, tipo, imagen: "", titulo: "Título principal", subtitulo: "Un subtítulo que acompaña", botonTexto: "Ver más", botonUrl: "", bg: "" };
     case "seccion": return { id, tipo, bg: "#faf7f0", titulo: "Título de sección", texto: "Texto de la sección.", botonTexto: "", botonUrl: "" };
     case "cupon": return { id, tipo, texto: "Usá este código en el checkout", codigo: "DESCUENTO10", botonTexto: "Comprar", botonUrl: "" };
     case "html": return { id, tipo, contenido: "" };
