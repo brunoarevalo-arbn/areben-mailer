@@ -12,7 +12,8 @@ import { leerContenido } from "@/lib/email/esquema";
 import { combinarTema, resolverPaleta } from "@/lib/email/tema";
 import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { TarjetaPlantilla } from "@/components/TarjetaPlantilla";
-import { automationDelTrigger, TRIGGERS } from "@/lib/automations";
+import { automationDelTrigger, esTrigger } from "@/lib/automations";
+import { TRIGGERS_UI } from "@/app/(app)/automations/presets-ui";
 import { AccionesModal } from "./AccionesModal";
 import { tapTarget } from "@/lib/ui";
 
@@ -22,15 +23,17 @@ export const dynamic = "force-dynamic";
 const BOTON_SEC =
   "inline-block rounded-xl border border-border px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface-muted hover:border-border-strong";
 
+const tituloTrigger = (t: string) => TRIGGERS_UI.find((u) => u.trigger === t)?.titulo ?? t;
+
 const esFamilia = (x: string | undefined): x is Familia =>
   !!x && FAMILIAS.some((f) => f.id === x);
 
 export default async function PlantillasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ familia?: string }>;
+  searchParams: Promise<{ familia?: string; para?: string }>;
 }) {
-  const { familia: familiaParam } = await searchParams;
+  const { familia: familiaParam, para: paraParam } = await searchParams;
   // Una familia inventada por la URL cae a la primera, no rompe la página.
   const activa: Familia = esFamilia(familiaParam) ? familiaParam : FAMILIAS[0].id;
 
@@ -51,10 +54,19 @@ export default async function PlantillasPage({
     }),
   ]);
 
-  const ocupados = TRIGGERS.map((t) => ({ trigger: t, ya: automationDelTrigger(automations, t) }))
-    .filter((x) => x.ya)
-    .map((x) => ({ trigger: x.trigger, id: x.ya!.id }));
-  const libres = TRIGGERS.filter((t) => !automationDelTrigger(automations, t));
+  /**
+   * Modo "elegí el diseño de esta automation". Se llega desde `/automations`,
+   * que es donde el contexto ya está puesto.
+   *
+   * 🔴 Si ese disparador YA tiene automation, el modo se apaga: una por trigger
+   * y por cuenta, porque el disparador manda todas las que matcheen ⇒ la segunda
+   * es un segundo mail a la misma persona. La guarda de verdad está igual en la
+   * action; esto es para no ofrecer un botón que no va a crear nada.
+   */
+  const para =
+    paraParam && esTrigger(paraParam) && !automationDelTrigger(automations, paraParam)
+      ? paraParam
+      : undefined;
 
   const todas = presetsGaleria(cuenta, remitente?.email);
   // ⚠️ Solo se DIBUJA la familia activa. `renderEmailHtml` devuelve el mail
@@ -139,6 +151,23 @@ export default async function PlantillasPage({
         subtitle="Empezá desde una prearmada o reusá tus diseños guardados."
       />
 
+      {/* Modo "elegí el diseño de esta automation". La barra dice para qué se
+          está eligiendo y cómo salirse: sin eso, la galería se ve igual que
+          siempre y el botón del modal aparecería de la nada. */}
+      {para && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent-subtle-foreground/30 bg-accent-subtle p-4">
+          <div className="text-sm text-accent-subtle-foreground">
+            Elegí el diseño para <b>«{tituloTrigger(para)}»</b>
+            <span className="mt-0.5 block text-xs text-muted">
+              Tocá <b>Ver</b> en la que te guste y confirmá adentro.
+            </span>
+          </div>
+          <Link href="/automations" className={BOTON_SEC}>
+            Cancelar
+          </Link>
+        </div>
+      )}
+
       {/* Prearmadas (vienen con la app), agrupadas por familia */}
       <section className="space-y-3">
         {/* Scroll horizontal en celular: seis pestañas no entran en 375px, y
@@ -150,7 +179,10 @@ export default async function PlantillasPage({
               return (
                 <Link
                   key={f.id}
-                  href={`/plantillas?familia=${f.id}`}
+                  // El `para` se arrastra entre pestañas: cambiar de familia no
+                  // puede sacarte del modo "estoy eligiendo el diseño de la
+                  // bienvenida" sin que lo pidas.
+                  href={`/plantillas?familia=${f.id}${para ? `&para=${para}` : ""}`}
                   className={`${tapTarget} flex items-center whitespace-nowrap rounded-xl px-3 py-1.5 text-sm transition-colors ${
                     sel
                       ? "bg-accent font-medium text-accent-foreground"
@@ -184,8 +216,7 @@ export default async function PlantillasPage({
                     origen={{ tipo: "preset", id: preset.id }}
                     crearCampania={usarPreset.bind(null, preset.id)}
                     tipos={tipos}
-                    libres={libres}
-                    ocupados={ocupados}
+                    para={para}
                   />
                 }
               />
@@ -227,8 +258,7 @@ export default async function PlantillasPage({
                     origen={{ tipo: "plantilla", id: p.id }}
                     crearCampania={usarPlantilla.bind(null, p.id)}
                     tipos={p.tipos}
-                    libres={libres}
-                    ocupados={ocupados}
+                    para={para}
                     extra={
                       <Link href={`/plantillas/${p.id}`} className={BOTON_SEC}>
                         Editar la plantilla original

@@ -73,9 +73,24 @@ export default async function AutomationsPage() {
                   </Link>
                 </div>
               ) : (
-                <form action={crearAutomation.bind(null, trigger)} className="mt-3">
-                  <button className={BOTON}>Crear</button>
-                </form>
+                /* Dos formas de arrancar, y la decisión es UNA sola: con qué
+                   diseño. El de fábrica ya trae lo que ese disparador necesita
+                   —el bloque `cupon` de la bienvenida, el `carrito`—, así que va
+                   primero; el otro camino lleva a la galería con el disparador
+                   puesto (`?para=`) y ahí se elige mirando. Al revés (elegir el
+                   disparador desde la galería) no se entendía: uno está mirando
+                   diseños y de golpe le preguntan por un evento de la tienda. */
+                <div className="mt-3 space-y-2">
+                  <form action={crearAutomation.bind(null, trigger)}>
+                    <button className={BOTON}>Crear con el diseño de fábrica</button>
+                  </form>
+                  <Link
+                    href={`/plantillas?para=${trigger}`}
+                    className="block text-xs text-muted underline transition-colors hover:text-foreground"
+                  >
+                    …o elegir un diseño de las plantillas
+                  </Link>
+                </div>
               )}
             </Card>
           );

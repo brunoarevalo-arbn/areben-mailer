@@ -66,10 +66,11 @@ export async function usarPlantilla(plantillaId: string) {
  */
 export async function usarComoAutomation(
   origen: { tipo: "preset" | "plantilla"; id: string },
-  formData: FormData,
+  trigger: Trigger,
 ) {
   const { cuenta } = await autorizar("editar");
-  const trigger = String(formData.get("trigger") ?? "");
+  // El trigger llega atado desde el server, pero se valida igual: una action es
+  // un endpoint público y sus argumentos vienen del navegador.
   if (!esTrigger(trigger)) return;
 
   const existentes = await prisma.automation.findMany({
