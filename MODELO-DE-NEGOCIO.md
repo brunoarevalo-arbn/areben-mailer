@@ -8,33 +8,52 @@
 > desactualizado, corregilo en vez de rehacerlo. Complementa a `SES-ESTADO.md` (estado del
 > envío) y `TIENDANUBE-PUBLICACION.md` (requisitos de la App Store).
 >
-> **Actualizado el 27-jul-2026** con la respuesta de Tiendanube a las 6 consultas: §6.5
+> **Actualizado el 27-jul-2026** con la respuesta de Tiendanube a las 6 consultas: §6.7
 > (cómo se cobra), §7.6 (NubeSDK y los temas) y §7.7 (Plan D confirmado).
 >
 > **Actualizado el 1-ago-2026** contra el código y contra la base: §1, §3 (estado remedido),
-> §6.5 (**el 30% NO es obligatorio** — se corrigió el encuadre), §9 y §10.
+> §6.7 (**el 30% NO es obligatorio** — se corrigió el encuadre), §9 y §10.
+>
+> **Actualizado el 2-ago-2026 — la revisión más grande hasta ahora.** Todo pasó a **pesos**, con
+> el tipo de cambio y la carga fiscal reales (§4). Se corrigieron cuatro errores de costos que
+> venían de julio (§4.2, §6.2, §6.7). Y se midieron **los precios de la competencia**, que dieron
+> vuelta dos conclusiones centrales: el margen del rubro es mucho más alto de lo que decía este
+> archivo, y **el incumbente no es un tercero: es Tiendanube, que compró Perfit** (§7.1).
 
 ---
 
 ## 1. Veredicto en tres líneas
 
-- **Uso propio: lanzalo.** Cuesta ~USD 40/mes contra los >USD 150/mes que se pagan hoy.
-  Ahorro ≥ USD 1.300/año, y el 97% del costo marginal es el proveedor de email.
-- **SaaS: la economía cierra** (equilibrio en 5 comerciantes, ~57% de margen a 50) **y los
-  tres cimientos que faltaban ya están**: SES aprobado (50k/día), la cola corre en el servidor
-  y la infra se paga desde el 31-jul (Vercel Pro + Neon pago). ✅ 1-ago-2026.
-- **Publicar en la App Store NO cuesta el 30%**: marcada como "Gratis con cobros externos" se
-  cobra por afuera con el 100% del ingreso → §6.5. El 30% es una modalidad que se elige, y lo
-  que compra es el checkout adentro del panel.
-- **Lo que hoy frena no es Tiendanube ni la infraestructura: es que el producto no es
+- **Uso propio: lanzalo.** El marginal de mandar los 94.592 mails propios es **~$35.500/mes**
+  contra los >USD 150/mes que se pagan hoy. El 97,7% del costo variable es el proveedor de
+  email; optimizar Vercel o Neon es irrelevante.
+- 🔑 **El margen del rubro es MUCHO más alto de lo que decía este archivo.** Medido el
+  2-ago-2026: el mercado local cobra **entre 9 y 16 veces el costo de mandar** — Marketing Nube
+  factura $75.480/mes por 3.000 contactos, cuyos envíos cuestan $5.625. **Esto no es un negocio
+  de reventa de envíos con 57% de margen: es software con 70-90%**, si se cobra cerca del
+  mercado. La pregunta deja de ser "¿cierra la economía?" y pasa a ser "¿cuánto de esa brecha
+  capturo?" → §7.1.
+- 🔴 **El incumbente NO es un tercero: es Tiendanube.** Compró Perfit en diciembre de 2023 y
+  hoy es **Marketing Nube (ex Perfit)**, producto oficial, con **4,7★ sobre 337 reseñas**. El
+  riesgo que este archivo anotaba como futuro —"si TN saca su propio email marketing se cierra
+  el canal"— **ya ocurrió hace más de dos años**, y las versiones anteriores lo daban por
+  pendiente mirando a Doppler, que es el competidor equivocado.
+- **Precio PROPUESTO —Bruno todavía no lo confirmó—: $19.900 / $59.900 / $149.900**, con
+  $14.900 de lanzamiento para los primeros 15 clientes por 3 meses → §6.4. Es la mitad de la
+  alternativa más barata que tiene un comerciante de Tiendanube y un cuarto de lo que cobra
+  Marketing Nube.
+- **Publicar en la App Store no cuesta el 30%** (§6.7) — pero ahora cuesta algo peor:
+  **competir contra el dueño del local, adentro del local**, con él controlando ranking,
+  ubicación y la homologación que hay que pedirle. ⇒ **La venta directa por GTM deja de ser el
+  atajo y pasa a ser la estrategia**: es la única vía que no depende de la empresa dueña de tu
+  competidor → §7.7.
+- **Lo que frena no es Tiendanube ni la infraestructura: es que el producto no es
   multi-inquilino.** Un comerciante que instala **no puede mandar un mail** (no hay alta de
   dominio autoservicio), la supresión de rebotes cruza cuentas y el import de CSV se
   auto-declara consentido → `TIENDANUBE-PUBLICACION.md` §3.
 - El costo que importa sigue sin ser la infraestructura: es **la reputación de envío
-  compartida entre inquilinos** y **el soporte de onboarding de dominio**.
-- **El canal no está bloqueado** (27-jul): los scripts que instala el propio comerciante por
-  GTM o Códigos externos **no caen bajo NubeSDK**. Se puede vender directo, con el 100% del
-  ingreso y sin homologación → §7.7.
+  compartida entre inquilinos** y **el soporte de onboarding de dominio**, que hoy es una hora
+  de Bruno por cliente y no aparece en ninguna tabla → §4.4.
 
 ---
 
@@ -46,11 +65,15 @@
 |---|---|---|
 | O1 | Dejar de pagar la herramienta actual de email marketing | Baja del gasto de >USD 150/mes |
 | O2 | Controlar el canal: segmentar con datos propios de Tiendanube que la herramienta actual no ve | Campañas segmentadas por compra/producto/marca |
-| O3 | Convertirlo en producto vendible en la App Store de Tiendanube | Ingreso recurrente mensual |
+| O3 | Convertirlo en producto vendible a comerciantes de Tiendanube | Ingreso recurrente mensual |
 | O4 | No poner en riesgo lo que ya está en producción (Resorty, mails de BDI/Zattia) | Cero incidentes por recursos compartidos |
 
 O1 y O2 se logran solos. **O3 depende de O4**: hoy el SaaS y la operación propia comparten
 base de datos y reputación de envío.
+
+⚠️ **O3 decía "vendible en la App Store de Tiendanube" hasta el 2-ago.** Se corrigió a "a
+comerciantes de Tiendanube": la App Store es un canal posible, no el objetivo, desde que se
+supo que su dueña es también la dueña del competidor (§7.1).
 
 ---
 
@@ -90,6 +113,24 @@ script descartable con `prisma.contacto.count` por cuenta.
 
 ## 4. Estructura de costos
 
+### 4.0 Los parámetros fiscales — sin esto, todos los números de abajo mienten
+
+Fijados el 2-ago-2026 con los datos de Bruno. **Todo se paga y se cobra por el monotributo.**
+
+| Parámetro | Valor | Por qué |
+|---|---|---|
+| Tipo de cambio | **$1.550** | El que usa Bruno |
+| Recargo de la tarjeta | **×1,51** | 21% de IVA que un monotributista **no computa** + 30% de percepción de Ganancias sobre todo pago a proveedor del exterior |
+| Costo de cobranza | **7,5%** | MP 4,99% + IVA sobre la comisión (tampoco se recupera) = 6,04%, más hasta 1,5% de IIBB por SIRTAC |
+
+⚠️ **El ×1,51 hay que confirmarlo mirando el resumen de la tarjeta**: si al lado del cargo de
+AWS, Vercel o Neon figura una línea de percepción, aplica. Si AWS factura desde su entidad
+argentina, ese cargo lleva IVA pero **no** percepción, y el costo por mail baja de $0,375 a
+$0,30 — un 25% menos, que se propaga a todos los márgenes de este archivo. La percepción de
+Ganancias además es **recuperable por trámite**; se cuenta como costo hasta que alguien lo haga.
+
+Ver [[project_resorty_cobranza]] en la memoria: la misma carga fiscal es la que descartó Paddle.
+
 ### 4.1 Costo marginal por 1.000 envíos
 
 Supone lotes de 20 (`app/api/campanias/[id]/procesar/route.ts`), ~250 ms por email,
@@ -108,30 +149,67 @@ Supone lotes de 20 (`app/api/campanias/[id]/procesar/route.ts`), ~250 ms por ema
 **La conclusión que gobierna todo lo demás: el costo variable es el proveedor de email y
 nada más.** Optimizar Vercel o Neon es irrelevante; elegir bien el proveedor lo es todo.
 
-### 4.2 Costos fijos
+### 4.2 Costos fijos — 🔴 el piso estaba contado DOS VECES
 
-| Concepto | USD/mes | Nota |
-|---|---|---|
-| Vercel Pro | **20** | Hobby prohíbe uso comercial. Incluye USD 20 de crédito de uso |
-| Neon Launch | ~5 | Pago por uso: $0,106/CU-h + $0,35/GB-mes |
-| Dominio propio | ~2 | Hoy corre en `areben-mailer.vercel.app` |
-| GitHub Actions (cron) | 0 – 7 | Repo privado: 2.000 min/mes gratis, mínimo 1 min por corrida. Cada 15 min = 2.880 min → ~$7 de exceso. Hoy GitHub throttlea a ~1/hora y zafa |
-| SES IP dedicada *(opcional, más adelante)* | 15 | + $0,02-0,08/1k. Recién con volumen y varios inquilinos |
-| **Piso realista** | **~27** | Sin IP dedicada |
+Hasta el 1-ago este archivo le cargaba al mailer un piso propio de **USD 27** (Vercel 20 +
+Neon 5 + dominio 2) y `areben-popups/MODELO-DE-NEGOCIO.md` le cargaba a Resorty uno de
+**USD 41** (Vercel 20 + Neon 19 + 2). **Es el mismo asiento de Vercel y la misma instancia de
+Neon.** El piso de los dos juntos no es 68.
+
+| Concepto | USD/mes | ARS/mes (×1.550×1,51) | Nota |
+|---|---|---|---|
+| Vercel Pro | **20** | $46.810 | Se cobra **por asiento**: un solo USD 20 cubre los 4 proyectos del team |
+| Neon | **~19** | $44.470 | Una instancia. La mantiene despierta el widget de Resorty, que le pega en cada pageview |
+| Dominios | ~4 | $9.360 | Mailer + Resorty |
+| GitHub Actions (cron) | 0 – 7 | $0 – 16.380 | Repo privado: 2.000 min/mes gratis, mínimo 1 min por corrida. Cada 15 min = 2.880 min. Hoy GitHub throttlea a ~1/hora y zafa |
+| SES IP dedicada *(opcional)* | 15 | $34.900 | + $0,02-0,08/1k. Recién con volumen y varios inquilinos |
+| **Piso combo mailer + Resorty** | **~45** | **≈ $105.000** | Sin IP dedicada |
+
+🔑 **La consecuencia: el piso marginal del mailer es casi cero.** Resorty ya paga Vercel y ya
+mantiene Neon despierta. Lo único que el mailer suma de verdad es el variable de SES. ⚠️ Si se
+corrige el número de un lado, **hay que corregirlo del otro** o vuelve la doble contabilidad.
 
 ### 4.3 Precios de proveedores de envío (verificados 25-jul-2026)
 
-| Proveedor | USD/1.000 | Estructura |
-|---|---|---|
-| Elastic Email (pay-as-you-go) | **0,09** | Sin cargo fijo. Starter $19/50k = $0,38/1k |
-| SES à la carte | **0,10** | Sin cargo fijo. Se cambia de plan desde la consola |
-| SES Essentials *(el plan actual)* | **0,16** | Sin cargo fijo. Incluye Virtual Deliverability Manager |
-| Resend | **0,90** | $20/50k · $35/100k · overage $0,90/1k |
-| MailerSend | **0,90** | $28/50k · overage $0,90/1k |
+| Proveedor | USD/1.000 | ARS por mail | Estructura |
+|---|---|---|---|
+| Elastic Email (pay-as-you-go) | **0,09** | $0,211 | Sin cargo fijo. Starter $19/50k = $0,38/1k |
+| SES à la carte | **0,10** | $0,234 | Sin cargo fijo. Se cambia de plan desde la consola |
+| SES Essentials *(el plan actual)* | **0,16** | **$0,375** | Sin cargo fijo. Incluye Virtual Deliverability Manager |
+| Resend | **0,90** | $2,106 | $20/50k · $35/100k · overage $0,90/1k |
+| MailerSend | **0,90** | $2,106 | $28/50k · overage $0,90/1k |
 
-**Umbral de decisión:** con un plan de USD 10/mes y un comerciante de 20.000 envíos, el
-equilibrio está en **$0,45 por mil**. Todo lo que esté por debajo permite el modelo de precio
-del mercado; por encima, hay que vender cupo en vez de "ilimitado".
+**El costo de un mail hoy es $0,375** ($375 el mil). Sin percepción sería $0,30.
+
+📌 **Decisión que está sobre la mesa y nunca se miró: pasar SES a *à la carte*.** Baja el mail
+de $0,375 a $0,234 ⇒ **$13.300/mes de ahorro solo con el uso propio**, ~$160.000 al año. Lo que
+se pierde es el Virtual Deliverability Manager. Con Outlook ya mandando a spam por reputación
+del dominio ([[project_mailer_deliverability_outlook]]), puede que valga los $13.300 — pero es
+una decisión que hay que tomar, no un default.
+
+**Umbral de decisión:** con el precio de §6.4 y el cupo de §6.4, el equilibrio del plan de
+entrada está en **$0,40 por mail**. SES y Elastic Email entran cómodos; Resend, a $2,11 por
+mail, **no cierra a ningún precio de mercado** y por eso el SaaS con Resend no existe.
+
+### 4.4 El costo que no está en ninguna tabla: el onboarding de dominio
+
+Hoy **un comerciante que instala no puede mandar un mail**: `crearRemitente` escribe una fila
+pero no da de alta el dominio en SES ni muestra los CNAME de DKIM — eso lo corre Bruno a mano
+con `scripts/ses-verify-domain.ts`. Entre explicarle el DNS a alguien que no sabe qué es un
+CNAME, esperar propagación y volver a mirar, es **una hora larga por cliente**.
+
+| Si la hora de Bruno vale | Meses de margen del Emprendedor | Del valor de vida del cliente |
+|---|---|---|
+| $15.000 | 1,1 | 7% |
+| $30.000 | 2,2 | 14% |
+| $60.000 | 4,4 | 27% |
+
+Contra $13.726 de contribución mensual (§6.4) y vida media de 16 meses (6% de rotación).
+
+🔴 **Mientras esto lo haga Bruno a mano, el tramo de entrada no cierra por más prolijo que sea
+el precio.** Las dos salidas: construir el alta autoservicio —que hace falta igual para vender
+directo, así que no es trabajo extra— o cobrar una implementación por única vez, que además
+filtra curiosos. Es el bloqueante #10 de §10.
 
 ---
 
@@ -140,78 +218,149 @@ del mercado; por encima, hay que vender cupo en vez de "ilimitado".
 **Supuesto:** 4 campañas/mes a lista completa = **94.592 envíos/mes**. *(Confirmar la
 frecuencia real.)*
 
-| Concepto | USD/mes |
+| Concepto | ARS/mes |
 |---|---|
-| SES Essentials (94.592 × $0,16/1k) | 15,13 |
-| Neon compute + almacenamiento | 0,19 |
-| Vercel memoria + CPU + invocaciones | 0,17 |
-| GitHub Actions | 0 – 7 |
-| Vercel Pro (piso) | 20,00 |
-| **Total** | **35,5 – 42,5** |
+| SES Essentials (94.592 × $0,375) | **$35.472** |
+| Neon compute + almacenamiento | $450 |
+| Vercel memoria + CPU + invocaciones | $400 |
+| **Marginal del uso propio** | **≈ $36.300** |
+| Piso compartido (§4.2) | $105.000 |
+| **Total si se le imputara el piso entero** | **≈ $141.300** |
 
-Anual: **~USD 430 – 510**. Gasto actual: **>USD 1.800/año**. → **Ahorro ≥ USD 1.300/año.**
+🔑 **El número honesto es $36.300, no $141.300**: el piso ya se paga por Resorty, que está en
+vivo en tres tiendas. Lo que cuesta reemplazar la herramienta actual es el marginal.
 
-Pasando SES a *à la carte* el costo variable baja a $9,46 (−$5,70/mes). A este volumen es
-marginal; a escala SaaS no.
+Pasando SES a *à la carte* el variable baja a **$22.100** (−$13.300/mes). A escala SaaS la
+diferencia se multiplica — ver §4.3.
 
 **Si SES no se destraba:** Resend plan de $35 (100k) → total ~USD 56/mes. Sigue ahorrando
 >USD 95/mes. **Para uso propio el proyecto cierra con cualquier proveedor.**
 
 ---
 
-## 6. Escenario B — SaaS en la App Store de Tiendanube
+## 6. Escenario B — SaaS vendido a comerciantes de Tiendanube
 
 ### 6.1 Costo por comerciante
 
-| Perfil | Contactos | Envíos/mes | Costo real (SES Essentials) |
+A 5 envíos por contacto por mes, que es un comerciante activo (y más o menos lo que va a usar BDI).
+
+| Perfil | Contactos | Envíos/mes | Costo real (ARS) |
 |---|---|---|---|
-| Chico | 1.000 | 4.000 | **$0,70** |
-| Mediano | 5.000 | 20.000 | **$3,30** |
-| Grande | 25.000 | 150.000 | **$25,00** |
+| Chico | 1.000 | 5.000 | **$1.873** |
+| Mediano | 2.500 | 12.500 | **$4.681** |
+| Grande | 10.000 | 50.000 | **$18.725** |
+| Muy grande | 30.000 | 150.000 | **$56.175** |
 
 ### 6.2 Punto de equilibrio
 
-Con un plan de USD 10/mes, comerciante mediano, comisión de cobro 5%:
+⚠️ Las versiones anteriores usaban **5% de comisión de cobro**; el número real es **7,5%**
+(§4.0), y la tabla de §6.7 directamente no restaba ninguna comisión.
 
-- Contribución por cuenta: `10 − 3,20 (SES) − 0,10 (infra) − 0,50 (cobro)` = **$6,20**
-- Piso fijo $27 → **equilibrio en 5 comerciantes pagos**
-- 50 comerciantes: ingreso $500 − variable $190 − fijo $27 = **$283/mes (57%)**
-- 200 comerciantes: ~$1.150/mes, pero requiere subir la cuota de SES (4M envíos/mes =
-  133k/día) y probablemente IP dedicada
+Con los precios de §6.4 y el piso combo de $105.000:
 
-### 6.3 Sensibilidad — dónde se rompe el plan plano
+| Cómo se llega al piso | Contribución c/u | Clientes |
+|---|---|---|
+| Solo Emprendedores ($19.900) | $13.726 | **8** |
+| Solo Tienda ($59.900) | $36.682 | **3** |
+| Combo Resorty + Emprendedor ($39.900) | $32.226 | **4** |
 
-Un plan de USD 10 con envíos ilimitados deja de ser rentable arriba de:
+**4 clientes del combo pagan toda la infraestructura de las dos apps.** Antes este archivo decía
+5 comerciantes a USD 10; el número cambió porque cambiaron el piso, la comisión y el precio.
 
-- **~58.000 envíos/mes por cuenta** con SES Essentials
-- **~10.400 envíos/mes por cuenta** con Resend
+### 6.3 Sensibilidad — dónde se rompe el "ilimitado"
 
-Por eso **no conviene copiar el modelo de Perfit/Doppler** (precio por contactos, envíos
-ilimitados): nuestro costo es por envío y el de ellos también, pero ellos ya tienen escala
-para absorberlo.
+El punto donde la contribución del plan se hace cero, a $0,375 por mail y 7,5% de cobranza:
 
-### 6.4 Modelo de precio — ⚠️ PROPUESTA DE CLAUDE, NO DECISIÓN
+| Plan | Precio | Se rompe a los | = envíos por contacto/mes |
+|---|---|---|---|
+| Emprendedor | $19.900 | 49.200 | **19,7** |
+| Tienda | $59.900 | 147.900 | **14,8** |
+| Pro | $149.900 | 370.300 | **12,3** |
 
-> Los números de esta tabla los propuso Claude en el análisis del 25-jul-2026 a partir de
-> los costos reales y de una referencia de mercado. **No están validados con clientes ni
-> decididos por Bruno.** Tomarlos como punto de partida para discutir, no como el precio.
+🔑 **Esto invierte la conclusión de julio.** El archivo decía que "no conviene copiar el modelo
+de Perfit/Doppler" de envíos ilimitados. A los precios de julio (USD 9-10) era cierto: se rompía
+a los 14,7 por contacto y hacía falta un cupo defensivo. **A los precios de §6.4 el ilimitado
+entra cómodo**, y eso importa porque los dos competidores lo ofrecen: con cupo, la oferta se ve
+peor en la única línea que el comerciante compara además del precio. Va **"ilimitado" con tope
+de uso justo escrito en los términos (15 por contacto al mes)**, que es lo que hacen todos.
 
-Precio por contactos **con cupo de envíos** (lo que hacen Mailchimp y Klaviyo), excedente
-facturado aparte:
+⚠️ Lo que **no** cambia: con un puñado de clientes no existe la ley de los grandes números. A
+Marketing Nube el que manda todos los días se le promedia contra miles que mandan una vez al
+mes; con 5 clientes, uno pesado **es** el margen. Por eso el tope de uso justo va escrito desde
+el día uno, aunque no se aplique nunca.
 
-| Plan | Contactos | Cupo envíos/mes | Costo SES | Precio propuesto | Margen bruto |
-|---|---|---|---|---|---|
-| Gratis | 500 | 2.000 | $0,32 | USD 0 | costo de adquisición |
-| Emprendedor | 2.500 | 15.000 | $2,40 | **USD 9** | ~67% |
-| Tienda | 10.000 | 60.000 | $9,60 | **USD 25** | ~57% |
-| Pro | 30.000 | 180.000 | $28,80 | **USD 59** | ~46% |
+### 6.4 Modelo de precio — ⚠️ PROPUESTA, todavía sin confirmar por Bruno
 
-Excedente propuesto: **USD 2 cada 1.000 envíos** (12,5× el costo — el excedente subsidia al
-que se pasa sin castigarlo).
+> Reemplaza la tabla en dólares del 25-jul. **La diferencia con aquella no es que se
+> tradujo: es que ahora está anclada en los precios medidos de la competencia (§7.1) y no
+> en una referencia inventada.** Sigue sin estar validada con un solo cliente.
 
-Referencia de mercado: Doppler arranca en USD 10 con 2.500 contactos y envíos ilimitados.
+**Por contactos, con envíos ilimitados y tope de uso justo.** Es como te comparan, y a este
+nivel de precio el ilimitado entra cómodo (§6.3).
 
-### 6.5 Cómo se cobra — RESPUESTA DE TIENDANUBE (27-jul-2026)
+| Plan | Contactos | Precio | Costo envíos | Cobranza | Contribución | Margen |
+|---|---|---|---|---|---|---|
+| Prueba | 500 | **$0** | $749 | — | −$749 | adquisición |
+| Emprendedor | 2.500 | **$19.900** | $4.681 | $1.493 | $13.726 | **69%** |
+| Tienda | 10.000 | **$59.900** | $18.725 | $4.493 | $36.682 | **61%** |
+| Pro | 30.000 | **$149.900** | $56.175 | $11.243 | $82.482 | **55%** |
+
+**Lanzamiento: $14.900 los primeros 15 clientes por 3 meses**, con el precio pleno publicado
+desde el día uno. Mismo mecanismo que ya se usó en Resorty, y por el mismo motivo: MP deja
+cambiar el monto de una suscripción activa sin reautorización **pero le manda un mail al
+cliente**, y un aumento que no estaba escrito de antes se lee como carnada
+([[project_resorty_cobranza]]).
+
+**Las tres razones para NO bajar de $19.900** — Bruno propuso $14.900 buscando inserción:
+
+1. **El piso contra el que hay que verse barato es Doppler con el 35% de TN: $40.897** a 2.500
+   contactos. A $19.900 el comerciante ya ahorra la mitad. **El que no se muda por 51% tampoco
+   se muda por 74%**; esos $5.000 por cliente por mes se regalan a cambio de nada.
+2. 🔴 **Un precio cinco veces abajo del mercado no lee como barato: lee como que no sirve.** Te
+   está entregando su lista de clientes — ahí la desconfianza sale más cara que el descuento.
+3. **El precio más alto compra aguante cambiario.** Con el dólar 60% arriba, a $14.900 el
+   Emprendedor queda en 42% de margen; a $19.900, en 55%. Los $5.000 son, en buena medida, el
+   seguro de cambio del plan (§6.6).
+
+**Excedente: $1.200 cada 1.000 envíos** (3,2× el costo). **Paquetes sueltos** para el
+estacional —el que manda en Hot Sale y en Navidad y nada en febrero—: 10.000 envíos a $16.900 y
+50.000 a $69.900. 🔴 **Con vencimiento a 6 meses**: un crédito sin vencimiento en Argentina es
+una posición corta en dólares, porque cobrás hoy y entregás el costo con el dólar de dentro de
+ocho meses.
+
+### 6.5 El combo con Resorty — el descuento NO sale de los envíos
+
+| Paquete | Suelto | Combo | Descuento |
+|---|---|---|---|
+| Resorty + Emprendedor | $44.800 | **$39.900** | $4.900 |
+| Resorty + Tienda | $84.800 | **$79.900** | $4.900 |
+
+🔑 **El descuento sale íntegro del margen de Resorty**, cuyo costo marginal por comerciante son
+centavos, y no toca el costo de SES. Descontar envíos es descontar el único costo variable real
+que hay — y encima los primeros envíos son los que le pagás a un cliente que todavía puede irse
+en el mes 2.
+
+⛔ **El mailer suelto nunca más barato que el del combo.** Si "envío solo" sale menos, se
+canibaliza el paquete que es justamente la tesis del negocio (§7.5).
+
+### 6.6 Qué pasa si se mueve el dólar
+
+Es la diferencia estructural con Resorty y la razón por la que no se puede copiar su esquema:
+**Resorty aguanta un precio en pesos sin indexar porque su costo marginal son centavos; el del
+mailer está en dólares y escala con el uso.**
+
+| Dólar | Emprendedor | Tienda | Pro |
+|---|---|---|---|
+| $1.550 *(hoy)* | 69% | 61% | 55% |
+| $2.015 *(+30%)* | 62% | 52% | 44% |
+| $2.480 *(+60%)* | 55% | 43% | 33% |
+| $3.100 *(+100%)* | 45% | 30% | 18% |
+
+Un año se aguanta; dos no. El que se licúa primero es el tramo grande, que es el que más cuesta
+conseguir. ⚠️ **El precio en pesos no se indexa solo**: sin que alguien lo toque, se vende por
+debajo sin haberlo decidido.
+
+### 6.7 Cómo se cobra — RESPUESTA DE TIENDANUBE (27-jul-2026)
 
 > 🔴 **LEER ESTO ANTES DE HABLAR DEL 30%.** Publicar en la App Store **no obliga a resignar
 > el 30%**: es una de tres modalidades y se elige. **Publicada como "Gratis" con *cobros
@@ -237,16 +386,17 @@ Si cobra Tiendanube, la comisión se genera sola cuando el pago se confirma y se
 donde el comerciante ya paga su plan, que es exactamente donde se pierden las conversiones. Es
 una decisión de conversión, no un peaje.
 
-**Lo que costaría** (sobre los precios *propuestos* de §6.4, que siguen sin decidirse):
+**Lo que costaría** (sobre los precios de §6.4). ⚠️ La versión anterior de esta tabla estaba
+mal: la columna "cobrando por afuera" **no restaba ninguna comisión de cobro**.
 
-| Plan | Precio | Contribución cobrando por afuera | Contribución con TN 30% | Margen |
+| Plan | Precio | Contribución por afuera (−7,5% MP) | Contribución con TN 30% | Margen |
 |---|---|---|---|---|
-| Emprendedor | USD 9 | $6,60 | $3,90 | 67% → 43% |
-| Tienda | USD 25 | $15,40 | $7,90 | 57% → 32% |
-| Pro | USD 59 | $30,20 | $12,50 | 46% → 21% |
+| Emprendedor | $19.900 | $13.726 | $9.249 | 69% → 46% |
+| Tienda | $59.900 | $36.682 | $23.205 | 61% → 39% |
+| Pro | $149.900 | $82.482 | $48.755 | 55% → 33% |
 
 En los planes baratos la comisión **pesa más que todo el costo de envío**: en Emprendedor son
-$2,70 de comisión contra $2,40 de SES, y el equilibrio de §6.2 pasaría de 5 comerciantes a ~9.
+$5.970 de comisión contra $4.681 de SES, y el equilibrio de §6.2 pasaría de 8 comerciantes a 12.
 Por eso la modalidad por defecto de este análisis es **cobros externos**, y el 30% se evalúa
 recién si se mide que la conversión adentro del panel lo paga.
 
@@ -267,33 +417,91 @@ pensaron.** Cuando un negocio se ve fácil de construir y con margen visible, lo
 suele ser la idea sino la barrera que impide que te copien. La pregunta útil no es "¿puedo
 hacerlo?" sino "¿por qué el comerciante me elegiría a mí y por qué se quedaría?".
 
-### 7.1 Lo que hay hoy
+### 7.1 Lo que hay hoy — MEDIDO el 2-ago-2026
 
 El email marketing para e-commerce es una categoría **madura y muy poblada a nivel global**
-(Mailchimp, Klaviyo, Omnisend, Brevo) y **con jugadores locales fuertes en Argentina**
-(Perfit, Doppler, emBlue). No hay ningún hueco de producto: todo lo que hace el mailer ya
-existe en algún lado, mejor hecho.
+(Mailchimp, Klaviyo, Omnisend, Brevo) y **con jugadores locales fuertes en Argentina**. No hay
+ningún hueco de producto: todo lo que hace el mailer ya existe en algún lado, mejor hecho.
 
-Lo que sí se ve más flojo es **la presencia dentro de la App Store de Tiendanube**:
+#### 🔴 Perfit es Tiendanube
 
-| Señal | Dato (25-jul-2026) |
+**Tiendanube compró Perfit en diciembre de 2023.** Hoy la app se llama **Marketing Nube (ex
+Perfit)** y es producto oficial de la plataforma, no una app de terceros.
+
+| Señal | Marketing Nube (ex Perfit) | Doppler |
+|---|---|---|
+| Reseñas en la App Store de TN | **4,7 ★ sobre 337** | 3,4 ★ sobre 25 |
+| Quién es | **El dueño de la plataforma** | Tercero |
+| Descuento a comercios de TN | — | 35% |
+
+**Esto corrige dos cosas que este archivo venía diciendo mal:**
+
+1. El argumento de §7.1 hasta el 1-ago era *"un incumbente con 25 reseñas y 3,4 estrellas no es
+   una posición dominante ⇒ la oportunidad es el canal"*. **Miraba al competidor equivocado.**
+   El que manda tiene 4,7★ y 337 reseñas, y es el dueño del local.
+2. El riesgo que §9 anotaba como futuro —*"si TN saca su propio email marketing, se cierra el
+   canal"*— **ya ocurrió hace más de dos años**.
+
+#### Los precios, en pesos
+
+Verificados dos veces: en la página pública de Perfit **y contra el panel de compra de la cuenta
+real de Nuby**, que dan idénticos ⇒ el precio de lista es el precio real, no hay descuento oculto
+para comercios. Todos con **envíos ilimitados**.
+
+| Contactos | Marketing Nube | Doppler | Doppler −35% TN | Propuesta §6.4 |
+|---|---|---|---|---|
+| 500 | $15.096 | $17.977 | $11.685 | — |
+| 1.000 | $30.192 | — | — | — |
+| 2.000 | $60.384 | — | — | — |
+| **2.500** | **$75.480** | **$62.919** | **$40.897** | **$19.900** |
+| 4.000 | $100.640 | — | — | — |
+| **10.000** | **$163.540** | **$165.388** | **$107.502** | **$59.900** |
+
+⚠️ **Perfit publica con impuestos incluidos; Doppler sin impuestos** y en valores que él mismo
+llama aproximados ⇒ su columna lleva el 21% sumado por nosotros. Doppler descuenta además 5/15/25%
+por comprometerse a 3/6/12 meses (a 2.500 contactos, el anual son $38.999 sin IVA) y tiene 50%
+por 6 meses en el tramo de entrada para quien nunca tuvo plan pago.
+📌 **Falta confirmar cómo se aplica el 35% de TN** (¿sobre el mensual, sobre el anual, se acumula
+con el 50%?). De eso depende si el piso real es $40.897 o $47.189.
+
+#### 🔑 El hallazgo que da vuelta el análisis
+
+**Marketing Nube factura $75.480/mes por 3.000 contactos.** A 5 envíos por contacto son 15.000
+mails, que cuestan **$5.625**. El mercado local cobra **entre 9 y 16 veces el costo de mandar**.
+
+**Este archivo venía tratando al rubro como reventa de envíos con margen ajustado** (§7.2 decía
+"57-67% está por debajo del SaaS típico"). Con los precios a la vista, no lo es: **es software
+con 70-90% de margen** para quien cobra precio de mercado. La pregunta deja de ser "¿cierra la
+economía?" y pasa a ser **"¿cuánto de esa brecha capturo?"**.
+
+#### ¿Somos competitivos para entrar?
+
+| Dimensión | Respuesta |
 |---|---|
-| Doppler en la App Store de TN | **3,4 ★ sobre 25 evaluaciones** |
-| Descuento que ofrece Doppler a clientes de TN | 35% |
-| Apps de la categoría con etiqueta "Pago" o "Compras dentro de la aplicación" | Existen — hay camino para cobrar, aunque falta confirmar cómo fluye la plata |
+| **Precio** | ✅ **Sí, con margen de sobra.** 74% abajo de Marketing Nube y la mitad de la alternativa más barata. Y **la queja nº 1 en las reseñas de Marketing Nube es el precio que escala con la lista** — de 3.000 a 4.000 contactos la factura salta de $75.480 a $100.640 sin que el comerciante haga nada distinto. Ese salto es la puerta de entrada, y no hay que adivinarlo: está escrito en la ficha de la app |
+| **Canal** | 🔴 **No, y peor que lo que decía este archivo.** Publicar es competir contra el dueño del local, adentro del local, con él controlando ranking, ubicación y la homologación que hay que pedirle |
+| **Producto** | 🔴 **Todavía no.** Marketing Nube está adentro del panel, con instalación de un clic y 337 comerciantes que lo recomiendan. Acá hay 24 mails enviados en total, sin alta de dominio autoservicio, con la supresión cruzando cuentas y el CSV auto-consentido |
 
-Un incumbente con 25 reseñas y 3,4 estrellas en el canal no es una posición dominante. **La
-oportunidad no es el producto: es el canal.**
+⚠️ **Entrar con producto a medio hacer Y precio muy barato es la peor combinación posible**:
+confirma la sospecha de que barato es sinónimo de que no sirve. El orden de §10 —terminar los
+envíos propios, cerrar las fugas, después vender— **no se puede saltear apoyándose en el precio**.
 
 ### 7.2 Por qué el margen alto no es la ventaja que parece
 
-- 57-67% de margen bruto **está por debajo del SaaS típico** (75-85%). Es un negocio de
-  reventa de envíos: el costo del proveedor es un *pass-through* que no se puede optimizar.
-- El margen de la sección 6 es **antes de trabajo humano**. Con un ARPU de USD 9-25, un solo
-  ticket de soporte de 30 minutos se come el margen de varios meses de esa cuenta.
-- El número absoluto es chico: 50 comerciantes son ~USD 283/mes. Esto recién se parece a un
-  negocio en el orden de los **cientos** de comerciantes, y eso es un problema de
-  distribución, no de software.
+⚠️ **Corregido el 2-ago:** la versión anterior decía que 57-67% "está por debajo del SaaS típico"
+y concluía que esto es reventa de envíos. Con los precios medidos de §7.1, el rubro corre al
+90%+ y **la restricción no es el margen posible, es cuánto se anima uno a cobrar**. Lo que
+sigue valiendo es todo lo demás, que es lo que de verdad decide:
+
+- El margen de §6.4 es **antes de trabajo humano**. Con una contribución de $13.726/mes, **una
+  hora de onboarding se come de 1 a 4 meses de esa cuenta** (§4.4), y hoy cada alta necesita
+  una hora de Bruno cargando DKIM a mano.
+- El número absoluto es chico: 50 Emprendedores dejan **~$581.000/mes** después del piso — unos
+  USD 375. Esto recién se parece a un negocio en el orden de los **cientos** de comerciantes, y
+  eso es un problema de distribución, no de software.
+- **Y la distribución ahora la controla el competidor**, que es el dueño de la plataforma
+  (§7.1). Es el cambio más importante respecto de todas las versiones anteriores de este
+  archivo.
 
 ### 7.3 Las barreras reales (ninguna es programar)
 
@@ -312,18 +520,25 @@ oportunidad no es el producto: es el canal.**
 
 - **Los costos de cambio son altos, y esa es la única barrera estructural del rubro.** Una
   vez que el comerciante tiene adentro su lista, sus plantillas y sus automatizaciones, no se
-  muda: es de los pocos SaaS donde la retención no depende de seguir gustando mes a mes. La
-  consecuencia estratégica es que **el que entra primero en cada tienda se queda con esa
-  tienda**, y por eso la velocidad de instalación importa más que la completitud del producto.
+  muda: es de los pocos SaaS donde la retención no depende de seguir gustando mes a mes.
+  🔴 **Pero corregido el 2-ago: hoy eso juega EN CONTRA.** "El que entra primero en cada tienda
+  se queda con esa tienda" se escribió imaginando tiendas vacías; **Marketing Nube ya entró
+  primero en muchísimas y es el default de la plataforma** (§7.1). No se trata de ocupar, se
+  trata de **desalojar** — que necesita una razón más grande que "soy más barato", y la única
+  medida es la queja de precio de sus propias reseñas.
+- **El precio que escala con la lista es el punto blando del incumbente**, y está documentado
+  por sus propios clientes en la ficha de la App Store. No hay que adivinar dónde duele.
 - **Dogfooding**: se usa en tres tiendas propias antes de vendérselo a nadie.
 - **Resorty como canal — pero todavía es una apuesta, no un activo.** ⚠️ Al 25-jul-2026
   Resorty **no está publicado en la App Store**: está en vivo en Zattia (tienda propia)
   instalado por GTM, y no tiene clientes externos. El argumento de "canal de distribución
   propio" vale **cuando** Resorty esté publicado e instalado en tiendas ajenas; hoy es el
   plan, no el punto de partida. Ver §7.6, que es donde está el problema.
-- **El combo captura + envío** (pop-up que capta el mail y mailer que lo trabaja) es un
-  producto más difícil de copiar que un mailer suelto, y ninguno de los incumbentes locales
-  lo ofrece integrado.
+- 🔑 **El combo captura + envío es lo único que NO compite de frente con el dueño del local.**
+  Marketing Nube trabaja la lista que el comerciante ya tiene; **Resorty la construye**. Ese es
+  el pedazo donde no se pelea contra Tiendanube, es el que ya está funcionando y midiendo venta
+  atribuida, y ninguno de los incumbentes locales lo ofrece integrado. Es la parte de la tesis
+  que sobrevive intacta al hallazgo de §7.1.
 - **Los datos de Tiendanube** (productos, pedidos, comportamiento) permiten segmentación que
   una herramienta genérica conectada por integración no tiene con la misma fidelidad.
 
@@ -331,8 +546,13 @@ oportunidad no es el producto: es el canal.**
 
 Es posible, pero **no por ser simple ni por el margen**. El modelo de negocio es claro y
 conocido justamente porque muchos ya lo hicieron. La versión defendible de esta apuesta no
-es "otro email marketing barato", sino **el paquete Resorty + mailer vendido dentro de
-Tiendanube a comerciantes que ya confían en la primera app**.
+es "otro email marketing barato", sino **el paquete Resorty + mailer vendido a comerciantes de
+Tiendanube que ya confían en la primera app**.
+
+⚠️ **Corregido el 2-ago:** hasta ayer esta línea decía "vendido **dentro de** Tiendanube".
+Sabiendo que Tiendanube es dueña del competidor (§7.1), la preposición importa: **el paquete se
+vende a comerciantes de Tiendanube, por afuera de su App Store**. La distribución propia deja de
+ser una comodidad y pasa a ser lo único que no está en manos del rival.
 
 ### 7.6 El canal — RESPUESTA DE TIENDANUBE (27-jul-2026)
 
@@ -380,22 +600,28 @@ y ese camino **no se rompe en agosto ni en octubre**.
 | NubeSDK | Obligatorio cargarlo, además del legacy | **No aplica nunca** |
 | Descubrimiento | El comerciante te encuentra solo | Hay que salir a buscarlo |
 | Fricción de instalación | Un clic | El comerciante pega un script |
-| Cobro | **Elegís**: TN cobra y retiene 30%, **o cobrás vos con el 100%** (§6.5) | Facturación propia, 100% |
-| Riesgo de plataforma | Alto: cambian las reglas y te caés | Bajo |
+| Cobro | **Elegís**: TN cobra y retiene 30%, **o cobrás vos con el 100%** (§6.7) | Facturación propia, 100% |
+| Riesgo de plataforma | 🔴 **Muy alto: el dueño de la plataforma ES tu competidor** (§7.1) | Bajo |
 
 Lo importante es que **ya no es "mientras tanto"**: la venta directa es un camino completo y
 permanente, con el 100% del ingreso y cero dependencia del calendario de Tiendanube.
 
 ⚠️ **Y las dos no son excluyentes.** Como la modalidad de *cobros externos* deja el 100%, la
 App Store no cuesta margen: cuesta **homologación, mantenimiento del trámite y riesgo de
-plataforma** — y, para Resorty, la reescritura a NubeSDK (al mailer eso no lo toca). El
-argumento para no publicar hoy no es el 30%: es que **todavía no hay un solo comerciante
-pago**, así que se estaría optimizando la adquisición de un producto sin tracción.
+plataforma** — y, para Resorty, la reescritura a NubeSDK (al mailer eso no lo toca).
 
-**Recomendación**: arrancar por venta directa —cuesta cero desarrollo nuevo, ya está probado
-en Zattia— y publicar en la App Store, con cobros externos, **cuando haya dos o tres
-comerciantes pagando** y el producto sea multi-inquilino (§10). Con el costo de cambio de §7.4
-jugando a favor, cinco tiendas conseguidas a mano hoy valen más que cincuenta dentro de un año.
+🔴 **Actualizado el 2-ago: el argumento para no publicar dejó de ser solo "no hay tracción".**
+Sabiendo que Tiendanube es dueña de Marketing Nube (§7.1), publicar es **competir contra el
+dueño del local, adentro del local**, con él decidiendo ranking, ubicación, bundling — y
+otorgando la homologación que hay que pedirle. El 30% nunca fue el problema; esto sí.
+
+⇒ **La venta directa por GTM deja de ser "el atajo mientras tanto" y pasa a ser la estrategia.**
+Es el único camino que no depende de la empresa dueña de tu competidor, y ya está probado en
+Zattia (GTM-P5B8T7QV), sin fecha de corte y sin homologación.
+
+**Recomendación**: vender directo, y tratar a la App Store como un canal secundario que se
+evalúa **cuando haya clientes pagos y producto multi-inquilino** (§10) — no como el objetivo.
+Cinco tiendas conseguidas a mano valen más que una ficha bien puesta en la vidriera del rival.
 
 ⚠️ Pero ojo con el orden: **vender directo adelanta los blanqueos de infraestructura**. Vercel
 sigue en Hobby, que prohíbe uso comercial, y Neon en Free compartido con Resorty en vivo
@@ -404,6 +630,11 @@ sigue en Hobby, que prohíbe uso comercial, y Neon en Free compartido con Resort
 ---
 
 ## 8. Planes A, B y C
+
+> ✅ **Resuelto: SES quedó aprobado el 29-jul-2026** (50k/día). Estamos en el Plan A y los
+> planes B y C quedan como registro de las alternativas evaluadas — B sigue siendo la red de
+> seguridad real, porque Resend está activo en el plan free y es lo que se usó para medir el
+> inbox de Outlook.
 
 ### Plan A — SES aprobado (objetivo)
 
@@ -456,11 +687,12 @@ chica **antes** de construir encima.
 | ~~**Base compartida con Resorty en Neon Free**~~ ✅ **RESUELTO 31-jul-2026** | Neon Free = 512 MB y suspende a las 100 CU-h; si se llenaba se caía Resorty también | Neon en plan pago. Queda pendiente la **retención/purga** de `Envio` y `Evento` (43 MB/mes proyectados) |
 | ~~**La cola de envío vive en el navegador**~~ ✅ **RESUELTO 25-jul-2026** | Antes `CampaniaEditor.tsx` mandaba de a 20 por request: ~1h20m de pestaña abierta para los 16.825 de BDI | Ya está en el servidor (`lib/email/cola.ts`): worker con lease + auto-encadenamiento, y el cron de GitHub como perro guardián. El editor solo mira el progreso |
 | ~~**Vercel Hobby prohíbe uso comercial**~~ ✅ **RESUELTO 31-jul-2026** | Riesgo de ToS desde el primer peso cobrado | Pro, USD 20/mes, cubre los 4 proyectos del team |
-| ~~**Cómo se cobra una app paga está sin documentar**~~ ✅ **RESUELTO 27-jul-2026** | — | Tres modalidades, y **cobros externos deja el 100%** → §6.5 |
+| ~~**Cómo se cobra una app paga está sin documentar**~~ ✅ **RESUELTO 27-jul-2026** | — | Tres modalidades, y **cobros externos deja el 100%** → §6.7 |
 | **Soporte de onboarding de dominio** | Cada comerciante que no sabe cargar DKIM es un ticket. Es el costo oculto grande del SaaS, y no aparece en ninguna tabla de arriba | Asistente guiado por proveedor de DNS; detección automática de registros |
 | **El motor nunca mandó un blast** | 24 envíos reales en total al 1-ago. Publicar expone comerciantes ajenos a un camino que no se probó a volumen | Terminar los tramos propios (BDI T01-T06, Zattia) antes de vender |
-| **Descalce cambiario** | Ingresos probablemente en ARS, costos 100% en USD | Precios en USD o indexados |
-| **Concentración en Tiendanube** | Si TN saca su propio email marketing, se cierra el canal | El producto también sirve fuera de TN |
+| **Descalce cambiario** | Ingresos en ARS, costo variable 100% en USD. Con el dólar 60% arriba el tramo Tienda pasa de 61% a 43% de margen (§6.6) | Precio pleno publicado desde el día uno para poder actualizarlo sin que se lea como carnada; paquetes de envíos con vencimiento a 6 meses |
+| 🔴 **~~Concentración en Tiendanube~~ YA OCURRIÓ** | Esto figuraba como riesgo futuro: *"si TN saca su propio email marketing, se cierra el canal"*. **TN compró Perfit en diciembre de 2023** y es Marketing Nube, 4,7★ sobre 337 reseñas (§7.1). El canal oficial es hoy la vidriera del competidor | Venta directa por GTM, que no pasa por la App Store. Y apoyarse en el combo con Resorty, que es la parte que TN **no** ofrece (§7.4) |
+| **El costo del onboarding de dominio** | Una hora de Bruno por cliente: de 1 a 4 meses del margen de esa cuenta (§4.4) | Alta de dominio autoservicio (#10), o implementación cobrada aparte |
 
 ---
 
@@ -478,7 +710,7 @@ el código en vez de la infraestructura.
 | 5 | Aislamiento de reputación por inquilino | 🔴 Diseñado, sin construir | **Sí** | **Sí** |
 | 6 | Los 4 webhooks obligatorios de TN | 🟡 El código está; **falta darlos de alta** en *Datos básicos* y probarlos | No | **Sí** |
 | 7 | App propia en Partners | ✅ Mailer #37222, Resorty #37985 | — | — |
-| 8 | Definir cómo se cobra | ✅ §6.5 — cobros externos deja el 100% | — | — |
+| 8 | Definir cómo se cobra | ✅ §6.7 — cobros externos deja el 100% | — | — |
 | 9 | **OAuth público + alta automática** | ✅ **Ya estaba construido** (`/api/tn/entrar` + callback) | — | — |
 | 10 | 🔴 **Alta de dominio autoservicio en SES** | Sin construir — hoy lo corre Bruno a mano | **Sí** | **Sí** |
 | 11 | 🔴 **Supresión que cruza cuentas** | `supresion.ts:35` sin `cuentaId` | **Sí** | **Sí** |
@@ -501,13 +733,15 @@ igual. Detalle en `TIENDANUBE-PUBLICACION.md` §3.
    soporte y onboarding con gente que perdona.
 4. **Cuarentena por tramos** (#5) y **planes** (#13), construidos contra lo que rompan esos
    primeros clientes y no contra lo que adivinemos hoy.
-5. **Publicar**: webhooks de LGPD dados de alta (#6), legales (#14), scopes (#15),
+5. **Publicar, si conviene**: webhooks de LGPD dados de alta (#6), legales (#14), scopes (#15),
    homologación. **Marcada "Gratis con cobros externos"** salvo que se mida que el 30% se
    paga solo en conversión.
 
-⚠️ Publicar en la App Store **no compite** con la venta directa ni la reemplaza: como la
-modalidad de cobros externos deja el 100%, el canal oficial es adquisición casi gratis. Lo que
-cuesta es la homologación y el riesgo de plataforma, no el margen.
+🔴 **El paso 5 dejó de ser el objetivo (2-ago-2026).** La versión anterior decía que la App
+Store "no compite con la venta directa: es adquisición casi gratis". Sabiendo que **Tiendanube
+es dueña de Marketing Nube** (§7.1), la vidriera es del competidor: él decide el ranking, la
+ubicación y la homologación. **Los pasos 1 a 4 no cambian** —son los mismos para las dos vías—
+pero el 5 pasa de "el plan" a "una opción a evaluar con clientes pagos en la mano".
 
 ---
 
@@ -517,12 +751,22 @@ Todo lo que sigue lo puso Claude en el análisis, no está medido:
 
 - 4 campañas/mes a lista completa (uso propio)
 - 25% de apertura, 3% de clic — afectan solo al 2% no-SES del costo
-- Comerciante mediano = 5.000 contactos y 20.000 envíos/mes
-- 5% de comisión de cobro
-- Precio de USD 10/mes en los cálculos de equilibrio; la tabla de planes de §6.4 es propuesta
-- ~250 ms por email (SES + escritura en Neon) — no se midió con envíos reales porque todavía
-  no hubo ninguno
-- 6% de churn mensual en la proyección de la §7.3
+- **5 envíos por contacto por mes** como uso de un comerciante activo (§6.1). Es el supuesto
+  que define el margen de todos los tramos; conviene probárselo primero a BDI
+- 6% de churn mensual ⇒ vida media de 16 meses, que es lo que sostiene la tabla de §4.4
+- **Los precios de §6.4 son propuesta y Bruno todavía no los confirmó.** Lo que sí está medido
+  son los de la competencia (§7.1)
+
+Y lo que dejó de ser supuesto:
+
+- ✅ **Tipo de cambio 1.550 y todo por el monotributo** — dato de Bruno, 2-ago-2026
+- ✅ **7,5% de comisión de cobro**, no 5% (§4.0)
+- ✅ **Precios de la competencia**, verificados en las páginas públicas y contra el panel real
+  de la cuenta de Nuby
+- ✅ **~170 ms por email** (mediana entre envíos consecutivos, n=5 sobre los 24 envíos reales).
+  El supuesto era 250 ms; la diferencia no mueve nada porque es el 2% no-SES del costo
+- ⏳ **El ×1,51 de la tarjeta sigue sin confirmarse** contra un resumen (§4.0). Es el supuesto
+  con más consecuencias que queda: mueve el costo por mail un 25%
 
 ---
 
@@ -536,3 +780,15 @@ Consultadas el 25-jul-2026:
 - [Resend pricing](https://resend.com/pricing) · [MailerSend pricing](https://www.mailersend.com/pricing) · [Elastic Email pricing](https://elasticemail.com/email-api-pricing)
 - [Doppler precios](https://www.fromdoppler.com/en/pricing/) · [Doppler en la App Store de Tiendanube](https://www.tiendanube.com/tienda-aplicaciones-nube/doppler)
 - [Tiendanube Partners](https://www.tiendanube.com/blog/tiendanube-partners/)
+
+Consultadas el 2-ago-2026, para §7.1:
+
+- [Perfit — planes y precios](https://www.perfit.com/es/precios) *(precios en ARS con impuestos
+  incluidos; verificados además contra el panel de compra de la cuenta real de Nuby)*
+- [Doppler — Plan Premium, calculadora por contactos](https://www.fromdoppler.com/es/precios-plan-premium/)
+  *(en ARS, **sin** impuestos, valores que Doppler llama aproximados)*
+- [Marketing Nube (ex Perfit) en la App Store de Tiendanube](https://www.tiendanube.com/tienda-aplicaciones-nube/perfit)
+  — 4,7★ sobre 337 reseñas
+- [El Economista — Tiendanube adquiere Perfit](https://eleconomista.com.ar/tech/tiendanube-adquiere-perfit-potenciar-ventas-eficiencia-campanas-marketing-su-plataforma-n69046)
+  · [Canal-AR](https://www.canal-ar.com.ar/31421-Tiendanube-adquiere-Perfit-y-se-sumerge-en-el-Marketing-Automation.html)
+  — la adquisición, anunciada en diciembre de 2023
