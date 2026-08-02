@@ -94,9 +94,20 @@ export const cta = (texto: string, url: string) => ({
 /** El bloque rico que, por diseño, no lleva botón: es una banda de texto. */
 export const sinBoton = { botonTexto: "", botonUrl: "" } as const;
 
-/** Botón suelto, o nada. Mismo criterio que `cta`. */
-export const botonSi = (texto: string, url: string, align: "left" | "center" = "left"): Bloque[] =>
-  url ? [{ tipo: "boton", texto, url, align, full: false }] : [];
+/**
+ * Botón suelto, o nada. Mismo criterio que `cta`.
+ *
+ * El `estilo` es para el botón que **no** se parece al del resto del mail: en
+ * R-013 hay dos, uno blanco arriba y uno azul abajo, y sin este parámetro el
+ * segundo obligaba a escribir el bloque a mano y perder la guarda del `url`
+ * vacío — que es justo lo que este helper existe para no olvidarse.
+ */
+export const botonSi = (
+  texto: string,
+  url: string,
+  align: "left" | "center" = "left",
+  estilo?: Bloque["estilo"],
+): Bloque[] => (url ? [{ tipo: "boton", texto, url, align, full: false, ...(estilo ? { estilo } : {}) }] : []);
 
 /**
  * Las redes de la marca.
@@ -162,13 +173,23 @@ export const menuTienda = (tienda: string, estilo?: Bloque["estilo"]): Bloque[] 
  * celda sale como salía.
  */
 export const fila = (
-  celdas: { titulo: string; texto: string; icono?: string }[],
+  celdas: { titulo: string; texto: string; icono?: string; boton?: { texto: string; url: string } }[],
   align: "left" | "center" = "center",
   estilo?: Bloque["estilo"],
 ): Bloque => ({
   tipo: "columnas",
   variante: "textos",
-  celdas: celdas.map((c) => ({ imagen: "", url: "", titulo: c.titulo, texto: c.texto, ...(c.icono ? { icono: c.icono } : {}) })),
+  // El botón por celda no era solo de las celdas con foto: R-015 pone ícono,
+  // etiqueta y un "Shop Now" propio abajo de cada una. Pasa por `cta`, así que
+  // una cuenta sin tienda cargada sigue sin botón en vez de con un `href=""`.
+  celdas: celdas.map((c) => ({
+    imagen: "",
+    url: "",
+    titulo: c.titulo,
+    texto: c.texto,
+    ...(c.icono ? { icono: c.icono } : {}),
+    ...(c.boton ? cta(c.boton.texto, c.boton.url) : {}),
+  })),
   // Centrada, que es como la dibujan las cinco referencias que la tienen (002 ·
   // 006 · 008 · 018 · 021). Se escribe explícito porque el `BASE` del rol trae
   // `align:"left"`: acá no alcanza con "no decir nada" — ver `alineacion()` en
@@ -333,10 +354,18 @@ export const portada = (
  * `boton` es el texto del botón propio de la celda (R-015, R-018, R-021). Sin
  * texto no se dibuja, y con botón la celda **deja de ser un ancla entera** — eso
  * lo resuelve el renderer, acá solo se pide.
+ *
+ * 🔑 **El `titulo` es opcional y esa es la forma de dibujar la etiqueta de
+ * R-013**, que no es un texto suelto debajo de la foto sino una **barra sólida
+ * de color pegada al borde de abajo**. `caja.fondo` no existe en `columnas`
+ * (⛔ ver `PLANTILLAS.md`), así que la barra se hace con el botón de la celda al
+ * ancho (`estilo.boton.ancho: 100`) y sin etiqueta: el renderer no dibuja label
+ * cuando no hay `titulo`, y un botón ya cuenta como contenido en el filtro de
+ * celdas vacías.
  */
 export const categorias = (
   tienda: string,
-  celdas: { clave: ClaveFoto; titulo: string; boton?: string }[],
+  celdas: { clave: ClaveFoto; titulo?: string; boton?: string }[],
   estilo?: Bloque["estilo"],
 ): Bloque => ({
   tipo: "columnas",
@@ -344,7 +373,7 @@ export const categorias = (
   celdas: celdas.map((c) => ({
     imagen: foto(c.clave),
     url: tienda,
-    titulo: c.titulo,
+    ...(c.titulo ? { titulo: c.titulo } : {}),
     // Mismo criterio que `cta`: sin tienda cargada no hay botón, y sin botón la
     // celda vuelve a ser el ancla de siempre.
     ...(c.boton ? cta(c.boton, tienda) : {}),

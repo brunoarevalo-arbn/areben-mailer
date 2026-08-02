@@ -176,3 +176,82 @@ Los dos pasan la regla de 3 y están en el *Backlog* de `PLANTILLAS.md`:
 - **Grilla de cuatro por fila**: `PorFila` es `2 | 3` y la piden R-004, R-007, R-011 y R-021.
   ⚠️ No cuesta una llamada más a Tiendanube: `claveProductos` es `fuente|categoriaId|n` y
   `porFila` no entra en la llave.
+
+---
+
+# La familia Fechas (ronda 3, 2-ago-2026)
+
+Los seis clones: `temporada` (R-004) · `spring-sale` (R-011) · `cyber-tipografico` (R-013) ·
+`cyber-marmol` (R-015) · `vuelta-al-cole` (R-014) · `invitacion` (R-017). La familia pasó de
+**1 a 7**.
+
+🔑 **La diferencia con las dos rondas anteriores es que estos se escribieron mirando la
+captura desde el principio**, no arreglándolos después: paleta medida antes de la primera
+línea y `Tema` completo declarado de entrada. El resultado se nota en cuánto hubo que
+corregir — cuatro retoques después de la primera comparación, contra once clones enteros
+reescritos en la ronda 1.
+
+## Los colores, medidos
+
+| clon | referencia | acento | fondo de página |
+|---|---|---|---|
+| `temporada` | R-004 | `#111111` (ningún saturado arriba de 0,43%) | blanco |
+| `spring-sale` | R-011 | `#111111` · hilo `#c03030` | `#e8f0f0` |
+| `cyber-tipografico` | R-013 | `#0058d0` (2,4%) | `#080028` (**74,4%**), igual que la tarjeta |
+| `cyber-marmol` | R-015 | `#485098` (1,5%) | `#101010`, igual que la tarjeta |
+| `vuelta-al-cole` | R-014 | `#111111` | `#000000` (32,3%) |
+| `invitacion` | R-017 | `#304858` (8,8%) | `#f8f8f8` |
+
+⚠️ **El plan había elegido tres hex a ojo y los tres estaban mal**: `cyber-tipografico`
+#2b4cff (el real es un fondo #080028 más un CTA #0058d0, o sea dos colores y ninguno ése),
+`cyber-marmol` #6d3bd6 (el real #485098 es mucho menos saturado) y el "coral" de R-011, que
+recortado y medido aparte dio **#c03030**, un rojo ladrillo.
+
+## Los tres hallazgos de esta ronda
+
+1. 🔑 **La barra de color pegada abajo de una foto es el BOTÓN de la celda, no una etiqueta.**
+   En R-013 cada categoría cierra con un rectángulo azul sólido de ancho completo. `caja.fondo`
+   no existe en `columnas` y parecía no expresable; sale con `estilo.boton.ancho: 100` y la
+   celda **sin `titulo`** —el renderer no dibuja label cuando no hay título, y un botón ya
+   cuenta como contenido en el filtro de celdas vacías—. Por eso `categorias()` pasó a tener el
+   `titulo` opcional. Salió idéntico a la captura.
+2. 🔑 **La foto de la portada puede salir del slot `celda`.** `temporada` es la única de la
+   galería que lo hace y es a propósito: su portada lleva **texto negro sobre foto clara** y las
+   diez fotos de slot `portada` son ambientes llenos de cosas, donde el título negro no se lee
+   por más velo que se le ponga. La de la referencia es un producto quieto sobre fondo claro.
+3. 🔑 **`fondo` y `fondoContenido` iguales otra vez, y en dos de seis.** R-013 y R-015 son una
+   sola pieza oscura de borde a borde; con dos oscuros distintos se ve el recuadro de la tarjeta
+   recortado, que solo lo tiene nuestro render. Ya había pasado con `brasas` y es la contracara
+   del truco de las bandas de `vuelta-al-cole`, donde se separan **a propósito** para dibujar el
+   encabezado y el pie negros.
+
+## Lo que cambió después de mirar el render al lado de la captura
+
+Cuatro cosas, todas de la primera comparación:
+
+- `cyber-marmol` — la tarjeta recortada (arriba) y una portada de 300px con media banda de
+  mármol vacía debajo del subtítulo. ⚠️ **El alto de un `hero` se mide contra el CONTENIDO, no
+  contra la captura**: la referencia llena ese alto con una segunda columna que no tenemos.
+- `temporada` — el título negro no se leía sobre la vidriera, y la bota de la portada se
+  repetía en la fila de categorías. Dos fotos cambiadas y el velo blanco de 30 a 50.
+- `cyber-tipografico` — el póster de la referencia son **dos renglones** y un `titulo` no los
+  tiene (el `<h2>` sale por `esc()`, sin `nl()`): el año va en su propio bloque.
+- `invitacion` — el segundo CTA de la referencia es *outline* y salía relleno.
+
+## Lo que quedó 🟡 en esta familia (no volver a intentarlo)
+
+- **El contador regresivo** (R-017): un mail no tiene JS y un GIF con la fecha adentro pide un
+  servicio que lo sirva. Va como fila de tres celdas con los números quietos.
+- **La fila de personas con foto** (R-017): 🔴 **el pack excluye las caras reconocibles a
+  propósito** —la plantilla la manda un tercero a su propia lista—, así que nombre y cargo van
+  en una fila de texto. No es una limitación del motor: es el criterio del pack.
+- **El menú adentro de una banda de color** (R-014, R-015): `caja.fondo` no existe en `menu`.
+  🔑 Con R-014 el contador llegó a **3** y pasa el umbral de la regla 5 ⇒ queda esperando que
+  Bruno decida si entra al motor.
+- **La segunda columna del hero** (R-015: el "40% OFF" al costado del título) y **la letra
+  gigante de fondo** (R-011): el `hero` es de una columna y `position` está prohibido.
+- **El pie con color propio**: el fondo de página es uno solo y arriba tiene que ser el de la
+  captura, así que en `spring-sale` e `invitacion` el cierre de color va **adentro de la
+  tarjeta**, igual que en `final-sale` y `mega-oferta`.
+- **La foto al costado de una banda de color** (R-015) y **la grilla de 4 por fila** (R-004,
+  R-011): siguen en el backlog, sin cambios.

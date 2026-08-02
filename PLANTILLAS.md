@@ -120,7 +120,7 @@ Los patrones que van apareciendo en las referencias, y qué puede hacer el motor
 | ícono en cada celda de una fila | ✅ | `icono` en `Columna` desde el 2-ago: clave de `lib/email/iconos.ts`, **nunca una URL libre**. Dos PNG por ícono (`public/iconos/<clave>-<claro\|oscuro>.png`, dibujados de lucide por `scripts/dibujar-iconos.ts`) y **el renderer elige cuál según `pal.esOscuro`**: un PNG no se tiñe | 002 · 006 · 008 · 018 · 021 |
 | botón al ancho de su celda | ✅ | `estilo.boton.ancho: 100` en el bloque `columnas`, desde el 2-ago. Tres barras parejas y no tres pastillas de distinto largo según el texto | 015 · 018 · 021 |
 | botón *outline* (borde fino, sin relleno) | ✅ | `boton.bordeAncho` + `bordeColor`, con el `fondo` del color que hay atrás: el motor **siempre** rellena, así que "sin fondo" se emula. ⚠️ Hasta el 2-ago el `<v:roundrect>` tenía `stroke="f"` cableado y **Outlook lo dibujaba sin borde** — `joyeria` ya estaba en producción con una pastilla blanca sobre blanco | 001 · 007 · 012 |
-| color de fondo en el menú o en una fila de celdas | 🔴 | `caja.fondo` lo dibujan solo `hero`, `seccion` y `cupon`, que son los tres bloques que arman su propio contenedor; el resto pasa por `pad()`, que es margen lateral y visibilidad y nada más (`propsCaja` en `estilos.ts`) | 010 · 021 |
+| color de fondo en el menú o en una fila de celdas | 🔴 **llegó a 3** | `caja.fondo` lo dibujan solo `hero`, `seccion` y `cupon`, que son los tres bloques que arman su propio contenedor; el resto pasa por `pad()`, que es margen lateral y visibilidad y nada más (`propsCaja` en `estilos.ts`). ⚠️ **R-014 lo pide para el MENÚ** (va adentro de la banda negra del encabezado) y con eso el contador llega al umbral de la regla 5 — decisión de Bruno, no se implementó en esta tanda. 🔑 Para la **fila de celdas** ya hay una salida que no lo necesita: la barra de color de R-013 es el **botón de la celda al ancho** | 010 · 014 · 021 |
 | banda de color con la foto a un costado | 🔴 | el `seccion` es de una columna y el `columnas`, que tiene dos, no toma color de fondo (fila de arriba). Se aproxima con la banda de color sola | 010 |
 | precio más grande que el nombre en la tarjeta | 🔴 | los dos salen del mismo `eTexto.tamano` en `renderCard`. **Pide un rol de estilo nuevo** (`precio`) | las 7 de catálogo |
 | grilla de 4 por fila | 🔴 | `PorFila` es `2 \| 3`. ⚠️ **No cuesta una llamada más a TN**: `claveProductos` es `fuente\|categoriaId\|n` y `porFila` no entra en la llave | 004 · 007 · 011 · 021 |
@@ -223,8 +223,11 @@ Anatomía: menu 6 · hero foto a sangre con el texto abajo a la izquierda · sec
 Tema: todo enmarcado con líneas negras finas, serifa, beige
 Copy: portugués, seco, sustentabilidad como argumento
 Patrones nuevos: grilla de 4 · cuotas · imagen a sangre
-Sale como: preset `categorias` (familia catalogo). ▶️ Su clon fiel es `temporada`, que sale en
-  la tanda de `fechas`: es un mail de cambio de estación
+Sale como: preset `categorias` (familia catalogo) y su clon fiel **`temporada`** (familia
+  fechas, no catalogo: es un mail de cambio de estación). 🟡 Seis links de menú con tres · grilla
+  de 4 con `porFila: 3`. ⚠️ Su portada es la única de la galería que usa una foto de slot
+  `celda`: las diez de slot `portada` son ambientes llenos de cosas y el título NEGRO no se leía
+  sobre ninguna
 
 ### R-005 · Baires, swimwear   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-005-baires-summer.png`
@@ -296,7 +299,9 @@ Anatomía: hero foto + velo con línea decorativa · **letra gigante de fondo** 
 Tema: blanco y negro, una línea coral como único acento
 Copy: la marca se presenta con firma de una persona
 Patrones nuevos: letra gigante de fondo 🔴 · grilla de 4
-Sale como: no sale sola — el "quiénes somos" firmado refuerza `editorial`
+Sale como: preset **`spring-sale`** (familia fechas), el clon fiel. ⚠️ Esta ficha decía "una
+  línea coral" y el hilo, recortado y medido aparte, es **#c03030** (rojo ladrillo). 🟡 La línea
+  va debajo de la portada y no adentro · el cierre negro va dentro de la tarjeta
 
 ### R-012 · "What's your style?"   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-012-whats-your-style.png`
@@ -320,7 +325,11 @@ Anatomía: encabezado · **eyebrow con espaciado** · titulo póster en dos reng
 Tema: azul noche + azul eléctrico, condensada, **sin una sola foto de stock**
 Copy: castellano rioplatense, tres días y una pregunta
 Patrones nuevos: label pegada a la foto 🟡 (es la celda de `columnas` con título)
-Sale como: preset `hot-sale` (familia venta) — **la referencia madre de la familia `fechas`**
+Sale como: preset **`cyber-tipografico`** (familia fechas), el clon fiel, y también `hot-sale`.
+  🔑 Medido, el azul noche **#080028 es el 74,4% de los píxeles**: no es el acento, es el mail
+  entero (`fondo` y `fondoContenido` iguales). El azul eléctrico #0058d0 son los dos botones y
+  las barras de categoría. 🔑 **La etiqueta de cada foto es una barra sólida y se hace con el
+  BOTÓN de la celda al ancho, sin `titulo`** — `caja.fondo` no existe en `columnas`
 
 ### R-014 · "Back to school"   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-014-back-to-school.png`
@@ -330,7 +339,10 @@ Anatomía: encabezado negro + menu con `·` · hero blanco con recorte de foto a
 Tema: blanco y negro, manuscrita para el título
 Copy: el descuento ES el diseño
 Patrones nuevos: número gigante (es un `titulo` con tamaño, no un bloque)
-Sale como: no sale sola — el remate de soporte se suma al pie de `hot-sale`
+Sale como: preset **`vuelta-al-cole`** (familia fechas), el clon fiel: blanco y negro puro
+  —medido, ningún color saturado— con el negro en el **fondo de PÁGINA**, que es lo que dibuja
+  las bandas de arriba y abajo. 🟡 El menú va sobre el blanco de la tarjeta: en la captura está
+  adentro de la banda negra y `caja.fondo` no existe en `menu`
 
 ### R-015 · Cyber Monday sobre mármol   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-015-cyber-monday-marmol.png`
@@ -340,7 +352,11 @@ Anatomía: encabezado + menu · hero foto con el título a la izquierda y el "40
 Tema: mármol negro y violeta
 Copy: el cupón se dice en el texto, no en un bloque aparte
 Patrones nuevos: badge de descuento 🔴 · botón por celda 🔴
-Sale como: preset `hot-sale` (familia venta) — de acá sale el `cupon` en el medio
+Sale como: preset **`cyber-marmol`** (familia fechas), el clon fiel. El violeta medido es
+  **#485098**, bastante menos saturado de lo que parece. 🟡 El "40% OFF" gigante va en otra
+  columna del hero y baja al subtítulo · el mármol del pack es CLARO y se oscurece con velo 70 ·
+  la banda clara va sin la foto al costado. ⛔ Los badges de App Store / Google Play no entran:
+  son logos de marca
 
 ### R-016 · "Sweet dreams", antifaces   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-016-sweet-dreams.png`
@@ -360,7 +376,10 @@ Anatomía: encabezado + menu 5 · hero foto con el texto a la derecha y boton ·
 Tema: azul pizarra y blanco, tipografía de sistema
 Copy: dos "Register now" idénticos, uno arriba y otro en el medio
 Patrones nuevos: contador regresivo 🔴 · fila de 3 celdas con personas
-Sale como: refuerza `evento`, que ya existe — le entra la fila de speakers
+Sale como: preset **`invitacion`** (familia fechas), el clon fiel. ⚠️ Se llama así porque
+  `evento` ya está tomado y un id no se cambia nunca (regla 7). 🟡 El contador regresivo va como
+  fila de 3 celdas con los números quietos · **la fila de speakers va SIN foto**: el pack excluye
+  las caras reconocibles a propósito, así que nombre y cargo van en una fila de texto
 
 ### R-018 · SIMPLE, "New arrivals"   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-018-simple-new-arrivals.png`
@@ -428,7 +447,7 @@ Ordenado por cuántas referencias lo pidieron. **Nada de acá se implementa hast
 | 4 | grilla de 4 por fila | `PorFila` es `2 \| 3`. No agrega llamadas a TN (`porFila` no está en `claveProductos`); sí toca el `GrillaControl` del panel |
 | ✅ 4 | texto de la portada fuera del centro | **hecho el 2-ago-2026**: `caja.align` salió de `SIN_EFECTO` en `hero` y `seccion` |
 | ✅ 5 | ícono en cada celda | **hecho el 2-ago-2026**: catálogo cerrado en `lib/email/iconos.ts` + dos PNG por ícono |
-| 2 | color de fondo en el menú y en la fila de celdas | `caja.fondo` lo dibujan solo `hero`, `seccion` y `cupon`. No es una prop nueva: es hacer que `menu` y `columnas` **dibujen su propio contenedor** en vez de pasar por `pad()`. ⚠️ Toca `propsCaja` y por lo tanto el panel |
+| **3** | color de fondo en el menú y en la fila de celdas | `caja.fondo` lo dibujan solo `hero`, `seccion` y `cupon`. No es una prop nueva: es hacer que `menu` y `columnas` **dibujen su propio contenedor** en vez de pasar por `pad()`. ⚠️ Toca `propsCaja` y por lo tanto el panel. **Llegó a 3 con R-014 el 2-ago-2026** (el menú adentro de la banda negra) ⇒ pasa el umbral de la regla 5 y **espera que Bruno decida si entra**. 🔑 Lo de la fila de celdas ya tiene salida sin esto: el botón al ancho |
 | 2 | badge de descuento sobre la foto | fila de tabla sobre la foto. ⚠️ nada de `position` |
 | 2 | producto único destacado | bloque propio, no `productos` con n=1 |
 | ✅ 2 | barra fina de aviso | **hecho el 2-ago-2026**: salió gratis con el margen muerto del `seccion`. Es `barra()` en `comun.ts` |
@@ -447,7 +466,7 @@ Ordenado por cuántas referencias lo pidieron. **Nada de acá se implementa hast
 | `venta` | oferta, liquidación, envío gratis, últimas unidades | `productos-dinamicos` fuente `oferta` |
 | `catalogo` | grilla, novedades, más vendidos, por categoría | `productos-dinamicos` |
 | `producto` | lanzamiento, restock, el kit | 1 foto elegida + `columnas` |
-| `fechas` | Día de la Madre, Navidad, Hot Sale, Black Friday | color + tipografía, sin foto |
+| `fechas` | Día de la Madre, Navidad, Hot Sale, Black Friday | color + tipografía; los seis clones suman fotos del pack, y `evento` es la única sin ninguna |
 | `ciclo` | bienvenida, post-compra, reactivación, carrito | color + cupón |
 | `editorial` | newsletter, detrás de escena, guía de talles | foto opcional con velo |
 

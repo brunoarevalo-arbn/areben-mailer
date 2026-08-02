@@ -58,6 +58,13 @@ const REFERENCIA: Record<string, string> = {
   "final-sale": "R-010-autopartes-final-sale.png",
   "tu-estilo": "R-012-whats-your-style.png",
   "mega-oferta": "R-021-toluca-camaras.png",
+  // fechas
+  temporada: "R-004-uyuni-invierno.png",
+  "spring-sale": "R-011-spring-sale.png",
+  "cyber-tipografico": "R-013-cyber-monday-tipografico.png",
+  "cyber-marmol": "R-015-cyber-monday-marmol.png",
+  "vuelta-al-cole": "R-014-back-to-school.png",
+  invitacion: "R-017-evento-business.png",
   // editorial
   lookbook: "R-016-sweet-dreams.png",
 };
