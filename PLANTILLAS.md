@@ -163,7 +163,9 @@ Anatomía: encabezado texto sobre foto · divisor claro · titulo póster · sub
 Tema: negro con foto de brasas a sangre en TODO el mail, tipografía de palo seco, blanco
 Copy: promesa arriba, urgencia en el subtítulo, un solo CTA antes de la grilla
 Patrones nuevos: foto de fondo del mail entero 🔴 (queda en el 🟡 del `hero` a sangre)
-Sale como: preset `hot-sale` (familia venta), sin la foto: el color hace el trabajo
+Sale como: preset **`brasas`** (familia venta), el clon fiel, y también `hot-sale` sin la foto.
+  🟡 Dos cosas no son expresables: la foto de fondo del MAIL ENTERO (el fondo de página es un
+  color del tema) y el botón *outline* (el rol `boton` no emite borde)
 
 ### R-002 · Morelia, marroquinería   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-002-morelia-cuero.png`
@@ -257,7 +259,8 @@ Anatomía: "ver online · compartir" · encabezado + menu con `|` · hero ilustr
 Tema: celeste y negro, ilustración en vez de foto
 Copy: promesa de descuento arriba, catálogo abajo
 Patrones nuevos: ver online 🔴 · fila de 3 celdas
-Sale como: preset `beneficios` (familia venta)
+Sale como: preset **`final-sale`** (familia venta), el clon fiel. 🟡 Su portada es una
+  ILUSTRACIÓN y el pack es de fotos; la foto redonda va con `estilo.imagen.radio: 32`, el tope
 
 ### R-011 · "Spring Sale"   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-011-spring-sale.png`
@@ -277,7 +280,8 @@ Anatomía: encabezado · foto con el título encima · texto + boton · columnas
 Tema: rojo ladrillo de punta a punta, blanco arriba
 Copy: pregunta como asunto, tres CTA iguales
 Patrones nuevos: `fondoImagen` en `seccion`
-Sale como: preset `hot-sale` (familia venta) — el color como estructura
+Sale como: preset **`tu-estilo`** (familia venta), el clon fiel: **el color ES la plantilla**
+  (#b23a2f), que es la excepción de la regla 4
 
 ### R-013 · Cyber Monday tipográfico   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-013-cyber-monday-tipografico.png`
@@ -373,7 +377,8 @@ Anatomía: encabezado + menu de dos renglones · hero banner con **el cupón ade
 Tema: negro, azul de CTA y verde lima en el pie
 Copy: portugués, el número manda en cada bloque
 Patrones nuevos: badge de % 🔴 · botón por celda 🔴 · grilla de 4
-Sale como: preset `beneficios` (familia venta)
+Sale como: preset **`mega-oferta`** (familia venta), el clon fiel: el cupón arriba y la fila de
+  porcentajes. 🟡 El badge de % va como fila abajo, no sobre la foto: `position` está prohibido
 
 ---
 

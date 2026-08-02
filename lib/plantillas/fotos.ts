@@ -252,6 +252,18 @@ const CATALOGO = {
     // ⚠️ La anterior tenía un libro con el título legible ("Gospels"): en una
     // plantilla que manda un tercero a su lista, un texto reconocible en la foto
     // dice algo que el comerciante no eligió decir.
+    //
+    // 🔴 **EL CAMBIO NO RESOLVIÓ NADA Y ESTA CLAVE NO LA USA NINGÚN PRESET**
+    // (2-ago-2026). Verificado bajando las 36 y comparándolas byte a byte contra
+    // su origen: el store y este catálogo coinciden, así que no es que quedó la
+    // vieja subida — **el id de reemplazo es otra foto del MISMO libro**, con el
+    // "GOSPELS" igual de legible, y encima el `alt` de acá describe una foto que
+    // no es (no hay ninguna vasija). O sea que el criterio se aplicó al catálogo
+    // y no a la imagen.
+    //
+    // Queda sin usar a propósito hasta que Bruno elija el reemplazo: las 36 las
+    // aprobó él mirándolas en la hoja de contactos, y elegir una a dedo desde
+    // acá sería saltearse ese checkpoint. `mega-oferta` usa `celda-plantas`.
     origen: "photo-1631125915902-d8abe9225ff2",
     alt: "Vasijas de cerámica sobre una repisa",
   },
