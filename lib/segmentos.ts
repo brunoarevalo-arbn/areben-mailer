@@ -1,7 +1,14 @@
 import type { Prisma } from "@prisma/client";
 
 // Reglas de un segmento (guardadas en Segmento.reglas como JSON).
-export type CondCampo = "tnTotalGastado" | "tnUltimaCompra" | "tnAcceptsMkt" | "esComprador" | "estado";
+export type CondCampo =
+  | "tnTotalGastado"
+  | "tnUltimaCompra"
+  | "tnAcceptsMkt"
+  | "esComprador"
+  | "estado"
+  | "abrio"
+  | "clickeo";
 
 export interface Condicion {
   campo: CondCampo;
@@ -45,6 +52,37 @@ function condToWhere(c: Condicion): Prisma.ContactoWhereInput | null {
         : { OR: [{ tnTotalGastado: null }, { tnTotalGastado: { lte: 0 } }] };
     case "estado":
       return { estado: c.valor as Prisma.ContactoWhereInput["estado"] };
+    // Enganche. Sale de `Envio` (`abiertoAt` / `clickAt`), que cuelga del
+    // contacto: es la única condición que no mira una columna de `Contacto`.
+    case "abrio":
+    case "clickeo": {
+      const dias = Number(c.valor);
+      if (Number.isNaN(dias)) return null;
+      const umbral = diasAtras(dias);
+      const marca = c.campo === "abrio" ? "abiertoAt" : "clickAt";
+      // "Lo hizo": algún envío de la ventana con la marca puesta.
+      if (c.op === "si") return { envios: { some: { [marca]: { gte: umbral } } } };
+      // 🔴 "No lo hizo" es **recibió y no lo hizo**, nunca "no me consta".
+      //
+      // Escrito como `{ envios: { none: { … } } }` a secas, entra todo el que
+      // NUNCA recibió un mail —los que se anotaron ayer, los que estaban en un
+      // tramo que todavía no salió— y el mail de reactivación le pega a gente
+      // que jamás supo de nosotros. Es el mismo agujero que tiene
+      // `noComproUltimos` acá arriba, donde una fecha vacía cuenta como "no
+      // compró": ahí ya está escrito así y cambiarlo movería segmentos que
+      // alguien pueda tener guardados, pero **no se repite en los nuevos**.
+      //
+      // Por eso son dos condiciones: recibió algo en la ventana Y ninguno de
+      // esos envíos tiene la marca.
+      if (c.op === "no")
+        return {
+          AND: [
+            { envios: { some: { enviadoAt: { gte: umbral } } } },
+            { envios: { none: { [marca]: { gte: umbral } } } },
+          ],
+        };
+      return null;
+    }
     default:
       return null;
   }
@@ -68,4 +106,19 @@ export const CAMPOS: { campo: CondCampo; label: string; ops: { op: string; label
   { campo: "esComprador", label: "Es comprador", tipo: "bool", ops: [{ op: "eq", label: "es" }] },
   { campo: "tnAcceptsMkt", label: "Acepta marketing", tipo: "bool", ops: [{ op: "eq", label: "es" }] },
   { campo: "estado", label: "Estado", tipo: "estado", ops: [{ op: "eq", label: "es" }] },
+  // ⚠️ El click va ANTES que la apertura en la lista a propósito: es la señal
+  // que no se falsifica. El pixel de apertura lo dispara el escaneo de
+  // seguridad de Outlook sin que nadie mire el mail —es lo que infló las 880
+  // aperturas de la campaña de Perfit—, así que un segmento de "abrió" sobre
+  // una lista con mucho Microsoft premia a gente que nunca lo vio. Para
+  // *premiar* al enganchado se usa el click; la apertura sirve para lo
+  // contrario: descartar al que ni la abre.
+  { campo: "clickeo", label: "Hizo click en un mail", tipo: "dias", ops: [
+    { op: "si", label: "sí, en los últimos (días)" },
+    { op: "no", label: "no, habiendo recibido en (días)" },
+  ] },
+  { campo: "abrio", label: "Abrió un mail", tipo: "dias", ops: [
+    { op: "si", label: "sí, en los últimos (días)" },
+    { op: "no", label: "no, habiendo recibido en (días)" },
+  ] },
 ];

@@ -76,6 +76,7 @@ node --import tsx scripts/probar-remitente.ts  # una marca sin remitente propio 
 node --import tsx scripts/probar-tracking.ts   # los links del mail cuelgan del dominio de la marca, y un valor basura cae al fallback
 node --import tsx scripts/probar-redes.ts      # cada red de la lista tiene su PNG; lo que no tiene icono sale en texto, nunca roto
 node --import tsx scripts/probar-negritas.ts   # `**negrita**` se resuelve DESPUÉS de escapar, y solo en los cuatro campos que se escriben
+node --env-file=.env --import tsx scripts/probar-segmentos.ts # el "no abrió/no clickeó" es RECIBIÓ y no lo hizo, nunca "no me consta"
 node --import tsx scripts/probar-automations.ts # una automation por trigger: dos son dos mails a la misma persona
 ```
 
@@ -507,6 +508,31 @@ una sola vez); está en `lib/` porque es la misma que necesita `importarCSV` de
   `lib/segmentos.ts`): lo que tiene que poder mandarse va a una **lista**, no a
   `custom`. Por eso el script crea `Perfit — abrieron 2026` con los 800 que
   tenían actividad registrada, en vez de guardar la fecha y esperar segmentarla.
+
+## Segmentos por enganche (2-ago-2026)
+
+`abrio` y `clickeo` son las dos únicas condiciones que **no miran una columna de
+`Contacto`**: salen de `Envio` (`abiertoAt` / `clickAt`) por filtro de relación.
+Existen para armar un funnel, que necesita un público que se recalcule solo — una
+lista fabricada es una foto que envejece el mismo día.
+
+- 🔴 **"No abrió / no clickeó" significa RECIBIÓ y no lo hizo.** Son dos
+  condiciones: `some enviadoAt` en la ventana **y** `none` de la marca. Con un
+  `none` pelado entra todo el que **nunca recibió un mail** y el tramo de
+  reactivación le pega a gente que jamás supo de la marca. Medido en el momento
+  de escribirlo: el `none` solo llevaba el segmento de **517 a 6.865** contactos.
+  Lo fija `probar-segmentos.ts`, verificado en rojo.
+- ⚠️ Es el mismo agujero que ya tiene **`noComproUltimos`**, donde una
+  `tnUltimaCompra` vacía cuenta como "no compró". Ahí quedó como está —cambiarlo
+  movería segmentos que alguien pueda tener guardados— pero **no se repite en los
+  nuevos**.
+- ⚠️ **La apertura miente y el click no.** El pixel lo dispara el escaneo de
+  seguridad de Outlook sin que nadie mire (las 880 aperturas de Perfit). Para
+  *premiar* al enganchado va el **click**; la apertura sirve para lo contrario,
+  descartar al que ni abre. Por eso `clickeo` va primero en `CAMPOS`.
+- La UI sale gratis: `SegmentoBuilder.tsx` se dibuja recorriendo `CAMPOS`, y
+  `tipo: "dias"` ya existía. Un campo nuevo con un `tipo` ya soportado no toca
+  una línea de componente.
 
 ## El panel se usa con el dedo
 
