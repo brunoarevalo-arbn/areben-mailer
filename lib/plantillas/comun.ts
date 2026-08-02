@@ -12,6 +12,7 @@ import type { Bloque } from "@/lib/email/render";
 import type { Estilos } from "@/lib/email/estilos";
 import type { Tema } from "@/lib/email/tema";
 import type { Trigger } from "@/lib/automations";
+import { foto, type ClaveFoto } from "./fotos";
 
 /** Lo que un preset sabe de la cuenta que lo instancia. */
 export interface CtxPreset {
@@ -176,3 +177,139 @@ export const fila = (celdas: { titulo: string; texto: string }[]): Bloque => ({
  */
 export const banda = (titulo: string, texto: string): Bloque =>
   ({ tipo: "seccion", bg: "", titulo, texto, ...sinBoton });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Las piezas con foto del pack de stock
+//
+// Existen para que un preset con portada, fila de categorías y banda sean veinte
+// líneas y no sesenta — y sobre todo para que **el truco del velo esté escrito
+// una sola vez**. Ver `fotos.ts` para dónde viven las fotos y por qué.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * El color del velo de toda banda con foto: **oscuro fijo, en los dos temas**.
+ *
+ * 🔴 Es la única excepción a la regla 4 que no depende de la plantilla, y la
+ * razón es que **el velo no es un tinte de marca: es la condición para que el
+ * texto se lea sobre una foto**. Con un token pasa lo siguiente:
+ *
+ * - `$texto` se porta perfecto en una marca clara (casi negro ⇒ oscurece) y **al
+ *   revés en una oscura**: casi blanco ⇒ aclara la foto y deja una banda lavada
+ *   adentro de un mail negro. Es el mismo rectángulo blanco gigante que hizo
+ *   rechazar la portada de la bienvenida de BDI, verificado el 2-ago-2026
+ *   mirando `audio` (tema oscuro) renderizada.
+ * - `$fondo` y `$tarjeta` hacen exactamente lo mismo, invertido.
+ * - `$acento` pinta el velo del color de la marca: en `audio` sería un velo
+ *   amarillo sobre la foto.
+ *
+ * Ningún token del tema es oscuro en los dos temas, así que el velo se clava. El
+ * contraste del título lo calcula `bandaConFoto` contra este mismo color ⇒ sale
+ * claro siempre, que es lo que hacen 13 de las 21 referencias.
+ */
+const VELO = "#111111";
+
+/**
+ * La portada con foto de fondo y el texto encima.
+ *
+ * 🔑 **`bg: ""` + `estilo.caja.fondo` es el punto**: `colorCss()` solo acepta hex
+ * (`render.ts:65`), así que `hero.bg` **no** toma `$acento` ni ningún token —
+ * escribir un token ahí es un color inválido que cae al fallback. La caja sí los
+ * toma (`bg = c.autoFondo ? b.bg || pal.tarjeta : c.fondo!`), y ese mismo color
+ * es el que `bandaConFoto` usa para tres cosas a la vez: el velo, el respaldo
+ * cuando la foto no carga, y el contraste del título.
+ *
+ * El velo va en 55: sin él, un título claro sobre una foto clara desaparece, que
+ * es lo que hizo descartar esta portada en Zattia (ver `bloques.ts`, campo
+ * `velo`, sobre por qué el DEFAULT del campo tiene que seguir siendo 0).
+ */
+export const portada = (
+  clave: ClaveFoto,
+  o: { titulo: string; subtitulo: string; boton?: { texto: string; url: string }; alto?: number; velo?: number },
+): Bloque => ({
+  tipo: "hero",
+  imagen: "",
+  fondoImagen: foto(clave),
+  titulo: o.titulo,
+  subtitulo: o.subtitulo,
+  alto: o.alto ?? 300,
+  velo: o.velo ?? 55,
+  bg: "",
+  estilo: { caja: { fondo: VELO } },
+  ...(o.boton ? cta(o.boton.texto, o.boton.url) : sinBoton),
+});
+
+/**
+ * La fila de categorías: foto arriba, cómo se llama debajo.
+ *
+ * La pide **10 de las 21 referencias** de la primera tanda y es la pieza que más
+ * "llena" una plantilla sin que el comerciante suba nada.
+ *
+ * ⚠️ Los links van todos a la **home**, igual que `menuTienda` y por la misma
+ * razón: las categorías son de cada tienda y un `/ofertas` adivinado es un 404 en
+ * un mail ya enviado. Quien arma el mail les cambia el destino en el editor.
+ *
+ * 🔑 El tope es 4 (`CantidadCeldas`): a 600px, cinco celdas dan 104px por columna
+ * y no se leen. R-002 usa cinco y se aproxima con cuatro.
+ *
+ * `boton` es el texto del botón propio de la celda (R-015, R-018, R-021). Sin
+ * texto no se dibuja, y con botón la celda **deja de ser un ancla entera** — eso
+ * lo resuelve el renderer, acá solo se pide.
+ */
+export const categorias = (
+  tienda: string,
+  celdas: { clave: ClaveFoto; titulo: string; boton?: string }[],
+): Bloque => ({
+  tipo: "columnas",
+  celdas: celdas.map((c) => ({
+    imagen: foto(c.clave),
+    url: tienda,
+    titulo: c.titulo,
+    // Mismo criterio que `cta`: sin tienda cargada no hay botón, y sin botón la
+    // celda vuelve a ser el ancla de siempre.
+    ...(c.boton ? cta(c.boton, tienda) : {}),
+  })),
+});
+
+/**
+ * La banda con foto de fondo en el MEDIO del mail (no la portada): la que usa la
+ * marca para contar quién es. Aparece en 4 de las 21 referencias.
+ *
+ * Comparte con `portada()` el truco del velo —es el mismo `bandaConFoto` del
+ * renderer— y por eso comparte el comentario: ver arriba.
+ */
+export const bandaFoto = (
+  clave: ClaveFoto,
+  titulo: string,
+  texto: string,
+  boton?: { texto: string; url: string },
+): Bloque => ({
+  tipo: "seccion",
+  bg: "",
+  fondoImagen: foto(clave),
+  titulo,
+  texto,
+  alto: 220,
+  velo: 55,
+  estilo: { caja: { fondo: VELO } },
+  ...(boton ? cta(boton.texto, boton.url) : sinBoton),
+});
+
+/**
+ * La barra fina de aviso de arriba de todo ("Envío gratis a partir de…").
+ *
+ * Es un `seccion` **sin título**, que es lo que la deja en una línea. Se pudo
+ * recién el 2-ago-2026: hasta entonces el `<p>` tenía `margin:0 0 16px` cableado
+ * y la barra salía 16px más alta de lo que pedía su padding, sin forma de
+ * achicarla desde el panel.
+ *
+ * El color sale de `pal.seccion` (regla 4): en una marca clara es el beige del
+ * tema y en una oscura el gris oscuro. Un `#f5f5f5` clavado sería una mancha.
+ */
+export const barra = (texto: string): Bloque => ({
+  tipo: "seccion",
+  bg: "",
+  titulo: "",
+  texto,
+  ...sinBoton,
+  estilo: { caja: { padY: 10 }, subtitulo: { tamano: 14 } },
+});

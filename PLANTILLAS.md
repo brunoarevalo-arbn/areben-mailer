@@ -100,10 +100,10 @@ Los patrones que van apareciendo en las referencias, y qué puede hacer el motor
 | eyebrow / volanta arriba del título | 🟡 | se aproxima con un `titulo` chico encima, con tamaño y espaciado del panel | 002 · 008 · 013 · 017 |
 | cuotas ("12 sin interés") | 🔴 | **no es diseño: es dato**. TN no lo devuelve en el producto, se calcularía a mano | 004 · 005 · 008 · 018 · 019 · 021 |
 | "ver online / compartir" arriba de todo | 🔴 | pide hostear una copia del mail. Es plataforma, no un bloque | 010 · 011 · 012 · 013 · 014 · 015 |
-| botón propio en cada celda de una fila | 🔴 | las celdas de `columnas` linkean enteras; no dibujan botón | 018 · 021 |
+| botón propio en cada celda de una fila | ✅ | `botonTexto`/`botonUrl` en `Columna` desde el 2-ago. ⚠️ El contador decía **2** y estaban mal contadas: son **3**, y por eso entró por la regla normal | 015 · 018 · 021 |
 | badge de descuento sobre la foto | 🔴 | ⚠️ `position` está prohibido en un mail: va como fila de tabla, no overlay | 015 · 021 |
 | producto único destacado grande | 🔴 | `productos` con 1 item dibuja media grilla | 002 · 009 |
-| barra fina de aviso ("Envío gratis a partir de…") | 🔴 | un `seccion` de una línea se aproxima, pero trae título y padding de sección | 007 · 008 |
+| barra fina de aviso ("Envío gratis a partir de…") | ✅ | `barra()` de `comun.ts`: un `seccion` sin título con `caja.padY`. Se pudo cuando el `<p>` dejó de arrastrar 16px de margen cableado | 007 · 008 |
 | menú lateral adentro de la portada | 🔴 | el `hero` es una columna: el menú al costado es otra tabla | 006 · 019 |
 | reseña / testimonio con estrellas | 🔴 | no hay bloque | — |
 | contador regresivo | 🔴 | un mail no tiene JS: sería un GIF servido, con fecha adentro | 017 |
@@ -174,7 +174,8 @@ Anatomía: encabezado · menu 5 · hero foto + velo + link · titulo "Los más e
 Tema: marrones y crema, serifa en los títulos, mucho aire
 Copy: la marca habla de sí misma en el medio; el producto va arriba
 Patrones nuevos: fila de 5 celdas · `fondoImagen` en `seccion`
-Sale como: preset `tienda` (familia catalogo) — es la anatomía más completa de la tanda
+Sale como: preset **`marroquineria`** (familia catalogo), el clon fiel — y es la que le dio la
+  anatomía a `tienda`. 🟡 La fila de 5 categorías va con 4: es el tope del bloque
 
 ### R-003 · Morelia Bodas   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-003-morelia-bodas.png`
@@ -194,7 +195,8 @@ Anatomía: menu 6 · hero foto a sangre con el texto abajo a la izquierda · sec
 Tema: todo enmarcado con líneas negras finas, serifa, beige
 Copy: portugués, seco, sustentabilidad como argumento
 Patrones nuevos: grilla de 4 · cuotas · imagen a sangre
-Sale como: preset `categorias` (familia catalogo)
+Sale como: preset `categorias` (familia catalogo). ▶️ Su clon fiel es `temporada`, que sale en
+  la tanda de `fechas`: es un mail de cambio de estación
 
 ### R-005 · Baires, swimwear   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-005-baires-summer.png`
@@ -214,7 +216,8 @@ Anatomía: **menú lateral adentro de la portada** + foto a la derecha · 3 cate
 Tema: negro, blanco y un azul de CTA
 Copy: funcional, cada bloque dice qué es
 Patrones nuevos: menú lateral en el hero 🔴
-Sale como: preset `tienda` (familia catalogo) — el video sale de acá
+Sale como: preset **`electro`** (familia catalogo), el clon fiel: es la única de las 21 con video.
+  🟡 El menú lateral de la portada no es expresable (el `hero` es una columna sola) y va arriba
 
 ### R-007 · Lima, joyería   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-007-lima-joyas.png`
@@ -224,7 +227,7 @@ Anatomía: menu · **barra fina "Envío gratis a partir de $20.000"** · hero fo
 Tema: azul noche y celeste, sobrio
 Copy: nombres propios de colección, poco texto
 Patrones nuevos: barra fina de aviso 🔴 · `fondoImagen` en `seccion`
-Sale como: preset `categorias` (familia catalogo)
+Sale como: preset **`joyeria`** (familia catalogo), el clon fiel: de acá salió la `barra()` fina
 
 ### R-008 · idea, "New in"   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-008-idea-new-in.png`
@@ -234,7 +237,7 @@ Anatomía: barra fina de envío · hero foto con logo + boton pastilla · banner
 Tema: verde agua y magenta sobre blanco
 Copy: volanta ("NEW COLLECTION") arriba de cada título
 Patrones nuevos: eyebrow 🟡 · imagen a sangre
-Sale como: preset `tienda` (familia catalogo)
+Sale como: preset **`new-in`** (familia catalogo), el clon fiel, con la volanta y la barra de envío
 
 ### R-009 · Vinos, "Say cheers together"   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-009a-vinos-say-cheers.png` + `R-009b-…` (el mismo mail, scrolleado)
@@ -335,7 +338,8 @@ Anatomía: encabezado en caja + menu con `·` · hero foto con el título encima
 Tema: gris claro y dorado, todo en mayúsculas
 Copy: la marca se explica en el medio, entre las dos grillas
 Patrones nuevos: botón por celda 🔴
-Sale como: preset `tienda` (familia catalogo) — es el esqueleto de referencia
+Sale como: preset **`new-arrivals`** (familia catalogo), el clon fiel: es la referencia que trajo
+  el **botón por celda** al motor
 
 ### R-019 · CUBO co., audio   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-019-cubo-audio.png`
@@ -346,7 +350,8 @@ Anatomía: encabezado negro · **menú lateral amarillo adentro de la portada** 
 Tema: negro y amarillo, sin serifa
 Copy: la categoría se explica en una línea abajo del nombre
 Patrones nuevos: menú lateral en el hero 🔴 · `fondoImagen` en `seccion`
-Sale como: preset `tienda` (familia catalogo)
+Sale como: preset **`audio`** (familia catalogo), el clon fiel. 🔑 Es la única de la familia que
+  clava un color (#ffd400 sobre tema oscuro): acá el color ES la plantilla
 
 ### R-020 · SIMPLE (portugués)   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-020-simple-pt.png`
@@ -356,7 +361,8 @@ Anatomía: encabezado dorado + menu negro · **hero foto a sangre sin texto** ·
 Tema: negro y dorado, serifa espaciada en el logo
 Copy: portugués, nombres de producto y nada más
 Patrones nuevos: portada que es solo una foto a sangre
-Sale como: preset `tienda` (familia catalogo)
+Sale como: preset **`minimal`** (familia catalogo), el clon fiel: la portada que es solo una foto
+  a sangre, sin texto encima
 
 ### R-021 · TOLUCA, cámaras   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-021-toluca-camaras.png`
@@ -383,10 +389,10 @@ Ordenado por cuántas referencias lo pidieron. **Nada de acá se implementa hast
 | ✅ 4 | `fondoImagen` en `seccion` | **hecho el 1-ago-2026**: mismo camino VML del `hero` |
 | 6 | cuotas del producto | ⚠️ **no es un bloque**: TN no devuelve el plan de cuotas en `/products`. Sale de la config de pagos de la tienda, o se escribe a mano en el mail |
 | 6 | "ver online / compartir" | pide guardar el HTML y servirlo por una URL pública. Es una feature de plataforma, con su propia decisión de privacidad: el mail de otra persona no puede quedar indexado |
-| 2 | botón propio en cada celda | hoy la celda entera linkea. Un botón por celda es `botonTexto`/`botonUrl` en `Columna`, con la regla de siempre: sin texto no se dibuja |
+| ✅ 3 | botón propio en cada celda | **hecho el 2-ago-2026**: `botonTexto`/`botonUrl` en `Columna`, sin bump de esquema. 🔴 Con botón la celda deja de ser un ancla entera |
 | 2 | badge de descuento sobre la foto | fila de tabla sobre la foto. ⚠️ nada de `position` |
 | 2 | producto único destacado | bloque propio, no `productos` con n=1 |
-| 2 | barra fina de aviso | `seccion` sin título ni padding: una línea, un color, un link |
+| ✅ 2 | barra fina de aviso | **hecho el 2-ago-2026**: salió gratis con el margen muerto del `seccion`. Es `barra()` en `comun.ts` |
 | 2 | menú lateral en la portada | el `hero` es de una columna; esto es una tabla de dos con el menú a un costado |
 | 1 | contador regresivo | sin JS: sería un GIF servido con la fecha adentro. Caro y con un servicio atrás |
 | 1 | letra gigante de fondo | superposición ⇒ `position` ⇒ prohibido. Se aproxima con una imagen |

@@ -9,7 +9,7 @@ import {
   resolverEstilo, extra, px, padCss,
   type CtxEstilo, type EstiloResuelto, type Estilos, type RolEstilo,
 } from "./estilos";
-import { cabeza, apertura, cierre, botonVml, clase, clasesDe, CLASES } from "./shell";
+import { cabeza, apertura, cierre, botonVml, botonVmlCrudo, clase, clasesDe, CLASES } from "./shell";
 import { claveProductos } from "./bloques";
 import { redConIcono, urlIcono } from "./redes";
 import type { Bloque, Columna, ContenidoCampania, PorFila, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
@@ -133,10 +133,32 @@ const pad = (inner: string, e?: EstiloResuelto) =>
  * ancho del mail: hoy, el botón de una celda de `columnas`.
  */
 function botonAnchor(texto: string, url: string, e: EstiloResuelto, pal: Paleta, full = false, anchoCaja?: number): string {
+  const a = anclaBoton(texto, url, e, full);
+  return `${botonVml(esc(texto), esc(url || "#"), e, pal, full, anchoCaja)}<!--[if !mso]><!-->${a}<!--<![endif]-->`;
+}
+
+/** El `<a>` pelado del botón, sin el condicional que lo esconde de Outlook. */
+function anclaBoton(texto: string, url: string, e: EstiloResuelto, full: boolean): string {
   const w = full ? ";width:100%;box-sizing:border-box;text-align:center" : "";
   const resto = extra(e, ["padX", "padY", "tamano", "peso", "color", "fondo", "radio", "align"]);
-  const a = `<a href="${esc(url || "#")}" style="display:inline-block;${padCss(e.padY, e.padX)};font-size:${px(e.tamano ?? 16)};font-weight:${e.peso ?? 600};color:${e.color};background:${e.fondo};border-radius:${px(e.radio ?? 8)};text-decoration:none${resto}${w}">${esc(texto)}</a>`;
-  return `${botonVml(esc(texto), esc(url || "#"), e, pal, full, anchoCaja)}<!--[if !mso]><!-->${a}<!--<![endif]-->`;
+  return `<a href="${esc(url || "#")}" style="display:inline-block;${padCss(e.padY, e.padX)};font-size:${px(e.tamano ?? 16)};font-weight:${e.peso ?? 600};color:${e.color};background:${e.fondo};border-radius:${px(e.radio ?? 8)};text-decoration:none${resto}${w}">${esc(texto)}</a>`;
+}
+
+/**
+ * Las dos mitades del botón, cada una **sin** su comentario condicional.
+ *
+ * 🔴 Es lo único que se le puede meter adentro de otro comentario condicional
+ * —la rama de Outlook de `bandaConFoto`—: un botón entero ahí adentro le cierra
+ * el comentario al de afuera en su primer `-->` y el resto sale a la vista. Ver
+ * el comentario de `botonVmlCrudo` en `shell.ts`.
+ */
+function botonPartes(
+  texto: string, url: string, e: EstiloResuelto, pal: Paleta, full = false, anchoCaja?: number,
+): { vml: string; ancla: string } {
+  return {
+    vml: botonVmlCrudo(esc(texto), esc(url || "#"), e, pal, full, anchoCaja),
+    ancla: anclaBoton(texto, url, e, full),
+  };
 }
 
 /**
@@ -163,7 +185,16 @@ function bandaConFoto(o: {
   pal: Paleta;
   /** Padding y alineación ya resueltos por la caja del bloque. */
   estiloCaja: string;
+  /**
+   * Título y texto: lo que va igual en las dos ramas.
+   *
+   * ⚠️ **Acá no puede venir un botón**, ni nada que traiga un comentario
+   * condicional adentro: esta cadena se inserta dentro del `<!--[if mso]>` de
+   * abajo, y el primer `-->` que aparezca lo cierra. El botón va por `boton`.
+   */
   interior: string;
+  /** El botón, ya partido en sus dos mitades desnudas. Ver `botonPartes`. */
+  boton?: { vml: string; ancla: string };
 }): string {
   const alto = Math.min(600, Math.max(120, Math.round(o.alto)));
   // El velo: una capa del color `bg` encima de la foto, para que el texto se
@@ -183,19 +214,21 @@ function bandaConFoto(o: {
   // `background-color` de respaldo: si la imagen no carga —Outlook con las
   // imágenes bloqueadas, un 404— el texto queda sobre el color y no sobre el
   // blanco de la tarjeta, que es donde se volvía invisible.
+  // Cada rama con su mitad del botón: el VML pelado adentro del condicional de
+  // Outlook, el ancla pelada adentro del de todos los demás. Ver `botonPartes`.
   return `<!--[if mso]>
 <v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:${o.pal.ancho}px;height:${alto}px">
 <v:fill type="frame" src="${esc(o.foto)}" color="${fondo}"${velo > 0 ? ` opacity="${(1 - velo / 100).toFixed(2)}"` : ""} />
 <v:textbox inset="0,0,0,0">
 <div style="${o.estiloCaja}">
-${o.interior}
+${o.interior}${o.boton?.vml ?? ""}
 </div>
 </v:textbox>
 </v:rect>
 <![endif]-->
 <!--[if !mso]><!-->
 <div style="background-color:${fondo};background-image:${capaVelo}url(${esc(o.foto)});background-size:cover;background-position:center;min-height:${px(alto)};${o.estiloCaja}">
-${o.interior}
+${o.interior}${o.boton?.ancla ?? ""}
 </div>
 <!--<![endif]-->`;
 }
@@ -661,7 +694,9 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
           bg,
           pal,
           estiloCaja: `${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}`,
-          interior,
+          // Sin el botón: adentro del condicional de Outlook va partido en dos.
+          interior: `${t}${s}`,
+          boton: b.botonTexto ? botonPartes(b.botonTexto, b.botonUrl, e("boton"), pal) : undefined,
         });
       }
 
@@ -690,7 +725,11 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // La misma banda del `hero`, en el medio del mail. Con la foto, el color
       // pasa a ser el respaldo y el velo; sin ella, es la sección de siempre.
       if (b.fondoImagen) {
-        return bandaConFoto({ foto: b.fondoImagen, alto: b.alto ?? 220, velo: b.velo, bg, pal, estiloCaja, interior: `${t}${tx}${btn}` });
+        return bandaConFoto({
+          foto: b.fondoImagen, alto: b.alto ?? 220, velo: b.velo, bg, pal, estiloCaja,
+          interior: `${t}${tx}`,
+          boton: b.botonTexto ? botonPartes(b.botonTexto, b.botonUrl, e("boton"), pal) : undefined,
+        });
       }
       return `<div style="background:${colorCss(bg, pal.tarjeta)};${estiloCaja}">${t}${tx}${btn}</div>`;
     }

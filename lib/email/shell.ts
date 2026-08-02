@@ -138,6 +138,31 @@ export function botonVml(
   texto: string, url: string, e: EstiloResuelto, pal: Paleta, full: boolean,
   anchoCaja?: number,
 ): string {
+  return `<!--[if mso]>
+${botonVmlCrudo(texto, url, e, pal, full, anchoCaja)}
+<![endif]-->`;
+}
+
+/**
+ * El `<v:roundrect>` **pelado**, sin el comentario condicional que lo envuelve.
+ *
+ * 🔴 Existe porque **los comentarios condicionales no se pueden anidar**: un
+ * comentario HTML termina en el primer `-->`, así que un botón entero
+ * (`<!--[if mso]>…<![endif]-->` + el ancla) metido adentro de otro
+ * `<!--[if mso]>` le cierra el comentario al de afuera. Lo que venía después
+ * —el ancla del botón y el cierre del `<v:rect>`— quedaba como HTML visible en
+ * Gmail, Apple Mail y el preview: un botón suelto y desalineado arriba de la
+ * portada. Es lo que pasaba con toda banda con foto de fondo **y** botón desde
+ * que `fondoImagen` entró (1-ago-2026); no lo vio nadie porque ningún preset
+ * combinaba las dos cosas hasta la tanda de clones del 2-ago.
+ *
+ * Por eso `bandaConFoto` arma **cada rama con su mitad**, y esta función es la
+ * que le da la de Outlook. Ver `botonPartes` en `render.ts` para la otra.
+ */
+export function botonVmlCrudo(
+  texto: string, url: string, e: EstiloResuelto, pal: Paleta, full: boolean,
+  anchoCaja?: number,
+): string {
   // El ancho útil: el del mail menos los dos márgenes laterales, o el de la
   // caja que lo contiene cuando el botón no ocupa todo el ancho (el de una
   // celda de `columnas`). ⚠️ Este número es un tope de verdad, no una
@@ -156,10 +181,8 @@ export function botonVml(
   // más, Outlook dibuja una cápsula deforme.
   const arc = Math.min(50, Math.round(((e.radio ?? 8) / (alto / 2)) * 100));
   const escUrl = url || "#";
-  return `<!--[if mso]>
-<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${escUrl}" style="height:${alto}px;v-text-anchor:middle;width:${ancho}px" arcsize="${arc}%" stroke="f" fillcolor="${e.fondo}">
+  return `<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${escUrl}" style="height:${alto}px;v-text-anchor:middle;width:${ancho}px" arcsize="${arc}%" stroke="f" fillcolor="${e.fondo}">
 <w:anchorlock/>
 <center style="color:${e.color};font-family:${e.fuente ?? pal.fuente};font-size:${tam}px;font-weight:${e.peso ?? 600}">${texto}</center>
-</v:roundrect>
-<![endif]-->`;
+</v:roundrect>`;
 }
