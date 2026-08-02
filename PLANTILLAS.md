@@ -89,6 +89,63 @@ siguiente arranque con **una sola lectura** es el punto de todo esto.
 
 ---
 
+## Fotos de stock
+
+El pack que hace que la regla 3 se cumpla de verdad. **36 fotos** propias del proyecto
+—10 `portada`, 6 `banda`, 12 `celda`, 8 `producto`— que cualquier plantilla puede usar sin
+que el comerciante suba nada. Salió el 1-ago-2026, cuando el encuadre pasó a ser "la galería
+es un producto": con `productos-dinamicos` + color la plantilla no se ve rota, pero tampoco
+da ganas de elegirla.
+
+**`lib/plantillas/fotos.ts` es la ÚNICA fuente de verdad** —lo leen los presets (`foto(clave)`),
+el script que sube y la auditoría— y ⛔ **ningún preset escribe una URL a mano**:
+`probar-fotos.ts` pone en rojo cualquier URL que no arranque con `BASE_FOTOS`.
+
+- **Viven en Vercel Blob bajo `stock/v1/`**, fuera de `mail/<cuentaId>/` y 🔴 **sin fila en
+  `ImagenMail`**. Con fila, el pack se duplicaría por comerciante, aparecería en su
+  biblioteca —y **un DELETE rompería las plantillas de todos**— y le inflaría el contador de
+  bytes, que existe para medir lo que consume él. Sin fila, borrarlo desde la app es
+  directamente inalcanzable: `/api/imagenes/[id]` borra por id de fila.
+- 🔑 **`v1` no es versionado semántico: es la promesa de que un archivo publicado nunca se
+  pisa.** Esas URLs quedan adentro de mails que ya están en la casilla de otra persona.
+  Cambiar una foto es una **clave nueva**, jamás un `allowOverwrite`.
+- 🔑 Con `addRandomSuffix: false` el pathname es determinístico ⇒ **re-correr el script
+  recupera una foto borrada con la MISMA URL**, y cura hasta los mails ya enviados. Por eso
+  el script nunca borra.
+- ⚠️ **El token de Blob está en `.env.local`, NO en `.env`** (que es el que usan los demás
+  scripts):
+  `node --env-file=.env.local --import tsx scripts/subir-fotos-stock.ts`
+- **Los topes de peso están medidos, y el script falla ruidoso** si una se pasa — no
+  recomprime en silencio. Las bandas van a `q=35` porque **siempre llevan velo**: medido con
+  `banda-envios`, a q=50 pesa 111 KB y a q=35, 77 KB, y debajo del velo son indistinguibles.
+  El peso no cuesta store: cuesta **una descarga por destinatario**, y quien la manda heredó
+  esa foto de la plantilla.
+- 🔴 **El criterio de selección es más estricto que la licencia**: sin caras reconocibles y
+  sin logos de marca, porque **la plantilla la manda un tercero a su propia lista** y no
+  controlamos con qué queda al lado. Quedaron afuera fotos buenas de Nike, Chanel, Prada,
+  Gucci y The Ordinary. Y 🔑 **tres se cambiaron después de verlas GRANDES**: en miniatura
+  parecían bien (una cara que parecía de espaldas, un recorte que quedaba vacío, un libro con
+  el título legible).
+- Respaldo local en `docs/fotos-stock/` (1,6 MB), que no viaja al deploy (`.vercelignore`).
+  ⛔ Descartado guardarlas en `public/`: una foto queda congelada en el Json al instanciar el
+  preset, y atarla a un dominio que varía por marca es garantizar mails rotos a futuro.
+
+### ▶️ Lo que quedó abierto al cerrar la galería (2-ago-2026)
+
+- **28 de las 36 las usa algún preset; 8 no las usa nadie**: `portada-escolar-1`,
+  `portada-belleza-1`, `banda-envios`, `banda-gimnasio`, `celda-hogar`, `producto-calzado`,
+  `producto-auricular`, `producto-reloj`. No es un error —el pack se armó antes que las
+  plantillas y sobra inventario a propósito—, pero el plan prometía que la auditoría lo
+  dijera y no lo decía. Desde el 2-ago `probar-fotos.ts` las **lista como aviso**, no como
+  falla: con 8 sueltas, un rojo obligaría a usarlas o borrarlas para poder commitear.
+- 🔴 **`celda-hogar` está QUEMADA**: la foto es **otra del mismo libro** con el "GOSPELS"
+  legible, y su `alt` describe una foto que no es. No es desincronización —las 36 coinciden
+  byte a byte con su origen—: el criterio se aplicó al catálogo y no a la imagen. Por eso
+  `mega-oferta` la cambió. **Espera que Bruno elija el reemplazo**, que va como **clave
+  nueva**.
+
+---
+
 ## Vocabulario de diseño
 
 Los patrones que van apareciendo en las referencias, y qué puede hacer el motor con cada uno.
@@ -150,313 +207,14 @@ Patrones nuevos: imagen a sangre 🔴 · badge "NEW" 🔴
 Sale como: preset `<id>` (familia <familia>)
 ```
 
-### Tanda 2026-08-01 — 21 mails
+Las fichas de la tanda **2026-08-01 (21 mails)** viven en
+**`docs/referencias/tanda-2026-08-01.md`** — salieron de acá el 2-ago-2026, cuando este
+archivo pasó su propio umbral de 40 KB. Son 20 KB de detalle referencia por referencia: se
+abren **cuando se clona una de esas 21**, y no hacen falta para sumar una plantilla nueva.
+Cada tanda que venga estrena su propio `docs/referencias/tanda-AAAA-MM-DD.md`.
 
-Salieron todas de galerías de plantillas (Tiendanube, Perfit, Unlayer): no son mails que una
-marca mandó, son **el catálogo contra el que nos comparan**. Por eso pesa tanto lo que se
-repite y casi nada lo que hace una sola.
-
-Lo que enseñó la tanda entera, antes de las fichas de a una:
-
-- 🔑 **Tres bloques que el motor ya tenía no los usaba ningún preset** — `menu` (15
-  referencias lo llevan), `columnas` (6) y `video` (1). El "se ven pobres" no era solo la
-  grilla vacía: era la galería usando 15 de los 18 bloques.
-- 🔑 **Y un cuarto que estaba en 12 presets sin dibujar nunca nada: `redes`.** El helper de
-  `comun.ts` lo pone con los links vacíos —Tiendanube no devuelve las redes de una tienda—
-  y el renderer, con razón, no dibuja un link vacío. O sea que 20 de las 21 referencias
-  cierran con una fila de iconos y **la galería entera terminaba en un bloque invisible**.
-  Se resolvió por donde correspondía: las redes son de la MARCA (`/remitentes`), y el bloque
-  sin links propios las resuelve al renderizar, igual que el logo. Las 12 plantillas que ya
-  existían se encienden solas.
-- 🔑 **La grilla de tres es el estándar de la industria**, no una preferencia: 16 de 21 la
-  usan y el motor dibujaba siempre dos.
-- 🔑 **La fila de 3–4 celdas aparece en 15 de 21** con tres disfraces distintos —beneficios
-  con ícono, categorías con foto, gente con nombre y cargo— y era el mismo bloque las tres
-  veces.
-- 🔑 **Solo una (013) no lleva una sola foto de stock**, y es la que un comerciante puede
-  copiar sin sesión de fotos. Es la que define la familia `fechas`.
-
----
-
-### R-001 · "Hot Deal" hasta 50% OFF   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-001-hot-deal-brasas.png`
-Anatomía: encabezado texto sobre foto · divisor claro · titulo póster · subtítulo ·
-  texto · boton outline · texto "mirá los productos 👇" · grilla 3 con tachado y botón por
-  producto · divisor · redes 4 · pie con teléfono, mail y domicilio
-Tema: negro con foto de brasas a sangre en TODO el mail, tipografía de palo seco, blanco
-Copy: promesa arriba, urgencia en el subtítulo, un solo CTA antes de la grilla
-Patrones nuevos: foto de fondo del mail entero 🔴 (queda en el 🟡 del `hero` a sangre)
-Sale como: preset **`brasas`** (familia venta), el clon fiel, y también `hot-sale` sin la foto.
-  🟡 Lo único que no es expresable es la foto de fondo del MAIL ENTERO (el fondo de página es un
-  color del tema); queda en la portada, con una **textura** oscura y no un producto.
-  ⚠️ El botón *outline* **sí** es expresable y esta ficha decía lo contrario: entra por
-  `boton.bordeAncho` + `bordeColor`, con el `fondo` del color de atrás (el motor siempre
-  rellena). Desde el 2-ago el `<v:roundrect>` también lo dibuja
-
-### R-002 · Morelia, marroquinería   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-002-morelia-cuero.png`
-Anatomía: encabezado · menu 5 · hero foto + velo + link · titulo "Los más elegidos" ·
-  grilla 3 con botón · **fila de 5 categorías** foto + label · columnas imagen-texto (el
-  producto del mes) · **banda con foto de fondo** y misión · **3 beneficios con ícono** ·
-  pie oscuro con redes y contacto
-Tema: marrones y crema, serifa en los títulos, mucho aire
-Copy: la marca habla de sí misma en el medio; el producto va arriba
-Patrones nuevos: fila de 5 celdas · `fondoImagen` en `seccion`
-Sale como: preset **`marroquineria`** (familia catalogo), el clon fiel — y es la que le dio la
-  anatomía a `tienda`. 🟡 La fila de 5 categorías va con 4: es el tope del bloque
-
-### R-003 · Morelia Bodas   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-003-morelia-bodas.png`
-Anatomía: encabezado con logo manuscrito · menu 5 · hero foto + velo · columnas
-  imagen-texto · titulo · grilla 3 **sin precio** · texto centrado con la dirección ·
-  pie rosa con redes
-Tema: rosa empolvado, serifa, todo centrado
-Copy: emocional, sin precios: el mail no vende, invita a entrar
-Patrones nuevos: grilla sin precio (es `productos` con el precio vacío, no un bloque)
-Sale como: preset **`ocasion`** (familia editorial), el clon fiel. Medido: el rosa de las
-  bandas de arriba y abajo es **#fcf0ec** (92% del recorte del pie), la tarjeta es blanco puro
-  y **el vinoso viene en dos tonos** —los títulos en **#7c1818** y los links "Ver más" en
-  **#9c5450**—. La captura **no tiene un solo color saturado**: `paleta-referencia` devuelve
-  "—", que es lo que "rosa empolvado" quiere decir. 🔑 **El velo de la portada va del vinoso
-  del mail y no del oscuro fijo**: es el tercer uso distinto de `veloColor` (aclarar en
-  `temporada`, unir portada y encabezado en `bodega`, **teñir** acá) y con el `#111111` de
-  siempre el mármol quedaba gris frío —#7d7d7d medido— en el medio de un mail rosa. 🟡 La
-  grilla sale con precio · el "Ver más" es un link subrayado y no una pastilla (`boton` con el
-  fondo de atrás + `subrayado`) · el menú va sobre el blanco de la tarjeta
-
-### R-004 · Uyuni, invierno (portugués)   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-004-uyuni-invierno.png`
-Anatomía: menu 6 · hero foto a sangre con el texto abajo a la izquierda · seccion título ·
-  grilla **4** con tachado y cuotas · seccion texto + link · 2 fotos con label · texto de
-  Instagram · redes en fila de 6 · contacto
-Tema: todo enmarcado con líneas negras finas, serifa, beige
-Copy: portugués, seco, sustentabilidad como argumento
-Patrones nuevos: grilla de 4 · cuotas · imagen a sangre
-Sale como: preset `categorias` (familia catalogo) y su clon fiel **`temporada`** (familia
-  fechas, no catalogo: es un mail de cambio de estación). 🟡 Seis links de menú con tres · grilla
-  de 4 con `porFila: 3`. ⚠️ Su portada es la única de la galería que usa una foto de slot
-  `celda`: las diez de slot `portada` son ambientes llenos de cosas y el título NEGRO no se leía
-  sobre ninguna
-
-### R-005 · Baires, swimwear   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-005-baires-summer.png`
-Anatomía: encabezado sobre negro · menu lima · hero foto · titulo lateral + grilla 3 ·
-  banda lima con el nombre de la colección repetido · **3 fotos a sangre sin separación** ·
-  banda lima "Bottoms. / Tops." · pie negro con menú vertical, redes y contacto
-Tema: negro y verde lima, dos colores y nada más
-Copy: mínimo, la foto manda
-Patrones nuevos: fotos a sangre pegadas · grilla de 4 fotos tipo lookbook
-Sale como: preset **`dos-colores`** (familia editorial), el clon fiel. Medido: negro puro
-  **#000000 el 23,1%** del mail (95,5% del recorte del pie), blanco el 26,3% y el lima
-  **#d8fc54** el 6% — el único color saturado de la captura. ⚠️ El plan había elegido #c8ff00
-  a ojo: **cuarta tanda seguida con el hex del plan mal**. 🔑 El lima **no es el acento**: con
-  6% de los píxeles es color de banda, y los botones son negros (misma lección que R-016). El
-  negro va en el `fondo` de PÁGINA, que es lo que dibuja las bandas de arriba y abajo. 🟡 Las
-  tres fotos van con el aire de `columnas` y no pegadas · el "Sets." va arriba y no al costado
-  de la grilla · **el menú va sobre el blanco**, y en la captura está adentro de la banda negra
-
-### R-006 · Atlántico, electrónica   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-006-atlantico-electro.png`
-Anatomía: **menú lateral adentro de la portada** + foto a la derecha · 3 categorías foto +
-  label · seccion titulo + texto + boton · grilla 3 con botón · **video** · 3 beneficios
-  con ícono · pie negro con redes
-Tema: negro, blanco y un azul de CTA
-Copy: funcional, cada bloque dice qué es
-Patrones nuevos: menú lateral en el hero 🔴
-Sale como: preset **`electro`** (familia catalogo), el clon fiel: es la única de las 21 con video.
-  🟡 El menú lateral de la portada no es expresable (el `hero` es una columna sola) y va arriba
-
-### R-007 · Lima, joyería   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-007-lima-joyas.png`
-Anatomía: menu · **barra fina "Envío gratis a partir de $20.000"** · hero foto + boton
-  pastilla · grilla **4** · fila de 4 categorías foto + label · banda azul con foto grande
-  y 2 tarjetas de producto · banda foto + velo · redes
-Tema: azul noche y celeste, sobrio
-Copy: nombres propios de colección, poco texto
-Patrones nuevos: barra fina de aviso 🔴 · `fondoImagen` en `seccion`
-Sale como: preset **`joyeria`** (familia catalogo), el clon fiel: de acá salió la `barra()` fina
-
-### R-008 · idea, "New in"   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-008-idea-new-in.png`
-Anatomía: barra fina de envío · hero foto con logo + boton pastilla · banner de categoría ·
-  2 fotos con el texto encima · titulo "New in!" · grilla 3 con tachado y cuotas ·
-  3 beneficios con ícono · pie color con menú y redes
-Tema: verde agua y magenta sobre blanco
-Copy: volanta ("NEW COLLECTION") arriba de cada título
-Patrones nuevos: eyebrow 🟡 · imagen a sangre
-Sale como: preset **`new-in`** (familia catalogo), el clon fiel, con la volanta y la barra de envío
-
-### R-009 · Vinos, "Say cheers together"   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-009a-vinos-say-cheers.png` + `R-009b-…` (el mismo mail, scrolleado)
-Anatomía: encabezado · ornamento · titulo póster · imagen de producto · banda más clara con
-  titulo + texto · seccion "The flavors" con foto · columnas textos con boton en cada una ·
-  **producto único grande** · pie oscuro con redes y contacto
-Tema: marrón oscuro casi negro, condensada en mayúsculas
-Copy: en inglés y de catálogo (lorem), pero la anatomía es la de un lanzamiento
-Patrones nuevos: producto único destacado 🔴 · ornamento como divisor 🔴
-Sale como: preset **`bodega`** (familia producto), el clon fiel. Medido: el marrón
-  **#201808 es el 71%** de la mitad de arriba y el 84% de la banda del pie; la banda del
-  medio es **#202020** —un gris neutro, no el marrón— y de ahí salen los botones; el único
-  color es el cobre **#c07850** del hilo y del ornamento. 🟡 El ornamento de filigrana y el
-  hilo separan dos zonas OSCURAS y un `divisor` se dibuja sobre la tarjeta blanca: el cobre
-  se mudó al hilo de abajo de la grilla, que es el único que la referencia pone sobre blanco ·
-  el título va **sobre** la foto y no encima de ella (la única foto de vino a sangre del pack
-  es una mesa clara y partía en dos la mitad oscura) · el producto único grande va a mano
-  (foto + título + bajada + botón), que es el 🔴 del backlog
-
-### R-010 · Autopartes, "Final sale"   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-010-autopartes-final-sale.png`
-Anatomía: "ver online · compartir" · encabezado + menu con `|` · hero ilustración sobre
-  color · titulo + texto + boton · seccion gris con **3 columnas** foto redonda + texto ·
-  banda color con texto y foto · grilla 3 con tachado · pie negro con redes y contacto
-Tema: celeste y negro, ilustración en vez de foto
-Copy: promesa de descuento arriba, catálogo abajo
-Patrones nuevos: ver online 🔴 · fila de 3 celdas
-Sale como: preset **`final-sale`** (familia venta), el clon fiel. 🟡 Su portada es una
-  ILUSTRACIÓN y el pack es de fotos; la foto redonda va con `estilo.imagen.radio: 32`, el tope
-
-### R-011 · "Spring Sale"   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-011-spring-sale.png`
-Anatomía: hero foto + velo con línea decorativa · **letra gigante de fondo** + texto +
-  firma · 3 categorías foto + label · banda negra de dos renglones · menu secundario ·
-  grilla **4** · boton centrado · texto de cierre · pie negro con redes y legales
-Tema: blanco y negro, una línea coral como único acento
-Copy: la marca se presenta con firma de una persona
-Patrones nuevos: letra gigante de fondo 🔴 · grilla de 4
-Sale como: preset **`spring-sale`** (familia fechas), el clon fiel. ⚠️ Esta ficha decía "una
-  línea coral" y el hilo, recortado y medido aparte, es **#c03030** (rojo ladrillo). 🟡 La línea
-  va debajo de la portada y no adentro · el cierre negro va dentro de la tarjeta
-
-### R-012 · "What's your style?"   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-012-whats-your-style.png`
-Anatomía: encabezado · foto con el título encima · texto + boton · columnas imagen-texto
-  con boton · **banda oscura con foto de fondo** · grilla 2 con precio y botón · banda de
-  cierre con boton · redes
-Tema: rojo ladrillo de punta a punta, blanco arriba
-Copy: pregunta como asunto, tres CTA iguales
-Patrones nuevos: `fondoImagen` en `seccion`
-Sale como: preset **`tu-estilo`** (familia venta), el clon fiel: **el color ES la plantilla**
-  (#d83028 medido, el 28,8% de los píxeles), que es la excepción de la regla 4. ⚠️ Esta ficha
-  decía #b23a2f, elegido a ojo de "rojo ladrillo", **y en el lugar equivocado**: con ese rojo
-  solo en `acento` salía un mail blanco con botones rojos. En la captura el rojo es el **fondo**
-  y los botones son negros
-
-### R-013 · Cyber Monday tipográfico   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-013-cyber-monday-tipografico.png`
-Anatomía: encabezado · **eyebrow con espaciado** · titulo póster en dos renglones · texto ·
-  boton · titulo chico "categorías seleccionadas" · 3 fotos con label pegada abajo · texto
-  de urgencia · segundo boton · divisor · contacto y redes chiquitas
-Tema: azul noche + azul eléctrico, condensada, **sin una sola foto de stock**
-Copy: castellano rioplatense, tres días y una pregunta
-Patrones nuevos: label pegada a la foto 🟡 (es la celda de `columnas` con título)
-Sale como: preset **`cyber-tipografico`** (familia fechas), el clon fiel, y también `hot-sale`.
-  🔑 Medido, el azul noche **#080028 es el 74,4% de los píxeles**: no es el acento, es el mail
-  entero (`fondo` y `fondoContenido` iguales). El azul eléctrico #0058d0 son los dos botones y
-  las barras de categoría. 🔑 **La etiqueta de cada foto es una barra sólida y se hace con el
-  BOTÓN de la celda al ancho, sin `titulo`** — `caja.fondo` no existe en `columnas`
-
-### R-014 · "Back to school"   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-014-back-to-school.png`
-Anatomía: encabezado negro + menu con `·` · hero blanco con recorte de foto a la derecha ·
-  **número gigante 60%** + banda negra · boton · banda negra con el texto de soporte ·
-  pie con menú, redes y domicilio
-Tema: blanco y negro, manuscrita para el título
-Copy: el descuento ES el diseño
-Patrones nuevos: número gigante (es un `titulo` con tamaño, no un bloque)
-Sale como: preset **`vuelta-al-cole`** (familia fechas), el clon fiel: blanco y negro puro
-  —medido, ningún color saturado— con el negro en el **fondo de PÁGINA**, que es lo que dibuja
-  las bandas de arriba y abajo. 🟡 El menú va sobre el blanco de la tarjeta: en la captura está
-  adentro de la banda negra y `caja.fondo` no existe en `menu`
-
-### R-015 · Cyber Monday sobre mármol   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-015-cyber-monday-marmol.png`
-Anatomía: encabezado + menu · hero foto con el título a la izquierda y el "40% OFF" a la
-  derecha · texto con **el código adentro** · 3 columnas ícono + label + boton · banda gris
-  con foto y badges de las tiendas de apps · pie negro con redes y legales
-Tema: mármol negro y violeta
-Copy: el cupón se dice en el texto, no en un bloque aparte
-Patrones nuevos: badge de descuento 🔴 · botón por celda 🔴
-Sale como: preset **`cyber-marmol`** (familia fechas), el clon fiel. El violeta medido es
-  **#485098**, bastante menos saturado de lo que parece. 🟡 El "40% OFF" gigante va en otra
-  columna del hero y baja al subtítulo · el mármol del pack es CLARO y se oscurece con velo 70 ·
-  la banda clara va sin la foto al costado. ⛔ Los badges de App Store / Google Play no entran:
-  son logos de marca
-
-### R-016 · "Sweet dreams", antifaces   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-016-sweet-dreams.png`
-Anatomía: encabezado · titulo póster dorado sobre negro con la foto del producto a sangre ·
-  banda blanca con titulo + subtítulo tenue + boton · divisor · **grilla 2×2 sin precio** ·
-  boton "ver todo" · foto a sangre de ancho completo · pie con menú y redes
-Tema: negro y dorado arriba, blanco abajo
-Copy: el producto se nombra en cada tarjeta, sin precio
-Patrones nuevos: imagen a sangre (dos veces en el mismo mail)
-Sale como: preset **`negro-y-dorado`** (familia producto), el clon fiel. Medido: **#000000 el
-  73%** de la mitad de arriba y #f8f8f8 el 31% del mail entero —negro puro, no un gris—, y el
-  dorado del póster, recortado aparte, es **#e0a868** (el plan había elegido #c9a227 a ojo).
-  🔑 Los dos botones son **negros**: el dorado aparece una sola vez en todo el mail y es el
-  título de la portada. 🟡 La grilla sale con precio (el precio lo pone Tiendanube) · la foto
-  de cierre es una textura y no una persona usando el producto · **el menú va sobre el blanco**
-  y en la captura está adentro de la banda negra del pie
-
-### R-017 · Evento de negocios   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-017-evento-business.png`
-Anatomía: encabezado + menu 5 · hero foto con el texto a la derecha y boton · **contador
-  regresivo** · columnas imagen-texto con boton · titulo "Our speakers" · **3 celdas con
-  foto, nombre y cargo** · pie azul con redes y contacto
-Tema: azul pizarra y blanco, tipografía de sistema
-Copy: dos "Register now" idénticos, uno arriba y otro en el medio
-Patrones nuevos: contador regresivo 🔴 · fila de 3 celdas con personas
-Sale como: preset **`invitacion`** (familia fechas), el clon fiel. ⚠️ Se llama así porque
-  `evento` ya está tomado y un id no se cambia nunca (regla 7). 🟡 El contador regresivo va como
-  fila de 3 celdas con los números quietos · **la fila de speakers va SIN foto**: el pack excluye
-  las caras reconocibles a propósito, así que nombre y cargo van en una fila de texto
-
-### R-018 · SIMPLE, "New arrivals"   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-018-simple-new-arrivals.png`
-Anatomía: encabezado en caja + menu con `·` · hero foto con el título encima · **3
-  categorías foto + label + boton propio** · seccion titulo + texto · grilla 3 con cuotas y
-  botón · boton ancho "ver todos" · columnas imagen-texto · 3 beneficios con ícono ·
-  pie con redes y contacto
-Tema: gris claro y dorado, todo en mayúsculas
-Copy: la marca se explica en el medio, entre las dos grillas
-Patrones nuevos: botón por celda 🔴
-Sale como: preset **`new-arrivals`** (familia catalogo), el clon fiel: es la referencia que trajo
-  el **botón por celda** al motor
-
-### R-019 · CUBO co., audio   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-019-cubo-audio.png`
-Anatomía: encabezado negro · **menú lateral amarillo adentro de la portada** + foto ·
-  3 tarjetas de categoría con foto, título y bajada · titulo "productos destacados" ·
-  grilla 3 con cuotas y botón subrayado · boton ancho · **banda con foto de fondo** y
-  boton · pie negro con redes
-Tema: negro y amarillo, sin serifa
-Copy: la categoría se explica en una línea abajo del nombre
-Patrones nuevos: menú lateral en el hero 🔴 · `fondoImagen` en `seccion`
-Sale como: preset **`audio`** (familia catalogo), el clon fiel. 🔑 Es la única de la familia que
-  clava un color (#ffd400 sobre tema oscuro): acá el color ES la plantilla
-
-### R-020 · SIMPLE (portugués)   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-020-simple-pt.png`
-Anatomía: encabezado dorado + menu negro · **hero foto a sangre sin texto** ·
-  3 categorías foto + label · divisor · titulo · grilla 3 con boton por producto ·
-  boton ancho · pie negro con titulo "redes sociais" y 4 íconos
-Tema: negro y dorado, serifa espaciada en el logo
-Copy: portugués, nombres de producto y nada más
-Patrones nuevos: portada que es solo una foto a sangre
-Sale como: preset **`minimal`** (familia catalogo), el clon fiel: la portada que es solo una foto
-  a sangre, sin texto encima
-
-### R-021 · TOLUCA, cámaras   (tanda 2026-08-01)
-Archivo: `docs/referencias/R-021-toluca-camaras.png`
-Anatomía: encabezado + menu de dos renglones · hero banner con **el cupón adentro** y badge
-  de envío · 2 categorías foto + label + boton · divisor · titulo de rubro · grilla **4**
-  con tachado, **% de descuento** y botón · fila de 4 badges de descuento · grilla 3 en
-  tarjetas con borde · 3 beneficios con ícono · pie verde con contacto y redes
-Tema: negro, azul de CTA y verde lima en el pie
-Copy: portugués, el número manda en cada bloque
-Patrones nuevos: badge de % 🔴 · botón por celda 🔴 · grilla de 4
-Sale como: preset **`mega-oferta`** (familia venta), el clon fiel: el cupón arriba y la fila de
-  porcentajes. 🟡 El badge de % va como fila abajo, no sobre la foto: `position` está prohibido
+🔑 Lo que la tanda enseñó **de conjunto** no se fue con las fichas: está repartido entre el
+*Vocabulario* (los contadores) y el *Backlog*, que es donde se lee sin abrir nada más.
 
 ---
 
@@ -514,11 +272,17 @@ node --import tsx scripts/probar-esquema.ts       # cada preset instancia en la 
 node --import tsx scripts/probar-encabezado.ts    # el link de baja sale en el 100% de los renders
 node --import tsx scripts/probar-html.ts          # VML, media queries, tracking y peso
 node --import tsx scripts/probar-tema.ts          # ningún preset queda ilegible con otro tema
+node --import tsx scripts/probar-fotos.ts         # toda imagen sale del pack, y con alt
+node --import tsx scripts/probar-fotos.ts --red   # + HEAD a las 36: publicadas y bajo su tope
 node --import tsx scripts/probar-render.ts        # golden: nada se movió sin querer
 ```
 
-Las cuatro primeras recorren `presetsPara()`, así que **un preset nuevo entra solo a las
+Las cinco primeras recorren `presetsPara()`, así que **un preset nuevo entra solo a las
 auditorías** sin escribir un test.
+
+⚠️ `probar-fotos` **sin `--red` no toca el store**: dice que las URLs salen del pack, no que
+existan. El `--red` es el que atrapa el caso caro —una foto que no está publicada, o que pesa
+el triple de lo que creemos— y ese peso se paga **por destinatario**.
 
 🔴 **El golden no veía la grilla hasta el 2-ago-2026**, que es el bloque más grande de la
 galería: `productos-dinamicos` no dibuja nada sin productos —y los productos viajan por

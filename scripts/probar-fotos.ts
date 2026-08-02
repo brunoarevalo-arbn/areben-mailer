@@ -15,9 +15,9 @@
 //      que creemos. El peso no cuesta store: cuesta una descarga por
 //      destinatario, y el que la manda heredó esa foto de la plantilla.
 //
-// ⚠️ El chequeo de "clave que no usa ningún preset" (peso muerto en el catálogo)
-// entra cuando existan las plantillas que las usan: hoy el pack está subido y
-// los presets todavía no lo referencian, así que sería rojo por diseño.
+// El chequeo de "clave que no usa ningún preset" (peso muerto en el catálogo)
+// entró el 2-ago-2026, con la galería cerrada en 38, y es un **aviso**: sobran 8
+// de 36 y eso no es un error. El porqué está al lado del chequeo.
 
 import { presetsPara } from "../lib/plantillas/presets";
 import { BASE_FOTOS, CLAVES_FOTO, SLOTS, foto, slotDe } from "../lib/plantillas/fotos";
@@ -108,6 +108,29 @@ ok(
   "BASE_FOTOS sin barra final",
   "foto() concatena con /, una barra de más da una URL con //"
 );
+
+// ─── Peso muerto del catálogo ────────────────────────────────────────────────
+// ⚠️ **AVISO, no falla**, y la diferencia es deliberada. El plan prometía exigir
+// "toda clave la usa alguien", pero medido con la galería cerrada en 38 sobran
+// OCHO de 36: el pack se armó antes que las plantillas y tener inventario de más
+// es lo correcto. Un rojo obligaría a usarlas o borrarlas para poder commitear,
+// y borrar una clave publicada es justo lo que `v1` promete no hacer.
+// Lo que sí resuelve el aviso es que se vea: `celda-hogar` está quemada y estuvo
+// meses invisible porque nadie contaba cuántas claves no usa nadie.
+{
+  const usadas = new Set(
+    presetsPara(CUENTA)
+      .flatMap((p) => p.contenido.bloques)
+      .flatMap(urlsDeImagen)
+      .map(({ url }) => url)
+  );
+  const sueltas = CLAVES_FOTO.filter((k) => !usadas.has(foto(k)));
+  console.log(
+    sueltas.length === 0
+      ? `  ✓ las ${CLAVES_FOTO.length} claves las usa algún preset`
+      : `  ⚠️ ${CLAVES_FOTO.length - sueltas.length}/${CLAVES_FOTO.length} en uso · sin usar: ${sueltas.join(", ")}`
+  );
+}
 
 // ─── Contra el store ─────────────────────────────────────────────────────────
 // ⚠️ Va adentro de una función y no como top-level await: `tsx` compila estos

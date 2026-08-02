@@ -391,6 +391,14 @@ hay que pasarle `token` a `put()`.
 - ⚠️ **Borrar una imagen rompe los mails ya enviados**: la URL está adentro del
   correo que ya está en la casilla de otra persona. La UI avisa; no hay borrado
   masivo.
+- 🔴 **El prefijo `stock/` es del proyecto, no de nadie**: son las 36 fotos de las
+  plantillas prearmadas y **no tienen fila en `ImagenMail`** — así que no salen en
+  la biblioteca de ningún comerciante, no le suman bytes al contador y **no se
+  pueden borrar desde la app** (`/api/imagenes/[id]` borra por id de fila). Se
+  suben con `node --env-file=.env.local --import tsx scripts/subir-fotos-stock.ts`:
+  ⚠️ el token de Blob vive en **`.env.local`**, no en el `.env` que usan los demás
+  scripts. El catálogo es `lib/plantillas/fotos.ts` y el porqué está en
+  `PLANTILLAS.md`.
 
 ## Importar contactos de afuera (`lib/contactos/importar.ts`)
 
@@ -517,9 +525,14 @@ comerciantes.
 ## Documentos largos (no los leas salvo que el tema sea ese)
 
 - `PLANTILLAS.md` — el acumulador de la galería: el ritual de cada tanda de referencias,
-  las reglas de qué plantilla puede entrar, el vocabulario de diseño (✅/🟡/🔴) y el
-  backlog del motor. **Se lee entero antes de tocar `lib/plantillas/`**; es el único de
-  los cuatro que sí conviene abrir completo.
+  las reglas de qué plantilla puede entrar, el pack de **fotos de stock**, el vocabulario de
+  diseño (✅/🟡/🔴) y el backlog del motor. **Se lee entero antes de tocar
+  `lib/plantillas/`**; es el único de los cuatro que sí conviene abrir completo — y queda
+  en 20 KB desde que las fichas se mudaron (abajo).
+- `docs/referencias/tanda-AAAA-MM-DD.md` — la ficha de cada captura de referencia: anatomía,
+  tema medido, y de qué preset salió. Salieron de `PLANTILLAS.md` el 2-ago-2026, cuando ese
+  archivo pasó su propio umbral de 40 KB. **Se abren solo para clonar una referencia**, no
+  para sumar una plantilla.
 - `SES-ESTADO.md` — 22 KB: estado de SES/Resend, DNS, DKIM, MAIL FROM, webhooks.
   Leerlo antes de tocar deliverability o DNS.
 - `MODELO-DE-NEGOCIO.md` — 25 KB: precios, GTM, combo con Resorty.

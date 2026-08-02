@@ -41,10 +41,14 @@ export default async function PlantillasPage({
 
   const todas = presetsGaleria(cuenta, remitente?.email);
   // ⚠️ Solo se DIBUJA la familia activa. `renderEmailHtml` devuelve el mail
-  // entero —unos 30 KB cada uno— y esto es un server component: lo que se
-  // renderiza acá viaja al navegador dentro del payload. Con las 12 de hoy ya
-  // eran ~350 KB por visita; con las 30+ que vienen pasaba el megabyte, en un
-  // panel que el comerciante abre desde el celular.
+  // entero y esto es un server component: lo que se renderiza acá viaja al
+  // navegador dentro del payload. Medido con la galería cerrada en 38 y las
+  // grillas llenas: **7-21 KB por plantilla**, la pestaña más cargada
+  // (catálogo, 12) **168 KB** y las 38 juntas **423 KB**, en un panel que el
+  // comerciante abre desde el celular.
+  // 🔑 Lo que pesa de verdad no es este HTML sino las fotos que se descargan al
+  // pintarlo — por eso `MiniaturaMail` no crea el iframe hasta que la tarjeta
+  // se acerca. Filtrar acá y ser perezoso allá son las dos mitades de lo mismo.
   const delaFamilia = todas.filter((p) => p.familia === activa);
   const contenidosGuardados = plantillas.map((p) => ({ ...p, contenido: leerContenido(p.contenido) }));
 
