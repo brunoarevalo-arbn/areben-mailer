@@ -30,23 +30,52 @@ export const CATALOGO: readonly DefPreset[] = [
     descripcion: "Portada con foto, los más elegidos, las categorías y la banda de quiénes somos. La anatomía más completa de todas.",
     familia: "catalogo",
     // Clon de R-002 (Morelia, marroquinería): es la referencia más completa de la
-    // primera tanda. Serifa en los títulos y mucho aire, que es lo que la hace
-    // verse cara sin un solo color clavado.
-    arma: ({ marca, tienda }) => ({
-      estilos: { titulo: { fuente: "georgia" }, imagen: { radio: 12 } },
+    // primera tanda.
+    //
+    // 🔑 **Lo que la hace ser ella no es la anatomía, es que no tiene un solo
+    // botón relleno**: todos los CTA son texto subrayado. Con el ámbar del tema
+    // por defecto salía un mail de pastillas naranjas que no se parecía en nada,
+    // aunque los bloques fueran los mismos. Ver el `boton` de la capa de abajo.
+    arma: ({ tienda }) => ({
+      // Tema COMPLETO: `combinarTema` es un spread plano, así que cualquier
+      // campo que falte acá se cae al de la marca que elige la plantilla y el
+      // clon deja de ser un clon. Ver `PLANTILLAS.md`, regla 4.
+      tema: { base: "claro", fondo: "#ffffff", fondoContenido: "#ffffff", acento: "#283840", link: "#283840", ancho: 600, fuente: "sistema" },
+      estilos: {
+        // Serifa en los títulos y palo seco en el cuerpo: la referencia mezcla
+        // las dos, así que la fuente del tema es la del cuerpo y la serifa entra
+        // por el rol.
+        // 🔴 **Sin `color`.** Clavarlo apaga el contraste automático, y esta
+        // plantilla tiene dos títulos sobre foto oscura (la portada y la banda
+        // del taller): salían negros sobre negro. El motor ya elige claro u
+        // oscuro según el fondo donde cae CADA título; ver `bandaConFoto`.
+        titulo: { fuente: "georgia", peso: 400, espaciado: 0.4 },
+        subtitulo: { color: "#5a5a5a" },
+        cuerpo: { color: "#5a5a5a" },
+        nota: { color: "#9a9a9a" },
+        // El CTA de texto subrayado. `fondo` blanco y no "sin fondo" porque el
+        // motor no tiene transparente —los colores son hex— y blanco sobre
+        // blanco es exactamente lo que se ve en la captura.
+        boton: { fondo: "#ffffff", color: "#1f1f1f", radio: 0, padX: 2, padY: 4, peso: 700, tamano: 14, subrayado: true },
+        imagen: { radio: 0 },
+      },
       bloques: [
-        ...menuTienda(tienda),
+        ...menuTienda(tienda, { cuerpo: { tamano: 13, color: "#4a4a4a" } }),
         portada("portada-cuero-1", {
-          titulo: "Hecho para durar",
-          subtitulo: `Lo que mejor trabajamos en ${marca}, en un solo lugar.`,
-          boton: { texto: "Ver la colección", url: tienda },
+          titulo: "100% cuero",
+          subtitulo: "Todos nuestros productos están confeccionados en cuero ecológico.",
+          boton: { texto: "Comprar", url: tienda },
+          alto: 260,
+          velo: 45,
+          // 🔴 El botón blanco de la capa de documento **sobre una foto oscura
+          // es un rectángulo blanco**, no un link subrayado: el motor siempre
+          // rellena, así que "sin fondo" se emula con un fondo que se confunda
+          // con lo que hay atrás. Acá atrás hay un velo oscuro.
+          estilo: { boton: { fondo: "#1f1f1f", color: "#ffffff" } },
         }),
         { tipo: "titulo", texto: "Los más elegidos", align: "center" },
-        { tipo: "texto", texto: "Hola ${contacto.nombre}, esto es lo que más nos están pidiendo este mes.", align: "center" },
         grilla("destacados", { tres: true, boton: "Comprar" }),
-        ...botonSi("Ver todo el catálogo", tienda, "center"),
         aire(8),
-        { tipo: "titulo", texto: "Por categoría", align: "left" },
         // ⚠️ La referencia pone CINCO categorías. Cuatro es el tope del bloque, y
         // no por el tipo: a 600px de ancho, cinco celdas quedan en 104px cada una
         // —menos que la foto de producto más chica— y en la casilla no se leen.
@@ -57,8 +86,10 @@ export const CATALOGO: readonly DefPreset[] = [
           { clave: "celda-joyas", titulo: "Accesorios" },
         ]),
         aire(8),
-        { tipo: "divisor" },
-        { tipo: "titulo", texto: "El del mes", align: "left" },
+        // El producto del mes: foto a la izquierda y el texto **centrado** a la
+        // derecha, que es como lo dibuja la captura. Sin título arriba: la
+        // referencia no lo tiene, el nombre del producto ES el título de la
+        // celda.
         {
           tipo: "columnas",
           variante: "imagen-texto",
@@ -66,24 +97,30 @@ export const CATALOGO: readonly DefPreset[] = [
           celdas: [
             { imagen: foto("producto-mochila"), url: tienda, titulo: "" },
             {
-              titulo: "Contá por qué este",
-              texto: "Una foto y tres renglones: qué es, para quién y por qué lo elegirían. Es el bloque que más convierte de todo el mail.",
+              titulo: "El del mes",
+              texto: "Descubrí la fusión perfecta entre estilo y sostenibilidad.\n\nTres renglones sobre qué es, para quién y por qué lo elegirían: es el bloque que más convierte de todo el mail.",
               imagen: "",
               url: tienda,
+              ...cta("Ver más", tienda),
             },
           ],
+          estilo: { titulo: { align: "center", tamano: 15, peso: 400 }, cuerpo: { align: "center", tamano: 13 } },
         },
         aire(8),
         bandaFoto(
           "banda-taller",
-          "Así trabajamos",
-          "Dos renglones sobre quién hace lo que vendés: dónde, con qué y desde cuándo. Es lo que separa una marca de un catálogo.",
+          "Nuestra misión es ofrecer objetos de alta calidad, sin comprometer el estilo ni el respeto por los animales.",
+          "",
+          { texto: "Conocer más", url: tienda },
+          200,
+          // Mismo caso que la portada: sobre la foto, el botón blanco es una caja.
+          { boton: { fondo: "#1f1f1f", color: "#ffffff" } },
         ),
         aire(8),
         fila([
-          { titulo: "Envíos a todo el país", texto: "Con seguimiento del pedido." },
-          { titulo: "Cambios sin vueltas", texto: "Tenés 30 días para cambiarlo." },
-          { titulo: "Te respondemos", texto: "Escribinos y te contestamos." },
+          { titulo: "Nosotros", texto: "Productos de alta calidad que reflejan la artesanía tradicional.", icono: "calidad" },
+          { titulo: "Locales", texto: "Tenemos locales en todo el país para que puedas verlos.", icono: "atencion" },
+          { titulo: "Reciclados", texto: "100% reciclados, amables con el medio ambiente.", icono: "cambios" },
         ]),
         redes,
       ],
@@ -95,36 +132,67 @@ export const CATALOGO: readonly DefPreset[] = [
     descripcion: "Categorías con su propio botón, la marca contada en el medio y la grilla de tres. En mayúsculas, para marcas de ropa.",
     familia: "catalogo",
     // Clon de R-018 (SIMPLE): es la referencia que trajo el botón por celda al
-    // motor. Gris y dorado, todo en mayúsculas — el rasgo lo pone la capa de
-    // documento, no un hex.
-    arma: ({ marca, tienda }) => ({
-      estilos: { titulo: { mayusculas: true, espaciado: 1 }, imagen: { radio: 12 } },
+    // motor.
+    //
+    // 🔑 Su portada es lo que más la distingue y es lo que teníamos al revés:
+    // el título va **enorme, negro y contra un costado**, sobre una foto clara
+    // y casi sin velo — sin subtítulo y sin botón. La nuestra era la portada
+    // genérica de la galería (velo oscuro, texto blanco centrado, tres cosas
+    // adentro) y por eso se leía como otra plantilla aunque el resto coincidiera.
+    arma: ({ tienda }) => ({
+      // Dorado medido sobre la captura con `scripts/paleta-referencia.ts`
+      // (#c0a040, 3,3% de los píxeles), no elegido a ojo: el ámbar del tema por
+      // defecto es de otra familia de color y es lo primero que se nota.
+      tema: { base: "claro", fondo: "#f0f0f0", fondoContenido: "#f8f8f8", acento: "#c0a040", link: "#c0a040", ancho: 600, fuente: "sistema" },
+      estilos: {
+        titulo: { mayusculas: true, espaciado: 1, peso: 700, color: "#1f2a36" },
+        subtitulo: { color: "#4a4a4a" },
+        cuerpo: { color: "#4a4a4a" },
+        // El botón dorado de la referencia es un rectángulo sin redondeo, con el
+        // texto chico y espaciado. `ancho: 100` es lo que lo estira al ancho de
+        // su celda en la fila de categorías.
+        boton: { radio: 0, mayusculas: true, tamano: 12, espaciado: 1, peso: 700 },
+        imagen: { radio: 0 },
+      },
       bloques: [
-        ...menuTienda(tienda),
+        ...menuTienda(tienda, { cuerpo: { mayusculas: true, tamano: 12, espaciado: 1, color: "#1f2a36" } }),
         portada("portada-moda-1", {
           titulo: "New arrivals",
-          subtitulo: "Lo que acaba de entrar, antes que en la tienda.",
-          boton: { texto: "Ver lo nuevo", url: tienda },
+          subtitulo: "",
+          alto: 240,
+          // Velo BLANCO y bajo: acá el velo no oscurece para que entre texto
+          // claro, aclara para que entre texto negro. De este mismo color sale
+          // el contraste que el renderer le calcula al título.
+          veloColor: "#ffffff",
+          velo: 12,
+          align: "right",
+          estilo: { titulo: { tamano: 44, interlinea: 1.05, color: "#111111", espaciado: 0 } },
         }),
         // El patrón que justificó el cambio de motor del 2-ago: cada celda con
-        // su propio "Ver", en vez de una foto muda que linkea entera.
+        // su propio botón, en vez de una foto muda que linkea entera. Los tres
+        // textos son distintos porque en la captura lo son.
         categorias(tienda, [
-          { clave: "celda-remeras", titulo: "Remeras", boton: "Ver" },
-          { clave: "celda-abrigos", titulo: "Abrigos", boton: "Ver" },
-          { clave: "celda-calzado", titulo: "Calzado", boton: "Ver" },
-        ]),
-        banda(
-          `Qué es ${marca}`,
-          "La marca se explica en el medio, entre las dos grillas: dos renglones sobre qué hacés y para quién.",
-        ),
-        { tipo: "titulo", texto: "Lo más pedido", align: "center" },
-        { tipo: "texto", texto: "Hola ${contacto.nombre}, si venías esperando algo, es probable que esté acá.", align: "center" },
-        grilla("recientes", { tres: true, boton: "Comprar" }),
+          { clave: "celda-remeras", titulo: "Mujer", boton: "Comprar" },
+          { clave: "celda-abrigos", titulo: "Hombre", boton: "Ver producto" },
+          { clave: "celda-calzado", titulo: "Niños", boton: "Shop" },
+        ], { boton: { ancho: 100 }, titulo: { align: "center", mayusculas: true, tamano: 13, espaciado: 0.5 } }),
+        // ⚠️ Era un `banda()` —un `seccion` con fondo de color— y la captura no
+        // tiene ninguna banda acá: es texto sobre el mismo fondo, entre dos
+        // líneas finas. Con la banda, el bloque se leía como un aviso y no como
+        // la marca presentándose.
+        { tipo: "divisor" },
+        { tipo: "titulo", texto: "Una filosofía de vida", align: "center" },
+        { tipo: "texto", texto: "Somos una tienda inspirada en la indumentaria. Vas a encontrar las tendencias de la moda y todo lo que se viene.", align: "center" },
+        { tipo: "divisor" },
+        // El nombre del producto va en mayúsculas, como en la captura. Va en el
+        // bloque y no en la capa de documento: el rol `cuerpo` también lo usa el
+        // párrafo de "una filosofía de vida", que ahí sí va en minúscula.
+        grilla("recientes", { tres: true, boton: "Agregar al carrito", estilo: { cuerpo: { mayusculas: true, peso: 700, tamano: 13 } } }),
         // ⚠️ Era `full: true`, y la captura dice que no: el "VER TODOS LOS
         // PRODUCTOS" de R-018 —y el de R-019 y R-020— es una pastilla centrada
         // de ancho medio, no una barra de lado a lado. Se escribió de la ficha
         // de texto, sin abrir la imagen.
-        ...(tienda ? [{ tipo: "boton" as const, texto: "Ver todos", url: tienda, align: "center" as const }] : []),
+        ...botonSi("Ver todos los productos", tienda, "center"),
         aire(8),
         {
           tipo: "columnas",
@@ -133,18 +201,20 @@ export const CATALOGO: readonly DefPreset[] = [
           celdas: [
             { imagen: foto("producto-textil"), url: tienda, titulo: "" },
             {
-              titulo: "El básico de la temporada",
-              texto: "Elegí uno y explicá por qué: de qué está hecho, cómo calza, con qué se usa.",
+              titulo: "Acompañamos tu camino",
+              texto: "Estamos presentes en todas las etapas de tu vida.",
               imagen: "",
               url: tienda,
+              ...cta("Conocénos", tienda),
             },
           ],
+          estilo: { titulo: { align: "center" }, cuerpo: { align: "center" } },
         },
         aire(8),
         fila([
-          { titulo: "Envío gratis", texto: "A partir del mínimo que definas." },
-          { titulo: "Hasta 12 cuotas", texto: "Con todas las tarjetas." },
-          { titulo: "Cambios sin cargo", texto: "Primera devolución gratis." },
+          { titulo: "Envíos gratis", texto: "Para compras de más del mínimo que definas.", icono: "envio" },
+          { titulo: "12 cuotas sin interés", texto: "Con todas las tarjetas.", icono: "tarjeta" },
+          { titulo: "Cambios y devoluciones", texto: "Primera devolución gratis.", icono: "cambios" },
         ]),
         redes,
       ],
@@ -157,27 +227,41 @@ export const CATALOGO: readonly DefPreset[] = [
     familia: "catalogo",
     // Clon de R-020 (SIMPLE en portugués): la portada que es SOLO una foto a
     // sangre, sin texto encima. Es la más silenciosa de la galería.
+    //
+    // 🔴 La serifa estaba de más: en la captura **solo el logo es serifa**, y el
+    // resto —menú, etiquetas, títulos, botones— es palo seco en negrita. Se
+    // había escrito de la ficha ("serifa espaciada en el logo") aplicándola a
+    // todos los títulos, que es media plantilla con otra tipografía.
     arma: ({ tienda }) => ({
-      estilos: { titulo: { fuente: "georgia", espaciado: 2, mayusculas: true }, imagen: { radio: 12 } },
+      // Negro y blanco, sin un tercer color: las bandas de arriba y de abajo son
+      // el fondo de PÁGINA, y el contenido va sobre blanco.
+      tema: { base: "claro", fondo: "#111111", fondoContenido: "#ffffff", acento: "#111111", link: "#111111", ancho: 600, fuente: "sistema" },
+      estilos: {
+        titulo: { peso: 700 },
+        // Botón negro, cuadrado y en mayúsculas: aparece cuatro veces en la
+        // captura y siempre igual.
+        boton: { radio: 2, mayusculas: true, peso: 700, tamano: 13, espaciado: 0.5 },
+        imagen: { radio: 2 },
+      },
       bloques: [
-        ...menuTienda(tienda),
+        ...menuTienda(tienda, { cuerpo: { mayusculas: true, tamano: 13, espaciado: 0.5 } }),
         // A sangre: pegada a los bordes de la tarjeta, sin radio ni margen. ⚠️ Es
         // el único caso del pack en el que la foto NO degrada a un color si no
         // carga (`fondoImagen` sí lo hace) — por eso lleva `alt` sí o sí: en
         // Outlook con imágenes bloqueadas, el alt ES la portada.
         { tipo: "imagen", url: foto("portada-moda-2"), alt: alt("portada-moda-2"), sangre: true },
         aire(16),
-        { tipo: "titulo", texto: "La temporada, en tres pasos", align: "center" },
-        { tipo: "texto", texto: "Hola ${contacto.nombre}, entrá por donde te quede más cómodo.", align: "center" },
+        // Sin título arriba: la captura pasa de la portada a las categorías sin
+        // decir nada en el medio. Es lo que la hace "la más silenciosa".
         categorias(tienda, [
-          { clave: "celda-remeras", titulo: "Ellos" },
-          { clave: "celda-abrigos", titulo: "Ellas" },
-          { clave: "celda-calzado", titulo: "Calzado" },
-        ]),
+          { clave: "celda-remeras", titulo: "Suéters" },
+          { clave: "celda-abrigos", titulo: "Camisas" },
+          { clave: "celda-calzado", titulo: "Remeras" },
+        ], { titulo: { align: "center", peso: 700, tamano: 14 } }),
         { tipo: "divisor" },
-        { tipo: "titulo", texto: "Destacados", align: "center" },
-        grilla("destacados", { tres: true, boton: "Comprar" }),
-        ...(tienda ? [{ tipo: "boton" as const, texto: "Ver la tienda", url: tienda, align: "center" as const }] : []),
+        { tipo: "titulo", texto: "Categorías principales", align: "center" },
+        grilla("destacados", { tres: true, boton: "Comprar", estilo: { cuerpo: { mayusculas: true, peso: 700, tamano: 13 } } }),
+        ...botonSi("Ver todos los productos", tienda, "center"),
         redes,
       ],
     }),
@@ -190,39 +274,59 @@ export const CATALOGO: readonly DefPreset[] = [
     // Clon de R-007 (Lima, joyería): la referencia que pidió la barra fina de
     // aviso, que se pudo recién cuando el `seccion` sin botón dejó de arrastrar
     // 16px de margen muerto.
-    arma: ({ marca, tienda }) => ({
-      // Pastilla en todo el mail: es lo que hace que se vea "de joyería" sin
-      // clavar el azul noche de la referencia.
-      estilos: { boton: { radio: 24 }, imagen: { radio: 12 } },
+    //
+    // 🔑 El azul noche **no era prescindible**: es la barra de arriba, la banda
+    // del medio y el color de todo el texto. Sin él quedaba un mail blanco con
+    // pastillas ámbar, que es otra plantilla. Y sus botones son **pastillas
+    // vacías con borde fino**, no rellenas: el único relleno de la captura es
+    // el blanco del hero.
+    arma: ({ tienda }) => ({
+      tema: { base: "claro", fondo: "#ffffff", fondoContenido: "#ffffff", acento: "#ffffff", link: "#183050", ancho: 600, fuente: "sistema" },
+      estilos: {
+        // Sin `color`: el azul se ve en la barra, la banda y los links, pero
+        // clavarlo en el rol dejaba "Narcissus" azul noche sobre la foto oscura
+        // de la portada. Mismo caso que `marroquineria`.
+        titulo: { peso: 600 },
+        cuerpo: { color: "#6b7280" },
+        nota: { color: "#9aa3af" },
+        // Pastilla vacía con borde: `fondo` blanco + `bordeAncho` es lo que la
+        // dibuja. Sin el borde, un botón blanco sobre fondo blanco no se ve.
+        boton: { radio: 24, fondo: "#ffffff", color: "#3f4a5a", bordeAncho: 1, bordeColor: "#c9ced8", peso: 600, tamano: 14 },
+        imagen: { radio: 4 },
+      },
       bloques: [
         ...menuTienda(tienda),
         // ⚠️ Sin monto: el mínimo de envío gratis es de cada tienda y no lo sabe
         // el preset. Prometer "$20.000" acá es una promesa ajena en un mail ya
         // enviado, que es de las pocas cosas que no se pueden corregir después.
-        barra("Envío gratis a partir del monto que definas · Cambios sin cargo"),
+        barra("Envío gratis a partir del monto que definas", "#183050"),
         portada("portada-joyas-1", {
-          titulo: "Para regalar (o no)",
-          subtitulo: `Las piezas que más salen de ${marca}.`,
-          boton: { texto: "Ver la tienda", url: tienda },
+          titulo: "Narcissus",
+          subtitulo: "Vestí tu reflejo con nuestra selección de artículos premium.",
+          boton: { texto: "Ver selección", url: tienda },
+          alto: 240,
+          velo: 30,
+          // El texto va contra el margen izquierdo, no centrado: es lo primero
+          // que separa esta portada de la genérica de la galería.
+          align: "left",
         }),
-        { tipo: "texto", texto: "Hola ${contacto.nombre}, esto es lo que más nos están eligiendo esta semana.", align: "center" },
+        { tipo: "titulo", texto: "Nuestra selección", align: "left", estilo: { titulo: { tamano: 16, peso: 400 } } },
+        // Cuatro por fila, como la captura. Es la otra forma de grilla que la
+        // galería permite (`{n:4}`), así que no agrega una consulta nueva.
+        // 🟡 La captura pone CUATRO por fila y el motor sabe dos o tres
+        // (`PorFila`). Tres se parece más que dos; el de cuatro quedó anotado en
+        // el backlog, que ya lleva cuatro referencias pidiéndolo.
         grilla("destacados", { tres: true, boton: "Comprar" }),
-        ...botonSi("Ver todo", tienda, "center"),
         aire(8),
-        { tipo: "titulo", texto: "Entrá directo", align: "left" },
+        { tipo: "titulo", texto: "Categorías", align: "left", estilo: { titulo: { tamano: 16, peso: 400 } } },
         categorias(tienda, [
-          { clave: "celda-joyas", titulo: "Joyas" },
-          { clave: "celda-regalos", titulo: "Regalos" },
-          { clave: "celda-belleza", titulo: "Belleza" },
-          { clave: "celda-bolsos", titulo: "Bolsos" },
-        ]),
+          { clave: "celda-joyas", titulo: "Aros" },
+          { clave: "celda-regalos", titulo: "Colgantes" },
+          { clave: "celda-belleza", titulo: "Pulseras" },
+          { clave: "celda-bolsos", titulo: "Anillos" },
+        ], { titulo: { align: "center", tamano: 13, peso: 400 } }),
         aire(8),
-        bandaFoto(
-          "banda-marmol",
-          "La colección nueva",
-          "Contá en dos renglones de qué se trata y mandá a la categoría.",
-          { texto: "Verla", url: tienda },
-        ),
+        bandaFoto("banda-marmol", "Colors", "Colección de joyas de acrílico.", { texto: "Ver colección", url: tienda }, 180),
         redes,
       ],
     }),
@@ -234,37 +338,52 @@ export const CATALOGO: readonly DefPreset[] = [
     familia: "catalogo",
     // Clon de R-008 (idea, "New in"): la que trajo la volanta —un título chico
     // arriba del grande— y la barra fina de envío arriba de todo.
-    arma: ({ marca, tienda }) => ({
-      estilos: { boton: { radio: 24 }, imagen: { radio: 12 } },
+    //
+    // 🔑 El verde agua (#18c8a0, medido) es la plantilla entera: la barra de
+    // arriba, el precio de oferta, los botones y el pie. Con el ámbar del tema
+    // por defecto no quedaba nada de la referencia salvo el orden de los
+    // bloques. Y sus botones son **pastillas**, no rectángulos.
+    arma: ({ tienda }) => ({
+      tema: { base: "claro", fondo: "#ffffff", fondoContenido: "#ffffff", acento: "#18c8a0", link: "#18c8a0", ancho: 600, fuente: "sistema" },
+      estilos: {
+        // Sin `color`, por lo mismo que en `marroquineria` y `joyeria`: la
+        // portada y la banda de "city walking" llevan el título sobre foto.
+        titulo: { peso: 700 },
+        cuerpo: { color: "#4a4a4a" },
+        // Verde con texto BLANCO: el contraste automático elegiría oscuro sobre
+        // un verde tan claro, y la captura lo hace al revés.
+        boton: { radio: 24, color: "#ffffff", mayusculas: true, peso: 700, tamano: 13, espaciado: 0.5 },
+        imagen: { radio: 4 },
+      },
       bloques: [
-        barra("Envío gratis en tu primera compra · Hasta 12 cuotas"),
+        // ⚠️ Sin monto: el mínimo de envío gratis es de cada tienda. Prometer
+        // "$14.000" acá es una promesa ajena en un mail ya enviado.
+        barra("Envío gratis a partir del monto que definas", "#18c8a0"),
         portada("portada-moda-2", {
-          titulo: "New in!",
-          subtitulo: `Entró la temporada nueva de ${marca}.`,
-          boton: { texto: "Verla ahora", url: tienda },
+          titulo: "Stripes shirt",
+          subtitulo: "Nueva colección",
+          // Pastilla BLANCA con texto oscuro sobre la foto, que es el único
+          // botón de la captura que no es verde.
+          boton: { texto: "Ver productos", url: tienda },
+          alto: 280,
+          velo: 25,
+          estilo: { boton: { fondo: "#ffffff", color: "#1a1a1a" } },
         }),
-        // La volanta: un `titulo` chico encima del grande. 🟡 No hay bloque
-        // "eyebrow" y no hace falta — es tamaño y espaciado sobre el bloque que
-        // ya existe (lo mismo que hace `hot-sale`).
-        {
-          tipo: "titulo",
-          texto: "NEW COLLECTION",
-          align: "center",
-          estilo: { titulo: { tamano: 13, peso: 700, espaciado: 2 } },
-        },
-        { tipo: "titulo", texto: "Lo que acaba de llegar", align: "center" },
-        { tipo: "texto", texto: "Hola ${contacto.nombre}, esto es lo primero que entró de la temporada.", align: "center" },
+        bandaFoto("banda-tela", "City walking", "", { texto: "Ver categoría", url: tienda }, 200),
         categorias(tienda, [
-          { clave: "celda-remeras", titulo: "Lo nuevo" },
-          { clave: "celda-abrigos", titulo: "Abrigos" },
-        ]),
-        grilla("recientes", { tres: true, boton: "Comprar" }),
-        ...botonSi("Ver todo lo nuevo", tienda, "center"),
+          { clave: "celda-remeras", titulo: "Adventure life" },
+          { clave: "celda-abrigos", titulo: "Bikinis" },
+        ], { titulo: { align: "center", peso: 700, tamano: 15 } }),
         aire(8),
+        { tipo: "titulo", texto: "New in!", align: "center" },
+        grilla("recientes", { tres: true, boton: "Comprar", estilo: { cuerpo: { peso: 700, tamano: 14 } } }),
+        { tipo: "divisor" },
+        // Los tres íconos de la captura son exactamente estos tres: camión,
+        // tarjeta y escudo.
         fila([
-          { titulo: "Envíos a todo el país", texto: "Con seguimiento del pedido." },
-          { titulo: "Hasta 12 cuotas", texto: "Con todas las tarjetas." },
-          { titulo: "Cambios sin vueltas", texto: "Tenés 30 días." },
+          { titulo: "Envíos a todo el país", texto: "A partir del mínimo, envío gratuito.", icono: "envio" },
+          { titulo: "Pagá con todas las tarjetas", texto: "Hasta en 12 cuotas.", icono: "tarjeta" },
+          { titulo: "Compra con seguridad", texto: "Todos tus datos están protegidos.", icono: "seguro" },
         ]),
         redes,
       ],
@@ -281,40 +400,49 @@ export const CATALOGO: readonly DefPreset[] = [
     // 🟡 **El menú lateral no es expresable**: el `hero` es una columna sola, y
     // un menú al costado es otra tabla. Va arriba, como en las otras 14
     // referencias que llevan `menu`. Quedó anotado en el backlog con 2 pedidos.
-    arma: ({ marca, tienda }) => ({
-      estilos: { boton: { radio: 8 }, imagen: { radio: 12 } },
+    arma: ({ tienda }) => ({
+      // Negro, blanco y un azul de CTA. El azul es #3080f8 medido sobre la
+      // captura: aparece solo en los botones y es todo el color que tiene el
+      // mail.
+      tema: { base: "claro", fondo: "#111111", fondoContenido: "#ffffff", acento: "#3080f8", link: "#3080f8", ancho: 600, fuente: "sistema" },
+      estilos: {
+        titulo: { peso: 700 },
+        cuerpo: { color: "#4a4a4a" },
+        boton: { radio: 4, color: "#ffffff", mayusculas: true, peso: 700, tamano: 13, espaciado: 0.5 },
+        imagen: { radio: 2 },
+      },
       bloques: [
         ...menuTienda(tienda),
         portada("portada-tech-1", {
           titulo: "Tecnología que se explica sola",
-          subtitulo: `Lo que más recomendamos en ${marca}.`,
-          boton: { texto: "Ver la tienda", url: tienda },
+          subtitulo: "Más de 20 horas de batería para usar.",
+          boton: { texto: "Comprar", url: tienda },
+          alto: 230,
+          velo: 45,
+          // Texto contra el margen izquierdo, como en la captura.
+          align: "left",
         }),
         categorias(tienda, [
           { clave: "celda-tecnologia", titulo: "Notebooks" },
           { clave: "celda-auriculares", titulo: "Audio" },
           { clave: "celda-regalos", titulo: "Regalos" },
-        ]),
-        {
-          tipo: "seccion",
-          bg: "",
-          titulo: "¿No sabés cuál elegir?",
-          texto: "Escribinos y te ayudamos a decidir. Contestamos todos los días.",
-          ...cta("Escribinos", tienda),
-        },
-        { tipo: "titulo", texto: "Los más vendidos", align: "left" },
-        { tipo: "texto", texto: "Hola ${contacto.nombre}, estos son los que más salen y los que menos nos vuelven.", align: "left" },
-        grilla("destacados", { tres: true, boton: "Comprar" }),
-        ...botonSi("Ver todo el catálogo", tienda, "center"),
+        ], { titulo: { align: "center", peso: 700, tamano: 14 } }),
+        { tipo: "titulo", texto: "Productos destacados", align: "center" },
+        { tipo: "texto", texto: "Descubrí los productos destacados de esta semana para estar siempre con las últimas tendencias.", align: "center" },
+        // El "ver todos" va ARRIBA de la grilla, no abajo: la captura lo pone
+        // como remate del bloque de texto y después muestra el catálogo.
+        ...botonSi("Ver todos los productos", tienda, "center"),
+        { tipo: "divisor" },
+        grilla("destacados", { tres: true, boton: "Comprar", estilo: { cuerpo: { peso: 700, tamano: 14 } } }),
         aire(8),
         // Sin miniatura el bloque no se dibuja, igual que la imagen: la plantilla
         // no muestra un hueco hasta que alguien pegue el link de su video.
         { tipo: "video", imagen: "", url: "" },
         aire(8),
         fila([
-          { titulo: "Garantía oficial", texto: "Con factura y respaldo." },
-          { titulo: "Envío en 48 h", texto: "A todo el país." },
-          { titulo: "Soporte real", texto: "Te atendemos después de la compra." },
+          { titulo: "Enviamos tu compra", texto: "Entregas a todo el país.", icono: "envio" },
+          { titulo: "Pagá como quieras", texto: "Tarjetas de crédito o efectivo.", icono: "tarjeta" },
+          { titulo: "Comprá con seguridad", texto: "Tus datos siempre protegidos.", icono: "seguro" },
         ]),
         redes,
       ],
@@ -327,20 +455,48 @@ export const CATALOGO: readonly DefPreset[] = [
     familia: "catalogo",
     // Clon de R-019 (CUBO co., audio): negro y amarillo, sin serifa.
     //
-    // 🔑 **Es la única de la familia que clava un color**, y entra por la
-    // excepción de la regla 4: acá el color ES la plantilla. Una versión de esta
-    // que se tiña con el tema de cada marca sería `minimal` con otro copy — el
-    // contraste duro sobre negro es todo lo que la distingue en la galería. El
-    // comerciante lo cambia desde el editor con dos clicks.
-    arma: ({ marca, tienda }) => ({
-      tema: { base: "oscuro", acento: "#ffd400" },
-      estilos: { titulo: { mayusculas: true }, imagen: { radio: 12 } },
+    // 🔴 **Estaba en tema OSCURO y la referencia no lo es.** Se escribió de la
+    // ficha, que dice "negro y amarillo", y el mail real es **blanco**: lo negro
+    // son dos bandas —la del logo arriba y la de las redes abajo— y el texto.
+    // Medido con `paleta-referencia.ts`: 47% de los píxeles son blancos
+    // (#f8f8f8 + #f0f0f0) contra 12,5% negros. Un mail entero en negro no se
+    // parece a uno blanco con dos bandas negras, por más que los dos "sean
+    // negro y amarillo".
+    //
+    // 🔑 Las bandas salen del `fondo` de PÁGINA: el encabezado y el pie se
+    // dibujan afuera de la tarjeta de contenido, así que un fondo de página
+    // negro con la tarjeta blanca da exactamente las dos bandas de la captura,
+    // sin ningún bloque nuevo.
+    arma: ({ tienda }) => ({
+      tema: { base: "claro", fondo: "#111111", fondoContenido: "#ffffff", acento: "#f8d000", link: "#111111", ancho: 600, fuente: "sistema" },
+      estilos: {
+        // 🔴 **Sin `color` a propósito.** Clavarlo en #111111 —que es el color
+        // que se ve en la captura— apagaba el contraste automático y dejaba el
+        // nombre de la marca negro sobre la banda negra y el título de la banda
+        // con foto negro sobre la foto oscura. El motor ya elige claro u oscuro
+        // según DÓNDE cae cada título, y acá cae en tres fondos distintos.
+        titulo: { peso: 700 },
+        subtitulo: { peso: 700 },
+        cuerpo: { color: "#4a4a4a" },
+        // Amarillo con texto BLANCO: el motor calcularía texto oscuro sobre un
+        // amarillo claro —que es lo correcto para contraste— y la referencia lo
+        // hace al revés. Es una elección de la marca, así que se escribe.
+        boton: { color: "#ffffff", radio: 2, mayusculas: true, peso: 700, tamano: 13, espaciado: 0.5 },
+        imagen: { radio: 2 },
+      },
       bloques: [
         ...menuTienda(tienda),
         portada("portada-tech-1", {
-          titulo: "Sonido, en serio",
-          subtitulo: `Lo que ${marca} elige para escuchar todos los días.`,
-          boton: { texto: "Ver la tienda", url: tienda },
+          titulo: "La mejor calidad de sonido",
+          subtitulo: "Anulación de sonido de ambiente.",
+          boton: { texto: "Ver productos", url: tienda },
+          alto: 260,
+          // Texto NEGRO a la izquierda sobre la parte clara de la foto, como en
+          // la captura: el velo aclara en vez de oscurecer.
+          veloColor: "#ffffff",
+          velo: 25,
+          align: "left",
+          estilo: { titulo: { tamano: 28, color: "#111111" }, subtitulo: { color: "#111111" } },
         }),
         // 🟡 La referencia le pone una BAJADA a cada tarjeta de categoría, debajo
         // del nombre. La celda de imagen dibuja foto + etiqueta y nada más
@@ -352,16 +508,20 @@ export const CATALOGO: readonly DefPreset[] = [
           { clave: "celda-deporte", titulo: "Deporte" },
         ]),
         { tipo: "titulo", texto: "Productos destacados", align: "left" },
-        { tipo: "texto", texto: "Hola ${contacto.nombre}, esto es lo que más se está llevando.", align: "left" },
-        grilla("destacados", { tres: true, boton: "Comprar" }),
-        ...(tienda ? [{ tipo: "boton" as const, texto: "Ver todo", url: tienda, align: "center" as const }] : []),
+        // El CTA de cada tarjeta es TEXTO subrayado, no una pastilla amarilla:
+        // en la captura el amarillo aparece una sola vez por bloque y por eso
+        // pega. Va en el bloque y no en la capa de documento, que es donde vive
+        // el botón amarillo de los CTA grandes.
+        grilla("destacados", {
+          tres: true,
+          boton: "Comprar",
+          estilo: { cuerpo: { peso: 700, color: "#111111" }, boton: { fondo: "#ffffff", color: "#111111", subrayado: true, radio: 0, padX: 2, padY: 2 } },
+        }),
+        ...botonSi("Ver todos los productos", tienda, "center"),
         aire(8),
-        bandaFoto(
-          "banda-madera",
-          "Probalo antes de decidir",
-          "Contá acá tu diferencial: garantía, prueba en el local, devolución sin preguntas.",
-          { texto: "Cómo funciona", url: tienda },
-        ),
+        // Baja (140 y no 220): en la captura es una franja, no un bloque de
+        // media pantalla con la foto respirando alrededor del texto.
+        bandaFoto("banda-madera", "Todo lo que necesitás para tu escritorio", "", { texto: "Visitar tienda", url: tienda }, 140),
         redes,
       ],
     }),

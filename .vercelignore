@@ -5,3 +5,4 @@
 # ⚠️ Solo `docs/`. Excluir `*.md` de un saque tentaba, pero son unas decenas de KB y el riesgo
 # de dejar afuera algo que el build sí lea no vale ese ahorro.
 docs/
+.mirar/

@@ -133,7 +133,7 @@ export const aire = (alto: number): Bloque => ({ tipo: "espaciador", alto });
  * Sin tienda cargada no hay bloque: el renderer filtra los links sin URL, así
  * que un menú entero sin links sería un bloque invisible.
  */
-export const menuTienda = (tienda: string): Bloque[] =>
+export const menuTienda = (tienda: string, estilo?: Bloque["estilo"]): Bloque[] =>
   tienda
     ? [
         {
@@ -143,6 +143,7 @@ export const menuTienda = (tienda: string): Bloque[] =>
             { texto: "Más vendidos", url: tienda },
             { texto: "Ofertas", url: tienda },
           ],
+          ...(estilo ? { estilo } : {}),
         },
       ]
     : [];
@@ -153,16 +154,20 @@ export const menuTienda = (tienda: string): Bloque[] =>
  * Es la banda de beneficios ("Envíos a todo el país" · "12 cuotas" · "Cambios
  * sin cargo") que aparece en 15 de las 21 referencias. Va con `textos` y no con
  * imágenes a propósito: **una plantilla se tiene que ver llena sin que nadie
- * suba una foto** (regla 3), y los íconos de esas bandas son imágenes que el
- * comerciante no tiene.
+ * suba una foto** (regla 3).
+ *
+ * 🔑 El `icono` es de un catálogo nuestro (`lib/email/iconos.ts`), así que no es
+ * una foto que el comerciante tenga que conseguir: es la parte de la banda que
+ * las cinco referencias con ícono tienen y la nuestra no tenía. Sin clave, la
+ * celda sale como salía.
  */
 export const fila = (
-  celdas: { titulo: string; texto: string }[],
+  celdas: { titulo: string; texto: string; icono?: string }[],
   align: "left" | "center" = "center",
 ): Bloque => ({
   tipo: "columnas",
   variante: "textos",
-  celdas: celdas.map((c) => ({ imagen: "", url: "", titulo: c.titulo, texto: c.texto })),
+  celdas: celdas.map((c) => ({ imagen: "", url: "", titulo: c.titulo, texto: c.texto, ...(c.icono ? { icono: c.icono } : {}) })),
   // Centrada, que es como la dibujan las cinco referencias que la tienen (002 ·
   // 006 · 008 · 018 · 021). Se escribe explícito porque el `BASE` del rol trae
   // `align:"left"`: acá no alcanza con "no decir nada" — ver `alineacion()` en
@@ -193,14 +198,17 @@ export const fila = (
  */
 export const grilla = (
   fuente: "destacados" | "recientes" | "oferta",
-  opts: { tres?: boolean; boton?: string } = {},
+  opts: { tres?: boolean; boton?: string; estilo?: Bloque["estilo"] } = {},
 ): Bloque => ({
   tipo: "productos-dinamicos",
   fuente,
   ...(opts.tres ? { n: 6, porFila: 3 } : { n: 4 }),
   movil: 2,
   ...(opts.boton ? { botonTexto: opts.boton } : {}),
-  estilo: { cuerpo: { align: "center" } },
+  // El `estilo` del llamador se mezcla ENCIMA, pero el `align` centrado se
+  // queda: es la forma de la grilla en las once referencias, no una preferencia
+  // de un preset.
+  estilo: { ...opts.estilo, cuerpo: { align: "center", ...opts.estilo?.cuerpo } },
 });
 
 /**
@@ -265,7 +273,25 @@ const VELO = "#111111";
  */
 export const portada = (
   clave: ClaveFoto,
-  o: { titulo: string; subtitulo: string; boton?: { texto: string; url: string }; alto?: number; velo?: number },
+  o: {
+    titulo: string;
+    subtitulo: string;
+    boton?: { texto: string; url: string };
+    alto?: number;
+    velo?: number;
+    /**
+     * El color del velo. Por defecto el oscuro fijo; **la única razón para
+     * pasarlo es una portada de texto NEGRO sobre una foto clara**, que es como
+     * la dibujan R-018 y R-020. Ahí el velo tiene que aclarar y no oscurecer, y
+     * de este mismo color sale el contraste que el renderer le calcula al
+     * título — pasarle `#ffffff` es lo que hace que salga oscuro.
+     */
+    veloColor?: `#${string}`;
+    /** Dónde va el texto adentro de la portada. Ausente = centrado, como siempre. */
+    align?: "left" | "center" | "right";
+    /** Overrides finos de la portada (tamaño del título, padding de la caja). */
+    estilo?: Bloque["estilo"];
+  },
 ): Bloque => ({
   tipo: "hero",
   imagen: "",
@@ -275,7 +301,10 @@ export const portada = (
   alto: o.alto ?? 300,
   velo: o.velo ?? 55,
   bg: "",
-  estilo: { caja: { fondo: VELO } },
+  estilo: {
+    ...o.estilo,
+    caja: { fondo: o.veloColor ?? VELO, ...(o.align ? { align: o.align } : {}), ...o.estilo?.caja },
+  },
   ...(o.boton ? cta(o.boton.texto, o.boton.url) : sinBoton),
 });
 
@@ -299,8 +328,10 @@ export const portada = (
 export const categorias = (
   tienda: string,
   celdas: { clave: ClaveFoto; titulo: string; boton?: string }[],
+  estilo?: Bloque["estilo"],
 ): Bloque => ({
   tipo: "columnas",
+  ...(estilo ? { estilo } : {}),
   celdas: celdas.map((c) => ({
     imagen: foto(c.clave),
     url: tienda,
@@ -323,15 +354,17 @@ export const bandaFoto = (
   titulo: string,
   texto: string,
   boton?: { texto: string; url: string },
+  alto = 220,
+  estilo?: Bloque["estilo"],
 ): Bloque => ({
   tipo: "seccion",
   bg: "",
   fondoImagen: foto(clave),
   titulo,
   texto,
-  alto: 220,
+  alto,
   velo: 55,
-  estilo: { caja: { fondo: VELO } },
+  estilo: { ...estilo, caja: { fondo: VELO, ...estilo?.caja } },
   ...(boton ? cta(boton.texto, boton.url) : sinBoton),
 });
 
@@ -346,9 +379,9 @@ export const bandaFoto = (
  * El color sale de `pal.seccion` (regla 4): en una marca clara es el beige del
  * tema y en una oscura el gris oscuro. Un `#f5f5f5` clavado sería una mancha.
  */
-export const barra = (texto: string): Bloque => ({
+export const barra = (texto: string, bg: "" | `#${string}` = ""): Bloque => ({
   tipo: "seccion",
-  bg: "",
+  bg,
   titulo: "",
   texto,
   ...sinBoton,

@@ -12,6 +12,7 @@ import {
 import { cabeza, apertura, cierre, botonVml, botonVmlCrudo, clase, clasesDe, CLASES } from "./shell";
 import { claveProductos } from "./bloques";
 import { redConIcono, urlIcono } from "./redes";
+import { iconoDe, urlIconoCelda } from "./iconos";
 import type { Bloque, Columna, ContenidoCampania, PorFila, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
 
 // Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
@@ -584,10 +585,11 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       //
       // ⚠️ Un botón TAMBIÉN es contenido: si no contara, una celda a la que le
       // falta la foto se llevaría puesto el CTA sin que nada avise, que es el
-      // modo de falla que este mismo filtro existe para no tener.
+      // modo de falla que este mismo filtro existe para no tener. Lo mismo vale
+      // para el ícono, por lo mismo.
       const celdas = todas
         .map((c, i) => ({ c, img: esImagenDe(i) }))
-        .filter(({ c, img }) => !!c.botonTexto || (img ? !!c.imagen : !!(c.titulo || c.texto)));
+        .filter(({ c, img }) => !!c.botonTexto || (img ? !!c.imagen : !!(c.titulo || c.texto || c.icono)));
       if (!celdas.length) return "";
       // La proporción es una pregunta de dos celdas: "cuál de las DOS es más
       // ancha". Con tres o cuatro el reparto es parejo — ver el comentario del
@@ -613,7 +615,14 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         // resto de los clientes se acomoda sola, el VML no. Los 12 px son el
         // `padding:6px` del `<td>`.
         const anchoCelda = Math.round(((pal.ancho - 64) * pct) / 100) - 12;
-        return `<div style="margin-top:10px;text-align:${align}">${botonAnchor(c.botonTexto, c.botonUrl ?? "", tBoton, pal, false, anchoCelda)}</div>`;
+        // `ancho: 100` estira el botón a toda la celda, que es como lo dibujan
+        // las tres referencias con botón por celda (R-015, R-018, R-021): tres
+        // barras parejas, no tres pastillas de distinto largo según el texto.
+        // Cualquier otro valor —o ninguno— deja la pastilla de siempre; el
+        // porcentaje intermedio no existe porque un `<a>` inline-block no lo
+        // toma en Outlook.
+        const full = tBoton.ancho === 100;
+        return `<div style="margin-top:10px;text-align:${align}">${botonAnchor(c.botonTexto, c.botonUrl ?? "", tBoton, pal, full, anchoCelda)}</div>`;
       };
 
       // El `alt` sale del título de la columna. No es accesibilidad de manual:
@@ -643,6 +652,26 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         return `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px">${interior}${botonCelda(c, pct, alineacion(tTitulo, "center"))}</td>`;
       };
 
+      // El ícono de la celda: chico, arriba del título, alineado como él.
+      //
+      // 🔑 **El color lo decide el fondo, no el autor**: un PNG no se tiñe con
+      // CSS —no hay `filter` confiable en un mail— así que hay dos archivos por
+      // ícono y acá se elige uno. Quien arma el mail dice "envío", nunca "envío
+      // gris oscuro", y por eso la misma plantilla no se rompe al cambiarle el
+      // tema. Ver `urlIconoCelda`.
+      //
+      // Sin `assetsBase` no hay ícono y la celda sale como salía: nunca un
+      // `<img>` sin `src`, que es lo que ya decidimos en `redes`.
+      const iconoCelda = (c: Columna, align: string) => {
+        const ico = iconoDe(c.icono);
+        const src = ico && urlIconoCelda(ctx.assetsBase, ico, pal.esOscuro);
+        if (!src) return "";
+        // `width`/`height` como ATRIBUTOS además del style: Outlook ignora el
+        // alto en CSS y estira el PNG a su tamaño natural.
+        const lado = Math.round(Math.min(96, Math.max(16, tImg.alto ?? 40)));
+        return `<div style="margin:0 0 10px;text-align:${align}"><img src="${esc(src)}" width="${lado}" height="${lado}" alt="${esc(ico.nombre)}" style="width:${px(lado)};height:${px(lado)};display:inline-block;border:0" /></div>`;
+      };
+
       const celdaTexto = (c: Columna, pct: number) => {
         const titulo = c.titulo
           ? `<div style="margin:0 0 6px;font-size:${px(tTitulo.tamano ?? 18)};font-weight:${tTitulo.peso ?? 700};line-height:${tTitulo.interlinea ?? 1.3};color:${tTitulo.color};text-align:${tTitulo.align ?? "left"}${extra(tTitulo, ["tamano", "peso", "interlinea", "color", "align"])}">${esc(c.titulo)}</div>`
@@ -650,7 +679,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         const texto = c.texto
           ? `<div style="font-size:${px(tCuerpo.tamano ?? 14)};line-height:${tCuerpo.interlinea ?? 1.5};color:${tCuerpo.color};text-align:${tCuerpo.align ?? "left"}${extra(tCuerpo, ["tamano", "interlinea", "color", "align"])}">${nl(c.texto)}</div>`
           : "";
-        const contenido = `${titulo}${texto}`;
+        const contenido = `${iconoCelda(c, tTitulo.align ?? "left")}${titulo}${texto}`;
         const interior = c.url && !c.botonTexto ? `<a href="${esc(c.url)}" style="text-decoration:none;color:inherit">${contenido}</a>` : contenido;
         return `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px">${interior}${botonCelda(c, pct, tTitulo.align ?? "left")}</td>`;
       };
@@ -755,7 +784,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
           velo: b.velo,
           bg,
           pal,
-          estiloCaja: `${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}`,
+          estiloCaja: `${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:${alineacion(c, "center")}${extra(c, ["fondo", "padX", "padY", "align"])}`,
           // Sin el botón: adentro del condicional de Outlook va partido en dos.
           interior: `${t}${s}`,
           boton: b.botonTexto ? botonPartes(b.botonTexto, b.botonUrl, e("boton"), pal) : undefined,
@@ -763,7 +792,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       }
 
       const img = b.imagen ? `<img src="${esc(b.imagen)}" alt="" style="width:100%;display:block;margin:0${extra(t0, ["radio", "align", "color", "tamano"])}" />` : "";
-      const cajaHtml = interior ? `<div style="background:${colorCss(bg, pal.tarjeta)};${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}">${interior}</div>` : "";
+      const cajaHtml = interior ? `<div style="background:${colorCss(bg, pal.tarjeta)};${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:${alineacion(c, "center")}${extra(c, ["fondo", "padX", "padY", "align"])}">${interior}</div>` : "";
       return `${img}${cajaHtml}`;
     }
     case "seccion": {
@@ -783,7 +812,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h2${clase(...clasesTitulo(x))} style="margin:0 0 ${px(b.texto || mBtn ? 8 : 0)};font-size:${px(x.tamano ?? 22)};line-height:${x.interlinea ?? 1.3};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.titulo)}</h2>`; })() : "";
       const tx = b.texto ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 ${px(mBtn ? 16 : 0)};font-size:${px(x.tamano ?? 16)};line-height:${x.interlinea ?? 1.6};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${nl(b.texto)}</p>`; })() : "";
       const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
-      const estiloCaja = `${padCss(c.padY ?? 32, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}`;
+      const estiloCaja = `${padCss(c.padY ?? 32, c.padX ?? 32)};text-align:${alineacion(c, "center")}${extra(c, ["fondo", "padX", "padY", "align"])}`;
       // La misma banda del `hero`, en el medio del mail. Con la foto, el color
       // pasa a ser el respaldo y el velo; sin ella, es la sección de siempre.
       if (b.fondoImagen) {

@@ -53,12 +53,25 @@ siguiente arranque con **una sola lectura** es el punto de todo esto.
      roto en la galería y en la casilla de quien lo recibe. Era el estado de `newsletter`,
      `editorial`, `lanzamiento` y `evento` hasta el 1-ago-2026.
 
-4. **Los tintes salen de la paleta, no de un hex clavado.** Un `seccion` con `bg: ""` toma
-   `pal.seccion`, que se deriva del tema de la marca (beige `#faf7f0` en claro, `#1f1f1f` en
-   oscuro). Así **la misma plantilla se tiñe sola en cada marca**. Un hex a mano
-   (`#fff7ed`, `#f0fdf4`) se ve como una mancha ajena en una marca con tema propio, y peor
-   en una con tema oscuro. Se clava un color **solo cuando el color ES la plantilla** —
-   la invitación de fondo negro, por ejemplo — y ahí va anotado por qué.
+4. **Hay DOS clases de plantilla y el color funciona al revés en cada una.** Partida el
+   2-ago-2026, cuando Bruno dijo *"el clon tiene que ser clon, exacto. Luego la gente edita.
+   Y NO tiene que ponerse NADA de la marca que lo está eligiendo"*. La galería es un catálogo
+   de SaaS: el comerciante elige por la miniatura y **después** edita.
+
+   - **La que clona una referencia** (los 11 de `docs/referencias/parecido.md`) **declara su
+     `Tema` COMPLETO** — `base`, `fondo`, `fondoContenido`, `acento`, `link`, `ancho`,
+     `fuente` — y clava los hex que hagan falta. 🔴 **Completo o nada**: `combinarTema` es un
+     spread plano, así que cualquier campo que falte se cae al tema de la marca y el clon se
+     ensucia. Los colores **se miden sobre la captura** con
+     `scripts/paleta-referencia.ts`, no se eligen a ojo: "gris claro y dorado" salió `#f59e0b`
+     y el dorado real era `#c0a040`.
+   - **La que no clona nada** (`tienda`, `ecommerce`, `novedades`, `grilla`, las de ciclo) no
+     declara tema y usa `bg: ""`, que toma `pal.seccion` del tema de la marca. **Se tiñe sola
+     en cada tienda**, y eso es un valor distinto, no una versión pobre.
+
+   🔴 **En las dos, el `color` del rol `titulo` NO se clava en la capa de documento si el
+   mail tiene bandas con foto**: apaga el contraste automático y el título sale oscuro sobre
+   la foto oscura. Pasó en tres de los siete clones de catálogo. Se clava en el bloque.
 
 5. **`movil: 2` en toda grilla**, igual que `nuevoBloque`. Entra el doble de producto en la
    misma pantalla del teléfono.
@@ -103,6 +116,11 @@ Los patrones que van apareciendo en las referencias, y qué puede hacer el motor
 | botón propio en cada celda de una fila | ✅ | `botonTexto`/`botonUrl` en `Columna` desde el 2-ago. ⚠️ El contador decía **2** y estaban mal contadas: son **3**, y por eso entró por la regla normal | 015 · 018 · 021 |
 | botón "Comprar" en cada tarjeta de la grilla | ✅ | `botonTexto` en `productos`/`productos-dinamicos` desde el 2-ago. **Un texto para toda la grilla**: el destino de cada botón es la ficha de SU producto, que el motor ya sabe. Con botón, la tarjeta deja de ser un ancla entera | 001 · 002 · 006 · 007 · 008 · 010 · 012 · 018 · 019 · 020 · 021 |
 | tarjeta de producto centrada | ✅ | `estilo.cuerpo.align` en la grilla, desde el 2-ago: el `text-align` va en el `<td>` y alinea nombre, precio y botón **juntos**. Antes salía por `extra()` en el nombre y nada más | las 11 de arriba, sin una excepción |
+| texto de la portada fuera del centro | ✅ | `estilo.caja.align` en `hero` y `seccion` desde el 2-ago. **Una sola perilla para todo el interior**: el `text-align` de la caja cascadea al título, al subtítulo y al botón. Default `center`, así que nada ya publicado se movió | 004 · 015 · 017 · 018 |
+| ícono en cada celda de una fila | ✅ | `icono` en `Columna` desde el 2-ago: clave de `lib/email/iconos.ts`, **nunca una URL libre**. Dos PNG por ícono (`public/iconos/<clave>-<claro\|oscuro>.png`, dibujados de lucide por `scripts/dibujar-iconos.ts`) y **el renderer elige cuál según `pal.esOscuro`**: un PNG no se tiñe | 002 · 006 · 008 · 018 · 021 |
+| botón al ancho de su celda | ✅ | `estilo.boton.ancho: 100` en el bloque `columnas`, desde el 2-ago. Tres barras parejas y no tres pastillas de distinto largo según el texto | 015 · 018 · 021 |
+| precio más grande que el nombre en la tarjeta | 🔴 | los dos salen del mismo `eTexto.tamano` en `renderCard`. **Pide un rol de estilo nuevo** (`precio`) | las 7 de catálogo |
+| grilla de 4 por fila | 🔴 | `PorFila` es `2 \| 3`. ⚠️ **No cuesta una llamada más a TN**: `claveProductos` es `fuente\|categoriaId\|n` y `porFila` no entra en la llave | 004 · 007 · 011 · 021 |
 | badge de descuento sobre la foto | 🔴 | ⚠️ `position` está prohibido en un mail: va como fila de tabla, no overlay | 015 · 021 |
 | producto único destacado grande | 🔴 | `productos` con 1 item dibuja media grilla | 002 · 009 |
 | barra fina de aviso ("Envío gratis a partir de…") | ✅ | `barra()` de `comun.ts`: un `seccion` sin título con `caja.padY`. Se pudo cuando el `<p>` dejó de arrastrar 16px de margen cableado | 007 · 008 |
@@ -397,6 +415,10 @@ Ordenado por cuántas referencias lo pidieron. **Nada de acá se implementa hast
 | 6 | cuotas del producto | ⚠️ **no es un bloque**: TN no devuelve el plan de cuotas en `/products`. Sale de la config de pagos de la tienda, o se escribe a mano en el mail |
 | 6 | "ver online / compartir" | pide guardar el HTML y servirlo por una URL pública. Es una feature de plataforma, con su propia decisión de privacidad: el mail de otra persona no puede quedar indexado |
 | ✅ 3 | botón propio en cada celda | **hecho el 2-ago-2026**: `botonTexto`/`botonUrl` en `Columna`, sin bump de esquema. 🔴 Con botón la celda deja de ser un ancla entera |
+| 7 | **precio más grande que el nombre** | las siete referencias de catálogo lo hacen. Pide un rol `precio` en la cascada: hoy nombre y precio comparten `eTexto.tamano`. ⚠️ Un rol nuevo obliga a una entrada de `SIN_EFECTO` por cada tipo de bloque que no lo use, o `probar-panel-estilo` se pone rojo |
+| 4 | grilla de 4 por fila | `PorFila` es `2 \| 3`. No agrega llamadas a TN (`porFila` no está en `claveProductos`); sí toca el `GrillaControl` del panel |
+| ✅ 4 | texto de la portada fuera del centro | **hecho el 2-ago-2026**: `caja.align` salió de `SIN_EFECTO` en `hero` y `seccion` |
+| ✅ 5 | ícono en cada celda | **hecho el 2-ago-2026**: catálogo cerrado en `lib/email/iconos.ts` + dos PNG por ícono |
 | 2 | badge de descuento sobre la foto | fila de tabla sobre la foto. ⚠️ nada de `position` |
 | 2 | producto único destacado | bloque propio, no `productos` con n=1 |
 | ✅ 2 | barra fina de aviso | **hecho el 2-ago-2026**: salió gratis con el margen muerto del `seccion`. Es `barra()` en `comun.ts` |
@@ -446,10 +468,22 @@ galería: `productos-dinamicos` no dibuja nada sin productos —y los productos 
 productos de mentira por grilla. Si algún día un bloque nuevo también resuelve su contenido
 por `RenderOpts`, hay que alimentarlo ahí o el golden lo mira sin verlo.
 
-📌 **Para mirar un preset con los ojos y no por hash** no hay nada en el repo: se renderiza a
-un HTML suelto —`presetsPara()` + `renderEmailHtml` con productos de mentira— y se le saca una
-captura con `--headless=new --screenshot` de Chrome. Es lo que hizo falta para la pasada de
-parecido del 2-ago; el script vivió en el scratchpad y no se commiteó.
+📌 **Para mirar un preset con los ojos** están estos dos, y son parte del ritual de cada tanda:
+
+```bash
+node --import tsx scripts/mirar-preset.ts catalogo   # deja en .mirar/ la comparación
+node --import tsx scripts/mirar-preset.ts audio --hostil   # ¿se filtra algo de la marca?
+node --import tsx scripts/paleta-referencia.ts --todas     # los colores REALES de cada captura
+```
+
+`mirar-preset` renderiza con productos de mentira, captura con Chrome y **compone la
+referencia y nuestro render lado a lado en un solo PNG**, las dos escaladas a la misma altura.
+🔑 Que sea UNA imagen es el punto: mirando una y después la otra solo se compara el esqueleto,
+y el esqueleto ya coincidía. `--hostil` renderiza con un tema de marca a propósito horrible —
+si algo de ese tema aparece, el clon dejó un campo del `Tema` sin declarar.
+
+⚠️ Los dos se corren **parados en el repo** (`tsx` resuelve desde el cwd). La salida va a
+`.mirar/`, que está ignorada por git y por Vercel.
 
 Después de deployar: abrir `/plantillas` en las 3 marcas y confirmar que **ninguna miniatura
 se ve vacía**; abrir una de cada familia en el editor con el toggle **Celular**; mandarse una

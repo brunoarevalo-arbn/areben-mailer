@@ -65,6 +65,22 @@ export interface Columna {
    */
   botonTexto?: string;
   botonUrl?: string;
+  /**
+   * Ícono chico arriba del título de la celda. Una clave de `ICONOS`
+   * (`lib/email/iconos.ts`), **nunca una URL libre**.
+   *
+   * Que sea una clave y no una imagen es el mismo criterio que `redes`: el
+   * archivo lo servimos nosotros desde `public/iconos/`, así que no puede
+   * quedar roto en una casilla, no se puede colar un tracker de un tercero, y
+   * **el color lo elige el renderer** según el fondo — un PNG no se tiñe.
+   *
+   * Entró el 2-ago-2026 por la regla de 3: la banda de beneficios con ícono
+   * está en R-002, R-006, R-008, R-018 y R-021 — cinco referencias.
+   *
+   * Sin bump de esquema, igual que `botonTexto`: es aditivo y el saneador hace
+   * `{ imagen:"", url:"", ...c }`, así que sobrevive el round-trip solo.
+   */
+  icono?: string;
 }
 
 /**

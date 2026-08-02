@@ -43,3 +43,6 @@ next-env.d.ts
 # permitir el ejemplo de variables
 !.env.example
 .env*.local
+
+# las capturas de `scripts/mirar-preset.ts` (se regeneran corriéndolo)
+.mirar/

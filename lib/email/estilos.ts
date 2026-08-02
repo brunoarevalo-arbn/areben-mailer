@@ -460,9 +460,9 @@ function propsCaja(tipo: TipoBloque): readonly (keyof EstiloBloque)[] {
  * Casi todo es una misma historia contada tres veces: **quién gana la
  * alineación**. `titulo`, `texto` y `boton` la tienen en su formulario de
  * contenido y el renderer escribe `b.align ?? t.align`, así que la del estilo no
- * llega nunca; la portada, la sección y el cupón centran su interior por diseño.
- * Ofrecer el control igual sería poner dos perillas para lo mismo y que solo
- * funcione una.
+ * llega nunca; en la portada, la sección y el cupón la gana **la caja**, que es
+ * la que escribe el `text-align` que cascadea al interior. Ofrecer el control
+ * igual sería poner dos perillas para lo mismo y que solo funcione una.
  *
  * ⚠️ Esta lista no se escribe a ojo: sale de correr
  * `scripts/probar-panel-estilo.ts`, que ejercita el renderer control por control
@@ -476,8 +476,21 @@ const SIN_EFECTO: Partial<Record<TipoBloque, Partial<Record<RolEstilo, readonly 
   texto: { cuerpo: ["align"] },
   carrito: { titulo: ["align"] },
   redes: { cuerpo: ["align", "subrayado"] },
-  hero: { caja: ["align"], titulo: ["align"], subtitulo: ["align"] },
-  seccion: { caja: ["align"], titulo: ["align"], subtitulo: ["align"] },
+  // 🔑 `caja.align` SÍ tiene efecto desde el 2-ago-2026: es **una sola perilla
+  // para todo el interior** de la portada y de la banda. El `text-align` va en
+  // la caja y cascadea al `<h1>`, al `<p>` y al botón —que es `inline-block`—,
+  // así que alinear los tres por separado sería tres controles para una decisión
+  // y con tres formas de dejarlos desalineados entre sí. Por eso `titulo` y
+  // `subtitulo` siguen acá: los gobierna la caja.
+  //
+  // Entró por la regla de 3 de `PLANTILLAS.md`: el texto de la portada va fuera
+  // del centro en R-004, R-015, R-017 y R-018 — cuatro referencias. Hasta hoy
+  // "centrado por diseño" era una decisión del renderer que ninguna captura
+  // respaldaba. El default sigue siendo `center`, así que nada ya publicado se
+  // mueve: lo resuelve `alineacion()`, que pregunta por `elegidas` y no por el
+  // valor.
+  hero: { titulo: ["align"], subtitulo: ["align"] },
+  seccion: { titulo: ["align"], subtitulo: ["align"] },
   cupon: { titulo: ["align", "interlinea"], cuerpo: ["align"] },
   // El "botón" del video es el círculo con el ▶ encima de la miniatura: toma
   // color, fondo y redondeo, y nada de tipografía porque no tiene texto.
