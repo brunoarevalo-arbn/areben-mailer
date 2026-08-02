@@ -164,6 +164,7 @@ export const menuTienda = (tienda: string, estilo?: Bloque["estilo"]): Bloque[] 
 export const fila = (
   celdas: { titulo: string; texto: string; icono?: string }[],
   align: "left" | "center" = "center",
+  estilo?: Bloque["estilo"],
 ): Bloque => ({
   tipo: "columnas",
   variante: "textos",
@@ -172,7 +173,15 @@ export const fila = (
   // 006 · 008 · 018 · 021). Se escribe explícito porque el `BASE` del rol trae
   // `align:"left"`: acá no alcanza con "no decir nada" — ver `alineacion()` en
   // `lib/email/estilos.ts`, donde ese default a la izquierda vive.
-  estilo: { titulo: { align }, cuerpo: { align } },
+  //
+  // El `estilo` del llamador se mezcla encima **por rol**, no por arriba de
+  // todo: un spread plano le borraría el `align` a la fila entera, que es lo
+  // único que esta pieza tiene que garantizar.
+  estilo: {
+    ...estilo,
+    titulo: { align, ...estilo?.titulo },
+    cuerpo: { align, ...estilo?.cuerpo },
+  },
 });
 
 /**

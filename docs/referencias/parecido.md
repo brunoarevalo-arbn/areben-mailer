@@ -84,6 +84,76 @@ hay atrás — sobre un velo oscuro, `fondo: "#1f1f1f"`.
   texto. Medido: 47% de píxeles blancos contra 12,5% negros. Además, el CTA de cada tarjeta es
   texto subrayado y el amarillo aparece una vez por bloque.
 
+---
+
+# La familia Venta (ronda 2, 2-ago-2026)
+
+Los cuatro clones: `brasas` (R-001) · `final-sale` (R-010) · `tu-estilo` (R-012) ·
+`mega-oferta` (R-021).
+
+🔑 **Fallaba lo mismo que en catálogo, y encima peor: los cuatro no declaraban `Tema`.**
+Tres no declaraban ninguno y el cuarto —`tu-estilo`— declaraba dos campos. O sea que los
+cuatro salían con el ámbar `#f59e0b` del default y se teñían con la marca que los elegía,
+que es exactamente lo que la regla 4 partida prohíbe.
+
+## Los colores, medidos
+
+| clon | referencia | acento | fondo de página |
+|---|---|---|---|
+| `brasas` | R-001 | `#f89800` (naranja de brasa) | `#181818` (62,5%), **igual que la tarjeta** |
+| `final-sale` | R-010 | `#18a8e8` (celeste, 9,4%) · CTA **negros** | `#18a8e8` |
+| `tu-estilo` | R-012 | `#d83028` (28,8%) · CTA **negros** | `#d83028` |
+| `mega-oferta` | R-021 | `#0038e8` (azul de CTA, 2,3%) | `#202020` · cierre `#80c000` |
+
+## Los tres hallazgos de esta ronda
+
+1. 🔴 **El color de la referencia no siempre es el `acento`: a veces es el `fondo`.** En
+   R-012 el rojo es el **28,8% de los píxeles** —el encabezado, dos bloques y el pie—, y
+   estaba escrito como acento: daba un mail blanco con botones rojos, que es otra plantilla.
+   La pregunta no es "¿de qué color es?" sino **"¿cuánto ocupa?"**. Arriba del ~20% es fondo.
+   Su gemelo: en tres de los cuatro los **botones son negros**, y el color de la marca no
+   toca un solo botón.
+2. 🔑 **`fondo` y `fondoContenido` iguales borran la tarjeta.** R-001 es una sola pieza
+   oscura de borde a borde; con dos oscuros distintos se ve el recuadro de la tarjeta
+   recortado contra la página, y eso solo lo tenía nuestro render. Es la contracara del
+   truco de las bandas: ahí los colores se separan **a propósito**.
+3. 🔴 **El botón *outline* era "no expresable" y no lo era.** La ficha de R-001 decía que el
+   rol `boton` no emite borde; lo emite desde `bordeAncho`/`bordeColor`, que estrenó
+   `joyeria` en la ronda anterior. Al escribirlo apareció el bug de verdad: el
+   `<v:roundrect>` tenía **`stroke="f"` cableado**, así que en Outlook el borde no se
+   dibujaba nunca — y `joyeria` ya estaba en producción con una pastilla blanca sobre fondo
+   blanco, o sea sin botón. Arreglado en `shell.ts`.
+
+## 🔴 El pie se volvió ilegible sobre un fondo saturado
+
+Estrenar fondos de página **del medio** (celeste, rojo) destapó que `pal.tenue` —el gris del
+pie— es fijo por tema y no mira el fondo. Medido: `#a3a3a3` sobre el celeste `#18a8e8` da
+**1,05:1**. Y en el pie vive el **link de baja**, que es obligatorio.
+
+Se arregló en el motor con `tenueSobre()` (`estilos.ts`): contra un fondo **extremo**
+—blanco o casi negro— queda el gris de siempre, y contra uno del medio se va al extremo
+contrario con la misma tabla que usa el resto del motor. 🔑 **Ninguna plantilla ya publicada
+se movió**: todas las que declaran `fondo` propio lo tienen en `#111111` o `#f0f0f0`, y el
+golden lo confirma —solo se movieron `final-sale` y `tu-estilo`—.
+
+## Clon por clon
+
+- **`brasas` (R-001)** — Una sola pieza `#181818`, título póster de 48px, botones *outline*
+  blancos, dos líneas blancas finas y fotos de producto al ras. 🟡 La foto de brasas es del
+  MAIL ENTERO y no es expresable: queda en la portada, con una **textura** (madera oscura,
+  velo 72) y no un producto — lo que hay atrás del título de la referencia es materia.
+- **`final-sale` (R-010)** — Marco celeste, CTA negros rectos, banda celeste en el medio y
+  cierre oscuro con una `barra()`. 🟡 Tres cosas quedaron afuera: el menú sobre celeste y el
+  gris de la fila de categorías (`caja.fondo` no existe fuera de `hero`/`seccion`/`cupon`) y
+  la foto del auto al costado de la banda de color.
+- **`tu-estilo` (R-012)** — Rojo en el `fondo` de página ⇒ encabezado y pie rojos, más dos
+  `seccion` rojas adentro. Botones negros, salvo los de la grilla, que la referencia
+  **invierte**: blancos con el texto y el borde rojos. Sobre la foto va solo el título.
+- **`mega-oferta` (R-021)** — Banda negra arriba, azul solo en los botones, cupón e hilos
+  divisores en verde lima y los íconos en la banda de beneficios. 🟡 El pie verde de la
+  captura no entra por el fondo de página —arriba tiene que ser negro y hay uno solo—, así
+  que el cierre verde va adentro de la tarjeta.
+
 ## Lo que sigue sin ser expresable (no volver a intentarlo)
 
 - **Menú lateral adentro de la portada** (R-006, R-019): el `hero` es una columna sola.

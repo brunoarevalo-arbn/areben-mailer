@@ -181,7 +181,17 @@ export function botonVmlCrudo(
   // más, Outlook dibuja una cápsula deforme.
   const arc = Math.min(50, Math.round(((e.radio ?? 8) / (alto / 2)) * 100));
   const escUrl = url || "#";
-  return `<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${escUrl}" style="height:${alto}px;v-text-anchor:middle;width:${ancho}px" arcsize="${arc}%" stroke="f" fillcolor="${e.fondo}">
+  // 🔴 **El borde del botón se dibuja acá o Outlook no lo dibuja en ningún
+  // lado.** `stroke="f"` estaba cableado desde el día uno, así que un botón
+  // *outline* —fondo del color de atrás + borde fino, que es la forma que le
+  // dan R-001, R-007 y R-012— salía en Outlook como un rectángulo relleno de
+  // ese mismo color: la caja desaparecía y quedaba el texto suelto. Ya estaba
+  // pasando en producción con `joyeria`, que es blanco sobre blanco.
+  // El ancho va en px explícitos: `strokeweight` sin unidad son *puntos*.
+  const borde = e.bordeAncho
+    ? ` stroke="t" strokecolor="${e.bordeColor ?? e.color}" strokeweight="${px(e.bordeAncho)}"`
+    : ` stroke="f"`;
+  return `<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${escUrl}" style="height:${alto}px;v-text-anchor:middle;width:${ancho}px" arcsize="${arc}%"${borde} fillcolor="${e.fondo}">
 <w:anchorlock/>
 <center style="color:${e.color};font-family:${e.fuente ?? pal.fuente};font-size:${tam}px;font-weight:${e.peso ?? 600}">${texto}</center>
 </v:roundrect>`;

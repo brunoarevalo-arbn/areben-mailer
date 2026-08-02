@@ -118,15 +118,26 @@ const OSCURO = {
 
 const ACENTO_DEFECTO = "#f59e0b";
 
-/** ¿Este color es oscuro? Luminancia relativa, para decidir el texto que va encima. */
-export function esColorOscuro(hex: string): boolean {
+/**
+ * Luminancia percibida de un color: 0 es negro, 1 es blanco.
+ *
+ * ⚠️ Un color que no se puede leer devuelve **1** (blanco), que es el fondo por
+ * defecto de un mail: así `esColorOscuro` sigue contestando `false` ante basura,
+ * que es lo que contestaba cuando esta cuenta vivía adentro suyo.
+ */
+export function luminancia(hex: string): number {
   const h = hex.replace("#", "").trim();
   const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
-  if (full.length !== 6) return false;
+  if (full.length !== 6) return 1;
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) / 255);
-  if ([r, g, b].some(Number.isNaN)) return false;
+  if ([r, g, b].some(Number.isNaN)) return 1;
   // Coeficientes de luminancia percibida (Rec. 709).
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.5;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** ¿Este color es oscuro? Luminancia relativa, para decidir el texto que va encima. */
+export function esColorOscuro(hex: string): boolean {
+  return luminancia(hex) < 0.5;
 }
 
 /**

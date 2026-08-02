@@ -119,6 +119,9 @@ Los patrones que van apareciendo en las referencias, y qué puede hacer el motor
 | texto de la portada fuera del centro | ✅ | `estilo.caja.align` en `hero` y `seccion` desde el 2-ago. **Una sola perilla para todo el interior**: el `text-align` de la caja cascadea al título, al subtítulo y al botón. Default `center`, así que nada ya publicado se movió | 004 · 015 · 017 · 018 |
 | ícono en cada celda de una fila | ✅ | `icono` en `Columna` desde el 2-ago: clave de `lib/email/iconos.ts`, **nunca una URL libre**. Dos PNG por ícono (`public/iconos/<clave>-<claro\|oscuro>.png`, dibujados de lucide por `scripts/dibujar-iconos.ts`) y **el renderer elige cuál según `pal.esOscuro`**: un PNG no se tiñe | 002 · 006 · 008 · 018 · 021 |
 | botón al ancho de su celda | ✅ | `estilo.boton.ancho: 100` en el bloque `columnas`, desde el 2-ago. Tres barras parejas y no tres pastillas de distinto largo según el texto | 015 · 018 · 021 |
+| botón *outline* (borde fino, sin relleno) | ✅ | `boton.bordeAncho` + `bordeColor`, con el `fondo` del color que hay atrás: el motor **siempre** rellena, así que "sin fondo" se emula. ⚠️ Hasta el 2-ago el `<v:roundrect>` tenía `stroke="f"` cableado y **Outlook lo dibujaba sin borde** — `joyeria` ya estaba en producción con una pastilla blanca sobre blanco | 001 · 007 · 012 |
+| color de fondo en el menú o en una fila de celdas | 🔴 | `caja.fondo` lo dibujan solo `hero`, `seccion` y `cupon`, que son los tres bloques que arman su propio contenedor; el resto pasa por `pad()`, que es margen lateral y visibilidad y nada más (`propsCaja` en `estilos.ts`) | 010 · 021 |
+| banda de color con la foto a un costado | 🔴 | el `seccion` es de una columna y el `columnas`, que tiene dos, no toma color de fondo (fila de arriba). Se aproxima con la banda de color sola | 010 |
 | precio más grande que el nombre en la tarjeta | 🔴 | los dos salen del mismo `eTexto.tamano` en `renderCard`. **Pide un rol de estilo nuevo** (`precio`) | las 7 de catálogo |
 | grilla de 4 por fila | 🔴 | `PorFila` es `2 \| 3`. ⚠️ **No cuesta una llamada más a TN**: `claveProductos` es `fuente\|categoriaId\|n` y `porFila` no entra en la llave | 004 · 007 · 011 · 021 |
 | badge de descuento sobre la foto | 🔴 | ⚠️ `position` está prohibido en un mail: va como fila de tabla, no overlay | 015 · 021 |
@@ -184,8 +187,11 @@ Tema: negro con foto de brasas a sangre en TODO el mail, tipografía de palo sec
 Copy: promesa arriba, urgencia en el subtítulo, un solo CTA antes de la grilla
 Patrones nuevos: foto de fondo del mail entero 🔴 (queda en el 🟡 del `hero` a sangre)
 Sale como: preset **`brasas`** (familia venta), el clon fiel, y también `hot-sale` sin la foto.
-  🟡 Dos cosas no son expresables: la foto de fondo del MAIL ENTERO (el fondo de página es un
-  color del tema) y el botón *outline* (el rol `boton` no emite borde)
+  🟡 Lo único que no es expresable es la foto de fondo del MAIL ENTERO (el fondo de página es un
+  color del tema); queda en la portada, con una **textura** oscura y no un producto.
+  ⚠️ El botón *outline* **sí** es expresable y esta ficha decía lo contrario: entra por
+  `boton.bordeAncho` + `bordeColor`, con el `fondo` del color de atrás (el motor siempre
+  rellena). Desde el 2-ago el `<v:roundrect>` también lo dibuja
 
 ### R-002 · Morelia, marroquinería   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-002-morelia-cuero.png`
@@ -301,7 +307,10 @@ Tema: rojo ladrillo de punta a punta, blanco arriba
 Copy: pregunta como asunto, tres CTA iguales
 Patrones nuevos: `fondoImagen` en `seccion`
 Sale como: preset **`tu-estilo`** (familia venta), el clon fiel: **el color ES la plantilla**
-  (#b23a2f), que es la excepción de la regla 4
+  (#d83028 medido, el 28,8% de los píxeles), que es la excepción de la regla 4. ⚠️ Esta ficha
+  decía #b23a2f, elegido a ojo de "rojo ladrillo", **y en el lugar equivocado**: con ese rojo
+  solo en `acento` salía un mail blanco con botones rojos. En la captura el rojo es el **fondo**
+  y los botones son negros
 
 ### R-013 · Cyber Monday tipográfico   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-013-cyber-monday-tipografico.png`
@@ -419,6 +428,7 @@ Ordenado por cuántas referencias lo pidieron. **Nada de acá se implementa hast
 | 4 | grilla de 4 por fila | `PorFila` es `2 \| 3`. No agrega llamadas a TN (`porFila` no está en `claveProductos`); sí toca el `GrillaControl` del panel |
 | ✅ 4 | texto de la portada fuera del centro | **hecho el 2-ago-2026**: `caja.align` salió de `SIN_EFECTO` en `hero` y `seccion` |
 | ✅ 5 | ícono en cada celda | **hecho el 2-ago-2026**: catálogo cerrado en `lib/email/iconos.ts` + dos PNG por ícono |
+| 2 | color de fondo en el menú y en la fila de celdas | `caja.fondo` lo dibujan solo `hero`, `seccion` y `cupon`. No es una prop nueva: es hacer que `menu` y `columnas` **dibujen su propio contenedor** en vez de pasar por `pad()`. ⚠️ Toca `propsCaja` y por lo tanto el panel |
 | 2 | badge de descuento sobre la foto | fila de tabla sobre la foto. ⚠️ nada de `position` |
 | 2 | producto único destacado | bloque propio, no `productos` con n=1 |
 | ✅ 2 | barra fina de aviso | **hecho el 2-ago-2026**: salió gratis con el margen muerto del `seccion`. Es `barra()` en `comun.ts` |

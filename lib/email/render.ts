@@ -6,7 +6,7 @@
 import { resolverPaleta, combinarTema, type Paleta, type Tema } from "./tema";
 import { leerContenido } from "./esquema";
 import {
-  resolverEstilo, extra, px, padCss, alineacion,
+  resolverEstilo, extra, px, padCss, alineacion, tenueSobre,
   type CtxEstilo, type EstiloResuelto, type Estilos, type RolEstilo,
 } from "./estilos";
 import { cabeza, apertura, cierre, botonVml, botonVmlCrudo, clase, clasesDe, CLASES } from "./shell";
@@ -961,6 +961,11 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
     ? `background:${pal.tarjeta}`
     : `background:${pal.tarjeta};border:1px solid ${pal.borde};border-radius:12px`;
 
+  // El pie se dibuja sobre el FONDO DE PÁGINA, no sobre la tarjeta: el gris
+  // apagado de la paleta sirve contra blanco o negro y desaparece contra un
+  // fondo saturado. Ver `tenueSobre` — ahí abajo vive el link de baja.
+  const tenuePie = tenueSobre(pal.fondo, pal.tenue);
+
   // El namespace de VML va en el <html> o Outlook no dibuja los botones.
   return `<!doctype html>
 <html lang="${esc(pal.idioma)}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
@@ -977,9 +982,9 @@ ${apertura(pal)}
       <div style="height:16px"></div>
     </div>
     <!-- Footer -->
-    <div style="text-align:center;color:${pal.tenue};font-size:12px;line-height:1.6;margin-top:20px">
+    <div style="text-align:center;color:${tenuePie};font-size:12px;line-height:1.6;margin-top:20px">
       ${esc(opts.nombreCuenta)}${opts.direccionPostal ? " · " + esc(opts.direccionPostal) : ""}<br>
-      <a href="${esc(opts.unsubscribeUrl)}" style="color:${pal.tenue}">Desuscribirme</a>
+      <a href="${esc(opts.unsubscribeUrl)}" style="color:${tenuePie}">Desuscribirme</a>
     </div>
 ${cierre}
 </body></html>`;

@@ -11,7 +11,7 @@
 // emisores de CSS llegan después: el normalizador del esquema tiene que poder
 // filtrar un `estilo` que venga de la base antes de que exista quien lo dibuje.
 
-import { FUENTES, esColorOscuro, type Paleta } from "./tema";
+import { FUENTES, esColorOscuro, luminancia, type Paleta } from "./tema";
 import type { TipoBloque } from "./bloques";
 
 /**
@@ -624,6 +624,27 @@ export function tonosSobre(bg: string): { texto: string; cuerpo: string; medio: 
   return esColorOscuro(bg)
     ? { texto: "#fafafa", cuerpo: "#d5d4d4", medio: "#b8b8b8" }
     : { texto: "#171717", cuerpo: "#404040", medio: "#525252" };
+}
+
+/**
+ * El gris apagado del pie, que se dibuja sobre el **fondo de página** y no sobre
+ * la tarjeta.
+ *
+ * 🔴 `pal.tenue` es un gris a propósito bajo de contraste y funciona contra un
+ * fondo **extremo** —blanco o casi negro—, que era lo único que había hasta el
+ * 2-ago-2026: todas las plantillas con `fondo` propio lo tenían en #111111 o en
+ * #f0f0f0. Contra un fondo del medio desaparece; medido sobre el celeste
+ * #18a8e8 de `final-sale`, el #a3a3a3 da **1,05:1**. Y en el pie vive el **link
+ * de baja**, que es obligatorio y es lo último del mail que puede quedar
+ * ilegible — por algo el pie no es un bloque que se pueda borrar.
+ *
+ * Contra un fondo del medio no hay gris que sirva, así que se va al extremo
+ * contrario con la misma tabla que usa el resto del motor. Un fondo extremo
+ * conserva el gris de siempre: **ninguna plantilla ya publicada se mueve**.
+ */
+export function tenueSobre(fondo: string, tenue: string): string {
+  const l = luminancia(fondo);
+  return l > 0.75 || l < 0.15 ? tenue : tonosSobre(fondo).medio;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
