@@ -255,3 +255,69 @@ Cuatro cosas, todas de la primera comparación:
   tarjeta**, igual que en `final-sale` y `mega-oferta`.
 - **La foto al costado de una banda de color** (R-015) y **la grilla de 4 por fila** (R-004,
   R-011): siguen en el backlog, sin cambios.
+
+---
+
+# La familia Producto (ronda 4, 2-ago-2026)
+
+Los dos clones: `bodega` (R-009) · `negro-y-dorado` (R-016). La familia pasó de **1 a 3** y
+la galería va **36 de 38**.
+
+🔑 **Las dos son el mismo truco y por eso salieron juntas: el mail está PARTIDO EN DOS.**
+Arriba una mitad oscura de borde a borde —donde va el logo— y abajo una mitad blanca con la
+grilla. Eso no pide ningún bloque: el color oscuro va en el `fondo` de **PÁGINA** y la tarjeta
+se queda blanca, porque el encabezado y el pie se dibujan fuera de ella. Es el mismo truco de
+`minimal`, `electro` y `vuelta-al-cole`, usado acá para la mitad del mail y no para dos bandas.
+
+## Los colores, medidos
+
+| clon | referencia | acento | fondo de página |
+|---|---|---|---|
+| `bodega` | R-009 | `#202020` (los botones; **no** es el marrón) | `#201808` (71% arriba, 84% abajo) |
+| `negro-y-dorado` | R-016 | `#000000` (negro puro) | `#000000` (73% de la mitad de arriba) |
+
+⚠️ **El dorado de R-016 es `#e0a868`**, medido sobre un recorte del póster (el 34% de ese
+recorte). El plan había elegido `#c9a227` a ojo — bastante más verdoso. Van tres tandas
+seguidas en las que **todos** los hex del plan estaban mal: medir es del ritual, no de una
+tanda. 🔑 Y el dorado **no es el acento**: aparece una sola vez en todo el mail, en el título
+de la portada, y los dos botones son negros. Misma lección que R-012 al revés.
+
+## Los dos hallazgos de esta ronda
+
+1. 🔴 **La barra de navegación salía pegada a la IZQUIERDA desde el día uno.** El `case "menu"`
+   del renderer decía `t.align ?? "center"` y ese `??` es letra muerta: `BASE.cuerpo` ya
+   escribe `align:"left"`, así que nunca corría. Son **15 de las 21 referencias** las que
+   centran el menú, sin una sola excepción, y el bloque está en 17 presets — o sea que era la
+   diferencia más repetida de toda la galería y no la había visto ninguna de las tres rondas
+   anteriores. Es **el mismo bug** que la etiqueta de la fila de categorías de la ronda 1, en
+   otro `case`: se arregló con `alineacion()`, que pregunta por `elegidas` y no por el valor.
+   El golden se movió en 17 plantillas y el diff es una sola línea en cada una.
+   🔑 **Si ves otro `align ?? …` en el renderer, mirá si el default coincide con el `BASE`**:
+   los de `titulo`/`texto`/`boton` caen a `"left"`, que es lo mismo que dice el `BASE`, así que
+   son inofensivos. El del `menu` era el único que prometía otra cosa.
+2. 🔑 **El velo de una portada también sirve para NO despegar la banda del fondo.** `portada()`
+   pinta el velo del oscuro fijo `#111111`, que es lo correcto cuando la portada es una isla;
+   acá las dos son la continuación de la banda del encabezado, así que el velo va del color de
+   la **página** (`veloColor: "#201808"`) y el mail arranca de una sola pieza. Es el mismo
+   parámetro que `temporada` usa para lo contrario —aclarar en vez de oscurecer—, y ahora tiene
+   dos usos que no se parecen en nada.
+
+## Clon por clon
+
+- **`bodega` (R-009)** — Marrón `#201808` de página, versales, botones `#202020` rectos y el
+  producto único grande armado a mano. ⚠️ **El primer intento fue fiel a la anatomía y salió
+  peor**: la referencia pone el título sobre marrón PLANO y las botellas debajo, así que se
+  escribió `hero` de color liso + `imagen` a sangre — y la única foto de vino a sangre del pack
+  es **una mesa clara**, que partía en dos la mitad oscura del mail, que es justo lo que la
+  define. Con la foto detrás del título (el camino de `brasas` y `cyber-marmol`) queda igual a
+  la captura, y la mesa clara se mudó abajo, al producto único, que en la referencia va sobre
+  blanco. 🟡 El ornamento de filigrana y el hilo cobre separan dos zonas oscuras y un `divisor`
+  se dibuja sobre la tarjeta blanca: el cobre quedó en el único hilo que la captura pone sobre
+  blanco, el de abajo de la grilla · la bajada debajo del nombre de cada producto no existe en
+  la grilla · las redes van sobre el blanco y no adentro de la banda marrón del pie.
+- **`negro-y-dorado` (R-016)** — Negro puro de página, póster dorado de 48 y foto de producto
+  oscura a sangre, que se funde con el negro igual que el antifaz de la captura. 🟡 La grilla
+  sale con precio —lo pone Tiendanube y apagarlo sería apagar el dato— · la foto de cierre es
+  una textura y no una persona usando el producto (**el pack excluye las caras a propósito**) ·
+  el menú va sobre el blanco de la tarjeta: en la captura está adentro de la banda negra del
+  pie, y con eso **el pedido de `caja.fondo` en `menu` llega a 4**.

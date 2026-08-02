@@ -739,7 +739,14 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const t = e("cuerpo");
       const enlaces = (b.links ?? []).filter((l) => l.url && l.texto);
       if (!enlaces.length) return "";
-      const align = t.align ?? "center";
+      // 🔴 `alineacion()` y no `t.align ?? "center"`: ese `??` es letra muerta
+      // —`BASE.cuerpo` ya escribe `align:"left"`, así que `t.align` nunca es
+      // `undefined`— y por eso la barra de navegación salió **pegada a la
+      // izquierda desde el día uno**, contra las 15 referencias de la primera
+      // tanda que la centran, sin una sola excepción. Es el mismo bug que la
+      // etiqueta de la fila de categorías, encontrado el 2-ago-2026 al mirar
+      // `negro-y-dorado` al lado de R-016. Ver `alineacion()` en `estilos.ts`.
+      const align = alineacion(t, "center");
       return pad(
         `<div style="text-align:${align};margin:12px 0">${enlaces
           .map(

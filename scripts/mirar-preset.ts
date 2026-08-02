@@ -65,8 +65,9 @@ const REFERENCIA: Record<string, string> = {
   "cyber-marmol": "R-015-cyber-monday-marmol.png",
   "vuelta-al-cole": "R-014-back-to-school.png",
   invitacion: "R-017-evento-business.png",
-  // editorial
-  lookbook: "R-016-sweet-dreams.png",
+  // producto
+  bodega: "R-009a-vinos-say-cheers.png",
+  "negro-y-dorado": "R-016-sweet-dreams.png",
 };
 
 /** La cuenta de mentira. Tiene redes cargadas para que el bloque `redes` dibuje. */

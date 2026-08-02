@@ -98,7 +98,7 @@ Los patrones que van apareciendo en las referencias, y qué puede hacer el motor
 |---|---|---|---|
 | portada con título grande | ✅ | `hero` sin `imagen`, con `bg` o sin él | 001 · 009 · 013 · 014 · 016 |
 | portada con foto de fondo y texto encima | ✅ | `hero.fondoImagen` + `velo` (VML para Outlook ya resuelto) | 002 · 003 · 004 · 005 · 007 · 008 · 011 · 012 · 015 · 017 · 018 · 019 · 020 |
-| menú de navegación | ✅ | `menu`. **Lo pide casi toda la tanda y no lo usaba NINGÚN preset** | 002 · 003 · 004 · 005 · 006 · 007 · 010 · 011 · 014 · 015 · 017 · 018 · 019 · 020 · 021 |
+| menú de navegación | ✅ | `menu`. **Lo pide casi toda la tanda y no lo usaba NINGÚN preset**. 🔴 Y hasta el 2-ago salía **pegado a la izquierda**: el `t.align ?? "center"` del renderer era letra muerta —`BASE.cuerpo` ya escribe `align:"left"`—, contra las 15 referencias que lo centran sin una excepción. Va por `alineacion()`, igual que la etiqueta de la fila de categorías | 002 · 003 · 004 · 005 · 006 · 007 · 010 · 011 · 014 · 015 · 016 · 017 · 018 · 019 · 020 · 021 |
 | redes con ícono al cierre | ✅ | `redes`. Los 7 íconos desde el 1-ago; **los links los trae la marca**, no el Json | las 21 menos 014 |
 | grilla de productos | ✅ | `productos-dinamicos`, `movil: 2`, `porFila: 3` desde el 1-ago | 001 · 002 · 003 · 004 · 005 · 006 · 007 · 008 · 010 · 011 · 012 · 016 · 018 · 019 · 020 · 021 |
 | precio de lista tachado | ✅ | sale solo: es el `promotional_price` de TN | 001 · 004 · 008 · 010 · 021 |
@@ -120,12 +120,12 @@ Los patrones que van apareciendo en las referencias, y qué puede hacer el motor
 | ícono en cada celda de una fila | ✅ | `icono` en `Columna` desde el 2-ago: clave de `lib/email/iconos.ts`, **nunca una URL libre**. Dos PNG por ícono (`public/iconos/<clave>-<claro\|oscuro>.png`, dibujados de lucide por `scripts/dibujar-iconos.ts`) y **el renderer elige cuál según `pal.esOscuro`**: un PNG no se tiñe | 002 · 006 · 008 · 018 · 021 |
 | botón al ancho de su celda | ✅ | `estilo.boton.ancho: 100` en el bloque `columnas`, desde el 2-ago. Tres barras parejas y no tres pastillas de distinto largo según el texto | 015 · 018 · 021 |
 | botón *outline* (borde fino, sin relleno) | ✅ | `boton.bordeAncho` + `bordeColor`, con el `fondo` del color que hay atrás: el motor **siempre** rellena, así que "sin fondo" se emula. ⚠️ Hasta el 2-ago el `<v:roundrect>` tenía `stroke="f"` cableado y **Outlook lo dibujaba sin borde** — `joyeria` ya estaba en producción con una pastilla blanca sobre blanco | 001 · 007 · 012 |
-| color de fondo en el menú o en una fila de celdas | 🔴 **llegó a 3** | `caja.fondo` lo dibujan solo `hero`, `seccion` y `cupon`, que son los tres bloques que arman su propio contenedor; el resto pasa por `pad()`, que es margen lateral y visibilidad y nada más (`propsCaja` en `estilos.ts`). ⚠️ **R-014 lo pide para el MENÚ** (va adentro de la banda negra del encabezado) y con eso el contador llega al umbral de la regla 5 — decisión de Bruno, no se implementó en esta tanda. 🔑 Para la **fila de celdas** ya hay una salida que no lo necesita: la barra de color de R-013 es el **botón de la celda al ancho** | 010 · 014 · 021 |
+| color de fondo en el menú o en una fila de celdas | 🔴 **llegó a 4** | `caja.fondo` lo dibujan solo `hero`, `seccion` y `cupon`, que son los tres bloques que arman su propio contenedor; el resto pasa por `pad()`, que es margen lateral y visibilidad y nada más (`propsCaja` en `estilos.ts`). ⚠️ **R-014 y R-016 lo piden para el MENÚ** (va adentro de la banda negra, del encabezado en una y del pie en la otra) y con eso el contador pasa el umbral de la regla 5 — decisión de Bruno, no se implementó. 🔑 Para la **fila de celdas** ya hay una salida que no lo necesita: la barra de color de R-013 es el **botón de la celda al ancho** | 010 · 014 · 016 · 021 |
 | banda de color con la foto a un costado | 🔴 | el `seccion` es de una columna y el `columnas`, que tiene dos, no toma color de fondo (fila de arriba). Se aproxima con la banda de color sola | 010 |
 | precio más grande que el nombre en la tarjeta | 🔴 | los dos salen del mismo `eTexto.tamano` en `renderCard`. **Pide un rol de estilo nuevo** (`precio`) | las 7 de catálogo |
 | grilla de 4 por fila | 🔴 | `PorFila` es `2 \| 3`. ⚠️ **No cuesta una llamada más a TN**: `claveProductos` es `fuente\|categoriaId\|n` y `porFila` no entra en la llave | 004 · 007 · 011 · 021 |
 | badge de descuento sobre la foto | 🔴 | ⚠️ `position` está prohibido en un mail: va como fila de tabla, no overlay | 015 · 021 |
-| producto único destacado grande | 🔴 | `productos` con 1 item dibuja media grilla | 002 · 009 |
+| producto único destacado grande | 🔴 | `productos` con 1 item dibuja media grilla. 🟡 `bodega` lo arma **a mano** —`imagen` + `titulo` + `texto` + `boton`, todo centrado— y sale igual que la captura: el bloque sigue faltando, la aproximación no | 002 · 009 |
 | barra fina de aviso ("Envío gratis a partir de…") | ✅ | `barra()` de `comun.ts`: un `seccion` sin título con `caja.padY`. Se pudo cuando el `<p>` dejó de arrastrar 16px de margen cableado | 007 · 008 |
 | menú lateral adentro de la portada | 🔴 | el `hero` es una columna: el menú al costado es otra tabla | 006 · 019 |
 | reseña / testimonio con estrellas | 🔴 | no hay bloque | — |
@@ -278,7 +278,15 @@ Anatomía: encabezado · ornamento · titulo póster · imagen de producto · ba
 Tema: marrón oscuro casi negro, condensada en mayúsculas
 Copy: en inglés y de catálogo (lorem), pero la anatomía es la de un lanzamiento
 Patrones nuevos: producto único destacado 🔴 · ornamento como divisor 🔴
-Sale como: no sale sola — refuerza `lanzamiento`, que ya existe
+Sale como: preset **`bodega`** (familia producto), el clon fiel. Medido: el marrón
+  **#201808 es el 71%** de la mitad de arriba y el 84% de la banda del pie; la banda del
+  medio es **#202020** —un gris neutro, no el marrón— y de ahí salen los botones; el único
+  color es el cobre **#c07850** del hilo y del ornamento. 🟡 El ornamento de filigrana y el
+  hilo separan dos zonas OSCURAS y un `divisor` se dibuja sobre la tarjeta blanca: el cobre
+  se mudó al hilo de abajo de la grilla, que es el único que la referencia pone sobre blanco ·
+  el título va **sobre** la foto y no encima de ella (la única foto de vino a sangre del pack
+  es una mesa clara y partía en dos la mitad oscura) · el producto único grande va a mano
+  (foto + título + bajada + botón), que es el 🔴 del backlog
 
 ### R-010 · Autopartes, "Final sale"   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-010-autopartes-final-sale.png`
@@ -366,7 +374,13 @@ Anatomía: encabezado · titulo póster dorado sobre negro con la foto del produ
 Tema: negro y dorado arriba, blanco abajo
 Copy: el producto se nombra en cada tarjeta, sin precio
 Patrones nuevos: imagen a sangre (dos veces en el mismo mail)
-Sale como: preset `lookbook` (familia editorial)
+Sale como: preset **`negro-y-dorado`** (familia producto), el clon fiel. Medido: **#000000 el
+  73%** de la mitad de arriba y #f8f8f8 el 31% del mail entero —negro puro, no un gris—, y el
+  dorado del póster, recortado aparte, es **#e0a868** (el plan había elegido #c9a227 a ojo).
+  🔑 Los dos botones son **negros**: el dorado aparece una sola vez en todo el mail y es el
+  título de la portada. 🟡 La grilla sale con precio (el precio lo pone Tiendanube) · la foto
+  de cierre es una textura y no una persona usando el producto · **el menú va sobre el blanco**
+  y en la captura está adentro de la banda negra del pie
 
 ### R-017 · Evento de negocios   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-017-evento-business.png`
@@ -447,7 +461,7 @@ Ordenado por cuántas referencias lo pidieron. **Nada de acá se implementa hast
 | 4 | grilla de 4 por fila | `PorFila` es `2 \| 3`. No agrega llamadas a TN (`porFila` no está en `claveProductos`); sí toca el `GrillaControl` del panel |
 | ✅ 4 | texto de la portada fuera del centro | **hecho el 2-ago-2026**: `caja.align` salió de `SIN_EFECTO` en `hero` y `seccion` |
 | ✅ 5 | ícono en cada celda | **hecho el 2-ago-2026**: catálogo cerrado en `lib/email/iconos.ts` + dos PNG por ícono |
-| **3** | color de fondo en el menú y en la fila de celdas | `caja.fondo` lo dibujan solo `hero`, `seccion` y `cupon`. No es una prop nueva: es hacer que `menu` y `columnas` **dibujen su propio contenedor** en vez de pasar por `pad()`. ⚠️ Toca `propsCaja` y por lo tanto el panel. **Llegó a 3 con R-014 el 2-ago-2026** (el menú adentro de la banda negra) ⇒ pasa el umbral de la regla 5 y **espera que Bruno decida si entra**. 🔑 Lo de la fila de celdas ya tiene salida sin esto: el botón al ancho |
+| **4** | color de fondo en el menú y en la fila de celdas | `caja.fondo` lo dibujan solo `hero`, `seccion` y `cupon`. No es una prop nueva: es hacer que `menu` y `columnas` **dibujen su propio contenedor** en vez de pasar por `pad()`. ⚠️ Toca `propsCaja` y por lo tanto el panel. **Llegó a 3 con R-014 y a 4 con R-016** (las dos ponen el menú adentro de una banda negra) ⇒ pasa el umbral de la regla 5 y **espera que Bruno decida si entra**. 🔑 Lo de la fila de celdas ya tiene salida sin esto: el botón al ancho |
 | 2 | badge de descuento sobre la foto | fila de tabla sobre la foto. ⚠️ nada de `position` |
 | 2 | producto único destacado | bloque propio, no `productos` con n=1 |
 | ✅ 2 | barra fina de aviso | **hecho el 2-ago-2026**: salió gratis con el margen muerto del `seccion`. Es `barra()` en `comun.ts` |
@@ -465,7 +479,7 @@ Ordenado por cuántas referencias lo pidieron. **Nada de acá se implementa hast
 |---|---|---|
 | `venta` | oferta, liquidación, envío gratis, últimas unidades | `productos-dinamicos` fuente `oferta` |
 | `catalogo` | grilla, novedades, más vendidos, por categoría | `productos-dinamicos` |
-| `producto` | lanzamiento, restock, el kit | 1 foto elegida + `columnas` |
+| `producto` | lanzamiento, restock, el kit | los dos clones sostienen el mail con **una foto grande** del pack; `lanzamiento` no usa ninguna y se llena con la tienda |
 | `fechas` | Día de la Madre, Navidad, Hot Sale, Black Friday | color + tipografía; los seis clones suman fotos del pack, y `evento` es la única sin ninguna |
 | `ciclo` | bienvenida, post-compra, reactivación, carrito | color + cupón |
 | `editorial` | newsletter, detrás de escena, guía de talles | foto opcional con velo |
