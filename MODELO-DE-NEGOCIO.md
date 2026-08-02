@@ -10,6 +10,9 @@
 >
 > **Actualizado el 27-jul-2026** con la respuesta de Tiendanube a las 6 consultas: §6.5
 > (cómo se cobra), §7.6 (NubeSDK y los temas) y §7.7 (Plan D confirmado).
+>
+> **Actualizado el 1-ago-2026** contra el código y contra la base: §1, §3 (estado remedido),
+> §6.5 (**el 30% NO es obligatorio** — se corrigió el encuadre), §9 y §10.
 
 ---
 
@@ -17,15 +20,21 @@
 
 - **Uso propio: lanzalo.** Cuesta ~USD 40/mes contra los >USD 150/mes que se pagan hoy.
   Ahorro ≥ USD 1.300/año, y el 97% del costo marginal es el proveedor de email.
-- **SaaS: la economía cierra** (equilibrio en 5 comerciantes, ~57% de margen a 50 — **9 y 32%
-  si cobra Tiendanube y retiene el 30%**, §6.5), **pero tres cimientos no están**: SES en
-  sandbox, la cola de envío corre en el navegador, y la base productiva está en el plan
-  gratuito de Neon compartida con Resorty, que está en vivo.
-- El costo que importa no es la infraestructura: es **la reputación de envío compartida
-  entre inquilinos** y **el soporte de onboarding de dominio**.
-- **El canal ya no está bloqueado** (27-jul): Tiendanube confirmó que los scripts que instala
-  el propio comerciante por GTM o Códigos externos **no caen bajo NubeSDK**. Se puede vender
-  directo, con el 100% del ingreso y sin homologación → §7.7.
+- **SaaS: la economía cierra** (equilibrio en 5 comerciantes, ~57% de margen a 50) **y los
+  tres cimientos que faltaban ya están**: SES aprobado (50k/día), la cola corre en el servidor
+  y la infra se paga desde el 31-jul (Vercel Pro + Neon pago). ✅ 1-ago-2026.
+- **Publicar en la App Store NO cuesta el 30%**: marcada como "Gratis con cobros externos" se
+  cobra por afuera con el 100% del ingreso → §6.5. El 30% es una modalidad que se elige, y lo
+  que compra es el checkout adentro del panel.
+- **Lo que hoy frena no es Tiendanube ni la infraestructura: es que el producto no es
+  multi-inquilino.** Un comerciante que instala **no puede mandar un mail** (no hay alta de
+  dominio autoservicio), la supresión de rebotes cruza cuentas y el import de CSV se
+  auto-declara consentido → `TIENDANUBE-PUBLICACION.md` §3.
+- El costo que importa sigue sin ser la infraestructura: es **la reputación de envío
+  compartida entre inquilinos** y **el soporte de onboarding de dominio**.
+- **El canal no está bloqueado** (27-jul): los scripts que instala el propio comerciante por
+  GTM o Códigos externos **no caen bajo NubeSDK**. Se puede vender directo, con el 100% del
+  ingreso y sin homologación → §7.7.
 
 ---
 
@@ -45,25 +54,37 @@ base de datos y reputación de envío.
 
 ---
 
-## 3. Estado medido (25-jul-2026)
+## 3. Estado medido (1-ago-2026)
+
+Remedido contra la base y contra el código. Lo que cambió respecto del 25-jul va marcado.
 
 | Qué | Valor | Cómo se midió |
 |---|---|---|
-| Contactos activos | **23.648** (BDI 16.825 · Zattia 6.823 · Stunned 0) | `prisma.contacto.groupBy` |
-| Campañas / envíos / eventos | 4 / **0** / 0 | idem — nunca se mandó nada real |
-| Tamaño de la base | **23 MB** (Contacto 10 MB, ContactoLista 4,1 MB) | `pg_database_size` |
-| Plan de Neon | **Free** — 0,5 GB, 100 CU-h/mes, us-east-1 | `neon.max_cluster_size = 512 MB` |
+| Contactos | **28.245** (BDI 21.381 · Zattia 6.864 · Stunned 0 · Resorty Lab 0) | `prisma.contacto.count` por cuenta |
+| Audiencia mandable | **25.488** (BDI 18.711 · Zattia 6.777) | `estado ACTIVO` + `tnAcceptsMkt` |
+| Campañas / envíos / eventos | 23 (4 enviadas) / **24** / 12 | ⬆️ era 4 / 0 / 0 — **ya salieron mails reales** |
+| Tamaño de la base | **34 MB** | ⬆️ era 23 MB (`pg_database_size`) |
+| Plan de Neon | ✅ **Pago desde el 31-jul** | era Free (512 MB, 100 CU-h) |
 | Base compartida con | **areben-popups (Resorty), EN VIVO en tiendas** | misma `DATABASE_URL` |
-| Plan de Vercel | **Hobby** | `GET /v2/user` → `billing.plan` |
+| Plan de Vercel | ✅ **Pro desde el 31-jul** | era Hobby (prohíbe uso comercial) |
 | Región y config de funciones | **iad1**, Fluid, memoria estándar, timeout 300 s | `GET /v9/projects/:id` |
 | Plan de SES | **Essentials** ($0,16/1k), us-east-1, `HEALTHY` | `SESv2 GetAccount` |
-| Acceso a producción SES | **Sandbox** — 200/día, 1/seg. Caso `178473604500639` respondido, esperando | ver `SES-ESTADO.md` |
-| Dominios autenticados | `bdiaccesorios.com.ar`, `zattia.com.ar` (Easy DKIM) | `ListEmailIdentities` |
+| Acceso a producción SES | ✅ **APROBADO — 50.000/día** | era sandbox (caso `178473604500639`) |
+| Proveedor activo | **SES** desde el 30-jul (`EMAIL_PROVIDER`); Resend free de respaldo | `/envio` |
+| Gate de envío | 🔴 **`real` — abierto desde el 31-jul 12:20** | `ENVIO_REAL=true`, ver `/envio` |
+| Remitentes cargados | Zattia `AUTENTICADO` · BDI `PENDIENTE` (columna stale) | `prisma.remitente.findMany` |
+| Dominios autenticados en SES | `bdiaccesorios.com.ar`, `zattia.com.ar` (Easy DKIM + custom MAIL FROM) | `ListEmailIdentities` |
+| Comerciantes externos pagos | **0** | — |
 | Cron | GitHub Actions cada 15 min, **repo privado** | `.github/workflows/cron.yml` |
 | Peso de un email renderizado | 2,6 – 3,1 KB (esqueleto, sin copy real) | `renderEmailHtml` sobre los 4 presets |
 
-**Re-verificar SES:** `node --env-file=.env scripts/ses-status.ts`. El resto sale de los
-comandos citados en la columna derecha.
+⚠️ **El `estado` de `Remitente` no es autoritativo**: BDI figura `PENDIENTE` y su dominio sí
+está verificado en SES — nadie apretó "verificar" desde que se creó la fila. Y el camino de
+envío **no lo lee** (`getRemitenteEnvio` ordena por `esPrincipal` y devuelve el primero). Ver
+`TIENDANUBE-PUBLICACION.md` §3.1.
+
+**Re-verificar SES:** `node --env-file=.env scripts/ses-status.ts`. Los conteos salen de un
+script descartable con `prisma.contacto.count` por cuenta.
 
 ---
 
@@ -192,34 +213,47 @@ Referencia de mercado: Doppler arranca en USD 10 con 2.500 contactos y envíos i
 
 ### 6.5 Cómo se cobra — RESPUESTA DE TIENDANUBE (27-jul-2026)
 
+> 🔴 **LEER ESTO ANTES DE HABLAR DEL 30%.** Publicar en la App Store **no obliga a resignar
+> el 30%**: es una de tres modalidades y se elige. **Publicada como "Gratis" con *cobros
+> externos*, Areben cobra por afuera y se queda con el 100%** — y sigue estando en la App
+> Store, con la ficha, el buscador y el botón de instalar. El 30% compra el checkout adentro
+> del panel; no es el precio de entrada al canal. Cualquier análisis que trate al 30% como
+> inevitable está mal, y este archivo lo dijo mal hasta el 1-ago-2026.
+
 Contestó Lucas, de socios@. Se elige en *Datos de publicación* → modalidad de cobro, después
 de completar el país. Hay tres opciones y **son excluyentes**:
 
-| Modalidad | Quién cobra | Se queda Areben |
-|---|---|---|
-| Suscripción mensual recurrente | Tiendanube | **70%** |
-| Pago único | Tiendanube | **70%** |
-| Gratis, marcada con *cobros externos* | Areben | **100%** |
+| Modalidad | Quién cobra | Se queda Areben | Fricción para el comerciante |
+|---|---|---|---|
+| **Gratis, marcada con *cobros externos*** | **Areben** | **100%** | Paga fuera del panel |
+| Suscripción mensual recurrente | Tiendanube | 70% | Un clic, adentro del panel |
+| Pago único | Tiendanube | 70% | Un clic, adentro del panel |
 
-La comisión se genera automáticamente cuando el pago se confirma y se ve en *Comisiones* del
-Partner Portal. Para retirarla hay que **emitir factura e iniciar el retiro de dinero** — no
-es una acreditación automática.
+Si cobra Tiendanube, la comisión se genera sola cuando el pago se confirma y se ve en
+*Comisiones* del Partner Portal. Para retirarla hay que **emitir factura e iniciar el retiro**
+— no es una acreditación automática.
 
-**Lo que cambia el 30%** (sobre los precios *propuestos* de §6.4, que siguen sin decidirse):
+**Qué se está comprando con el 30%**, entonces: fricción cero en el checkout, dentro del panel
+donde el comerciante ya paga su plan, que es exactamente donde se pierden las conversiones. Es
+una decisión de conversión, no un peaje.
 
-| Plan | Precio | Contribución sin TN | Contribución con TN 30% | Margen |
+**Lo que costaría** (sobre los precios *propuestos* de §6.4, que siguen sin decidirse):
+
+| Plan | Precio | Contribución cobrando por afuera | Contribución con TN 30% | Margen |
 |---|---|---|---|---|
-| Emprendedor | USD 9 | $6,60 | **$3,90** | 67% → 43% |
-| Tienda | USD 25 | $15,40 | **$7,90** | 57% → 32% |
-| Pro | USD 59 | $30,20 | **$12,50** | 46% → 21% |
+| Emprendedor | USD 9 | $6,60 | $3,90 | 67% → 43% |
+| Tienda | USD 25 | $15,40 | $7,90 | 57% → 32% |
+| Pro | USD 59 | $30,20 | $12,50 | 46% → 21% |
 
-En los planes baratos **la comisión de Tiendanube pesa más que todo el costo de envío**: en
-Emprendedor son $2,70 de comisión contra $2,40 de SES. El punto de equilibrio de §6.2 (5
-comerciantes) pasa a **~9** si cobra Tiendanube.
+En los planes baratos la comisión **pesa más que todo el costo de envío**: en Emprendedor son
+$2,70 de comisión contra $2,40 de SES, y el equilibrio de §6.2 pasaría de 5 comerciantes a ~9.
+Por eso la modalidad por defecto de este análisis es **cobros externos**, y el 30% se evalúa
+recién si se mide que la conversión adentro del panel lo paga.
 
-El 30% no es un robo — compra la fricción cero del checkout dentro del panel donde el
-comerciante ya paga su plan, que es exactamente donde se pierden las conversiones. Pero
-convierte al canal oficial en una decisión de adquisición, no de margen.
+⚠️ **Cobrar por afuera no es gratis: es trabajo.** Hace falta la cobranza propia (Resorty ya
+resolvió esa parte con **MP Suscripciones**, ver `areben-popups`) y **falta definir quién
+factura**. Pero es trabajo que la venta directa (§7.7) necesita igual, así que no es un costo
+extra de publicar.
 
 ---
 
@@ -346,18 +380,22 @@ y ese camino **no se rompe en agosto ni en octubre**.
 | NubeSDK | Obligatorio cargarlo, además del legacy | **No aplica nunca** |
 | Descubrimiento | El comerciante te encuentra solo | Hay que salir a buscarlo |
 | Fricción de instalación | Un clic | El comerciante pega un script |
-| Cobro | TN cobra y retiene 30%, o cobrás vos con 100% | Facturación propia, 100% |
+| Cobro | **Elegís**: TN cobra y retiene 30%, **o cobrás vos con el 100%** (§6.5) | Facturación propia, 100% |
 | Riesgo de plataforma | Alto: cambian las reglas y te caés | Bajo |
 
 Lo importante es que **ya no es "mientras tanto"**: la venta directa es un camino completo y
-permanente, con el 100% del ingreso y cero dependencia del calendario de Tiendanube. La App
-Store es un canal de **adquisición** que se compra con el 30% (o con el trabajo de cobrar
-aparte) más la reescritura del widget a NubeSDK.
+permanente, con el 100% del ingreso y cero dependencia del calendario de Tiendanube.
+
+⚠️ **Y las dos no son excluyentes.** Como la modalidad de *cobros externos* deja el 100%, la
+App Store no cuesta margen: cuesta **homologación, mantenimiento del trámite y riesgo de
+plataforma** — y, para Resorty, la reescritura a NubeSDK (al mailer eso no lo toca). El
+argumento para no publicar hoy no es el 30%: es que **todavía no hay un solo comerciante
+pago**, así que se estaría optimizando la adquisición de un producto sin tracción.
 
 **Recomendación**: arrancar por venta directa —cuesta cero desarrollo nuevo, ya está probado
-en Zattia— y tratar la App Store como una segunda fase que se evalúa cuando haya comerciantes
-pagando. Con el costo de cambio de §7.4 jugando a favor, cinco tiendas conseguidas a mano hoy
-valen más que cincuenta dentro de un año.
+en Zattia— y publicar en la App Store, con cobros externos, **cuando haya dos o tres
+comerciantes pagando** y el producto sea multi-inquilino (§10). Con el costo de cambio de §7.4
+jugando a favor, cinco tiendas conseguidas a mano hoy valen más que cincuenta dentro de un año.
 
 ⚠️ Pero ojo con el orden: **vender directo adelanta los blanqueos de infraestructura**. Vercel
 sigue en Hobby, que prohíbe uso comercial, y Neon en Free compartido con Resorty en vivo
@@ -411,12 +449,16 @@ chica **antes** de construir encima.
 
 | Riesgo | Impacto | Mitigación |
 |---|---|---|
-| **Reputación compartida entre inquilinos** | Un comerciante con lista comprada quema la cuenta SES entera — y con ella los mails de BDI y Zattia | *Tenants* de SES (hasta 10.000), doble opt-in obligatorio, límite de rebote por cuenta con suspensión automática, IP dedicada con volumen |
-| **Base de datos compartida con Resorty, que está en vivo** | Neon Free = 512 MB; 43 MB/mes de filas `Envio`. Si se llena, se cae Resorty también | Neon a plan pago **antes** del primer blast; retención/purga de `Envio` y `Evento` |
+| **Reputación compartida entre inquilinos** | Un comerciante con lista comprada quema la cuenta SES entera — y con ella los mails de BDI y Zattia | Cuarentena por tramos (**diseñada, no construida** — plan `fluffy-chasing-wirth.md`), *tenants* de SES, límite de rebote por cuenta con corte automático, IP dedicada con volumen |
+| 🔴 **La supresión cruza cuentas** | `lib/email/supresion.ts:35` hace `updateMany` **por email, sin `cuentaId`**: una queja en la tienda A marca `SPAM` al mismo contacto en la tienda B. Fuga entre clientes y bajas que nadie pidió | Agregar `cuentaId` al `where`. Barato ahora, caro con el primer cliente |
+| 🔴 **Un CSV se auto-declara consentido** | `app/(app)/contactos/actions.ts:54` fija `tnAcceptsMkt: true` en el import. Es la puerta por la que entra una lista comprada | Que el consentimiento del import sea explícito y trazable, como en `importar.ts` |
+| 🔴 **El comerciante no puede verificar su dominio solo** | Instala, arma la campaña, y no sale nada: `crearRemitente` no da de alta la identidad en SES ni muestra los DKIM. Hoy lo corre Bruno a mano | Alta autoservicio + CNAME en pantalla + exigir `AUTENTICADO` antes de enviar. Ver `TIENDANUBE-PUBLICACION.md` §3.1 |
+| ~~**Base compartida con Resorty en Neon Free**~~ ✅ **RESUELTO 31-jul-2026** | Neon Free = 512 MB y suspende a las 100 CU-h; si se llenaba se caía Resorty también | Neon en plan pago. Queda pendiente la **retención/purga** de `Envio` y `Evento` (43 MB/mes proyectados) |
 | ~~**La cola de envío vive en el navegador**~~ ✅ **RESUELTO 25-jul-2026** | Antes `CampaniaEditor.tsx` mandaba de a 20 por request: ~1h20m de pestaña abierta para los 16.825 de BDI | Ya está en el servidor (`lib/email/cola.ts`): worker con lease + auto-encadenamiento, y el cron de GitHub como perro guardián. El editor solo mira el progreso |
-| **Vercel Hobby prohíbe uso comercial** | Riesgo de ToS desde el primer peso cobrado | Pro, USD 20/mes |
-| **Cómo se cobra una app paga en Tiendanube está sin documentar** | Puede exigir cobro fuera de plataforma (fricción) o quedarse un % | Preguntar a socios@tiendanube.com — ya está en la consulta pendiente |
+| ~~**Vercel Hobby prohíbe uso comercial**~~ ✅ **RESUELTO 31-jul-2026** | Riesgo de ToS desde el primer peso cobrado | Pro, USD 20/mes, cubre los 4 proyectos del team |
+| ~~**Cómo se cobra una app paga está sin documentar**~~ ✅ **RESUELTO 27-jul-2026** | — | Tres modalidades, y **cobros externos deja el 100%** → §6.5 |
 | **Soporte de onboarding de dominio** | Cada comerciante que no sabe cargar DKIM es un ticket. Es el costo oculto grande del SaaS, y no aparece en ninguna tabla de arriba | Asistente guiado por proveedor de DNS; detección automática de registros |
+| **El motor nunca mandó un blast** | 24 envíos reales en total al 1-ago. Publicar expone comerciantes ajenos a un camino que no se probó a volumen | Terminar los tramos propios (BDI T01-T06, Zattia) antes de vender |
 | **Descalce cambiario** | Ingresos probablemente en ARS, costos 100% en USD | Precios en USD o indexados |
 | **Concentración en Tiendanube** | Si TN saca su propio email marketing, se cierra el canal | El producto también sirve fuera de TN |
 
@@ -424,27 +466,48 @@ chica **antes** de construir encima.
 
 ## 10. Bloqueantes para publicar (checklist)
 
-| # | Bloqueante | ¿Bloquea uso propio? | ¿Bloquea SaaS? |
-|---|---|---|---|
-| 1 | Acceso a producción de SES | **Sí** | **Sí** |
-| 2 | Vercel Pro | No (aunque el ToS ya aplica) | **Sí** |
-| 3 | Neon a plan pago | Antes del primer blast grande | **Sí** |
-| 4 | Cola de envío del lado del servidor | No (tolerable) | **Sí** |
-| 5 | Aislamiento de reputación por inquilino | No | **Sí** |
-| 6 | Los 4 webhooks obligatorios de TN | No | **Sí** — ver `TIENDANUBE-PUBLICACION.md` |
-| 7 | App propia en Partners (hoy comparte credencial con Resorty) | No | **Sí** |
-| 8 | ~~Definir cómo se cobra~~ | No | **Resuelto 27-jul** — §6.5 |
+**Estado al 1-ago-2026. De los 8 originales quedan 1 y medio; aparecieron 4 nuevos** al mirar
+el código en vez de la infraestructura.
 
-**Actualización 27-jul-2026.** Los bloqueantes 6 y 8 se destrabaron con la respuesta de
-Tiendanube: los tres webhooks de LGPD se cargan en *Datos básicos* (no por API) y la
-modalidad de cobro está documentada en §6.5. Y, sobre todo, **2, 3, 4, 6, 7 y 8 solo bloquean
-la App Store**: por venta directa (§7.7) no aplican 6 ni 7. Los que quedan para cobrar el
-primer peso por cualquier vía son **1 (SES), 2 (Vercel Pro) y 3 (Neon pago)** — y de esos, el
-único fuera de control es SES.
+| # | Bloqueante | Estado | ¿Bloquea venta directa? | ¿Bloquea App Store? |
+|---|---|---|---|---|
+| 1 | Acceso a producción de SES | ✅ Aprobado, 50k/día | — | — |
+| 2 | Vercel Pro | ✅ Desde el 31-jul | — | — |
+| 3 | Neon a plan pago | ✅ Desde el 31-jul | — | — |
+| 4 | Cola de envío del lado del servidor | ✅ 25-jul | — | — |
+| 5 | Aislamiento de reputación por inquilino | 🔴 Diseñado, sin construir | **Sí** | **Sí** |
+| 6 | Los 4 webhooks obligatorios de TN | 🟡 El código está; **falta darlos de alta** en *Datos básicos* y probarlos | No | **Sí** |
+| 7 | App propia en Partners | ✅ Mailer #37222, Resorty #37985 | — | — |
+| 8 | Definir cómo se cobra | ✅ §6.5 — cobros externos deja el 100% | — | — |
+| 9 | **OAuth público + alta automática** | ✅ **Ya estaba construido** (`/api/tn/entrar` + callback) | — | — |
+| 10 | 🔴 **Alta de dominio autoservicio en SES** | Sin construir — hoy lo corre Bruno a mano | **Sí** | **Sí** |
+| 11 | 🔴 **Supresión que cruza cuentas** | `supresion.ts:35` sin `cuentaId` | **Sí** | **Sí** |
+| 12 | 🔴 **Import de CSV auto-consentido** | `contactos/actions.ts:54` | **Sí** | **Sí** |
+| 13 | 🟡 **Planes, cuotas y límites** | No existe ningún modelo de facturación | **Sí** | **Sí** |
+| 14 | 🟡 `/privacidad` y `/terminos` | No existen | Conviene | **Sí** |
+| 15 | 🟡 Revisión de scopes de la #37222 | Sin hacer — pedir de más es rechazo | No | **Sí** |
 
-**Orden sugerido:** (1) destrabar el envío — apelación de SES · (2) Vercel Pro y Neon pago
-antes de cobrarle a nadie · (3) cola en el servidor · (4) primeros comerciantes por venta
-directa · (5) recién ahí evaluar App Store + NubeSDK.
+**Lo que cambia respecto del 27-jul:** los bloqueantes de plata (1, 2, 3) y de arquitectura
+(4, 7, 9) están todos cerrados. **Publicar dejó de depender de Tiendanube y pasa a depender de
+que el producto sea multi-inquilino** — 10, 11, 12 y 13, que bloquean *las dos* vías por
+igual. Detalle en `TIENDANUBE-PUBLICACION.md` §3.
+
+**Orden sugerido:**
+
+1. **Terminar los envíos propios** (BDI T01-T06, Zattia) — el motor todavía no mandó un blast.
+2. **Alta de dominio autoservicio** (#10) y **las dos fugas** (#11, #12). Sirven igual para
+   las dos vías y son lo más barato de la lista.
+3. **Dos o tres comerciantes conocidos por venta directa**, cobrados a mano. Valida precio,
+   soporte y onboarding con gente que perdona.
+4. **Cuarentena por tramos** (#5) y **planes** (#13), construidos contra lo que rompan esos
+   primeros clientes y no contra lo que adivinemos hoy.
+5. **Publicar**: webhooks de LGPD dados de alta (#6), legales (#14), scopes (#15),
+   homologación. **Marcada "Gratis con cobros externos"** salvo que se mida que el 30% se
+   paga solo en conversión.
+
+⚠️ Publicar en la App Store **no compite** con la venta directa ni la reemplaza: como la
+modalidad de cobros externos deja el 100%, el canal oficial es adquisición casi gratis. Lo que
+cuesta es la homologación y el riesgo de plataforma, no el margen.
 
 ---
 
