@@ -475,7 +475,21 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // celda, si va imagen o texto — no hay un quinto caso "mixto libre" a
       // propósito: menos combinaciones, menos perillas que probar en el panel.
       const variante = b.variante ?? "imagenes";
-      const celdas = b.celdas ?? [];
+      const todas = b.celdas ?? [];
+      // Qué es cada celda se decide con su posición ORIGINAL: con dos celdas,
+      // `imagen-texto` es izquierda-derecha; con más, la primera y la última.
+      const esImagenDe = (i: number) =>
+        variante === "imagenes" ||
+        (variante === "imagen-texto" && i === 0) ||
+        (variante === "texto-imagen" && i === todas.length - 1);
+      // Misma regla que en el resto del motor: **lo que no tiene contenido no
+      // reserva lugar**. Una celda de foto sin foto dibujaba un `<td>` vacío del
+      // 40% al lado del texto — un hueco en el mail de quien todavía no subió la
+      // imagen, que es justo el estado en el que sale una plantilla recién
+      // elegida. Con la celda afuera, la que queda ocupa todo el ancho.
+      const celdas = todas
+        .map((c, i) => ({ c, img: esImagenDe(i) }))
+        .filter(({ c, img }) => (img ? !!c.imagen : !!(c.titulo || c.texto)));
       if (!celdas.length) return "";
       // La proporción es una pregunta de dos celdas: "cuál de las DOS es más
       // ancha". Con tres o cuatro el reparto es parejo — ver el comentario del
@@ -516,17 +530,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         return `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px">${interior}</td>`;
       };
 
-      // Con dos celdas esto es exactamente lo que hacía antes (`imagen-texto` =
-      // izquierda con foto). Con tres o cuatro, "la primera" y "la última" son
-      // la única lectura que no inventa nada.
-      const esImagen = (i: number) =>
-        variante === "imagenes" ||
-        (variante === "imagen-texto" && i === 0) ||
-        (variante === "texto-imagen" && i === celdas.length - 1);
-
-      const html = celdas
-        .map((c, i) => (esImagen(i) ? celdaImagen(c, pcts[i]) : celdaTexto(c, pcts[i])))
-        .join("");
+      const html = celdas.map(({ c, img }, i) => (img ? celdaImagen(c, pcts[i]) : celdaTexto(c, pcts[i]))).join("");
 
       return pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px"><tr>${html}</tr></table>`, caja());
     }

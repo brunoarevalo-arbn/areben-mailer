@@ -16,10 +16,12 @@ export const VENTA: readonly DefPreset[] = [
     // ÚNICA de las 21 que no lleva una sola foto de stock, y por eso es la que
     // un comerciante puede mandar hoy sin sesión de fotos.
     arma: ({ marca, tienda }) => ({
-      // El rasgo entero vive en la capa de documento: título grande, botón
-      // pastilla. Un mail de fecha se distingue por la tipografía, no por una
-      // banda de color clavada que después se ve ajena en otra marca.
-      estilos: { titulo: { tamano: 40, peso: 800 }, boton: { radio: 24 } },
+      // ⚠️ El tamaño del título grande va en el BLOQUE, no en la capa de
+      // documento: `estilos.titulo` alcanza al rol `titulo` de todos los
+      // bloques, y el `encabezado` es uno de ellos — con 40px ahí, el nombre de
+      // la marca salía más grande que el "HOT SALE". En la capa de documento
+      // queda lo que sí es del mail entero: el botón pastilla.
+      estilos: { boton: { radio: 24 } },
       bloques: [
         aire(12),
         // La volanta: un título chico arriba del grande. Es el "YA LLEGA" de la
@@ -32,6 +34,7 @@ export const VENTA: readonly DefPreset[] = [
           titulo: "HOT SALE",
           subtitulo: `Hasta 50% OFF en toda la tienda de ${marca}.`,
           bg: "",
+          estilo: { titulo: { tamano: 40, peso: 700 } },
           ...cta("Ver las ofertas", tienda),
         },
         { tipo: "cupon", texto: "Sumale un 10% con este código", codigo: "HOTSALE10", ...cta("Comprar ahora", tienda) },

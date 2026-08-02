@@ -129,6 +129,26 @@ titulo("Responsive");
   ok(cuatro.includes(`width="25%"`), "una fila de cuatro reparte el ancho parejo");
   ok(cuatro.includes("Cat 4"), "la etiqueta de la celda de imagen se dibuja");
 
+  // 🔴 Una celda sin contenido NO reserva lugar: es la diferencia entre "todavía
+  // no subí la foto" y "el mail tiene un hueco del 40%".
+  const media = render({
+    bloques: [
+      {
+        tipo: "columnas",
+        variante: "imagen-texto",
+        proporcion: 40,
+        celdas: [
+          { imagen: "", url: "#" },
+          { imagen: "", url: "#", titulo: "El destacado", texto: "Tres renglones." },
+        ],
+      },
+    ],
+  });
+  ok(media.includes(`width="100%"`), "con la celda de foto vacía, el texto ocupa todo");
+  ok(!media.includes(`width="40%"`), "y no queda el hueco reservado de la foto");
+  const nada = render({ bloques: [{ tipo: "columnas", celdas: [{ imagen: "", url: "#" }, { imagen: "", url: "#" }] }] });
+  ok(!nada.includes("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:8px 0 16px\"><tr>"), "una fila entera vacía no se dibuja");
+
   // La grilla de tres: el ancho inline es el de escritorio (33%) y en el celular
   // apila. `movil: 2` no puede ganarle — una `<tr>` de tres celdas no se parte
   // en dos filas con CSS, así que el bloque **ignora** el pedido en vez de
