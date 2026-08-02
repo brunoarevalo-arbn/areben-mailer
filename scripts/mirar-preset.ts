@@ -68,6 +68,9 @@ const REFERENCIA: Record<string, string> = {
   // producto
   bodega: "R-009a-vinos-say-cheers.png",
   "negro-y-dorado": "R-016-sweet-dreams.png",
+  // editorial
+  ocasion: "R-003-morelia-bodas.png",
+  "dos-colores": "R-005-baires-summer.png",
 };
 
 /** La cuenta de mentira. Tiene redes cargadas para que el bloque `redes` dibuje. */

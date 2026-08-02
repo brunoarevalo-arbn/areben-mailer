@@ -321,3 +321,81 @@ de la portada, y los dos botones son negros. Misma lección que R-012 al revés.
   una textura y no una persona usando el producto (**el pack excluye las caras a propósito**) ·
   el menú va sobre el blanco de la tarjeta: en la captura está adentro de la banda negra del
   pie, y con eso **el pedido de `caja.fondo` en `menu` llega a 4**.
+
+---
+
+# La familia Editorial (ronda 5, 2-ago-2026)
+
+Los dos clones: `ocasion` (R-003) · `dos-colores` (R-005). La familia pasó de **3 a 5** y con
+eso **la galería cierra en 38 de 38**.
+
+🔑 **Son las dos referencias que quedaban porque son las dos que menos venden.** R-003 es un
+mail sin un solo precio y R-005 uno donde el texto casi no aparece: por eso terminaron en
+editorial y no en catálogo, aunque las dos tengan grilla. Lo que las hace de esta familia no
+es el bloque, es qué hace el mail.
+
+## Los colores, medidos
+
+| clon | referencia | acento | fondo de página |
+|---|---|---|---|
+| `ocasion` | R-003 | `#7c1818` (vinoso de los títulos) · link `#9c5450` | `#fcf0ec` (92% de la banda del pie) |
+| `dos-colores` | R-005 | `#000000` (los botones; **no** es el lima) | `#000000` (23,1% del mail) |
+
+⚠️ **El lima de R-005 es `#d8fc54`** y el plan había elegido `#c8ff00` a ojo: **cuarta tanda
+seguida con el hex del plan mal**, sin una sola excepción en ninguna. Y otra vez el color que
+salta a la vista **no es el acento**: con el 6% de los píxeles el lima es color de banda y los
+botones son negros, igual que el dorado de R-016.
+
+🔑 **R-003 es la única referencia de las 21 sin un solo color saturado.** `paleta-referencia`
+devuelve `—` en la lista de saturados: los diez colores del mail son rosas y grises de dos
+dígitos de diferencia entre sí. Eso es lo que "rosa empolvado" quiere decir, y es la razón por
+la que el vinoso hubo que medirlo por recorte — en el conteo del mail entero no aparece.
+
+## Los dos hallazgos de esta ronda
+
+1. 🔴 **El fondo de un botón sobre una portada no es el color del velo: es el color de la banda
+   YA VELADA, y se mide sobre nuestro propio render.** El truco de "sin fondo se emula con el
+   fondo de atrás" venía escrito desde la ronda 2 y **estaba mal aplicado**: en las dos
+   portadas de esta familia el botón llevaba el `#111111` del velo y salía como un **rectángulo
+   negro opaco** en el medio de la foto. La cuenta es simple —el velo es semitransparente, así
+   que la banda queda entre la foto y el color del velo— pero el resultado no se adivina: sobre
+   el mármol claro de `ocasion` da `#a47777` y sobre la playa de `dos-colores` `#4c4644`.
+   🔑 Es la trampa de "un botón claro sobre foto oscura", **al revés**: sobre una foto clara el
+   que se ve es el oscuro. Y solo aparece cuando la referencia pide un link y no una pastilla.
+2. 🔑 **`veloColor` tiene un tercer uso: TEÑIR.** En `temporada` sirve para aclarar (texto
+   negro sobre foto clara) y en `bodega`/`negro-y-dorado` para que la portada sea la
+   continuación de la banda del encabezado. Acá va del **vinoso del propio mail** para que el
+   mármol —que es gris neutro— salga rosa empolvado: con el `#111111` de siempre la portada
+   quedaba una plancha gris fría (`#7d7d7d` medido) en el medio de un mail rosa, y era la única
+   diferencia grande que quedaba contra la captura. **El velo no es solo para que el texto se
+   lea: también decide de qué color es la foto.**
+
+## Clon por clon
+
+- **`ocasion` (R-003)** — Rosa `#fcf0ec` de página, serifa en todo el mail, títulos vinosos
+  clavados **bloque por bloque** (nunca en la capa de documento: hay un título sobre la foto de
+  la portada) y los dos "Ver más" como **link subrayado sin caja**. ⚠️ **La primera portada fue
+  `banda-tela` y salió mal por el brillo, no por el tema**: es lo que más dice "vestido" del
+  pack, pero es arpillera oscura y bajo velo daba una banda marrón adentro de un mail que es
+  rosa y blanco. El mármol es neutro y se tiñe. 🟡 La grilla sale con precio y la captura no
+  tiene ninguno · el menú va sobre el blanco (acá la diferencia es de dos tonos casi iguales,
+  no de blanco contra negro) · la dirección del cierre **no se repite**: ya sale en el pie.
+- **`dos-colores` (R-005)** — Negro puro de página, lima `#d8fc54` en dos bandas y en el bloque
+  de cierre, botones negros y el "Summer" a 48 contra el costado izquierdo de la portada
+  (`caja.align`). 🔴 **`mayusculas` en la capa de documento no se puede apagar en un bloque**:
+  `sanearBool` no escribe un `false`, así que el `mayusculas: false` del botón de la portada no
+  existía y el "Ver colección" —que en la captura es un link en minúsculas— salía "VER
+  COLECCIÓN". Se resuelve al revés: las versales se piden en el botón de la grilla, que es el
+  único que las tiene. 🟡 Las tres fotos llevan el aire de `columnas` y en la captura están
+  pegadas · el "Sets." va arriba y no en su propia columna al lado de la grilla · **el menú va
+  sobre el blanco con los links negros**, y en la captura es lima adentro de la banda negra —
+  es el 🟡 más caro de toda la galería y el que lleva **el pedido de `caja.fondo` en `menu` a 5**.
+
+## La grilla de tres, a mano y no por `grilla()`
+
+Los dos clones escriben `{ n: 3, porFila: 3 }` en vez de usar el helper, y **no es una fuga de
+la regla de las dos formas: es la lectura correcta de por qué existe**. La regla protege la
+cantidad de consultas que `/plantillas` le hace a Tiendanube por pestaña, y `recientes|3` es la
+clave que **`lookbook` ya pedía en esta misma familia** ⇒ `ocasion` viaja gratis y la pestaña
+editorial resuelve **menos** consultas que si las dos hubieran usado `grilla(tres)`. Con las
+dos formas del helper este mail medía media pantalla más que su referencia, que muestra tres.

@@ -120,7 +120,7 @@ Los patrones que van apareciendo en las referencias, y qué puede hacer el motor
 | ícono en cada celda de una fila | ✅ | `icono` en `Columna` desde el 2-ago: clave de `lib/email/iconos.ts`, **nunca una URL libre**. Dos PNG por ícono (`public/iconos/<clave>-<claro\|oscuro>.png`, dibujados de lucide por `scripts/dibujar-iconos.ts`) y **el renderer elige cuál según `pal.esOscuro`**: un PNG no se tiñe | 002 · 006 · 008 · 018 · 021 |
 | botón al ancho de su celda | ✅ | `estilo.boton.ancho: 100` en el bloque `columnas`, desde el 2-ago. Tres barras parejas y no tres pastillas de distinto largo según el texto | 015 · 018 · 021 |
 | botón *outline* (borde fino, sin relleno) | ✅ | `boton.bordeAncho` + `bordeColor`, con el `fondo` del color que hay atrás: el motor **siempre** rellena, así que "sin fondo" se emula. ⚠️ Hasta el 2-ago el `<v:roundrect>` tenía `stroke="f"` cableado y **Outlook lo dibujaba sin borde** — `joyeria` ya estaba en producción con una pastilla blanca sobre blanco | 001 · 007 · 012 |
-| color de fondo en el menú o en una fila de celdas | 🔴 **llegó a 4** | `caja.fondo` lo dibujan solo `hero`, `seccion` y `cupon`, que son los tres bloques que arman su propio contenedor; el resto pasa por `pad()`, que es margen lateral y visibilidad y nada más (`propsCaja` en `estilos.ts`). ⚠️ **R-014 y R-016 lo piden para el MENÚ** (va adentro de la banda negra, del encabezado en una y del pie en la otra) y con eso el contador pasa el umbral de la regla 5 — decisión de Bruno, no se implementó. 🔑 Para la **fila de celdas** ya hay una salida que no lo necesita: la barra de color de R-013 es el **botón de la celda al ancho** | 010 · 014 · 016 · 021 |
+| color de fondo en el menú o en una fila de celdas | 🔴 **llegó a 5** | `caja.fondo` lo dibujan solo `hero`, `seccion` y `cupon`, que son los tres bloques que arman su propio contenedor; el resto pasa por `pad()`, que es margen lateral y visibilidad y nada más (`propsCaja` en `estilos.ts`). ⚠️ **R-014, R-016 y R-005 lo piden para el MENÚ** (va adentro de una banda negra: del encabezado en dos, del pie en la otra) y con eso el contador pasa el umbral de la regla 5 — decisión de Bruno, no se implementó. 🔴 En R-005 es donde más se nota: son links **lima sobre negro** y salen negros sobre blanco, no dos tonos parecidos como en R-003. 🔑 Para la **fila de celdas** ya hay una salida que no lo necesita: la barra de color de R-013 es el **botón de la celda al ancho** | 003 · 005 · 010 · 014 · 016 · 021 |
 | banda de color con la foto a un costado | 🔴 | el `seccion` es de una columna y el `columnas`, que tiene dos, no toma color de fondo (fila de arriba). Se aproxima con la banda de color sola | 010 |
 | precio más grande que el nombre en la tarjeta | 🔴 | los dos salen del mismo `eTexto.tamano` en `renderCard`. **Pide un rol de estilo nuevo** (`precio`) | las 7 de catálogo |
 | grilla de 4 por fila | 🔴 | `PorFila` es `2 \| 3`. ⚠️ **No cuesta una llamada más a TN**: `claveProductos` es `fuente\|categoriaId\|n` y `porFila` no entra en la llave | 004 · 007 · 011 · 021 |
@@ -213,7 +213,16 @@ Anatomía: encabezado con logo manuscrito · menu 5 · hero foto + velo · colum
 Tema: rosa empolvado, serifa, todo centrado
 Copy: emocional, sin precios: el mail no vende, invita a entrar
 Patrones nuevos: grilla sin precio (es `productos` con el precio vacío, no un bloque)
-Sale como: preset `lookbook` (familia editorial)
+Sale como: preset **`ocasion`** (familia editorial), el clon fiel. Medido: el rosa de las
+  bandas de arriba y abajo es **#fcf0ec** (92% del recorte del pie), la tarjeta es blanco puro
+  y **el vinoso viene en dos tonos** —los títulos en **#7c1818** y los links "Ver más" en
+  **#9c5450**—. La captura **no tiene un solo color saturado**: `paleta-referencia` devuelve
+  "—", que es lo que "rosa empolvado" quiere decir. 🔑 **El velo de la portada va del vinoso
+  del mail y no del oscuro fijo**: es el tercer uso distinto de `veloColor` (aclarar en
+  `temporada`, unir portada y encabezado en `bodega`, **teñir** acá) y con el `#111111` de
+  siempre el mármol quedaba gris frío —#7d7d7d medido— en el medio de un mail rosa. 🟡 La
+  grilla sale con precio · el "Ver más" es un link subrayado y no una pastilla (`boton` con el
+  fondo de atrás + `subrayado`) · el menú va sobre el blanco de la tarjeta
 
 ### R-004 · Uyuni, invierno (portugués)   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-004-uyuni-invierno.png`
@@ -237,7 +246,14 @@ Anatomía: encabezado sobre negro · menu lima · hero foto · titulo lateral + 
 Tema: negro y verde lima, dos colores y nada más
 Copy: mínimo, la foto manda
 Patrones nuevos: fotos a sangre pegadas · grilla de 4 fotos tipo lookbook
-Sale como: preset `lookbook` (familia editorial)
+Sale como: preset **`dos-colores`** (familia editorial), el clon fiel. Medido: negro puro
+  **#000000 el 23,1%** del mail (95,5% del recorte del pie), blanco el 26,3% y el lima
+  **#d8fc54** el 6% — el único color saturado de la captura. ⚠️ El plan había elegido #c8ff00
+  a ojo: **cuarta tanda seguida con el hex del plan mal**. 🔑 El lima **no es el acento**: con
+  6% de los píxeles es color de banda, y los botones son negros (misma lección que R-016). El
+  negro va en el `fondo` de PÁGINA, que es lo que dibuja las bandas de arriba y abajo. 🟡 Las
+  tres fotos van con el aire de `columnas` y no pegadas · el "Sets." va arriba y no al costado
+  de la grilla · **el menú va sobre el blanco**, y en la captura está adentro de la banda negra
 
 ### R-006 · Atlántico, electrónica   (tanda 2026-08-01)
 Archivo: `docs/referencias/R-006-atlantico-electro.png`
@@ -461,7 +477,7 @@ Ordenado por cuántas referencias lo pidieron. **Nada de acá se implementa hast
 | 4 | grilla de 4 por fila | `PorFila` es `2 \| 3`. No agrega llamadas a TN (`porFila` no está en `claveProductos`); sí toca el `GrillaControl` del panel |
 | ✅ 4 | texto de la portada fuera del centro | **hecho el 2-ago-2026**: `caja.align` salió de `SIN_EFECTO` en `hero` y `seccion` |
 | ✅ 5 | ícono en cada celda | **hecho el 2-ago-2026**: catálogo cerrado en `lib/email/iconos.ts` + dos PNG por ícono |
-| **4** | color de fondo en el menú y en la fila de celdas | `caja.fondo` lo dibujan solo `hero`, `seccion` y `cupon`. No es una prop nueva: es hacer que `menu` y `columnas` **dibujen su propio contenedor** en vez de pasar por `pad()`. ⚠️ Toca `propsCaja` y por lo tanto el panel. **Llegó a 3 con R-014 y a 4 con R-016** (las dos ponen el menú adentro de una banda negra) ⇒ pasa el umbral de la regla 5 y **espera que Bruno decida si entra**. 🔑 Lo de la fila de celdas ya tiene salida sin esto: el botón al ancho |
+| **5** | color de fondo en el menú y en la fila de celdas | `caja.fondo` lo dibujan solo `hero`, `seccion` y `cupon`. No es una prop nueva: es hacer que `menu` y `columnas` **dibujen su propio contenedor** en vez de pasar por `pad()`. ⚠️ Toca `propsCaja` y por lo tanto el panel. **Llegó a 3 con R-014, a 4 con R-016 y a 5 con R-005** (las tres ponen el menú adentro de una banda negra) ⇒ pasa el umbral de la regla 5 y **espera que Bruno decida si entra**. 🔑 Lo de la fila de celdas ya tiene salida sin esto: el botón al ancho |
 | 2 | badge de descuento sobre la foto | fila de tabla sobre la foto. ⚠️ nada de `position` |
 | 2 | producto único destacado | bloque propio, no `productos` con n=1 |
 | ✅ 2 | barra fina de aviso | **hecho el 2-ago-2026**: salió gratis con el margen muerto del `seccion`. Es `barra()` en `comun.ts` |
@@ -482,7 +498,7 @@ Ordenado por cuántas referencias lo pidieron. **Nada de acá se implementa hast
 | `producto` | lanzamiento, restock, el kit | los dos clones sostienen el mail con **una foto grande** del pack; `lanzamiento` no usa ninguna y se llena con la tienda |
 | `fechas` | Día de la Madre, Navidad, Hot Sale, Black Friday | color + tipografía; los seis clones suman fotos del pack, y `evento` es la única sin ninguna |
 | `ciclo` | bienvenida, post-compra, reactivación, carrito | color + cupón |
-| `editorial` | newsletter, detrás de escena, guía de talles | foto opcional con velo |
+| `editorial` | newsletter, detrás de escena, guía de talles, una fecha que se elige con tiempo | los dos clones traen fotos del pack; `newsletter` y `editorial` no usan ninguna |
 
 Las de automation (`auto-*`) **no tienen familia**: no salen en la galería, se crean desde
 `/automations` con su disparador. Se distinguen por tener `trigger`.
