@@ -6,7 +6,7 @@
 import { resolverPaleta, combinarTema, type Paleta, type Tema } from "./tema";
 import { leerContenido } from "./esquema";
 import {
-  resolverEstilo, extra, px, padCss,
+  resolverEstilo, extra, px, padCss, alineacion,
   type CtxEstilo, type EstiloResuelto, type Estilos, type RolEstilo,
 } from "./estilos";
 import { cabeza, apertura, cierre, botonVml, botonVmlCrudo, clase, clasesDe, CLASES } from "./shell";
@@ -254,18 +254,53 @@ function detalleHtml(p: ProductoEmail, e: EstiloResuelto): string {
     : "";
 }
 
-function renderCard(p: ProductoEmail, pal: Paleta, eTexto: EstiloResuelto, eNota: EstiloResuelto, eImg: EstiloResuelto, dosEnMovil: boolean, pct = 50): string {
+function renderCard(
+  p: ProductoEmail,
+  pal: Paleta,
+  e: EstProducto,
+  dosEnMovil: boolean,
+  pct = 50,
+  botonTexto?: string,
+  anchoGrilla?: number,
+): string {
+  const { nombre: eTexto, nota: eNota, img: eImg, boton: eBoton } = e;
+  // 🔑 La alineación va en el `<td>` y no en el nombre.
+  //
+  // Hasta el 2-ago-2026 el `align` del rol `cuerpo` salía por `extra()` en el
+  // `<div>` del nombre y en ningún lado más: centrar la grilla dejaba el nombre
+  // centrado y el precio —que no pasa por `extra`— pegado a la izquierda. La
+  // perilla existía, hacía algo, y lo que hacía se veía mal. Con el
+  // `text-align` en la celda se alinean los tres renglones y el botón juntos,
+  // que es lo que pide toda referencia con grilla (002 · 018 · 019 · 020 · 021,
+  // todas centradas).
+  //
+  // ⚠️ Se emite **solo si alguien lo eligió** (`elegidas`, no `align`: el BASE
+  // del rol `cuerpo` ya escribe "left" y preguntar por el valor daría siempre
+  // que sí). Ausente = heredar de la caja, la convención del motor entero: un
+  // `text-align:left` fijo le clavaría la alineación a toda grilla ya guardada.
+  const al = eTexto.elegidas.has("align") ? `;text-align:${eTexto.align}` : "";
+  // El interior de la tarjeta, sin el ancla: con botón no se puede envolver.
+  const interior = `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:${px(eImg.radio ?? 8)};display:block" />
+      <div style="margin-top:8px;font-size:${px(eTexto.tamano ?? 14)};color:${eTexto.color}${extra(eTexto, ["tamano", "color", "align"])}">${esc(p.nombre)}</div>
+      ${detalleHtml(p, eNota)}
+      <div style="margin-top:2px;font-size:${px(eTexto.tamano ?? 14)}">${precioHtml(p, pal)}</div>`;
+
+  // 🔴 Con botón, la tarjeta deja de ser un ancla entera — la misma lección que
+  // el botón por celda de `columnas`: un `<a>` adentro de otro no está
+  // permitido y cada cliente lo repara distinto, así que el click terminaba
+  // yendo a cualquier lado. La foto y el nombre siguen linkeados; el botón sale
+  // afuera, con el mismo destino.
+  const cuerpo = botonTexto
+    ? `<a href="${esc(p.url)}" style="text-decoration:none;color:inherit">${interior}</a>
+      <div style="margin-top:10px">${botonAnchor(botonTexto, p.url, eBoton, pal, false, anchoGrilla)}</div>`
+    : `<a href="${esc(p.url)}" style="text-decoration:none;color:inherit">${interior}</a>`;
+
   // La única diferencia entre una y dos por fila en el celular es CUÁL de las dos
   // clases lleva la celda: `m-col` la apila y `m-col2` la deja en la mitad. El
   // `width` inline —el layout de escritorio— es el mismo en los dos casos, que
   // es la regla del shell: la clase solo puede ser un override.
-  return `<td width="${pct}%" valign="top"${clase(dosEnMovil ? CLASES.col2 : CLASES.col)} style="padding:8px">
-    <a href="${esc(p.url)}" style="text-decoration:none;color:inherit">
-      <img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:${px(eImg.radio ?? 8)};display:block" />
-      <div style="margin-top:8px;font-size:${px(eTexto.tamano ?? 14)};color:${eTexto.color}${extra(eTexto, ["tamano", "color"])}">${esc(p.nombre)}</div>
-      ${detalleHtml(p, eNota)}
-      <div style="margin-top:2px;font-size:${px(eTexto.tamano ?? 14)}">${precioHtml(p, pal)}</div>
-    </a>
+  return `<td width="${pct}%" valign="top"${clase(dosEnMovil ? CLASES.col2 : CLASES.col)} style="padding:8px${al}">
+    ${cuerpo}
   </td>`;
 }
 
@@ -329,6 +364,8 @@ interface EstProducto {
   nombre: EstiloResuelto;
   nota: EstiloResuelto;
   img: EstiloResuelto;
+  /** El botón por tarjeta. Se resuelve siempre; solo se dibuja si hay texto. */
+  boton: EstiloResuelto;
 }
 
 function estProducto(tipo: TipoBloque, rolNombre: RolEstilo, ctx: Ctx, propio: Estilos | undefined): EstProducto {
@@ -336,6 +373,7 @@ function estProducto(tipo: TipoBloque, rolNombre: RolEstilo, ctx: Ctx, propio: E
     nombre: est(tipo, rolNombre, ctx, propio),
     nota: est(tipo, "nota", ctx, propio),
     img: est(tipo, "imagen", ctx, propio),
+    boton: est(tipo, "boton", ctx, propio),
   };
 }
 
@@ -360,15 +398,29 @@ export function renderProductosHtml(items: ProductoEmail[], tema?: Tema, movil?:
  * ⚠️ Con `porFila: 3` el `movil` no se puede respetar —una `<tr>` de tres celdas
  * no se parte en dos filas con CSS— y la grilla apila. Ver `PorFila`.
  */
-function renderProductos(items: ProductoEmail[], pal: Paleta, e: EstProducto, movil?: PorFilaMovil, porFila?: PorFila): string {
+function renderProductos(
+  items: ProductoEmail[],
+  pal: Paleta,
+  e: EstProducto,
+  movil?: PorFilaMovil,
+  porFila?: PorFila,
+  botonTexto?: string,
+): string {
   if (items.length === 0) return "";
   const n = porFila === 3 ? 3 : 2;
   const dos = movil === 2 && n === 2;
   const pct = Math.round(100 / n);
+  // El ancho real de una celda, que es el tope del `<v:roundrect>` de Outlook:
+  // sin él un texto largo dibuja un botón más ancho que su `<td>` y descuadra
+  // la fila entera. Mismo cálculo que `botonCelda` de `columnas`; los 16 px son
+  // el `padding:8px` de cada lado.
+  const anchoCelda = Math.round((pal.ancho - 64) / n) - 16;
   const filas: string[] = [];
   for (let i = 0; i < items.length; i += n) {
     const celdas = Array.from({ length: n }, (_, j) =>
-      items[i + j] ? renderCard(items[i + j], pal, e.nombre, e.nota, e.img, dos, pct) : `<td width="${pct}%"></td>`,
+      items[i + j]
+        ? renderCard(items[i + j], pal, e, dos, pct, botonTexto, anchoCelda)
+        : `<td width="${pct}%"></td>`,
     );
     filas.push(`<tr>${celdas.join("")}</tr>`);
   }
@@ -482,7 +534,10 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       return pad(`<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" style="max-width:100%;height:auto;border-radius:${px(t.radio ?? 8)};margin:8px 0 16px;display:block${extra(t, ["radio", "align", "tamano", "color"])}" />`, caja());
     }
     case "productos":
-      return pad(renderProductos(b.items ?? [], pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil, b.porFila), caja());
+      return pad(
+        renderProductos(b.items ?? [], pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil, b.porFila, b.botonTexto),
+        caja(),
+      );
     // Se dibuja igual que `productos` —es la misma grilla— y la diferencia entera
     // está en de dónde salen los productos: el bloque guarda la consulta y la
     // respuesta llega por `opts`, resuelta contra la tienda minutos antes.
@@ -495,7 +550,10 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // ⚠️ `movil` NO entra en `claveProductos`: es cómo se dibuja la grilla, no
       // qué se le pide a Tiendanube. Si entrara, dos bloques con la misma
       // consulta y distinto layout costarían dos llamadas a TN.
-      return pad(renderProductos(items, pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil, b.porFila), caja());
+      return pad(
+        renderProductos(items, pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil, b.porFila, b.botonTexto),
+        caja(),
+      );
     }
     case "carrito": {
       // Sin items no se inventa nada: si el carrito llegó vacío, el bloque
@@ -570,15 +628,19 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         // La etiqueta debajo de la foto. Es la fila de categorías de 10 de las
         // 21 referencias de la primera tanda: sin ella, la celda de imagen es
         // una foto muda y hay que adivinar a dónde lleva.
+        // 🔴 `alineacion()` y no `tTitulo.align ?? "center"`: ese `??` no corrió
+        // NUNCA —el BASE del rol `titulo` ya trae `align:"left"`— y la etiqueta
+        // salió a la izquierda desde el día uno, contra las seis referencias que
+        // la centran (002 · 006 · 007 · 018 · 020 · 021). Ver `alineacion()`.
         const label = c.titulo
-          ? `<div style="margin-top:8px;font-size:${px(tTitulo.tamano ?? 15)};font-weight:${tTitulo.peso ?? 600};color:${tTitulo.color};text-align:${tTitulo.align ?? "center"}${extra(tTitulo, ["tamano", "peso", "color", "align"])}">${esc(c.titulo)}</div>`
+          ? `<div style="margin-top:8px;font-size:${px(tTitulo.tamano ?? 15)};font-weight:${tTitulo.peso ?? 600};color:${tTitulo.color};text-align:${alineacion(tTitulo, "center")}${extra(tTitulo, ["tamano", "peso", "color", "align"])}">${esc(c.titulo)}</div>`
           : "";
         const foto = `${c.imagen ? `<img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:${px(tImg.radio ?? 8)};display:block" alt="${esc(c.titulo ?? "")}" />` : ""}${label}`;
         // Sin botón la celda entera es el link —como fue siempre, hasta con la
         // url vacía—; con botón, la foto se queda sin ancla y el click vive en
         // el botón, que es lo que el lector ve.
         const interior = c.botonTexto ? foto : `<a href="${esc(c.url || "#")}" style="text-decoration:none;color:inherit">${foto}</a>`;
-        return `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px">${interior}${botonCelda(c, pct, tTitulo.align ?? "center")}</td>`;
+        return `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px">${interior}${botonCelda(c, pct, alineacion(tTitulo, "center"))}</td>`;
       };
 
       const celdaTexto = (c: Columna, pct: number) => {

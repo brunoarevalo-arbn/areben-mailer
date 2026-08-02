@@ -19,7 +19,7 @@
 
 import {
   type DefPreset, aire, banda, bandaFoto, barra, botonSi, categorias, cta, fila,
-  menuTienda, portada, redes,
+  grilla, menuTienda, portada, redes,
 } from "../comun";
 import { alt, foto } from "../fotos";
 
@@ -43,7 +43,7 @@ export const CATALOGO: readonly DefPreset[] = [
         }),
         { tipo: "titulo", texto: "Los más elegidos", align: "center" },
         { tipo: "texto", texto: "Hola ${contacto.nombre}, esto es lo que más nos están pidiendo este mes.", align: "center" },
-        { tipo: "productos-dinamicos", fuente: "destacados", n: 6, movil: 2, porFila: 3 },
+        grilla("destacados", { tres: true, boton: "Comprar" }),
         ...botonSi("Ver todo el catálogo", tienda, "center"),
         aire(8),
         { tipo: "titulo", texto: "Por categoría", align: "left" },
@@ -119,10 +119,12 @@ export const CATALOGO: readonly DefPreset[] = [
         ),
         { tipo: "titulo", texto: "Lo más pedido", align: "center" },
         { tipo: "texto", texto: "Hola ${contacto.nombre}, si venías esperando algo, es probable que esté acá.", align: "center" },
-        { tipo: "productos-dinamicos", fuente: "recientes", n: 6, movil: 2, porFila: 3 },
-        // Botón de ancho completo: el "VER TODOS" de la referencia, que ocupa
-        // toda la columna en vez de ser una pastilla centrada.
-        ...(tienda ? [{ tipo: "boton" as const, texto: "Ver todos", url: tienda, align: "center" as const, full: true }] : []),
+        grilla("recientes", { tres: true, boton: "Comprar" }),
+        // ⚠️ Era `full: true`, y la captura dice que no: el "VER TODOS LOS
+        // PRODUCTOS" de R-018 —y el de R-019 y R-020— es una pastilla centrada
+        // de ancho medio, no una barra de lado a lado. Se escribió de la ficha
+        // de texto, sin abrir la imagen.
+        ...(tienda ? [{ tipo: "boton" as const, texto: "Ver todos", url: tienda, align: "center" as const }] : []),
         aire(8),
         {
           tipo: "columnas",
@@ -174,8 +176,8 @@ export const CATALOGO: readonly DefPreset[] = [
         ]),
         { tipo: "divisor" },
         { tipo: "titulo", texto: "Destacados", align: "center" },
-        { tipo: "productos-dinamicos", fuente: "destacados", n: 6, movil: 2, porFila: 3 },
-        ...(tienda ? [{ tipo: "boton" as const, texto: "Ver la tienda", url: tienda, align: "center" as const, full: true }] : []),
+        grilla("destacados", { tres: true, boton: "Comprar" }),
+        ...(tienda ? [{ tipo: "boton" as const, texto: "Ver la tienda", url: tienda, align: "center" as const }] : []),
         redes,
       ],
     }),
@@ -204,7 +206,7 @@ export const CATALOGO: readonly DefPreset[] = [
           boton: { texto: "Ver la tienda", url: tienda },
         }),
         { tipo: "texto", texto: "Hola ${contacto.nombre}, esto es lo que más nos están eligiendo esta semana.", align: "center" },
-        { tipo: "productos-dinamicos", fuente: "destacados", n: 6, movil: 2, porFila: 3 },
+        grilla("destacados", { tres: true, boton: "Comprar" }),
         ...botonSi("Ver todo", tienda, "center"),
         aire(8),
         { tipo: "titulo", texto: "Entrá directo", align: "left" },
@@ -256,7 +258,7 @@ export const CATALOGO: readonly DefPreset[] = [
           { clave: "celda-remeras", titulo: "Lo nuevo" },
           { clave: "celda-abrigos", titulo: "Abrigos" },
         ]),
-        { tipo: "productos-dinamicos", fuente: "recientes", n: 6, movil: 2, porFila: 3 },
+        grilla("recientes", { tres: true, boton: "Comprar" }),
         ...botonSi("Ver todo lo nuevo", tienda, "center"),
         aire(8),
         fila([
@@ -302,7 +304,7 @@ export const CATALOGO: readonly DefPreset[] = [
         },
         { tipo: "titulo", texto: "Los más vendidos", align: "left" },
         { tipo: "texto", texto: "Hola ${contacto.nombre}, estos son los que más salen y los que menos nos vuelven.", align: "left" },
-        { tipo: "productos-dinamicos", fuente: "destacados", n: 6, movil: 2, porFila: 3 },
+        grilla("destacados", { tres: true, boton: "Comprar" }),
         ...botonSi("Ver todo el catálogo", tienda, "center"),
         aire(8),
         // Sin miniatura el bloque no se dibuja, igual que la imagen: la plantilla
@@ -351,8 +353,8 @@ export const CATALOGO: readonly DefPreset[] = [
         ]),
         { tipo: "titulo", texto: "Productos destacados", align: "left" },
         { tipo: "texto", texto: "Hola ${contacto.nombre}, esto es lo que más se está llevando.", align: "left" },
-        { tipo: "productos-dinamicos", fuente: "destacados", n: 6, movil: 2, porFila: 3 },
-        ...(tienda ? [{ tipo: "boton" as const, texto: "Ver todo", url: tienda, align: "center" as const, full: true }] : []),
+        grilla("destacados", { tres: true, boton: "Comprar" }),
+        ...(tienda ? [{ tipo: "boton" as const, texto: "Ver todo", url: tienda, align: "center" as const }] : []),
         aire(8),
         bandaFoto(
           "banda-madera",

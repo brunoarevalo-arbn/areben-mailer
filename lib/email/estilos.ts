@@ -375,8 +375,10 @@ export const ROLES_POR_TIPO: Record<TipoBloque, readonly RolEstilo[]> = {
   texto: ["caja", "cuerpo"],
   boton: ["caja", "boton"],
   imagen: ["caja", "imagen"],
-  productos: ["caja", "cuerpo", "nota", "imagen"],
-  "productos-dinamicos": ["caja", "cuerpo", "nota", "imagen"],
+  // "boton" entró con el botón por tarjeta (2-ago-2026): una grilla sin
+  // `botonTexto` no dibuja ninguno, igual que `seccion` con el texto vacío.
+  productos: ["caja", "cuerpo", "nota", "imagen", "boton"],
+  "productos-dinamicos": ["caja", "cuerpo", "nota", "imagen", "boton"],
   carrito: ["caja", "titulo", "nota", "imagen"],
   // "imagen" solo pesa en la variante de dos fotos; en las de texto no se dibuja
   // ningún `<img>`, así que ofrecer su control ahí sería una perilla suelta.
@@ -577,6 +579,26 @@ export function resolverEstilo(
     autoColor,
     autoFondo,
   };
+}
+
+/**
+ * La alineación de un rol, con un default que **de verdad se usa**.
+ *
+ * 🔴 Existe porque `e.align ?? "center"` es letra muerta en todo el motor: el
+ * `BASE` de `titulo`, `subtitulo` y `cuerpo` ya escribe `align:"left"`, así que
+ * `mezclado.align` nunca es `undefined` y el `??` no corre jamás. La etiqueta de
+ * la fila de categorías se escribió con ese `?? "center"` y salió alineada a la
+ * izquierda desde el primer día, contra seis referencias que la centran — es una
+ * de las cosas que hacían que los clones no se parecieran a su captura.
+ *
+ * La pregunta correcta no es "¿hay valor?" sino **"¿lo eligió una persona?"**,
+ * que es justo lo que responde `elegidas`. Misma convención que `extra()`.
+ */
+export function alineacion(
+  e: EstiloResuelto,
+  porDefecto: "left" | "center" | "right",
+): "left" | "center" | "right" {
+  return e.elegidas.has("align") ? e.align ?? porDefecto : porDefecto;
 }
 
 /**

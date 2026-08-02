@@ -83,6 +83,10 @@ function muestra(tipo: TipoBloque): Bloque {
     ];
   }
   if (tipo === "productos" || tipo === "carrito") b.items = PRODUCTO;
+  // El botón por tarjeta: sin texto la grilla no dibuja ninguno y todo el rol
+  // `boton` sería una perilla desconectada. El `carrito` no lo lleva — es una
+  // lista de lo que alguien dejó, no una grilla de "mirá esto".
+  if (tipo === "productos" || tipo === "productos-dinamicos") b.botonTexto = "Comprar";
   if (tipo === "redes") b.links = [{ red: "Instagram", url: "https://instagram.com/x" }];
   if (tipo === "menu") b.links = [{ texto: "Inicio", url: "https://ejemplo.com" }];
   if (tipo === "html") b.contenido = "<p>Hola</p>";

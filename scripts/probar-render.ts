@@ -16,6 +16,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { claveProductos, type Bloque } from "../lib/email/bloques";
 import { renderEmailHtml, renderEmailTexto, type ContenidoCampania } from "../lib/email/render";
 import { presetsPara } from "../lib/plantillas/presets";
 
@@ -46,6 +47,33 @@ const SIMPLE = {
   ],
 } as unknown as ContenidoCampania;
 
+/**
+ * Dos productos de mentira para llenar TODA grilla dinámica del documento.
+ *
+ * 🔴 Sin esto el golden no ve la grilla, que es el bloque más grande de la
+ * galería: `productos-dinamicos` **no dibuja nada** cuando no le llegan
+ * productos —a propósito, para no mandar un hueco— y los productos viajan por
+ * `opts`, no adentro del bloque. Medido el 2-ago-2026: el botón por tarjeta y la
+ * alineación de la tarjeta se agregaron y el golden pasó en verde sin haberlos
+ * dibujado una sola vez.
+ *
+ * Van dos y no seis: alcanza para una fila completa de la grilla de a dos y
+ * para una incompleta en la de a tres, que son los dos caminos del `for`.
+ */
+const PRODUCTOS = [
+  { nombre: "Producto uno", precio: "24990", precioPromo: "19990", imagen: "https://ejemplo.com/1.jpg", url: "https://ejemplo.com/p/1" },
+  { nombre: "Producto dos", precio: "33990", imagen: "https://ejemplo.com/2.jpg", url: "https://ejemplo.com/p/2" },
+];
+
+/** El mapa `claveProductos(bloque) → productos` que espera `RenderOpts`. */
+function conProductos(c: ContenidoCampania): Record<string, typeof PRODUCTOS> {
+  const mapa: Record<string, typeof PRODUCTOS> = {};
+  for (const b of c.bloques as Bloque[]) {
+    if (b.tipo === "productos-dinamicos") mapa[claveProductos(b)] = PRODUCTOS;
+  }
+  return mapa;
+}
+
 function capturarTodo(): Record<string, string> {
   const out: Record<string, string> = {};
   out["simple.html"] = renderEmailHtml(SIMPLE, OPTS);
@@ -53,11 +81,12 @@ function capturarTodo(): Record<string, string> {
 
   for (const p of presetsPara(CUENTA)) {
     const c = p.contenido;
-    out[`${p.id}.html`] = sha(renderEmailHtml(c, OPTS));
-    out[`${p.id}.texto`] = sha(renderEmailTexto(c, OPTS));
+    const opts = { ...OPTS, productosDinamicos: conProductos(c) };
+    out[`${p.id}.html`] = sha(renderEmailHtml(c, opts));
+    out[`${p.id}.texto`] = sha(renderEmailTexto(c, opts));
     // Con la muestra prendida: es lo que ve el editor, y es el camino donde el
     // carrito se dibuja. Sin esto, un cambio en el carrito no lo agarra nadie.
-    out[`${p.id}.html.muestra`] = sha(renderEmailHtml(c, { ...OPTS, muestraCarrito: true }));
+    out[`${p.id}.html.muestra`] = sha(renderEmailHtml(c, { ...opts, muestraCarrito: true }));
   }
   return out;
 }

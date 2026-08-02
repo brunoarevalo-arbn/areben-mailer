@@ -156,10 +156,51 @@ export const menuTienda = (tienda: string): Bloque[] =>
  * suba una foto** (regla 3), y los íconos de esas bandas son imágenes que el
  * comerciante no tiene.
  */
-export const fila = (celdas: { titulo: string; texto: string }[]): Bloque => ({
+export const fila = (
+  celdas: { titulo: string; texto: string }[],
+  align: "left" | "center" = "center",
+): Bloque => ({
   tipo: "columnas",
   variante: "textos",
   celdas: celdas.map((c) => ({ imagen: "", url: "", titulo: c.titulo, texto: c.texto })),
+  // Centrada, que es como la dibujan las cinco referencias que la tienen (002 ·
+  // 006 · 008 · 018 · 021). Se escribe explícito porque el `BASE` del rol trae
+  // `align:"left"`: acá no alcanza con "no decir nada" — ver `alineacion()` en
+  // `lib/email/estilos.ts`, donde ese default a la izquierda vive.
+  estilo: { titulo: { align }, cuerpo: { align } },
+});
+
+/**
+ * La grilla que se llena sola con el catálogo, **como la dibujan las
+ * referencias**: la tarjeta centrada y un botón propio abajo de cada precio.
+ *
+ * 🔑 Es lo que más separaba a los clones de su captura, y no la anatomía. Las
+ * ocho referencias de la primera tanda que tienen grilla —002 · 006 · 007 · 008
+ * · 010 · 012 · 019 · 020 · 021— la dibujan **centrada y con "Comprar" en cada
+ * tarjeta**, sin una sola excepción. La nuestra alineaba a la izquierda y no
+ * tenía botón; como la grilla ocupa media pantalla de cada mail, el mismo
+ * esqueleto se leía distinto.
+ *
+ * ⚠️ **Solo las dos formas que la galería permite** (`tres` o el default de a
+ * dos): `/plantillas` resuelve una consulta por `claveProductos` de la familia
+ * activa, así que doce presets con su propio `n` convierten una pestaña de 2-3
+ * llamadas a Tiendanube en una de 10.
+ *
+ * ⚠️ El `boton` va **vacío por default**, no con "Comprar" puesto: los presets
+ * que no clonan ninguna referencia (`tienda`, `ecommerce`, `novedades`,
+ * `grilla`, los de ciclo) siguen como estaban. Un default nuevo les cambiaría la
+ * cara a todos sin que nadie lo haya pedido.
+ */
+export const grilla = (
+  fuente: "destacados" | "recientes" | "oferta",
+  opts: { tres?: boolean; boton?: string } = {},
+): Bloque => ({
+  tipo: "productos-dinamicos",
+  fuente,
+  ...(opts.tres ? { n: 6, porFila: 3 } : { n: 4 }),
+  movil: 2,
+  ...(opts.boton ? { botonTexto: opts.boton } : {}),
+  estilo: { cuerpo: { align: "center" } },
 });
 
 /**

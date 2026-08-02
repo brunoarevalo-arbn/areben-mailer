@@ -101,6 +101,8 @@ Los patrones que van apareciendo en las referencias, y qué puede hacer el motor
 | cuotas ("12 sin interés") | 🔴 | **no es diseño: es dato**. TN no lo devuelve en el producto, se calcularía a mano | 004 · 005 · 008 · 018 · 019 · 021 |
 | "ver online / compartir" arriba de todo | 🔴 | pide hostear una copia del mail. Es plataforma, no un bloque | 010 · 011 · 012 · 013 · 014 · 015 |
 | botón propio en cada celda de una fila | ✅ | `botonTexto`/`botonUrl` en `Columna` desde el 2-ago. ⚠️ El contador decía **2** y estaban mal contadas: son **3**, y por eso entró por la regla normal | 015 · 018 · 021 |
+| botón "Comprar" en cada tarjeta de la grilla | ✅ | `botonTexto` en `productos`/`productos-dinamicos` desde el 2-ago. **Un texto para toda la grilla**: el destino de cada botón es la ficha de SU producto, que el motor ya sabe. Con botón, la tarjeta deja de ser un ancla entera | 001 · 002 · 006 · 007 · 008 · 010 · 012 · 018 · 019 · 020 · 021 |
+| tarjeta de producto centrada | ✅ | `estilo.cuerpo.align` en la grilla, desde el 2-ago: el `text-align` va en el `<td>` y alinea nombre, precio y botón **juntos**. Antes salía por `extra()` en el nombre y nada más | las 11 de arriba, sin una excepción |
 | badge de descuento sobre la foto | 🔴 | ⚠️ `position` está prohibido en un mail: va como fila de tabla, no overlay | 015 · 021 |
 | producto único destacado grande | 🔴 | `productos` con 1 item dibuja media grilla | 002 · 009 |
 | barra fina de aviso ("Envío gratis a partir de…") | ✅ | `barra()` de `comun.ts`: un `seccion` sin título con `caja.padY`. Se pudo cuando el `<p>` dejó de arrastrar 16px de margen cableado | 007 · 008 |
@@ -436,6 +438,18 @@ node --import tsx scripts/probar-render.ts        # golden: nada se movió sin q
 
 Las cuatro primeras recorren `presetsPara()`, así que **un preset nuevo entra solo a las
 auditorías** sin escribir un test.
+
+🔴 **El golden no veía la grilla hasta el 2-ago-2026**, que es el bloque más grande de la
+galería: `productos-dinamicos` no dibuja nada sin productos —y los productos viajan por
+`opts`, no adentro del bloque—, así que el botón por tarjeta y la alineación se agregaron y
+`probar-render` pasó en verde **sin haberlos dibujado una sola vez**. Hoy inyecta dos
+productos de mentira por grilla. Si algún día un bloque nuevo también resuelve su contenido
+por `RenderOpts`, hay que alimentarlo ahí o el golden lo mira sin verlo.
+
+📌 **Para mirar un preset con los ojos y no por hash** no hay nada en el repo: se renderiza a
+un HTML suelto —`presetsPara()` + `renderEmailHtml` con productos de mentira— y se le saca una
+captura con `--headless=new --screenshot` de Chrome. Es lo que hizo falta para la pasada de
+parecido del 2-ago; el script vivió en el scratchpad y no se commiteó.
 
 Después de deployar: abrir `/plantillas` en las 3 marcas y confirmar que **ninguna miniatura
 se ve vacía**; abrir una de cada familia en el editor con el toggle **Celular**; mandarse una

@@ -229,7 +229,14 @@ export type Bloque = BloqueBase &
          */
         sangre?: boolean;
       }
-    | { tipo: "productos"; items: ProductoEmail[]; movil?: PorFilaMovil; porFila?: PorFila }
+    | {
+        tipo: "productos";
+        items: ProductoEmail[];
+        movil?: PorFilaMovil;
+        porFila?: PorFila;
+        /** Ver `botonTexto` de `productos-dinamicos`: es el mismo campo. */
+        botonTexto?: string;
+      }
     /**
      * La grilla de `productos`, pero guardando **la consulta y no los productos**.
      *
@@ -253,6 +260,24 @@ export type Bloque = BloqueBase &
         movil?: PorFilaMovil;
         /** Cuántos por fila en escritorio. Ausente = 2. Ver `PorFila`. */
         porFila?: PorFila;
+        /**
+         * El texto del botón que lleva **cada tarjeta**. Vacío o ausente = sin
+         * botón, igual que en `seccion` y en una celda de `columnas`.
+         *
+         * 🔑 Es UN texto para toda la grilla y no uno por producto: el destino
+         * de cada botón es la ficha de SU producto, que ya la sabe el motor. Un
+         * texto por tarjeta sería contenido guardado sobre productos que este
+         * bloque, a propósito, no guarda.
+         *
+         * Entró el 2-ago-2026 por la regla de 3 de `PLANTILLAS.md`, con cinco
+         * referencias pidiéndolo (002 · 018 · 019 · 020 · 021): en todas, la
+         * grilla lleva un "Comprar" abajo de cada precio.
+         *
+         * ⚠️ No entra en `claveProductos`: es cómo se dibuja la grilla, no qué
+         * se le pide a Tiendanube. Si entrara, dos bloques con la misma consulta
+         * y distinto botón costarían dos llamadas a TN.
+         */
+        botonTexto?: string;
         /**
          * ⛔ **Acá no hay `items`, y es la decisión de diseño del bloque.**
          *

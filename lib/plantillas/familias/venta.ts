@@ -14,7 +14,7 @@
 
 import {
   type DefPreset, aire, banda, bandaFoto, botonSi, categorias, cta, fila,
-  menuTienda, portada, redes,
+  grilla, menuTienda, portada, redes,
 } from "../comun";
 import { foto } from "../fotos";
 
@@ -45,7 +45,7 @@ export const VENTA: readonly DefPreset[] = [
           alto: 320,
         }),
         { tipo: "texto", texto: "Hola ${contacto.nombre}, mirá los productos 👇", align: "center" },
-        { tipo: "productos-dinamicos", fuente: "oferta", n: 6, movil: 2, porFila: 3 },
+        grilla("oferta", { tres: true, boton: "Comprar" }),
         ...botonSi("Ver todo lo rebajado", tienda, "center"),
         aire(8),
         { tipo: "divisor" },
@@ -89,7 +89,7 @@ export const VENTA: readonly DefPreset[] = [
           "Que sea liquidación no cambia el envío: sale el mismo día y con seguimiento.",
         ),
         { tipo: "titulo", texto: "Lo que está rebajado", align: "center" },
-        { tipo: "productos-dinamicos", fuente: "oferta", n: 6, movil: 2, porFila: 3 },
+        grilla("oferta", { tres: true, boton: "Comprar" }),
         ...botonSi("Ver todo", tienda, "center"),
         redes,
       ],
@@ -139,7 +139,7 @@ export const VENTA: readonly DefPreset[] = [
           { texto: "Ver ofertas", url: tienda },
         ),
         // La otra forma de grilla permitida: cuatro, dos filas parejas.
-        { tipo: "productos-dinamicos", fuente: "oferta", n: 4, movil: 2 },
+        grilla("oferta", { boton: "Comprar" }),
         aire(8),
         banda("¿Seguís sin decidirte?", "Escribinos y te ayudamos a elegir. Contestamos todos los días."),
         redes,
@@ -188,8 +188,8 @@ export const VENTA: readonly DefPreset[] = [
           { titulo: "Envío gratis", texto: "A partir de tu monto mínimo." },
         ]),
         { tipo: "titulo", texto: "Lo más rebajado", align: "center" },
-        { tipo: "productos-dinamicos", fuente: "oferta", n: 6, movil: 2, porFila: 3 },
-        ...(tienda ? [{ tipo: "boton" as const, texto: "Ver todas las ofertas", url: tienda, align: "center" as const, full: true }] : []),
+        grilla("oferta", { tres: true, boton: "Comprar" }),
+        ...(tienda ? [{ tipo: "boton" as const, texto: "Ver todas las ofertas", url: tienda, align: "center" as const }] : []),
         aire(8),
         fila([
           { titulo: "Compra protegida", texto: "Con garantía y factura." },
