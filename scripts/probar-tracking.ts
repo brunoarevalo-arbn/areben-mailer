@@ -67,10 +67,19 @@ console.log("\n5) El link de baja NO se reescribe por el tracking");
 // dominio de la marca y una regex distraída lo envolvería en un redirect.
 ok(conTracking.includes(`href="${APP}/baja?e=E1"`), "el /baja pasa intacto por inyectarTracking");
 
-console.log("\n6) El dominio no es marca: no viaja al renderer");
-const m = marcaDe(cuentaCon("links.zattia.com.ar")) as Record<string, unknown>;
-ok(!("dominioEnvio" in m), "marcaDe() no lo expone (no se dibuja, no es un RenderOpt)");
+console.log("\n6) El dominio crudo no es marca, pero el assetsBase que sale de él SÍ");
+const m = marcaDe(cuentaCon("links.zattia.com.ar"), APP) as Record<string, unknown>;
+ok(!("dominioEnvio" in m), "marcaDe() no expone el valor crudo (no se dibuja)");
 ok(JSON.stringify(m).includes("Zattia"), "…pero marcaDe() sigue devolviendo la marca");
+// 🔴 Esto es lo que hacía que el preview del editor dibujara las redes en
+// texto: `assetsBase` era el único campo de `RenderOpts` que cada call site
+// armaba a mano, y el editor lo sacaba de `window`, que en el servidor no
+// existe. Que viaje adentro de la marca es lo que lo lleva a los ocho lugares.
+ok(m.assetsBase === "https://links.zattia.com.ar", "assetsBase sale del dominio de la marca");
+ok(
+  marcaDe(cuentaCon(undefined), APP).assetsBase === APP,
+  "sin dominio propio cae al APP_URL, igual que los links",
+);
 
 console.log("\n7) Guardarlo no pisa el resto del config");
 const c = leerConfigCuenta({ tema: { acento: "#000000" }, logo: "https://x/y.png", dominioEnvio: "links.zattia.com.ar" });

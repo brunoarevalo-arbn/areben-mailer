@@ -111,7 +111,7 @@ export default async function CampaniaEditorPage({
       )}
       <CampaniaEditor
         id={campania.id}
-        marca={marcaDe(cuenta)}
+        marca={marcaDe(cuenta, process.env.APP_URL ?? "")}
         initial={{
           nombre: campania.nombre,
           asunto: campania.asunto ?? "",

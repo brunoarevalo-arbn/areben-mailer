@@ -98,8 +98,9 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
       productosDinamicos,
       // Los iconos de `redes` salen del mismo host que los links, no de una
       // constante: un mail de Zattia trae sus iconos de links.zattia.com.ar.
-      assetsBase: appUrl,
-      ...marcaDe(campania.cuenta),
+      // Viaja adentro de `marcaDe` como `assetsBase` — es el mismo
+      // `hostDeEnvio` con el que se armó `appUrl` acá arriba.
+      ...marcaDe(campania.cuenta, process.env.APP_URL ?? ""),
     };
     let html = renderEmailHtml(contenido, opts);
     html = aplicarMergeTags(html, envio.contacto);

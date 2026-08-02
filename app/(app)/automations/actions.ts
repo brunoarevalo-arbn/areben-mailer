@@ -173,8 +173,7 @@ export async function enviarPruebaAutomation(id: string, email: string) {
     preheader: a.preheader ?? undefined,
     unsubscribeUrl,
     productosDinamicos,
-    assetsBase: hostPrueba,
-    ...marcaDe(cuenta),
+    ...marcaDe(cuenta, process.env.APP_URL ?? ""),
   };
   const destinatario = { nombre: nombre ?? "", email: destino };
   const html = aplicarMergeTags(renderEmailHtml(contenido, opts), destinatario);

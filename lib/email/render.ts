@@ -24,7 +24,41 @@ export { nuevoBloque, duplicarBloque, nuevoId, TIPOS_BLOQUE, ETIQUETA_BLOQUE } f
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-const nl = (s: string) => esc(s).replace(/\n/g, "<br>");
+/**
+ * `**palabra**` → `<strong>palabra</strong>`.
+ *
+ * 🔴 **Recibe texto YA ESCAPADO, y ese orden es toda la seguridad.** Después de
+ * `esc()` no queda un solo `<` ni `>` que venga de la base, así que los únicos
+ * tags de la salida son los `<strong>` que emite esta función: un `<script>`
+ * escrito en el editor sigue saliendo como texto literal. Llamarla antes de
+ * escapar abriría el XSS almacenado que motivó que el motor escape todo — por
+ * eso el único llamador es `nl()`, que escapa primero, y no se exporta.
+ *
+ * El patrón es deliberadamente chico: no cruza renglones (`[^*\n]`) y es
+ * perezoso, así que `**a** y **b**` da dos negritas y no una sola que se coma el
+ * medio. Un `**` suelto, sin cerrar o vacío queda literal, que es lo que espera
+ * quien escribió dos asteriscos sin querer pedir nada.
+ *
+ * ⚠️ Va `<strong>` y no `<b>`: Outlook dibuja los dos igual, pero el peso
+ * semántico es lo que hace que un lector de pantalla lo diga distinto.
+ */
+const negritas = (yaEscapado: string) =>
+  yaEscapado.replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>");
+
+/** La misma marca, borrada. Para la parte text/plain, que no tiene tags. */
+const sinNegritas = (s: string) => s.replace(/\*\*([^*\n]+?)\*\*/g, "$1");
+
+/**
+ * Texto de la base → HTML de un párrafo: escapa, resuelve negritas y corta
+ * renglones.
+ *
+ * 🔑 Los tres lugares que llaman a `nl()` —el bloque `texto`, el texto de una
+ * celda de `columnas` y la bajada de `hero`/`seccion`— son exactamente los tres
+ * donde se escribe de verdad, así que la negrita entró **sin tocar un solo call
+ * site**. Los títulos van por `esc()` pelado y quedan afuera a propósito: un
+ * título ya es grande y pesado, y ahí la negrita no se nota.
+ */
+const nl = (s: string) => negritas(esc(s)).replace(/\n/g, "<br>");
 
 /**
  * Un color de la base a `rgba(...)`, para poder pintarlo semitransparente.
@@ -775,7 +809,11 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const c = caja();
       const bg = c.autoFondo ? b.bg || pal.tarjeta : c.fondo!;
       const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h1${clase(...clasesTitulo(x))} style="margin:0 0 10px;font-size:${px(x.tamano ?? 30)};line-height:${x.interlinea ?? 1.2};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.titulo)}</h1>`; })() : "";
-      const s = b.subtitulo ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 20px;font-size:${px(x.tamano ?? 17)};line-height:${x.interlinea ?? 1.5};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.subtitulo)}</p>`; })() : "";
+      // La bajada va por `nl()` —y no por `esc()`— igual que la de `seccion`:
+      // es la otra mitad del mismo par y no había razón para que una admitiera
+      // negritas y saltos de línea y la otra no. Verificado que ningún preset
+      // publicado tiene un `\n` ni un `**` acá, así que el golden no se mueve.
+      const s = b.subtitulo ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 20px;font-size:${px(x.tamano ?? 17)};line-height:${x.interlinea ?? 1.5};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${nl(b.subtitulo)}</p>`; })() : "";
       const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
       const interior = `${t}${s}${btn}`;
 
@@ -1056,8 +1094,12 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
     }
     case "titulo":
       return b.texto;
+    // 🔴 Los mismos campos que en el HTML admiten `**negrita**` tienen que
+    // salir acá SIN los asteriscos. La parte text/plain va en cada envío y es
+    // una de las señales que mira el filtro: un mail cuyo cuerpo dice
+    // "**Solo hasta el domingo**" se lee como marcado de spam, no como énfasis.
     case "texto":
-      return b.texto;
+      return sinNegritas(b.texto);
     case "boton":
       return b.url ? link(b.texto, b.url) : b.texto;
     case "imagen":
@@ -1085,7 +1127,9 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       // esta rama, la versión de texto de una fila de tarjetas con CTA propio
       // salía sin un solo link.
       const lado = (c: Columna) =>
-        [c.titulo, c.texto, c.botonTexto ? link(c.botonTexto, c.botonUrl) : c.url].filter(Boolean).join(" — ");
+        [c.titulo, c.texto && sinNegritas(c.texto), c.botonTexto ? link(c.botonTexto, c.botonUrl) : c.url]
+          .filter(Boolean)
+          .join(" — ");
       return (b.celdas ?? []).map(lado).filter(Boolean).join("\n") || null;
     }
     case "video":
@@ -1106,9 +1150,11 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       // No aporta nada legible: en texto plano el aire ya lo dan los saltos.
       return null;
     case "hero":
-      return [b.titulo, b.subtitulo, b.botonTexto ? link(b.botonTexto, b.botonUrl) : null].filter(Boolean).join("\n") || null;
+      return [b.titulo, b.subtitulo && sinNegritas(b.subtitulo), b.botonTexto ? link(b.botonTexto, b.botonUrl) : null]
+        .filter(Boolean).join("\n") || null;
     case "seccion":
-      return [b.titulo, b.texto, b.botonTexto ? link(b.botonTexto, b.botonUrl) : null].filter(Boolean).join("\n") || null;
+      return [b.titulo, b.texto && sinNegritas(b.texto), b.botonTexto ? link(b.botonTexto, b.botonUrl) : null]
+        .filter(Boolean).join("\n") || null;
     case "cupon":
       return [b.texto, b.codigo, b.botonTexto ? link(b.botonTexto, b.botonUrl) : null].filter(Boolean).join("\n") || null;
     // Sin conversión razonable a texto plano: es la escotilla de HTML libre.

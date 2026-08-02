@@ -10,7 +10,7 @@ import { renderEmailHtml, aplicarMergeTags } from "@/lib/email/render";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { leerContenido } from "@/lib/email/esquema";
 import { combinarTema, resolverPaleta } from "@/lib/email/tema";
-import { marcaDe, hostDeEnvio } from "@/lib/marca";
+import { marcaDe } from "@/lib/marca";
 import { TarjetaPlantilla } from "@/components/TarjetaPlantilla";
 import { automationDelTrigger, esTrigger } from "@/lib/automations";
 import { TRIGGERS_UI } from "@/app/(app)/automations/presets-ui";
@@ -99,10 +99,9 @@ export default async function PlantillasPage({
     cuenta,
   );
 
-  const marca = marcaDe(cuenta);
+  const marca = marcaDe(cuenta, process.env.APP_URL ?? "");
   const opts = {
     unsubscribeUrl: "#",
-    assetsBase: hostDeEnvio(cuenta, process.env.APP_URL ?? ""),
     productosDinamicos,
     // Igual que el preview del editor: el `carrito` se llena con productos de
     // muestra para que se vea de qué se trata la plantilla. ⛔ Es solo de

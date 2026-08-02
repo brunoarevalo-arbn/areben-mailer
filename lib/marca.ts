@@ -86,9 +86,12 @@ export interface ConfigCuenta {
    * firma el mail. Es una de las señales que miran los filtros, y la pagamos en
    * TODOS los envíos reales de TODAS las marcas.
    *
-   * ⚠️ Esto NO es marca (no se dibuja): es de dónde cuelgan los links. Por eso
-   * no sale por `marcaDe()` ni entra en `RenderOpts` — si viajara ahí, el
-   * preview del editor lo pediría sin tener para qué.
+   * ⚠️ El valor crudo no se dibuja y **no** sale por `marcaDe()`: lo que sí
+   * sale es `assetsBase`, que se deriva de acá con `hostDeEnvio()` y de donde
+   * cuelgan los iconos del bloque `redes`. Hasta el 2-ago-2026 este comentario
+   * decía que no entraba a `RenderOpts` "porque el preview lo pediría sin tener
+   * para qué", y era al revés: el preview lo necesita —son los iconos— y por no
+   * tenerlo los dibujaba en texto.
    */
   dominioEnvio?: string;
 }
@@ -143,7 +146,14 @@ export function hostDeEnvio(cuenta: { config: unknown }, fallback: string): stri
  */
 export type Marca = Pick<
   RenderOpts,
-  "nombreCuenta" | "logoCuenta" | "urlCuenta" | "direccionPostal" | "temaMarca" | "permiteHtmlCrudo" | "redesMarca"
+  | "nombreCuenta"
+  | "logoCuenta"
+  | "urlCuenta"
+  | "direccionPostal"
+  | "temaMarca"
+  | "permiteHtmlCrudo"
+  | "redesMarca"
+  | "assetsBase"
 >;
 
 const txt = (v: unknown): string | undefined => {
@@ -201,8 +211,16 @@ export function leerConfigCuenta(valor: unknown): ConfigCuenta {
   };
 }
 
-/** La marca de una cuenta, lista para pasarle al renderer. */
-export function marcaDe(cuenta: { nombre: string; config: unknown }): Marca {
+/**
+ * La marca de una cuenta, lista para pasarle al renderer.
+ *
+ * `appUrl` es el fallback de `hostDeEnvio` y va **por parámetro**, no leyendo
+ * `process.env` acá: este archivo se declara puro (ver el aviso de arriba) y es
+ * el mismo criterio que `hostDeEnvio`, que existía con esa firma desde antes.
+ * Es obligatorio a propósito — un call site que se lo olvide tiene que ser un
+ * error de tipos, no un mail sin iconos que se descubre en la casilla de otro.
+ */
+export function marcaDe(cuenta: { nombre: string; config: unknown }, appUrl: string): Marca {
   const c = leerConfigCuenta(cuenta.config);
   // El idioma de la tienda solo se usa si el tema no dice otra cosa: quien
   // eligió un idioma a mano en el diseño mandó sobre lo que trajo TN.
@@ -221,6 +239,16 @@ export function marcaDe(cuenta: { nombre: string; config: unknown }): Marca {
     // Igual que el domicilio y el logo: la marca la resuelve el render, no el
     // documento. Así el mismo Json sale con las redes de cada tienda.
     redesMarca: c.redes,
+    // 🔴 De acá salen los iconos de `redes`, y por eso viaja con la marca y no
+    // suelto: era el único campo de `RenderOpts` que cada call site armaba a
+    // mano, y el preview del editor —el único que no podía resolverlo en el
+    // servidor— lo sacaba de `window.location.origin`. En el render del
+    // servidor `window` no existe ⇒ `assetsBase` vacío ⇒ el bloque `redes`
+    // caía al fallback de texto y el mail se veía SIN iconos en el editor,
+    // mientras el envío real los mandaba bien. Con el campo acá adentro llega
+    // a los ocho lugares que dibujan un mail, editores incluidos, sin que
+    // ninguno tenga que acordarse.
+    assetsBase: hostDeEnvio(cuenta, appUrl),
   };
 }
 

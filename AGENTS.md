@@ -75,6 +75,7 @@ node --import tsx scripts/probar-tramos.ts     # el ramp no pierde ni duplica a 
 node --import tsx scripts/probar-remitente.ts  # una marca sin remitente propio NO manda (no hay fallback)
 node --import tsx scripts/probar-tracking.ts   # los links del mail cuelgan del dominio de la marca, y un valor basura cae al fallback
 node --import tsx scripts/probar-redes.ts      # cada red de la lista tiene su PNG; lo que no tiene icono sale en texto, nunca roto
+node --import tsx scripts/probar-negritas.ts   # `**negrita**` se resuelve DESPUÉS de escapar, y solo en los cuatro campos que se escriben
 node --import tsx scripts/probar-automations.ts # una automation por trigger: dos son dos mails a la misma persona
 ```
 
@@ -194,6 +195,29 @@ golden.
 ⚠️ **Ningún string del Json llega al HTML sin pasar por `hex()`, `px()` o un
 enum** — `esc()` no escapa comillas, así que un color con una comilla se escapa
 del atributo `style="…"`. Los preview van con `sandbox` por lo mismo.
+
+### Negrita inline: `**palabra**` (2-ago-2026)
+
+El único formato que se puede pedir adentro de un texto. **El bloque sigue siendo
+un `string` plano**: no hay editor rich-text, ni esquema nuevo, ni migración — el
+botón "Negrita" del editor (`components/editor/BotonNegrita.tsx`) no hace más que
+escribir los cuatro asteriscos alrededor de la selección.
+
+- 🔴 **`negritas()` recibe texto YA ESCAPADO, y ese orden es toda la seguridad.**
+  Después de `esc()` no queda un `<` que venga de la base, así que los únicos tags
+  de la salida son los `<strong>` que emite el motor. Llamarla antes de escapar
+  abre el XSS almacenado que motivó que el motor escape todo. Por eso el único
+  llamador es `nl()`, que escapa primero, y **no se exporta**.
+- **El alcance sale gratis de `nl()`**: los cuatro campos que lo llaman —el bloque
+  `texto`, la bajada de `seccion`, la bajada de `hero` y el texto de una celda de
+  `columnas`— son exactamente los cuatro donde se escribe de verdad. Los títulos
+  van por `esc()` pelado y quedan afuera **a propósito**: ya salen grandes y
+  pesados.
+- ⚠️ **La parte text/plain va por `sinNegritas()`**. Un cuerpo que dice
+  `**Solo hasta el domingo**` se lee como marcado de spam, no como énfasis, y ese
+  texto sale en cada envío.
+- Lo fija `probar-negritas.ts`, verificado en rojo invirtiendo el orden de
+  `esc()`/`negritas()` y sacando el `sinNegritas()` del texto plano.
 
 ### El preview del editor se puede tocar (2-ago-2026)
 
@@ -367,11 +391,23 @@ El logo, el sitio, el idioma y el domicilio salen del endpoint `/store` y viven
 en **`Cuenta.config`** (Json libre — sin columna nueva: la base es compartida).
 `lib/marca.ts` es el **único** archivo que conoce la forma de ese Json.
 
-- **`marcaDe(cuenta)` devuelve un pedazo de `RenderOpts`**, así que los 8 call
-  sites del renderer hacen `{ unsubscribeUrl, ...marcaDe(cuenta) }`. Está atado
-  por tipos a `RenderOpts` a propósito: un campo de marca nuevo llega a todos
-  lados sin que haya que acordarse de ninguno. Enumerar campos a mano es el bug
-  que hacía que el preview mostrara una cosa y el mail saliera otra.
+- **`marcaDe(cuenta, appUrl)` devuelve un pedazo de `RenderOpts`**, así que los 8
+  call sites del renderer hacen `{ unsubscribeUrl, ...marcaDe(cuenta, appUrl) }`.
+  Está atado por tipos a `RenderOpts` a propósito: un campo de marca nuevo llega
+  a todos lados sin que haya que acordarse de ninguno. Enumerar campos a mano es
+  el bug que hacía que el preview mostrara una cosa y el mail saliera otra.
+  - **`appUrl` va por parámetro y es obligatorio.** Este archivo se declara puro
+    (lo importa el cliente), así que no lee `process.env`: es el mismo criterio
+    que `hostDeEnvio`, con el que se resuelve `assetsBase`. Obligatorio para que
+    olvidarlo sea un error de tipos y no un mail sin iconos.
+  - 🔴 **`assetsBase` —de donde salen los iconos de `redes`— entró acá el
+    2-ago-2026 y era el último campo de `RenderOpts` que cada call site armaba a
+    mano.** El preview del editor, el único que no podía resolverlo en el
+    servidor, lo sacaba de `window.location.origin` con un ternario para el
+    render del servidor — y ese ternario ERA el bug: en el servidor `window` no
+    existe ⇒ `assetsBase` vacío ⇒ el bloque `redes` caía al fallback de texto.
+    El editor mostraba las redes sin iconos mientras el envío real las mandaba
+    bien. Lo fija `probar-tracking.ts`.
 - **Nada de esto se guarda adentro del contenido**: son defaults que resuelve el
   render. El mismo Json sale con el logo de BDI en BDI y con el de Zattia en
   Zattia. Lo fija `probar-marca.ts`.

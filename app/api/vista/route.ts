@@ -4,7 +4,7 @@ import { leerContenido } from "@/lib/email/esquema";
 import { renderEmailHtml, aplicarMergeTags } from "@/lib/email/render";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { combinarTema, resolverPaleta } from "@/lib/email/tema";
-import { marcaDe, hostDeEnvio } from "@/lib/marca";
+import { marcaDe } from "@/lib/marca";
 
 /**
  * El HTML de un mail ya guardado, para mirarlo sin abrir el editor.
@@ -61,14 +61,13 @@ export async function GET(req: Request) {
   if (!fila) return Response.json({ error: "no encontrado" }, { status: 404 });
 
   const contenido = leerContenido(fila.contenido);
-  const marca = marcaDe(cuenta);
+  const marca = marcaDe(cuenta, process.env.APP_URL ?? "");
   const productosDinamicos = await resolverProductosDinamicos(contenido.bloques, cuenta);
 
   const html = aplicarMergeTags(
     renderEmailHtml(contenido, {
       preheader: fila.preheader ?? undefined,
       unsubscribeUrl: "#",
-      assetsBase: hostDeEnvio(cuenta, process.env.APP_URL ?? ""),
       // Solo de preview: `probar-carrito.ts` fija que la muestra no sale en un
       // envío real.
       muestraCarrito: true,

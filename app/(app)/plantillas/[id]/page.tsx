@@ -27,7 +27,7 @@ export default async function PlantillaEditorPage({
       <PageHeader eyebrow="Plantilla" title={plantilla.nombre} />
       <PlantillaEditor
         id={plantilla.id}
-        marca={marcaDe(cuenta)}
+        marca={marcaDe(cuenta, process.env.APP_URL ?? "")}
         initial={{ nombre: plantilla.nombre, contenido: leerContenido(plantilla.contenido) }}
       />
     </div>

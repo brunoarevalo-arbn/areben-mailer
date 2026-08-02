@@ -31,6 +31,8 @@ const ok = (cond: boolean, que: string, detalle = "") => {
 const titulo = (s: string) => console.log(`\n${s}`);
 
 const BAJA = "https://ejemplo.com/baja?token=abc";
+/** El fallback de `hostDeEnvio`, que `marcaDe` pide por parámetro (nunca de `process.env`). */
+const APP = "https://areben-mailer.vercel.app";
 const render = (c: unknown, opts: Record<string, unknown> = {}) =>
   renderEmailHtml(c as ContenidoCampania, {
     unsubscribeUrl: BAJA,
@@ -110,16 +112,16 @@ titulo("Traer la marca no pisa el resto del config");
 // ─── marcaDe: el idioma ─────────────────────────────────────────────────────
 titulo("El idioma de la tienda llega al mail");
 {
-  const m = marcaDe({ nombre: "Zattia", config: { idioma: "pt" } });
+  const m = marcaDe({ nombre: "Zattia", config: { idioma: "pt" } }, APP);
   ok(m.temaMarca?.idioma === "pt", "el idioma de TN entra al tema");
   ok(render({ v: V_ACTUAL, bloques: [] }, m as Record<string, unknown>).includes('lang="pt"'), "y sale en el `lang` del documento");
 }
 {
-  const m = marcaDe({ nombre: "Zattia", config: { idioma: "pt", tema: { idioma: "en" } } });
+  const m = marcaDe({ nombre: "Zattia", config: { idioma: "pt", tema: { idioma: "en" } } }, APP);
   ok(m.temaMarca?.idioma === "en", "pero si alguien eligió idioma en el diseño, ese manda");
 }
 {
-  const m = marcaDe({ nombre: "Zattia", config: { tema: { acento: "#000" } } });
+  const m = marcaDe({ nombre: "Zattia", config: { tema: { acento: "#000" } } }, APP);
   ok(m.temaMarca?.acento === "#000" && !m.temaMarca?.idioma, "sin idioma de TN el tema queda como estaba");
 }
 
@@ -196,7 +198,7 @@ titulo("Las redes las pone la marca, no el documento");
     { red: "instagram", url: "https://instagram.com/zattia_co" },
     { red: "tiktok", url: "https://tiktok.com/@zattia" },
   ];
-  const m = marcaDe({ nombre: "Marca Uno", config: { redes: REDES } });
+  const m = marcaDe({ nombre: "Marca Uno", config: { redes: REDES } }, APP);
   ok(m.redesMarca?.length === 2, "`marcaDe` las devuelve como parte de RenderOpts");
 
   // El bloque nace con la lista vacía —así lo puede traer un preset— y el mail
@@ -227,10 +229,10 @@ titulo("Las redes las pone la marca, no el documento");
 titulo("Mostrar el domicilio es una decisión de la marca");
 {
   const DIR = "AREBEN COMERCIAL S. R. L. · PJE HUTCHINSON 3869";
-  const con = marcaDe({ nombre: "Marca Uno", config: { direccion: DIR } });
+  const con = marcaDe({ nombre: "Marca Uno", config: { direccion: DIR } }, APP);
   ok(con.direccionPostal === DIR, "sin la clave, el domicilio sale como salió siempre");
 
-  const sin = marcaDe({ nombre: "Marca Uno", config: { direccion: DIR, direccionOculta: true } });
+  const sin = marcaDe({ nombre: "Marca Uno", config: { direccion: DIR, direccionOculta: true } }, APP);
   ok(sin.direccionPostal === undefined, "con `direccionOculta` no llega al renderer");
 
   // 🔴 Apagarlo no puede llevarse puesto el dato: "Traer de mi tienda" lo
@@ -250,7 +252,7 @@ titulo("Mostrar el domicilio es una decisión de la marca");
 {
   // El default importa: las cuentas que ya existen no tienen la clave, y no
   // pueden empezar a mandar sin domicilio por un cambio de código.
-  const vieja = marcaDe({ nombre: "Marca Uno", config: { direccion: "CALLE FALSA 123" } });
+  const vieja = marcaDe({ nombre: "Marca Uno", config: { direccion: "CALLE FALSA 123" } }, APP);
   ok(vieja.direccionPostal === "CALLE FALSA 123", "una cuenta vieja no cambia de comportamiento");
 }
 
@@ -260,13 +262,13 @@ titulo("El domicilio del pie se puede cambiar, y traer la marca no lo pisa");
   const FISCAL = "AREBEN COMERCIAL S. R. L. · PJE HUTCHINSON 3869";
   const PROPIO = "Zattia · Córdoba, Argentina";
 
-  const m = marcaDe({ nombre: "Zattia", config: { direccion: FISCAL, direccionPropia: PROPIO } });
+  const m = marcaDe({ nombre: "Zattia", config: { direccion: FISCAL, direccionPropia: PROPIO } }, APP);
   ok(m.direccionPostal === PROPIO, "el escrito a mano le gana al fiscal que trajo TN");
 
-  const solo = marcaDe({ nombre: "Zattia", config: { direccion: FISCAL } });
+  const solo = marcaDe({ nombre: "Zattia", config: { direccion: FISCAL } }, APP);
   ok(solo.direccionPostal === FISCAL, "sin uno propio sale el de Tiendanube");
 
-  const vacio = marcaDe({ nombre: "Zattia", config: { direccion: FISCAL, direccionPropia: "   " } });
+  const vacio = marcaDe({ nombre: "Zattia", config: { direccion: FISCAL, direccionPropia: "   " } }, APP);
   ok(vacio.direccionPostal === FISCAL, "vaciarlo vuelve al de Tiendanube (no deja el pie mudo)");
 
   // 🔴 La razón de que sean dos claves y no una: "Traer de mi tienda" se corre
@@ -284,11 +286,11 @@ titulo("El domicilio del pie se puede cambiar, y traer la marca no lo pisa");
   );
   ok(despues.direccionPropia === PROPIO, "traer la marca NO pisa el domicilio escrito a mano");
   ok(
-    marcaDe({ nombre: "Zattia", config: despues }).direccionPostal === PROPIO,
+    marcaDe({ nombre: "Zattia", config: despues }, APP).direccionPostal === PROPIO,
     "…y el pie sigue saliendo con el propio",
   );
 
-  const oculto = marcaDe({ nombre: "Zattia", config: { direccionPropia: PROPIO, direccionOculta: true } });
+  const oculto = marcaDe({ nombre: "Zattia", config: { direccionPropia: PROPIO, direccionOculta: true } }, APP);
   ok(oculto.direccionPostal === undefined, "el interruptor apaga también al escrito a mano");
 }
 

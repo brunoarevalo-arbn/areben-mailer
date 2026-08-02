@@ -93,13 +93,17 @@ export function PreviewMail({
       renderEmailHtml(contenidoDif, {
         preheader: preheaderDif,
         unsubscribeUrl: "#",
-        // Los iconos de `redes` necesitan URL absoluta (el iframe va con
-        // `srcDoc`, así que una relativa no resuelve contra ningún origen). Se
-        // usa el del propio panel y no el dominio de la marca a propósito: son
-        // los MISMOS archivos, el preview se ve igual, y evita enhebrar la prop
-        // por los tres editores. Lo que el preview promete es el aspecto, no la
-        // URL — esa la decide `hostDeEnvio` al enviar.
-        assetsBase: typeof window === "undefined" ? "" : window.location.origin,
+        // ⚠️ `assetsBase` —de donde salen los iconos de `redes`— NO se arma
+        // acá: viene adentro de `...marca`, resuelto en el servidor con el
+        // mismo `hostDeEnvio` del envío.
+        //
+        // 🔴 Hasta el 2-ago-2026 salía de `window.location.origin`, con un
+        // ternario para el render del servidor. Ese ternario era el bug: en el
+        // servidor `window` no existe ⇒ `assetsBase` vacío ⇒ `urlIcono()`
+        // devuelve `undefined` ⇒ el bloque `redes` cae al fallback de texto. El
+        // preview mostraba los nombres pelados mientras el envío real mandaba
+        // los iconos bien, que es la peor forma de equivocarse: la que hace
+        // desconfiar de lo que sí funciona.
         // El carrito se dibuja con productos de muestra SOLO acá. El bloque
         // guardado sigue vacío: si trajera datos, una automation se los mandaría
         // a un cliente real.

@@ -271,10 +271,10 @@ export async function enviarPrueba(id: string, emailDestino: string) {
     preheader: campania.preheader ?? undefined,
     unsubscribeUrl: unsubPrueba,
     productosDinamicos,
-    assetsBase: hostPrueba,
     // La prueba tiene que salir con el MISMO aspecto que el envío real: mismo
-    // tema, mismo logo, mismo pie.
-    ...marcaDe(cuenta),
+    // tema, mismo logo, mismo pie. `assetsBase` viene adentro, del mismo
+    // `hostDeEnvio` que arma `hostPrueba`.
+    ...marcaDe(cuenta, process.env.APP_URL ?? ""),
   };
   const destinatario = { nombre: nombre ?? "", email: destino };
   const htmlFinal = aplicarMergeTags(renderEmailHtml(contenido, opts), destinatario);

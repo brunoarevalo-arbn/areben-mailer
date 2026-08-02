@@ -119,7 +119,10 @@ export async function traerMarcaDeTienda() {
   revalidatePath("/remitentes");
   // Se devuelve lo que quedó para poder mostrarlo sin recargar: un "listo"
   // pelado no deja ver si la tienda tenía logo cargado o no.
-  return { ok: true as const, marca: marcaDe({ nombre: cuenta.nombre, config }) };
+  return {
+    ok: true as const,
+    marca: marcaDe({ nombre: cuenta.nombre, config }, process.env.APP_URL ?? ""),
+  };
 }
 
 /**

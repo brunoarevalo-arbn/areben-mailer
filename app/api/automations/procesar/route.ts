@@ -153,9 +153,10 @@ export async function GET(req: Request) {
       preheader: automation.preheader ?? undefined,
       unsubscribeUrl: unsubUrl,
       productosDinamicos,
-      // Ídem campañas: del host de ESTA marca, que en este loop cambia por run.
-      assetsBase: host,
-      ...marcaDe(automation.cuenta),
+      // ⚠️ `marcaDe` va adentro del loop, no una vez arriba: el lote mezcla
+      // marcas y de acá sale también el `assetsBase` de los iconos, que es el
+      // host de ESTA marca — el mismo `hostDeEnvio` que arma `host`.
+      ...marcaDe(automation.cuenta, appUrl),
     };
     // Se pasa el contenido ENTERO con los bloques pisados, no `{ bloques, tema }`.
     //

@@ -28,7 +28,7 @@ export default async function AutomationPage({ params }: { params: Promise<{ id:
       <PageHeader eyebrow="Automation" title={a.nombre} />
       <AutomationEditor
         id={a.id}
-        marca={marcaDe(cuenta)}
+        marca={marcaDe(cuenta, process.env.APP_URL ?? "")}
         triggerLabel={TRIGGER_LABEL[a.trigger] ?? a.trigger}
         estadoInicial={a.estado}
         emailPrueba={email}

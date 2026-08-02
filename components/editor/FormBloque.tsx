@@ -5,6 +5,7 @@ import { ProductosBlock } from "@/components/ProductosBlock";
 import { ProductosDinamicosBlock } from "@/components/editor/ProductosDinamicosBlock";
 import { ImagenDrop } from "@/components/editor/ImagenDrop";
 import { Rango } from "@/components/editor/Rango";
+import { ConNegrita } from "@/components/editor/BotonNegrita";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
@@ -190,20 +191,32 @@ export function FormBloque({
       );
 
     case "titulo":
-    case "texto":
+    case "texto": {
+      const esTitulo = b.tipo === "titulo";
+      const campo = (
+        <Textarea
+          label={esTitulo ? "Título" : "Texto"}
+          fullWidth
+          rows={esTitulo ? 2 : 6}
+          value={b.texto}
+          onChange={(e) => set({ texto: e.target.value })}
+          hint={
+            esTitulo
+              ? "Podés usar ${contacto.nombre}."
+              : "Podés usar ${contacto.nombre}, y **así** para poner algo en negrita."
+          }
+        />
+      );
       return (
         <div className="space-y-3">
-          <Textarea
-            label={b.tipo === "titulo" ? "Título" : "Texto"}
-            fullWidth
-            rows={b.tipo === "texto" ? 6 : 2}
-            value={b.texto}
-            onChange={(e) => set({ texto: e.target.value })}
-            hint="Podés usar ${contacto.nombre}."
-          />
+          {/* ⛔ El título NO lleva negrita, y no es un olvido: ya sale grande y
+              pesado, así que adentro no se notaría. Los dos tipos comparten
+              este `case` desde siempre; lo único que los separa es esto. */}
+          {esTitulo ? campo : <ConNegrita value={b.texto} onChange={(texto) => set({ texto })}>{campo}</ConNegrita>}
           <Alineacion value={b.align ?? "left"} onChange={(align) => set({ align })} />
         </div>
       );
+    }
 
     case "boton":
       return (
@@ -256,7 +269,9 @@ export function FormBloque({
             <ImagenDrop value={b.imagen} onChange={(imagen) => set({ imagen })} placeholder="URL de la imagen (banner)" />
           )}
           <Input label="Título principal" fullWidth value={b.titulo} onChange={(e) => set({ titulo: e.target.value })} />
-          <Input label="Subtítulo" fullWidth value={b.subtitulo} onChange={(e) => set({ subtitulo: e.target.value })} />
+          <ConNegrita value={b.subtitulo} onChange={(subtitulo) => set({ subtitulo })}>
+            <Input label="Subtítulo" fullWidth value={b.subtitulo} onChange={(e) => set({ subtitulo: e.target.value })} />
+          </ConNegrita>
           <Input label="Texto del botón" fullWidth value={b.botonTexto} onChange={(e) => set({ botonTexto: e.target.value })} />
           <Input label="Link del botón" fullWidth value={b.botonUrl} placeholder="https://…" onChange={(e) => set({ botonUrl: e.target.value })} />
           <ColorFijo label="Fondo del texto" value={b.bg} onChange={(bg) => set({ bg })} />
@@ -269,7 +284,9 @@ export function FormBloque({
       return (
         <div className="space-y-3">
           <Input label="Título de la sección" fullWidth value={b.titulo} onChange={(e) => set({ titulo: e.target.value })} />
-          <Textarea label="Texto" fullWidth rows={4} value={b.texto} onChange={(e) => set({ texto: e.target.value })} />
+          <ConNegrita value={b.texto} onChange={(texto) => set({ texto })}>
+            <Textarea label="Texto" fullWidth rows={4} value={b.texto} onChange={(e) => set({ texto: e.target.value })} />
+          </ConNegrita>
           <Input label="Texto del botón" fullWidth value={b.botonTexto} placeholder="Opcional" onChange={(e) => set({ botonTexto: e.target.value })} />
           <Input label="Link del botón" fullWidth value={b.botonUrl} placeholder="https://…" onChange={(e) => set({ botonUrl: e.target.value })} />
           <Select
@@ -487,13 +504,15 @@ export function FormBloque({
                     placeholder="Título"
                     onChange={(e) => setCelda(i, { titulo: e.target.value })}
                   />
-                  <Textarea
-                    fullWidth
-                    rows={3}
-                    value={c.texto ?? ""}
-                    placeholder="Texto"
-                    onChange={(e) => setCelda(i, { texto: e.target.value })}
-                  />
+                  <ConNegrita value={c.texto ?? ""} onChange={(texto) => setCelda(i, { texto })}>
+                    <Textarea
+                      fullWidth
+                      rows={3}
+                      value={c.texto ?? ""}
+                      placeholder="Texto"
+                      onChange={(e) => setCelda(i, { texto: e.target.value })}
+                    />
+                  </ConNegrita>
                   <Input
                     fullWidth
                     value={c.url}

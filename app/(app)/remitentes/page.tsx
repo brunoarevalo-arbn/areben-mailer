@@ -39,7 +39,7 @@ export default async function RemitentesPage() {
       <RemitentesManager marca={cuenta.nombre} remitentes={remitentes} />
       <TemaMarca
         inicial={temaDe(cuenta.config)}
-        marca={marcaDe(cuenta)}
+        marca={marcaDe(cuenta, process.env.APP_URL ?? "")}
         conectada={!!cuenta.tnStoreId}
         direccion={config.direccion}
         direccionPropia={config.direccionPropia}
