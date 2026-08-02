@@ -1,10 +1,10 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { renderEmailHtml, type ContenidoCampania } from "@/lib/email/render";
 import { claveProductos, type ConsultaProductos, type ProductoEmail } from "@/lib/email/bloques";
 import type { Marca } from "@/lib/marca";
-import { Monitor, Smartphone } from "lucide-react";
+import { VistaPreviaMail } from "@/components/VistaPreviaMail";
 
 /**
  * El mail, dibujado con el MISMO `renderEmailHtml` que el envío.
@@ -12,20 +12,14 @@ import { Monitor, Smartphone } from "lucide-react";
  * No es una aproximación: lo que se ve acá es byte por byte lo que sale, y por
  * eso el editor puede existir sin mantener una segunda versión del diseño.
  *
- * Dos cosas que no son obvias:
+ * Este componente resuelve **qué** se dibuja (los productos automáticos, los
+ * merge tags, la marca); el marco escalado y el toggle Escritorio/Celular viven
+ * en `VistaPreviaMail`, que es el mismo que usa la galería y las listas.
  *
- * - **El ancho del iframe importa.** El corte responsive del mail es el ancho
- *   del propio mail, no 600px fijos, así que un iframe angosto muestra la
- *   versión de celular aunque el toggle diga "escritorio". Por eso el marco
- *   tiene el ancho real y se **escala** para entrar en la columna, en vez de
- *   achicarse.
- * - **`useDeferredValue`**: sin esto, cada tecla que se escribe en un título
- *   vuelve a renderizar el mail entero y a reemplazar el `srcDoc` del iframe —
- *   que es un reparse de HTML completo por pulsación.
+ * `useDeferredValue`: sin esto, cada tecla que se escribe en un título vuelve a
+ * renderizar el mail entero y a reemplazar el `srcDoc` del iframe — que es un
+ * reparse de HTML completo por pulsación.
  */
-
-/** El ancho del celular más chico que vale la pena mirar. */
-const ANCHO_MOVIL = 375;
 
 export function PreviewMail({
   contenido,
@@ -33,20 +27,21 @@ export function PreviewMail({
   preheader,
   /** Ancho del mail ya resuelto (el del tema). El marco de escritorio no baja de acá. */
   anchoMail,
+  /** El bloque que se está editando: se le pinta un contorno acá adentro. */
+  seleccionadoId,
+  /** Tocar una parte del mail abre su formulario. */
+  onSeleccionar,
   className = "",
 }: {
   contenido: ContenidoCampania;
   marca: Marca;
   preheader?: string;
   anchoMail: number;
+  seleccionadoId?: string | null;
+  onSeleccionar?: (id: string) => void;
   className?: string;
 }) {
-  // Arranca en CELULAR a propósito: es donde el mail se lee de verdad, así que
-  // es el default que empuja a diseñar para ahí. Escritorio queda a un click.
-  const [movil, setMovil] = useState(true);
-  const [caja, setCaja] = useState({ w: 0, h: 0 });
-  const cont = useRef<HTMLDivElement>(null);
-
+  const [frame, setFrame] = useState<HTMLIFrameElement | null>(null);
   // ⚠️ Cada valor se difiere por separado y nunca un objeto armado en el render:
   // un literal nuevo en cada pasada hace que el diferido nunca alcance al actual
   // y el componente se re-renderice para siempre.
@@ -113,94 +108,83 @@ export function PreviewMail({
         // (`opts`, no el documento) y con la misma llave. Es lo que hace que el
         // preview no sea una aproximación de lo que va a salir.
         productosDinamicos: productos,
+        // ⛔ Solo acá. Le pone `data-b` a cada bloque para poder saber qué se
+        // tocó; `probar-marcado.ts` fija que no salga en ningún envío.
+        marcarBloques: true,
         ...marca,
       }),
     [contenidoDif, preheaderDif, marca, productos],
   );
 
+  /**
+   * Un click adentro del mail abre el formulario de ESA parte.
+   *
+   * 🔴 Y de paso arregla el bug que se veía como "el preview se pone en blanco":
+   * tocar un botón del mail navegaba el iframe a la tienda, que no se deja
+   * enmarcar, y quedaba un cuadro vacío hasta la próxima tecla. Apagar el mouse
+   * (`pointer-events-none`, como la miniatura de la galería) no servía: el mail
+   * es más alto que el marco y hay que poder scrollearlo adentro.
+   *
+   * ⚠️ El listener se recuelga en cada `load`: el `srcDoc` se reemplaza entero
+   * cada vez que cambia el HTML, y con él el documento donde estaba colgado.
+   */
   useEffect(() => {
-    const el = cont.current;
-    if (!el) return;
-    const medir = () => setCaja({ w: el.clientWidth, h: el.clientHeight });
-    medir();
-    const ro = new ResizeObserver(medir);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    if (!frame || !onSeleccionar) return;
+    const alClick = (e: MouseEvent) => {
+      // TODO click se frena, no solo los links: adentro del mail no hay nada a
+      // dónde ir. Lo que decide es el `data-b` más cercano hacia arriba.
+      e.preventDefault();
+      const cerca = (e.target as Element | null)?.closest?.("[data-b]");
+      const id = cerca?.getAttribute("data-b");
+      if (id) onSeleccionar(id);
+    };
+    const enganchar = () => frame.contentDocument?.addEventListener("click", alClick);
+    frame.addEventListener("load", enganchar);
+    // Por si el documento ya está montado cuando corre el efecto.
+    enganchar();
+    return () => {
+      frame.removeEventListener("load", enganchar);
+      frame.contentDocument?.removeEventListener("click", alClick);
+    };
+  }, [frame, onSeleccionar, html]);
 
-  const anchoMarco = movil ? ANCHO_MOVIL : Math.max(640, anchoMail);
-  // Solo se achica, nunca se agranda: un mail de 600px estirado a 900 se vería
-  // borroso y encima mentiría sobre el tamaño de la tipografía.
-  const escala = caja.w ? Math.min(1, caja.w / anchoMarco) : 1;
+  // El contorno del bloque elegido, del lado de adentro. Se pinta por DOM y no
+  // en el HTML del mail: lo que se renderiza tiene que seguir siendo el mail que
+  // sale, y un borde de más ahí saldría en el envío.
+  useEffect(() => {
+    const d = frame?.contentDocument;
+    if (!d) return;
+    for (const el of d.querySelectorAll<HTMLElement>("[data-b]")) {
+      const puesto = el.getAttribute("data-b") === seleccionadoId;
+      el.style.outline = puesto ? "2px solid #f59e0b" : "";
+      el.style.outlineOffset = puesto ? "-2px" : "";
+    }
+  }, [frame, seleccionadoId, html]);
+
+  // Llevar el mail hasta el bloque elegido. Solo cuando cambia la selección: si
+  // dependiera del html, scrollearía en cada tecla que se escribe.
+  useEffect(() => {
+    if (!seleccionadoId) return;
+    frame?.contentDocument
+      ?.querySelector(`[data-b="${CSS.escape(seleccionadoId)}"]`)
+      ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seleccionadoId]);
 
   return (
-    <div className={className}>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-sm text-muted">Vista previa</span>
-        <div className="flex items-center gap-1 rounded-lg border border-border p-0.5">
-          {([
-            { movil: false, Icono: Monitor, label: "Escritorio" },
-            { movil: true, Icono: Smartphone, label: "Celular" },
-          ] as const).map(({ movil: m, Icono, label }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => setMovil(m)}
-              aria-pressed={movil === m}
-              title={label}
-              className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors ${
-                movil === m ? "bg-accent-subtle text-accent-subtle-foreground" : "text-muted hover:text-foreground"
-              }`}
-            >
-              <Icono className="h-3.5 w-3.5" aria-hidden />
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Dos divs y no uno: el de afuera es el que MIDE (y el que observa el
-          ResizeObserver), el de adentro es el que se achica al ancho real del
-          mail. Con uno solo, cambiarle el ancho al elemento observado lo hace
-          re-medir y dispararse para siempre.
-
-          El de adentro mide `anchoMarco * escala` y va centrado. Sin eso, en
-          celular el iframe queda en 375px dentro de una caja de ~460 y esos 85px
-          sobrantes se ven como un borde blanco a la derecha — que es lo que se
-          veía y parecía "que no actualiza". */}
-      {/* 🔴 `dvh` y no `vh`. En iOS Safari `vh` es el viewport GRANDE —el que
-          queda cuando la barra de direcciones se esconde—, así que un 70vh se
-          mete abajo del chrome del navegador y el mail se lee cortado. `dvh`
-          sigue al alto real y se ajusta solo cuando la barra aparece o se va.
-          Las 13rem son el encabezado, la barra de acciones, el selector de
-          vista y la fila de "Vista previa"; el `min-h-96` es el piso para una
-          pantalla corta. Arriba del corte vuelve al 70vh de siempre, y va con
-          el MISMO `@[66rem]` de la grilla: acá "una sola vista" quiere decir
-          "el mail ocupa la pantalla", no "hay una pantalla chica". */}
-      <div ref={cont} className="flex h-[calc(100dvh-13rem)] min-h-96 w-full justify-center @[66rem]:h-[70vh]">
-        <div
-          className="h-full overflow-hidden rounded-xl border border-border bg-white"
-          style={{ width: caja.w ? anchoMarco * escala : "100%" }}
-        >
-        <iframe
-          title="Vista previa del mail"
-          // `sandbox=""` sin permisos: el contenido sale de un Json que puede
-          // haber escrito otro usuario de la cuenta y el iframe hereda el origen
-          // del panel. Sin esto, un color con comillas es XSS almacenado.
-          sandbox=""
-          srcDoc={html}
-          style={{
-            width: anchoMarco,
-            // Alto compensado, para que después de escalar ocupe exactamente el
-            // alto del contenedor y no quede una franja blanca abajo.
-            height: caja.h ? caja.h / escala : "100%",
-            transform: `scale(${escala})`,
-            transformOrigin: "top left",
-            border: 0,
-          }}
-        />
-        </div>
-      </div>
-    </div>
+    <VistaPreviaMail
+      html={html}
+      anchoMail={anchoMail}
+      className={className}
+      onIframe={setFrame}
+      // 🔴 `allow-same-origin` **sin `allow-scripts`**: el panel necesita leer el
+      // documento para saber qué bloque se tocó, y sin `allow-scripts` el
+      // navegador no ejecuta NADA de adentro —ni `<script>`, ni `onerror=`, ni
+      // `javascript:`—, así que el XSS almacenado que motivó el `sandbox=""`
+      // sigue tapado. Tampoco van `allow-forms`, `allow-popups` ni
+      // `allow-top-navigation`: el documento queda inerte, solo legible.
+      // ⚠️ La miniatura de la galería NO cambia: sigue `sandbox=""`.
+      sandbox="allow-same-origin"
+    />
   );
 }

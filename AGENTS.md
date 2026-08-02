@@ -60,6 +60,7 @@ node --import tsx scripts/probar-bienvenida.ts # el cupón del pop-up entra, el 
 node --import tsx scripts/probar-productos-dinamicos.ts # la consulta se guarda, los productos no
 node --env-file=.env --import tsx scripts/verificar-productos-tn.ts # ↑ pero contra la API real de TN
 node --import tsx scripts/probar-tema.ts       # un tema no deja el mail ilegible
+node --import tsx scripts/probar-marcado.ts    # el `data-b` del preview NO sale en un envío
 node --import tsx scripts/probar-esquema.ts    # el Json de bloques migra sin perder nada
 node --import tsx scripts/probar-estilos.ts    # la cascada respeta el orden y no inyecta
 node --import tsx scripts/probar-render.ts     # golden: el mail no cambió sin querer
@@ -114,7 +115,7 @@ lib/email/…       motor: proveedor.ts (gate+contrato), cola.ts, procesar.ts,
 lib/auth.ts       autorizar/chequear/autorizarApi ← ÚNICO camino de autorización
 lib/permisos.ts   matriz de roles (puro: lo importa server Y cliente)
 lib/tn/…          cliente Tiendanube, import de contactos/órdenes, webhooks
-components/ui/    Button, Card, Badge, Input, Select, Textarea, NumInput,
+components/ui/    Button, Card, Badge, Input, Select, Textarea, NumInput, Desplegable,
                   PageHeader, EmptyState, LoadingState, ErrorState → reusar, no reinventar
 ```
 
@@ -192,7 +193,33 @@ golden.
 
 ⚠️ **Ningún string del Json llega al HTML sin pasar por `hex()`, `px()` o un
 enum** — `esc()` no escapa comillas, así que un color con una comilla se escapa
-del atributo `style="…"`. Los preview van con `sandbox=""` por lo mismo.
+del atributo `style="…"`. Los preview van con `sandbox` por lo mismo.
+
+### El preview del editor se puede tocar (2-ago-2026)
+
+Un click adentro del mail abre el formulario de ESE bloque. Antes navegaba el
+iframe a la tienda —que no se deja enmarcar— y **dejaba el preview en blanco**.
+
+- **`RenderOpts.marcarBloques`** le pone `data-b="<id>"` a cada bloque, **en la
+  etiqueta que ya emitía** (no envuelve nada, no cambia el layout). ⛔ Lo prende
+  **solo** `PreviewMail`: `probar-marcado.ts` fija que sin la opción no aparezca
+  ni un `data-b` —son bytes contra los ~102 KB con los que Gmail recorta— y que
+  con ella **todo** bloque que dibuja algo quede marcado y **fuera de los
+  comentarios condicionales** (adentro de un `<!--[if mso]>` el navegador no lo
+  ve, que es justo quien lo tiene que leer).
+- 🔴 **El id tiene que ser el que conoce el editor.** `renderEmailHtml` vuelve a
+  pasar el documento por `leerContenido`, y un documento **sin `v`** se migra:
+  la migración materializa un encabezado con id NUEVO y el click no selecciona
+  nada. Los documentos reales ya vienen en la versión actual; los tests tienen
+  que pasar `v: V_ACTUAL` o prueban otra cosa.
+- El iframe del editor va con **`sandbox="allow-same-origin"`**, sin
+  `allow-scripts`: el panel necesita leer el `contentDocument` para saber qué se
+  tocó, y sin `allow-scripts` no corre **nada** de adentro —ni `<script>`, ni
+  `onerror=`, ni `javascript:`—, así que el XSS almacenado sigue tapado. Tampoco
+  van `allow-forms`, `allow-popups` ni `allow-top-navigation`.
+  ⛔ **La miniatura de la galería NO cambia**: sigue `sandbox=""` +
+  `pointer-events-none`. Y `pointer-events-none` no servía para el editor: el
+  mail es más alto que el marco y hay que poder scrollearlo adentro.
 
 ## El HTML que sale (`lib/email/shell.ts`)
 
@@ -274,6 +301,18 @@ botones vacíos**.
 - Las plantillas guardadas se editan en **`/plantillas/[id]`** con el mismo
   `EditorMail` que campañas y automations. Antes había que crear una campaña
   desde la plantilla para poder tocarla, y quedaba una campaña fantasma.
+- 🔑 **Mirar es gratis; crear no** (2-ago-2026). La tarjeta ofrece **"Ver"**, que
+  abre el mail entero en un modal, y recién ahí se elige qué crear: **campaña** o
+  **automation**. La palabra "Usar" no existe más — creaba una campaña `BORRADOR`
+  sin decirlo, y `/campanias` se llenaba de plantillas que alguien quiso mirar.
+  El HTML de la galería **ya viaja en el payload**, así que el modal no pide
+  nada; las listas de campañas y automations sí, por `/api/vista`.
+- Una automation desde una plantilla respeta las mismas guardas que
+  `crearAutomation`: **una por trigger** (`automationDelTrigger`) y **nace
+  PAUSADA**. Y avisa —mirando los bloques, no por regla general— cuando la
+  plantilla elegida no trae el bloque que ese disparador necesita: sin `cupon`,
+  la bienvenida sale sin el premio que la persona ganó
+  (`aplicarCuponDelTrigger` **pisa** el bloque, no lo crea).
 
 ## Productos automáticos (`productos-dinamicos`)
 
@@ -476,9 +515,11 @@ está **en cero** y de acá en más pone en rojo cualquier hallazgo.
 - ⚠️ **Lo táctil cuelga de `lg` (el viewport); la grilla, del contenedor.** Son
   preguntas distintas. A 1280 el editor apila pero hay un mouse, y ahí el hover
   es lo correcto.
-- ⛔ **El toggle Escritorio/Celular de `PreviewMail` es del MAIL, no del panel**:
-  muestra cómo se ve el correo en el teléfono de quien lo recibe. No se elimina
-  al hacer responsive el panel — son dos cosas que no tienen nada que ver. Y
+- ⛔ **El toggle Escritorio/Celular de `VistaPreviaMail` es del MAIL, no del
+  panel**: muestra cómo se ve el correo en el teléfono de quien lo recibe. No se
+  elimina al hacer responsive el panel — son dos cosas que no tienen nada que
+  ver. (El marco escalado salió de `PreviewMail` el 2-ago-2026: hoy lo comparten
+  el editor, la galería y las listas.) Y
   ⛔ **`lib/email/**` no se toca**: los mails ya son responsive contra su propio
   ancho.
 - **El drag & drop de bloques sigue sin andar con el dedo** y es a propósito: los

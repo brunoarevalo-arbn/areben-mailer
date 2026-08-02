@@ -5,9 +5,11 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
-import { automationDelTrigger, type Trigger } from "@/lib/automations";
+import { automationDelTrigger, motivoNoBorrable, type Trigger } from "@/lib/automations";
+import { BotonVistaPrevia } from "@/components/BotonVistaPrevia";
+import { BotonEliminar } from "@/components/BotonEliminar";
 import { TRIGGERS_UI } from "./presets-ui";
-import { crearAutomation } from "./actions";
+import { crearAutomation, eliminarAutomation } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -84,21 +86,40 @@ export default async function AutomationsPage() {
       {automations.length > 0 && (
         <div className="space-y-2">
           <div className="text-sm font-medium text-muted">Tus automations</div>
+          {/* 🔴 La fila NO es un `<Link>` que envuelve todo: un `<button>` adentro
+              de un `<a>` es HTML inválido y el click navega igual. El ancla
+              cubre el nombre y el disparador; las acciones van al lado. */}
           {automations.map((a) => (
-            <Link key={a.id} href={`/automations/${a.id}`} className="block">
-              <Card padding="compact" className="hover:border-accent transition-colors">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="font-medium text-foreground truncate">{a.nombre}</div>
-                    <div className="text-sm text-muted">{TRIGGER_LABEL[a.trigger]} · espera {a.esperaHoras}h</div>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-sm text-subtle tabular-nums">{a.runs.length} enviados</span>
-                    <Badge variant={a.estado === "ACTIVO" ? "success" : "default"}>{a.estado}</Badge>
-                  </div>
+            <Card key={a.id} padding="compact" className="transition-colors hover:border-accent">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <Link href={`/automations/${a.id}`} className="min-w-0 flex-1">
+                  <div className="truncate font-medium text-foreground">{a.nombre}</div>
+                  <div className="text-sm text-muted">{TRIGGER_LABEL[a.trigger]} · espera {a.esperaHoras}h</div>
+                </Link>
+                <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                  <span className="text-sm text-subtle tabular-nums">{a.runs.length} enviados</span>
+                  <Badge variant={a.estado === "ACTIVO" ? "success" : "default"}>{a.estado}</Badge>
+                  <BotonVistaPrevia
+                    titulo={a.nombre}
+                    fuente={{ tipo: "automation", id: a.id }}
+                    acciones={
+                      <Link href={`/automations/${a.id}`} className={BOTON}>
+                        Abrir el editor
+                      </Link>
+                    }
+                  />
+                  {/* La MISMA guarda que la action, para no dibujar un botón que
+                      el servidor va a frenar. Los runs alcanzan: cada `Envio` de
+                      una automation cuelga de un run, así que no puede haber
+                      envíos sin runs. El chequeo fino lo hace igual el servidor. */}
+                  <BotonEliminar
+                    accion={eliminarAutomation.bind(null, a.id)}
+                    motivo={motivoNoBorrable(a, a._count.runs, 0)}
+                    confirmacion={`¿Eliminar "${a.nombre}"?\n\nNunca mandó ningún mail, así que no se pierde historial. El diseño sí.`}
+                  />
                 </div>
-              </Card>
-            </Link>
+              </div>
+            </Card>
           ))}
         </div>
       )}

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { autorizar, chequear } from "@/lib/auth";
 import { presetDe } from "@/lib/plantillas/presets";
 import { getRemitenteEnvio } from "@/lib/remitentes";
+import { automationDelTrigger, esTrigger, type Trigger } from "@/lib/automations";
 import { V_ACTUAL } from "@/lib/email/esquema";
 import { nuevoBloque, type ContenidoCampania } from "@/lib/email/render";
 import { revalidatePath } from "next/cache";
@@ -43,6 +44,64 @@ export async function usarPlantilla(plantillaId: string) {
     },
   });
   redirect(`/campanias/${campania.id}`);
+}
+
+/**
+ * Crea una AUTOMATION a partir de una plantilla (prearmada o guardada).
+ *
+ * El diseño de un mail es el mismo Json para las tres tablas —`Plantilla`,
+ * `Campania` y `Automation` guardan un `ContenidoCampania` y se leen con
+ * `leerContenido`—, así que esto es una copia, igual que "crear campaña". Lo que
+ * cambia son las reglas de las automations, que son las caras:
+ *
+ * - 🔴 **Una por trigger y por cuenta.** Si ya hay una, redirige a ESA en vez de
+ *   insertar. Es la misma guarda de `crearAutomation` y por la misma razón: el
+ *   disparador manda todas las que matcheen ⇒ dos son dos mails a la misma
+ *   persona. Va en el servidor porque la página puede estar cacheada.
+ * - **Nace PAUSADA** (el default del schema). Prender es lo que registra el
+ *   webhook en Tiendanube y lo que hace que salgan mails solos: eso se aprieta
+ *   a propósito, nunca de arrastre.
+ * - El asunto de una plantilla de galería no existe (solo lo traen los presets
+ *   de automation), así que se hereda el nombre. Sin asunto no se puede prender.
+ */
+export async function usarComoAutomation(
+  origen: { tipo: "preset" | "plantilla"; id: string },
+  formData: FormData,
+) {
+  const { cuenta } = await autorizar("editar");
+  const trigger = String(formData.get("trigger") ?? "");
+  if (!esTrigger(trigger)) return;
+
+  const existentes = await prisma.automation.findMany({
+    where: { cuentaId: cuenta.id },
+    select: { id: true, trigger: true, createdAt: true },
+  });
+  const ya = automationDelTrigger(existentes, trigger);
+  if (ya) redirect(`/automations/${ya.id}`);
+
+  let nombre: string;
+  let asunto: string;
+  let contenido: object;
+
+  if (origen.tipo === "preset") {
+    const rem = await getRemitenteEnvio(cuenta.id);
+    const preset = presetDe(origen.id, cuenta, rem?.email);
+    if (!preset) return;
+    nombre = preset.nombre;
+    asunto = preset.asunto || preset.nombre;
+    contenido = preset.contenido as object;
+  } else {
+    const p = await prisma.plantilla.findFirst({ where: { id: origen.id, cuentaId: cuenta.id } });
+    if (!p) return;
+    nombre = p.nombre;
+    asunto = p.nombre;
+    contenido = p.contenido as object;
+  }
+
+  const a = await prisma.automation.create({
+    data: { cuentaId: cuenta.id, nombre, trigger, asunto, contenido },
+  });
+  redirect(`/automations/${a.id}`);
 }
 
 /**

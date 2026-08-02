@@ -10,7 +10,9 @@ import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import type { Marca } from "@/lib/marca";
 import { REDES, redConIcono } from "@/lib/email/redes";
+import { Desplegable } from "@/components/ui/Desplegable";
 import { X } from "lucide-react";
+import type { ReactNode } from "react";
 
 /**
  * El formulario de UN bloque: lo que antes vivía adentro de cada fila de la
@@ -22,6 +24,19 @@ import { X } from "lucide-react";
  * el color de su marca.
  */
 
+/**
+ * Lo secundario de un bloque, plegado.
+ *
+ * ⚠️ Lo que entra acá es lo que **casi nunca se toca** (el link de la cabecera,
+ * el "de borde a borde" de una imagen), nunca lo que define cómo se ve el
+ * bloque: un control escondido es un control que no existe. Ante la duda, queda
+ * afuera.
+ */
+const MasOpciones = ({ children }: { children: ReactNode }) => (
+  <Desplegable titulo="Más opciones" tono="rol">
+    {children}
+  </Desplegable>
+);
 
 function Check({
   label,
@@ -158,17 +173,19 @@ export function FormBloque({
             </>
           )}
 
-          <Input
-            label="Link al tocarlo"
-            fullWidth
-            value={b.url ?? ""}
-            placeholder={marca.urlCuenta || "https://… (opcional)"}
-            onChange={(e) => set({ url: e.target.value })}
-          />
-          <Check label="Barrita de color debajo" checked={b.linea !== false} onChange={(linea) => set({ linea })} />
-          {b.variante !== "logo" && (
-            <Check label="En mayúsculas" checked={b.mayusculas !== false} onChange={(mayusculas) => set({ mayusculas })} />
-          )}
+          <MasOpciones>
+            <Input
+              label="Link al tocarlo"
+              fullWidth
+              value={b.url ?? ""}
+              placeholder={marca.urlCuenta || "https://… (opcional)"}
+              onChange={(e) => set({ url: e.target.value })}
+            />
+            <Check label="Barrita de color debajo" checked={b.linea !== false} onChange={(linea) => set({ linea })} />
+            {b.variante !== "logo" && (
+              <Check label="En mayúsculas" checked={b.mayusculas !== false} onChange={(mayusculas) => set({ mayusculas })} />
+            )}
+          </MasOpciones>
         </div>
       );
 
@@ -308,16 +325,18 @@ export function FormBloque({
             onChange={(e) => set({ alt: e.target.value })}
             hint="Lo que se lee cuando el cliente de mail bloquea las imágenes — que es el caso por defecto en Outlook."
           />
-          <Check
-            label="De borde a borde"
-            checked={b.sangre === true}
-            onChange={(sangre) => set({ sangre: sangre || undefined })}
-          />
-          <p className="text-xs leading-relaxed text-muted">
-            Sin margen a los costados ni esquinas redondeadas. Es la portada fotográfica que usan
-            casi todas las tiendas: la foto pegada a los bordes es lo que hace que el mail no se
-            vea como un documento.
-          </p>
+          <MasOpciones>
+            <Check
+              label="De borde a borde"
+              checked={b.sangre === true}
+              onChange={(sangre) => set({ sangre: sangre || undefined })}
+            />
+            <p className="text-xs leading-relaxed text-muted">
+              Sin margen a los costados ni esquinas redondeadas. Es la portada fotográfica que usan
+              casi todas las tiendas: la foto pegada a los bordes es lo que hace que el mail no se
+              vea como un documento.
+            </p>
+          </MasOpciones>
         </div>
       );
 
@@ -427,9 +446,18 @@ export function FormBloque({
               <option value="60">Angosta a la derecha (60 / 40)</option>
             </Select>
           )}
+          {/* Una celda por desplegable: cuatro celdas de cuatro campos son
+              dieciséis controles seguidos y encontrar "la de la derecha" era
+              contar para abajo. Abierta la primera, como en el panel de estilo.
+              El resumen dice qué hay adentro sin abrirla. */}
           {celdas.map((c, i) => (
-            <div key={i} className="space-y-2">
-              <div className="text-xs font-semibold text-muted">{nombreCelda(i)}</div>
+            <Desplegable
+              key={i}
+              tono="rol"
+              titulo={nombreCelda(i)}
+              abiertoDeFabrica={i === 0}
+              resumen={c.titulo || c.texto || c.url || (c.imagen ? "con imagen" : "vacía")}
+            >
               {esImagen(i) ? (
                 <>
                   <ImagenDrop
@@ -475,7 +503,7 @@ export function FormBloque({
                   <BotonDeCelda c={c} onChange={(campos) => setCelda(i, campos)} />
                 </>
               )}
-            </div>
+            </Desplegable>
           ))}
         </div>
       );

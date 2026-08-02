@@ -9,6 +9,22 @@ import { leerConfigCuenta } from "./marca";
 export type Trigger = "NUEVO_CLIENTE" | "COMPRA" | "CARRITO_ABANDONADO" | "NUEVO_SUSCRIPTOR";
 
 /**
+ * Los cuatro valores del enum `TriggerTipo`, como lista.
+ *
+ * Es lo que valida un trigger que llega de un formulario: el enum de la base no
+ * viaja al cliente, y un valor inventado lo descubriría Prisma al insertar.
+ * El `satisfies` obliga a que un trigger nuevo del tipo entre también acá.
+ */
+export const TRIGGERS = [
+  "NUEVO_CLIENTE",
+  "NUEVO_SUSCRIPTOR",
+  "COMPRA",
+  "CARRITO_ABANDONADO",
+] as const satisfies readonly Trigger[];
+
+export const esTrigger = (x: string): x is Trigger => (TRIGGERS as readonly string[]).includes(x);
+
+/**
  * Qué hacer cuando alguien pide la automation de un trigger: llevarlo a la que
  * ya existe, o crearla.
  *
@@ -33,6 +49,38 @@ export function automationDelTrigger<T extends { id: string; trigger: string; cr
   return existentes
     .filter((a) => a.trigger === trigger)
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+}
+
+/**
+ * Por qué NO se puede borrar una automation. `null` = se puede.
+ *
+ * 🔴 Puro y compartido por la action de `/automations` y por
+ * `scripts/borrar-automation.ts`, por lo mismo que `automationDelTrigger`: dos
+ * copias de una guarda son dos guardas que se van a portar distinto.
+ *
+ * Las dos razones no son cosméticas:
+ *
+ * 1. **ACTIVA no se borra.** Prender una automation es lo que registra el
+ *    webhook en Tiendanube; borrar la fila deja el webhook colgado en TN
+ *    apuntando a un id que ya no existe. Primero se pausa desde la UI, que es lo
+ *    que lo da de baja.
+ * 2. **Con historial no se borra.** No es solo perder las métricas del home: una
+ *    bienvenida es **una sola vez en la vida del contacto**, y eso se decide
+ *    preguntando "¿hubo algún run?". Borrarla y volver a crearla deja a todos
+ *    elegibles otra vez ⇒ un segundo mail a gente que ya lo recibió. Es
+ *    exactamente lo que pasó en BDI: 354 runs sobre 177 leads.
+ *
+ * La salida para una que ya mandó no es borrarla: es dejarla PAUSADA.
+ */
+export function motivoNoBorrable(
+  a: { estado: string },
+  runs: number,
+  envios: number,
+): string | null {
+  if (a.estado === "ACTIVO") return "Está activa: pausala primero (eso da de baja el webhook en Tiendanube).";
+  if (runs > 0 || envios > 0)
+    return `Ya mandó ${Math.max(runs, envios)} mail${Math.max(runs, envios) === 1 ? "" : "es"}: no se borra, se deja pausada. Borrarla y recrearla se los volvería a mandar.`;
+  return null;
 }
 
 /**

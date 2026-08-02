@@ -16,7 +16,7 @@
 // se puede crear, y una tarjeta de un trigger que no existe es un botón que
 // revienta al apretarlo.
 
-import { automationDelTrigger, type Trigger } from "../lib/automations";
+import { automationDelTrigger, motivoNoBorrable, type Trigger } from "../lib/automations";
 import { TRIGGERS_UI } from "../app/(app)/automations/presets-ui";
 import { presetDeTrigger } from "../lib/plantillas/presets";
 
@@ -114,6 +114,21 @@ titulo("Cada tarjeta tiene un preset detrás");
     const p = presetDeTrigger(trigger, cuenta as never, "info@ejemplo.com");
     ok(Boolean(p?.asunto && p?.contenido), `${trigger}: preset con asunto y contenido`);
   }
+}
+
+titulo("Una automation con historial NO se borra");
+{
+  // La guarda es la que comparten `/automations` y `scripts/borrar-automation.ts`.
+  // Lo que protege no es el historial: borrar y recrear una bienvenida deja a
+  // todos elegibles otra vez, y esa gente ya la recibió.
+  ok(motivoNoBorrable({ estado: "PAUSADO" }, 0, 0) === null, "pausada y sin runs: se borra");
+  ok(motivoNoBorrable({ estado: "ACTIVO" }, 0, 0) !== null, "ACTIVA: no se borra (el webhook de TN quedaría colgado)");
+  ok(motivoNoBorrable({ estado: "PAUSADO" }, 1, 0) !== null, "con un run: no se borra");
+  ok(motivoNoBorrable({ estado: "PAUSADO" }, 0, 1) !== null, "con un envío y sin runs: tampoco");
+  ok(
+    (motivoNoBorrable({ estado: "PAUSADO" }, 177, 177) ?? "").includes("177"),
+    "el motivo dice CUÁNTOS mails, no 'no se puede'",
+  );
 }
 
 console.log(fallas === 0 ? "\n✅ Todo en verde" : `\n❌ ${fallas} fallas`);

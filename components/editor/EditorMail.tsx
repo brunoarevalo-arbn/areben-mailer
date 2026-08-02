@@ -12,6 +12,7 @@ import { FormBloque } from "@/components/editor/FormBloque";
 import { PanelEstilo } from "@/components/editor/PanelEstilo";
 import { PreviewMail } from "@/components/editor/PreviewMail";
 import { TemaSelector } from "@/components/TemaSelector";
+import { Desplegable } from "@/components/ui/Desplegable";
 import { AISoonButton } from "@/components/ui/AISoonButton";
 import { usePermisos } from "@/components/PermisosProvider";
 import type { Marca } from "@/lib/marca";
@@ -375,15 +376,17 @@ export function EditorMail({
               onChange={setTema}
               temaMarca={marca.temaMarca}
               ayuda={ayudaTema}
+              plegable
             />
-            <div className="space-y-3 rounded-2xl border border-border bg-surface px-8 py-6 shadow-sm">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Tipografía del mail</h3>
-                <p className="mt-0.5 text-xs text-muted">
-                  Vale para todos los bloques de este mail. Un bloque suelto puede pisarlo desde su
-                  pestaña Estilo.
-                </p>
-              </div>
+            <div className="rounded-2xl border border-border bg-surface px-8 py-6 shadow-sm">
+              <Desplegable
+                titulo="Tipografía del mail"
+                resumen="tamaños, colores y alineación por rol"
+              >
+              <p className="text-xs text-muted">
+                Vale para todos los bloques de este mail. Un bloque suelto puede pisarlo desde su
+                pestaña Estilo.
+              </p>
               <fieldset disabled={soloLectura} className="space-y-3 disabled:opacity-60">
                 <PanelEstilo
                   // La capa de documento no es de ningún bloque: cada rol se
@@ -399,6 +402,7 @@ export function EditorMail({
                   avanzado={avanzado}
                 />
               </fieldset>
+              </Desplegable>
             </div>
           </div>
         )}
@@ -409,6 +413,11 @@ export function EditorMail({
           marca={marca}
           preheader={preheader}
           anchoMail={anchoMail}
+          seleccionadoId={seleccionadoId}
+          // Tocar una parte del mail abre su formulario. En celular `elegir`
+          // además salta a la vista "Editar": tocar algo y quedarse mirando el
+          // mail sería la mitad del gesto.
+          onSeleccionar={soloLectura ? undefined : elegir}
           // El `sticky` se mueve con la grilla, no con el viewport: si se
           // quedara en `xl:` el preview se volvería pegajoso mientras todavía
           // está apilado abajo de las otras dos columnas, y "pegado arriba"

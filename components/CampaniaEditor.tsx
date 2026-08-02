@@ -16,6 +16,7 @@ import type { Marca } from "@/lib/marca";
 import { Button } from "@/components/ui/Button";
 import { usePermisos } from "@/components/PermisosProvider";
 import { AISoonButton } from "@/components/ui/AISoonButton";
+import { Desplegable } from "@/components/ui/Desplegable";
 import { inputClass } from "@/lib/ui";
 
 interface Lista {
@@ -163,6 +164,34 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
     router.refresh();
   };
 
+  /**
+   * 🔴 Congelado en el MONTAJE, no calculado en cada render.
+   *
+   * `Desplegable` pasa esto al `open` del `<details>`, y React reasigna el
+   * atributo cuando el valor cambia: con `!asunto` derecho, la caja se cerraría
+   * de golpe al escribir la primera letra del asunto. Acá lo único que decide es
+   * cómo NACE la pantalla — abierta si falta algo para poder enviar.
+   */
+  const [ajustesAbiertos] = useState(() => !initial.asunto || !initial.destino);
+
+  const nombreDestino = destino.startsWith("lista:")
+    ? listas.find((l) => `lista:${l.id}` === destino)?.nombre
+    : destino.startsWith("seg:")
+      ? segmentos.find((s) => `seg:${s.id}` === destino)?.nombre
+      : null;
+
+  // Plegar el asunto no puede convertirse en mandar una campaña sin asunto: lo
+  // que falta se ve en rojo desde afuera, sin abrir nada.
+  const falta = (t: string) => <span className="font-medium text-danger-foreground">{t}</span>;
+  const resumenEnvio = (
+    <>
+      {asunto ? `«${asunto}»` : falta("sin asunto")}
+      {" · "}
+      {nombreDestino ?? falta("sin destino")}
+      {abActivo && " · A/B"}
+    </>
+  );
+
   // Fases de A/B (según lo que viene del server).
   const testEnviado = !!abInfo && abInfo.a.enviados + abInfo.b.enviados > 0;
   const esperandoGanador = testEnviado && !abInfo!.ganador;
@@ -172,9 +201,19 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
   return (
     <div className="space-y-4">
       {/* Los datos de envío arriba, a lo ancho: el editor de abajo necesita las
-          tres columnas enteras y antes estaba metido en media pantalla. */}
+          tres columnas enteras y antes estaba metido en media pantalla.
+
+          🔑 Y PLEGADOS: son cinco campos que se escriben una vez y después no se
+          vuelven a mirar, ocupando el arriba de la pantalla mientras se diseña el
+          mail —que es donde se pasa el 95% del tiempo—. El resumen del summary es
+          la contracara: cerrada, la caja igual dice el asunto y a quién va. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="space-y-3 rounded-xl border border-border bg-surface p-4 shadow-sm">
+        <Desplegable
+          titulo="Datos del envío"
+          resumen={resumenEnvio}
+          abiertoDeFabrica={ajustesAbiertos}
+          className="rounded-xl border border-border bg-surface p-4 shadow-sm"
+        >
           <label className="block text-sm">
             <span className="text-muted">Nombre interno</span>
             <input className={inputClass} value={nombre} onChange={(e) => setNombre(e.target.value)} />
@@ -257,7 +296,7 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
               )}
             </select>
           </label>
-        </div>
+        </Desplegable>
       </div>
 
       <EditorMail
@@ -306,10 +345,19 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
         </div>
         )}
 
-        {/* Panel de resultados A/B — elegir ganador */}
+        {/* Panel de resultados A/B — elegir ganador.
+
+            Se pliega, pero **nace abierto**: hay una decisión pendiente y el
+            holdout está esperando. Plegarlo es para sacarlo del medio mientras se
+            retoca el mail, no para esconder que falta elegir — por eso el resumen
+            del summary lleva las dos tasas. */}
         {esperandoGanador && (
-          <div className="space-y-3 rounded-xl border border-accent-subtle-foreground/30 bg-accent-subtle p-4">
-            <div className="text-sm font-medium text-accent-subtle-foreground">Resultado del test A/B</div>
+          <Desplegable
+            titulo="Resultado del test A/B"
+            resumen={`A ${tasa(abInfo!.a.aperturas, abInfo!.a.enviados)}% · B ${tasa(abInfo!.b.aperturas, abInfo!.b.enviados)}%`}
+            abiertoDeFabrica
+            className="rounded-xl border border-accent-subtle-foreground/30 bg-accent-subtle p-4"
+          >
             <p className="text-xs text-muted">
               Elegí el asunto que mejor rindió y mandalo al resto de la lista (~{abInfo!.holdout.toLocaleString("es-AR")} contactos).
               Las aperturas se van cargando con el tiempo — recargá para ver el dato actualizado.
@@ -351,7 +399,7 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
               })}
             </div>
             {progreso && <div className="text-sm text-foreground">{progreso}</div>}
-          </div>
+          </Desplegable>
         )}
 
         {/* Ganador ya promovido */}

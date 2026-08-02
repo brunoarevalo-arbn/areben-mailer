@@ -193,6 +193,41 @@ export async function promoverGanador(id: string, ganador: "A" | "B") {
   return { ok: true, total: resto.length };
 }
 
+/**
+ * Borra una campaña **en borrador**. Nada más.
+ *
+ * Existe porque la galería creaba una campaña para cada plantilla que alguien
+ * quería mirar y no había forma de sacarlas: `/campanias` se volvía una lista
+ * eterna de intentos. Con la vista previa se crean muchas menos, pero las que se
+ * crean tienen que poder irse.
+ *
+ * ⛔ **Una campaña ENVIADA no se borra, y no hay botón que lo ofrezca.** No es
+ * por las métricas del home (que también): los rebotes que llegan después
+ * matchean por `Envio.sesMessageId`, y esa tabla cuelga en cascada de la
+ * campaña. Borrar una que ya salió apaga la supresión de contactos de ese envío
+ * — con 6,7% de rebote histórico, eso es la reputación del dominio.
+ *
+ * El estado va en el WHERE del `deleteMany` y no en un `if` de antes, igual que
+ * `eliminarLista` filtra `tipo: "MANUAL"`: entre el chequeo y el borrado hay una
+ * query de por medio, y una campaña puede haber arrancado a enviarse ahí.
+ */
+export async function eliminarCampania(id: string) {
+  const auth = await chequear("editar");
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const cuenta = auth.ctx.cuenta;
+
+  // Cinturón y tiradores: un BORRADOR con envíos no debería existir —solo
+  // `enviarCampania` crea `Envio`, y lo primero que hace es pasar a ENVIANDO—
+  // pero si existiera sería un envío en curso a medio marcar, y eso no se toca.
+  const envios = await prisma.envio.count({ where: { campaniaId: id, campania: { cuentaId: cuenta.id } } });
+  if (envios > 0) return { ok: false, error: "Esta campaña ya tiene envíos: no se borra." };
+
+  const r = await prisma.campania.deleteMany({ where: { id, cuentaId: cuenta.id, estado: "BORRADOR" } });
+  if (r.count === 0) return { ok: false, error: "Solo se borran las campañas en borrador." };
+  revalidatePath("/campanias");
+  return { ok: true };
+}
+
 export async function guardarComoPlantilla(nombre: string, contenido: ContenidoCampania) {
   const auth = await chequear("editar");
   if (!auth.ok) return { ok: false, error: auth.error };

@@ -10,7 +10,7 @@ import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { sendEmail } from "@/lib/email/enviar";
 import { MSG_SIN_REMITENTE } from "@/lib/email/proveedor";
 import { getRemitenteEnvio } from "@/lib/remitentes";
-import { automationDelTrigger, type Trigger } from "@/lib/automations";
+import { automationDelTrigger, motivoNoBorrable, type Trigger } from "@/lib/automations";
 import { presetDeTrigger } from "@/lib/plantillas/presets";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -117,6 +117,37 @@ export async function toggleAutomation(id: string) {
   revalidatePath("/automations");
   revalidatePath(`/automations/${id}`);
   return { ok: true, estado: nuevoEstado };
+}
+
+/**
+ * Borra una automation que nunca mandó nada.
+ *
+ * Las guardas son las de `motivoNoBorrable` —las mismas tres que ya tenía
+ * `scripts/borrar-automation.ts`, ahora compartidas— y se chequean **acá**, en
+ * el servidor: la lista puede estar cacheada y el botón puede llegar de un doble
+ * click. Devuelve `{ok,error}` porque en producción Next redacta los mensajes de
+ * las excepciones y el motivo es justamente lo que hay que leer.
+ */
+export async function eliminarAutomation(id: string) {
+  const auth = await chequear("editar");
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const cuenta = auth.ctx.cuenta;
+
+  const a = await prisma.automation.findFirst({ where: { id, cuentaId: cuenta.id } });
+  if (!a) return { ok: false, error: "No se encontró la automation" };
+
+  const [runs, envios] = await Promise.all([
+    prisma.automationRun.count({ where: { automationId: id } }),
+    prisma.envio.count({ where: { automationRun: { automationId: id } } }),
+  ]);
+  const motivo = motivoNoBorrable(a, runs, envios);
+  if (motivo) return { ok: false, error: motivo };
+
+  // El `cuentaId` va en el WHERE igual que en el `findFirst`: entre los dos pasa
+  // el tiempo de dos queries, y el borrado es lo que no se deshace.
+  await prisma.automation.deleteMany({ where: { id, cuentaId: cuenta.id } });
+  revalidatePath("/automations");
+  return { ok: true };
 }
 
 export async function enviarPruebaAutomation(id: string, email: string) {

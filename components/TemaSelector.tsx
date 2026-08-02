@@ -2,6 +2,7 @@
 
 import { FUENTES, FUENTE_LABEL, resolverPaleta, type Tema } from "@/lib/email/tema";
 import { Card } from "@/components/ui/Card";
+import { Desplegable } from "@/components/ui/Desplegable";
 import { campoCompacto } from "@/lib/ui";
 import { RotateCcw } from "lucide-react";
 
@@ -70,12 +71,18 @@ export function TemaSelector({
   temaMarca,
   titulo = "Diseño del mail",
   ayuda,
+  /**
+   * Plegado (el editor de mail). En `/remitentes` va abierto: ahí el tema de la
+   * marca ES la pantalla, no una caja al costado de otra cosa.
+   */
+  plegable = false,
 }: {
   tema: Tema | undefined;
   onChange: (t: Tema | undefined) => void;
   temaMarca?: Tema | null;
   titulo?: string;
   ayuda?: string;
+  plegable?: boolean;
 }) {
   const t = tema ?? {};
   const set = (patch: Partial<Tema>) => onChange({ ...t, ...patch });
@@ -83,24 +90,18 @@ export function TemaSelector({
   const base = resolverPaleta({ ...(temaMarca ?? {}), ...t });
   const sinTema = Object.values(t).every((v) => v === undefined || v === "");
 
-  return (
-    <Card padding="loose" className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">{titulo}</h3>
-          {ayuda && <p className="mt-0.5 text-xs text-muted">{ayuda}</p>}
-        </div>
-        {!sinTema && (
-          <button
-            type="button"
-            onClick={() => onChange(undefined)}
-            className="shrink-0 text-xs text-muted underline transition-colors hover:text-foreground"
-          >
-            Restablecer
-          </button>
-        )}
-      </div>
+  const restablecer = !sinTema && (
+    <button
+      type="button"
+      onClick={() => onChange(undefined)}
+      className="shrink-0 text-xs text-muted underline transition-colors hover:text-foreground"
+    >
+      Restablecer
+    </button>
+  );
 
+  const cuerpo = (
+    <>
       <div>
         <div className="mb-1.5 text-xs text-muted">Punto de partida</div>
         <div className="flex gap-2">
@@ -189,6 +190,36 @@ export function TemaSelector({
           </select>
         </label>
       </div>
+    </>
+  );
+
+  if (plegable) {
+    return (
+      <Card padding="loose">
+        <Desplegable
+          titulo={titulo}
+          // Cerrada, la caja igual dice si el mail sigue el tema de la marca o
+          // tiene el suyo: es la única pregunta que se le hace de un vistazo.
+          resumen={sinTema ? "el de la marca" : "personalizado"}
+        >
+          {ayuda && <p className="text-xs text-muted">{ayuda}</p>}
+          {restablecer && <div className="flex justify-end">{restablecer}</div>}
+          {cuerpo}
+        </Desplegable>
+      </Card>
+    );
+  }
+
+  return (
+    <Card padding="loose" className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">{titulo}</h3>
+          {ayuda && <p className="mt-0.5 text-xs text-muted">{ayuda}</p>}
+        </div>
+        {restablecer}
+      </div>
+      {cuerpo}
     </Card>
   );
 }

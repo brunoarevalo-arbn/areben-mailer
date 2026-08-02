@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
@@ -10,11 +9,18 @@ import { getRemitenteEnvio } from "@/lib/remitentes";
 import { renderEmailHtml, aplicarMergeTags } from "@/lib/email/render";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { leerContenido } from "@/lib/email/esquema";
+import { combinarTema, resolverPaleta } from "@/lib/email/tema";
 import { marcaDe, hostDeEnvio } from "@/lib/marca";
-import { MiniaturaMail } from "@/components/MiniaturaMail";
+import { TarjetaPlantilla } from "@/components/TarjetaPlantilla";
+import { automationDelTrigger, TRIGGERS } from "@/lib/automations";
+import { AccionesModal } from "./AccionesModal";
 import { tapTarget } from "@/lib/ui";
 
 export const dynamic = "force-dynamic";
+
+/** El botón secundario de la tarjeta (mismas clases de siempre). */
+const BOTON_SEC =
+  "inline-block rounded-xl border border-border px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface-muted hover:border-border-strong";
 
 const esFamilia = (x: string | undefined): x is Familia =>
   !!x && FAMILIAS.some((f) => f.id === x);
@@ -29,7 +35,7 @@ export default async function PlantillasPage({
   const activa: Familia = esFamilia(familiaParam) ? familiaParam : FAMILIAS[0].id;
 
   const cuenta = await getCuentaActiva();
-  const [plantillas, remitente] = await Promise.all([
+  const [plantillas, remitente, automations] = await Promise.all([
     prisma.plantilla.findMany({
       where: { cuentaId: cuenta.id },
       orderBy: { createdAt: "desc" },
@@ -37,7 +43,18 @@ export default async function PlantillasPage({
     // El sitio de la tienda sale de `Cuenta.config`; el remitente es el fallback
     // para las cuentas que todavía no lo tienen cargado.
     getRemitenteEnvio(cuenta.id),
+    // Para saber qué disparadores quedan libres: una automation por trigger y
+    // por cuenta. Ofrecer uno que ya existe sería un botón que no crea nada.
+    prisma.automation.findMany({
+      where: { cuentaId: cuenta.id },
+      select: { id: true, trigger: true, createdAt: true },
+    }),
   ]);
+
+  const ocupados = TRIGGERS.map((t) => ({ trigger: t, ya: automationDelTrigger(automations, t) }))
+    .filter((x) => x.ya)
+    .map((x) => ({ trigger: x.trigger, id: x.ya!.id }));
+  const libres = TRIGGERS.filter((t) => !automationDelTrigger(automations, t));
 
   const todas = presetsGaleria(cuenta, remitente?.email);
   // ⚠️ Solo se DIBUJA la familia activa. `renderEmailHtml` devuelve el mail
@@ -84,14 +101,31 @@ export default async function PlantillasPage({
   const ejemplo = { nombre: "Ana", email: "ana@ejemplo.com" };
   const vista = (c: Parameters<typeof renderEmailHtml>[0]) =>
     aplicarMergeTags(renderEmailHtml(c, opts), ejemplo);
+  // El ancho del mail decide el marco de "escritorio" de la vista previa: el
+  // corte responsive del correo es su propio ancho, así que un marco más angosto
+  // mostraría la versión de celular con el toggle puesto en escritorio.
+  const ancho = (c: Parameters<typeof renderEmailHtml>[0]) =>
+    resolverPaleta(combinarTema(marca.temaMarca, c.tema)).ancho;
 
-  const previews = delaFamilia.map((p) => ({ preset: p, html: vista(p.contenido) }));
+  // Los tipos de bloque de cada una: es con lo que el modal avisa que, como
+  // bienvenida, esta plantilla saldría sin cupón. Un aviso medido y no una regla
+  // general — decirlo en las 38 sería ruido.
+  const tiposDe = (c: Parameters<typeof renderEmailHtml>[0]) => [...new Set(c.bloques.map((b) => b.tipo))];
+
+  const previews = delaFamilia.map((p) => ({
+    preset: p,
+    html: vista(p.contenido),
+    ancho: ancho(p.contenido),
+    tipos: tiposDe(p.contenido),
+  }));
 
   const guardadas = contenidosGuardados.map((p) => ({
     id: p.id,
     nombre: p.nombre,
     bloques: p.contenido.bloques.length,
     html: vista(p.contenido),
+    ancho: ancho(p.contenido),
+    tipos: tiposDe(p.contenido),
   }));
 
   const cuantas = (f: Familia) => todas.filter((p) => p.familia === f).length;
@@ -138,19 +172,23 @@ export default async function PlantillasPage({
           />
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {previews.map(({ preset, html }) => (
-              <Card key={preset.id} padding="none" className="overflow-hidden">
-                <MiniaturaMail titulo={preset.nombre} html={html} />
-                <div className="p-4">
-                  <div className="font-medium text-foreground">{preset.nombre}</div>
-                  <div className="mt-1 text-xs text-muted">{preset.descripcion}</div>
-                  <form action={usarPreset.bind(null, preset.id)} className="mt-3">
-                    <button className="w-full rounded-xl bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover">
-                      Usar
-                    </button>
-                  </form>
-                </div>
-              </Card>
+            {previews.map(({ preset, html, ancho: a, tipos }) => (
+              <TarjetaPlantilla
+                key={preset.id}
+                titulo={preset.nombre}
+                subtitulo={preset.descripcion}
+                html={html}
+                anchoMail={a}
+                acciones={
+                  <AccionesModal
+                    origen={{ tipo: "preset", id: preset.id }}
+                    crearCampania={usarPreset.bind(null, preset.id)}
+                    tipos={tipos}
+                    libres={libres}
+                    ocupados={ocupados}
+                  />
+                }
+              />
             ))}
           </div>
         )}
@@ -176,35 +214,34 @@ export default async function PlantillasPage({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {guardadas.map((p) => (
-              <Card key={p.id} padding="none" className="overflow-hidden">
-                {/* Misma miniatura que las prearmadas: un diseño guardado se
-                    reconoce mirándolo, no leyendo "8 bloques". */}
-                <MiniaturaMail titulo={p.nombre} html={p.html} />
-                <div className="p-4">
-                  <div className="truncate font-medium text-foreground" title={p.nombre}>
-                    {p.nombre}
-                  </div>
-                  <div className="mt-1 text-xs text-muted">{p.bloques} bloques</div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <Link
-                      href={`/plantillas/${p.id}`}
-                      className="rounded-xl bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
-                    >
-                      Editar
-                    </Link>
-                    <form action={usarPlantilla.bind(null, p.id)}>
-                      <button className="rounded-xl border border-border px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface-muted hover:border-border-strong">
-                        Usar
-                      </button>
-                    </form>
-                    <form action={eliminarPlantilla.bind(null, p.id)}>
-                      <button className="rounded-xl border border-border px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface-muted hover:border-border-strong">
-                        Eliminar
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              </Card>
+              /* Misma tarjeta que las prearmadas: un diseño guardado se reconoce
+                 mirándolo, no leyendo "8 bloques". */
+              <TarjetaPlantilla
+                key={p.id}
+                titulo={p.nombre}
+                subtitulo={`${p.bloques} bloques`}
+                html={p.html}
+                anchoMail={p.ancho}
+                acciones={
+                  <AccionesModal
+                    origen={{ tipo: "plantilla", id: p.id }}
+                    crearCampania={usarPlantilla.bind(null, p.id)}
+                    tipos={p.tipos}
+                    libres={libres}
+                    ocupados={ocupados}
+                    extra={
+                      <Link href={`/plantillas/${p.id}`} className={BOTON_SEC}>
+                        Editar la plantilla original
+                      </Link>
+                    }
+                  />
+                }
+                pie={
+                  <form action={eliminarPlantilla.bind(null, p.id)}>
+                    <button className={BOTON_SEC}>Eliminar</button>
+                  </form>
+                }
+              />
             ))}
           </div>
         )}

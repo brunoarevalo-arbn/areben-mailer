@@ -923,6 +923,42 @@ export interface RenderOpts {
    * bloque `html` no se dibuja, aunque el documento lo tenga guardado.
    */
   permiteHtmlCrudo?: boolean;
+  /**
+   * ⛔ **Solo el preview del editor.** Le pega un `data-b="<id del bloque>"` a
+   * cada bloque para que un click en el mail pueda decir QUÉ se tocó.
+   *
+   * Existe porque tocar una parte del mail y que se abra el formulario de esa
+   * parte es como uno piensa cuando algo no gusta — y porque hasta el 2-ago-2026
+   * un click en un botón del preview navegaba el iframe y **dejaba la pantalla
+   * en blanco**.
+   *
+   * No envuelve nada: el atributo va en la etiqueta que el bloque ya emitía, así
+   * que no cambia el layout. Aun así **no sale nunca en un envío**: ningún call
+   * site del motor lo prende y `probar-marcado.ts` verifica que sin la opción no
+   * aparezca ni un `data-b`. Un atributo de más en un mail son bytes contra los
+   * ~102 KB con los que Gmail recorta.
+   */
+  marcarBloques?: boolean;
+}
+
+/**
+ * Le pega `data-b="<id>"` a la etiqueta con la que ARRANCA el bloque.
+ *
+ * Se salta los comentarios condicionales del principio (`<!--[if mso]>…`):
+ * meter el atributo adentro de uno lo dejaría invisible justo para el navegador,
+ * que es el único que lo tiene que leer. Y un bloque que no dibujó nada —una
+ * grilla sin productos, un `html` sin permiso— se devuelve tal cual: no hay
+ * dónde ponerlo, y tampoco a qué apuntar.
+ */
+function marcarBloque(html: string, id: string): string {
+  // El id es un cuid generado por `nuevoBloque`, pero esto termina adentro de un
+  // atributo: se filtra igual, como todo lo que sale del Json.
+  const limpio = id.replace(/[^\w-]/g, "");
+  if (!limpio) return html;
+  const salto = /^(?:\s|<!--[\s\S]*?-->)*/.exec(html)?.[0].length ?? 0;
+  const resto = html.slice(salto);
+  if (!resto.startsWith("<")) return html;
+  return html.slice(0, salto) + resto.replace(/^<([a-zA-Z][\w:-]*)/, `<$1 data-b="${limpio}"`);
 }
 
 /** Renderiza el contenido a un HTML de email completo (shell + bloques + footer). */
@@ -952,9 +988,13 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
   // el renderer no puede depender de eso para no dibujar dos cabeceras.
   const bloques = contenido.bloques ?? [];
   const cabecera = bloques.find((b) => b.tipo === "encabezado");
+  // Un bloque sin `id` no se marca (no existe: `leerContenido` se los pone a
+  // todos), pero el tipo lo permite y un `undefined` en un atributo sería peor.
+  const marca = (b: Bloque) =>
+    opts.marcarBloques ? marcarBloque(renderBloque(b, ctx), b.id ?? "") : renderBloque(b, ctx);
   const cuerpo = bloques
     .filter((b) => b.tipo !== "encabezado")
-    .map((b) => renderBloque(b, ctx))
+    .map(marca)
     .join("\n");
   const preheader = opts.preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(opts.preheader)}</div>`
@@ -981,7 +1021,7 @@ ${cabeza(pal)}
   ${preheader}
 ${apertura(pal)}
     <!-- Encabezado de marca (bloque; se puede editar o borrar) -->
-    ${cabecera ? renderBloque(cabecera, ctx) : ""}
+    ${cabecera ? marca(cabecera) : ""}
     <!-- Cuerpo -->
     <div style="${cajaCuerpo};overflow:hidden">
       <div style="height:12px"></div>
