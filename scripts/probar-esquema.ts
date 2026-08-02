@@ -221,6 +221,56 @@ titulo("La grilla se acuerda de cuántos productos por fila van en el celular");
   ok(b.movil === undefined, "un documento viejo NO gana el campo al migrar (ausente = apila)");
 }
 
+// ─── v3 → v4: `columnas` deja de ser izquierda y derecha ─────────────────────
+//
+// Es la migración más peligrosa que hubo hasta ahora: no agrega un campo, le
+// **cambia la forma** a un bloque que ya está guardado en campañas y plantillas
+// de comerciantes. Si perdiera una celda, el mail sale con la mitad del bloque y
+// nadie se entera hasta que está en la casilla de otro.
+titulo("v3→v4: las dos columnas de un documento viejo son las dos primeras celdas");
+{
+  const viejo = leerContenido({
+    v: 3,
+    bloques: [
+      { tipo: "encabezado" },
+      {
+        tipo: "columnas",
+        variante: "imagen-texto",
+        proporcion: 40,
+        izq: { imagen: "https://x/a.jpg", url: "https://a" },
+        der: { titulo: "T", texto: "Cuerpo", url: "https://b" },
+      },
+    ],
+  });
+  const b = cuerpo(viejo)[0] as Extract<Bloque, { tipo: "columnas" }>;
+  ok(b.celdas?.length === 2, "quedan dos celdas");
+  ok(b.celdas?.[0]?.imagen === "https://x/a.jpg", "la izquierda es la primera, con su foto");
+  ok(b.celdas?.[1]?.texto === "Cuerpo", "la derecha es la segunda, con su texto");
+  ok(b.proporcion === 40 && b.variante === "imagen-texto", "la proporción y la variante no se tocan");
+  ok(
+    (b as unknown as Record<string, unknown>).izq === undefined,
+    "el campo viejo se borra: dos fuentes de verdad para lo mismo es la próxima falla silenciosa",
+  );
+
+  // Un Json que ya dice v4 pero todavía trae `izq`/`der` —editado a mano, o
+  // escrito por un script que no se actualizó— NO puede entrar por el camino
+  // rápido: el render se quedaría sin celdas y el bloque desaparecería callado.
+  const mentiroso = leerContenido({
+    v: V_ACTUAL,
+    bloques: [{ tipo: "columnas", izq: { imagen: "https://x/a.jpg", url: "#" }, der: { imagen: "https://x/b.jpg", url: "#" } }],
+  });
+  const m = cuerpo(mentiroso)[0] as Extract<Bloque, { tipo: "columnas" }>;
+  ok(m.celdas?.length === 2, "un v4 con la forma vieja adentro igual se convierte");
+
+  // Los bordes del rango: nunca menos de 2 ni más de 4.
+  const muchas = leerContenido({
+    bloques: [{ tipo: "columnas", celdas: [1, 2, 3, 4, 5, 6].map((n) => ({ imagen: `https://x/${n}.jpg`, url: "#" })) }],
+  });
+  ok((cuerpo(muchas)[0] as Extract<Bloque, { tipo: "columnas" }>).celdas.length === 4, "seis celdas se recortan a cuatro");
+  const pocas = leerContenido({ bloques: [{ tipo: "columnas", celdas: [{ imagen: "https://x/a.jpg", url: "#" }] }] });
+  ok((cuerpo(pocas)[0] as Extract<Bloque, { tipo: "columnas" }>).celdas.length === 2, "una sola celda se completa a dos");
+}
+
 // ─── El carrito no se llena solo ─────────────────────────────────────────────
 titulo("La migración no le inventa productos al carrito");
 {

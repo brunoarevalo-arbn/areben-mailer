@@ -52,6 +52,19 @@ export interface ConfigCuenta {
    * guardarla igual deja volver atrás con un click.
    */
   direccionOculta?: boolean;
+  /**
+   * Las redes de la marca, en el orden en que se muestran. Las escribe una
+   * persona en `/remitentes`: Tiendanube **no** las devuelve en `/store`.
+   *
+   * 🔑 Vive en la cuenta y no adentro del mail para que una PLANTILLA pueda
+   * cerrar con redes. Un preset que guardara el Instagram de alguien sería la
+   * bienvenida de Zattia linkeando al Instagram de BDI — la misma razón por la
+   * que el logo tampoco se guarda en el Json.
+   *
+   * `red` es el slug de `lib/email/redes.ts` cuando hay icono; cualquier otro
+   * nombre sale en texto, que es lo que el bloque hizo siempre.
+   */
+  redes?: { red: string; url: string }[];
   /** Cuándo se sincronizaron los contactos por última vez. */
   lastSyncContactos?: string;
   /** Cuándo se trajeron los datos de la tienda por última vez. */
@@ -130,13 +143,41 @@ export function hostDeEnvio(cuenta: { config: unknown }, fallback: string): stri
  */
 export type Marca = Pick<
   RenderOpts,
-  "nombreCuenta" | "logoCuenta" | "urlCuenta" | "direccionPostal" | "temaMarca" | "permiteHtmlCrudo"
+  "nombreCuenta" | "logoCuenta" | "urlCuenta" | "direccionPostal" | "temaMarca" | "permiteHtmlCrudo" | "redesMarca"
 >;
 
 const txt = (v: unknown): string | undefined => {
   const s = typeof v === "string" ? v.trim() : "";
   return s || undefined;
 };
+
+/**
+ * La lista de redes del config, sin confiar en nada.
+ *
+ * 🔴 **Una entrada sin `url` se descarta acá**, no en el renderer: estas URLs
+ * van al `href` de un mail que ya está en la casilla de otra persona, y un
+ * `href=""` es un link que no lleva a ningún lado y no se puede corregir. Es la
+ * misma postura de `normalizarDominioEnvio`: ante la duda, afuera.
+ *
+ * El tope de 8 no es capricho: son los iconos que entran en un renglón a 600px.
+ */
+function redesDe(valor: unknown): { red: string; url: string }[] | undefined {
+  if (!Array.isArray(valor)) return undefined;
+  const out = valor
+    .map((v) => {
+      if (!v || typeof v !== "object") return null;
+      const r = v as Record<string, unknown>;
+      const red = txt(r.red);
+      const url = txt(r.url);
+      // `https://` y nada más: `javascript:` en el href de un mail no lo
+      // ejecutaría ningún cliente serio, pero tampoco tiene por qué llegar.
+      if (!red || !url || !/^https?:\/\//i.test(url)) return null;
+      return { red, url };
+    })
+    .filter((x): x is { red: string; url: string } => x !== null)
+    .slice(0, 8);
+  return out.length ? out : undefined;
+}
 
 /** Lee `Cuenta.config` sin confiar en nada de lo que haya adentro. */
 export function leerConfigCuenta(valor: unknown): ConfigCuenta {
@@ -150,6 +191,7 @@ export function leerConfigCuenta(valor: unknown): ConfigCuenta {
     direccion: txt(c.direccion),
     direccionPropia: txt(c.direccionPropia),
     direccionOculta: c.direccionOculta === true,
+    redes: redesDe(c.redes),
     lastSyncContactos: txt(c.lastSyncContactos),
     marcaSync: txt(c.marcaSync),
     htmlCrudoHabilitado: c.htmlCrudoHabilitado === true,
@@ -176,6 +218,9 @@ export function marcaDe(cuenta: { nombre: string; config: unknown }): Marca {
     direccionPostal: c.direccionOculta ? undefined : c.direccionPropia ?? c.direccion,
     temaMarca,
     permiteHtmlCrudo: c.htmlCrudoHabilitado,
+    // Igual que el domicilio y el logo: la marca la resuelve el render, no el
+    // documento. Así el mismo Json sale con las redes de cada tienda.
+    redesMarca: c.redes,
   };
 }
 

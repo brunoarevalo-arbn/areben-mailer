@@ -32,10 +32,29 @@ export interface ProductoEmail {
 export interface Columna {
   imagen: string;
   url: string;
-  /** Solo para las variantes de texto del bloque `columnas`. */
+  /**
+   * En una celda de texto es el título; en una celda de imagen es la **etiqueta
+   * de abajo** y el `alt` de la foto.
+   *
+   * Que sea el mismo campo y no dos no es ahorro: una fila de categorías es
+   * exactamente "foto + cómo se llama", y en 10 de las 21 referencias de la
+   * tanda del 1-ago la etiqueta ES el contenido de la celda. Con dos campos, el
+   * día que alguien cambia la variante de la celda el texto se le queda atrás.
+   */
   titulo?: string;
   texto?: string;
 }
+
+/**
+ * Cuántas celdas tiene un bloque `columnas`. **Ausente = 2**, que es el bloque
+ * de siempre.
+ *
+ * El tope es 4 y no "las que quieras": a 600px de ancho, cinco celdas dejan 104
+ * px por columna —menos que la foto de producto más chica del catálogo— y en el
+ * celular apilan igual. La referencia que usa cinco (R-002) las dibuja de 90px
+ * y es ilegible en la casilla, no solo en la captura.
+ */
+export type CantidadCeldas = 2 | 3 | 4;
 
 /**
  * De dónde salen los productos de un bloque dinámico.
@@ -68,6 +87,25 @@ export interface ConsultaProductos {
  * nuevos en 2; en el documento vive el dato.
  */
 export type PorFilaMovil = 1 | 2;
+
+/**
+ * Cuántas tarjetas por fila en el ESCRITORIO. **Ausente = 2**, que es como se
+ * dibujó la grilla desde el día uno.
+ *
+ * Tres es el estándar de la industria —16 de las 21 referencias de la primera
+ * tanda lo usan, incluida la galería de Tiendanube— y el motor solo sabía hacer
+ * dos. Cuatro no entra: a 600px de ancho son 132px de foto por tarjeta con el
+ * nombre y el precio abajo, y en dos de las referencias que lo intentan el
+ * botón sale partido en dos renglones ("COMP / RAR").
+ *
+ * ⚠️ **Con 3 por fila, en el celular se APILA**, sea cual sea `movil`. No es una
+ * decisión estética: la fila es una `<tr>` con tres `<td>`, y una clase no puede
+ * convertirla en dos filas de dos. Lo que sí se puede —`display:inline-block` en
+ * las celdas— deja de ser una tabla justo en los clientes donde la tabla es lo
+ * único confiable. Vale la regla del shell: lo peor que se ve es el layout de
+ * escritorio, nunca uno roto.
+ */
+export type PorFila = 2 | 3;
 
 /**
  * La consulta, hecha texto.
@@ -153,8 +191,23 @@ export type Bloque = BloqueBase &
     | { tipo: "titulo"; texto: string; align?: "left" | "center" }
     | { tipo: "texto"; texto: string; align?: "left" | "center" }
     | { tipo: "boton"; texto: string; url: string; align?: "left" | "center"; full?: boolean }
-    | { tipo: "imagen"; url: string; alt?: string }
-    | { tipo: "productos"; items: ProductoEmail[]; movil?: PorFilaMovil }
+    | {
+        tipo: "imagen";
+        url: string;
+        alt?: string;
+        /**
+         * De borde a borde de la tarjeta, sin margen ni esquinas redondeadas.
+         * **Ausente = no**, que es como se dibujó siempre.
+         *
+         * Es la portada fotográfica de 6 de las 21 referencias de la primera
+         * tanda: la foto pegada a los bordes es lo que hace que un mail no se
+         * vea como un documento. ⚠️ El estilo del rol `imagen` (radio, margen)
+         * no se aplica cuando está prendida — pegada a los bordes, una esquina
+         * redondeada deja cuatro puntitos del color de la tarjeta.
+         */
+        sangre?: boolean;
+      }
+    | { tipo: "productos"; items: ProductoEmail[]; movil?: PorFilaMovil; porFila?: PorFila }
     /**
      * La grilla de `productos`, pero guardando **la consulta y no los productos**.
      *
@@ -176,6 +229,8 @@ export type Bloque = BloqueBase &
         n?: number;
         /** Cuántos por fila en el celular. Ausente = 1. Ver `PorFilaMovil`. */
         movil?: PorFilaMovil;
+        /** Cuántos por fila en escritorio. Ausente = 2. Ver `PorFila`. */
+        porFila?: PorFila;
         /**
          * ⛔ **Acá no hay `items`, y es la decisión de diseño del bloque.**
          *
@@ -199,14 +254,40 @@ export type Bloque = BloqueBase &
     // carrito real del contacto justo antes de enviar, EN ESTE LUGAR de la lista
     // — que es la diferencia con `productos`, que es una grilla curada.
     | { tipo: "carrito"; items?: ProductoEmail[]; restantes?: number }
+    /**
+     * La fila: de 2 a 4 celdas, cada una con foto o con texto.
+     *
+     * Nació como "dos columnas" (`izq`/`der`) y se abrió el 1-ago-2026: la fila
+     * de 3 o 4 celdas apareció en **15 de las 21 referencias** de la primera
+     * tanda, con tres disfraces que son el mismo bloque —la banda de beneficios
+     * con ícono, la fila de categorías con foto, y la de gente con nombre y
+     * cargo—. Ver `PLANTILLAS.md`.
+     *
+     * Los documentos viejos siguen entrando: la migración v3→v4 convierte
+     * `izq`/`der` en `celdas`, y el saneo lo vuelve a hacer en cada lectura por
+     * si un Json entra editado a mano.
+     */
     | {
         tipo: "columnas";
-        /** Ausente = "imagenes", que es el bloque de siempre: dos fotos lado a lado. */
+        /**
+         * Ausente = "imagenes", que es el bloque de siempre.
+         *
+         * Con más de dos celdas la variante decide igual, generalizando lo que
+         * ya hacía: `imagen-texto` es "la PRIMERA con foto" y `texto-imagen` es
+         * "la ÚLTIMA con foto". Con dos celdas eso es exactamente izquierda y
+         * derecha, así que ningún mail ya guardado cambia.
+         */
         variante?: "imagenes" | "textos" | "imagen-texto" | "texto-imagen";
-        /** % de ancho de la columna izquierda. Ausente = 50 (parejo). */
+        /**
+         * % de ancho de la primera celda. Ausente = parejo.
+         *
+         * ⚠️ **Solo se aplica con dos celdas.** Con tres o cuatro el reparto es
+         * parejo y punto: "40 / 60" no dice nada sobre la tercera, y la única
+         * lectura que no inventa nada es ignorarlo.
+         */
         proporcion?: 40 | 50 | 60;
-        izq: Columna;
-        der: Columna;
+        /** De 2 a 4. Lo garantiza `leerContenido`, no el tipo. */
+        celdas: Columna[];
       }
     | { tipo: "video"; imagen: string; url: string }
     | { tipo: "redes"; links: { red: string; url: string }[] }
@@ -249,7 +330,25 @@ export type Bloque = BloqueBase &
          */
         velo?: number;
       }
-    | { tipo: "seccion"; bg: string; titulo: string; texto: string; botonTexto: string; botonUrl: string }
+    | {
+        tipo: "seccion";
+        bg: string;
+        titulo: string;
+        texto: string;
+        botonTexto: string;
+        botonUrl: string;
+        /**
+         * Foto de fondo, con el texto encima. Los tres campos se portan igual
+         * que en el `hero` y comparten el código (`bandaConFoto`): la banda con
+         * foto en el MEDIO del mail —no en la portada— aparece en 4 de las 21
+         * referencias de la primera tanda.
+         */
+        fondoImagen?: string;
+        /** Alto aproximado en px, solo con `fondoImagen`. Outlook no mide texto. */
+        alto?: number;
+        /** Cuánto se oscurece la foto, 0-100. **Ausente = 0**, como el `hero`. */
+        velo?: number;
+      }
     | { tipo: "cupon"; texto: string; codigo: string; botonTexto: string; botonUrl: string }
     /**
      * HTML crudo. Escotilla de administrador, no de comerciante: sale desde un
@@ -364,12 +463,18 @@ export function nuevoBloque(tipo: TipoBloque): Bloque {
     // Nace en "los más vendidos" y no en "una categoría": es la única fuente que
     // ya devuelve algo sin que haya que elegir nada, así que el bloque se ve
     // funcionando en el preview desde el segundo cero.
+    // `n: 4` y no 3 aunque la fila sea de dos: cuatro llena dos filas parejas, y
+    // el que pase la grilla a tres las ve completas igual.
     case "productos-dinamicos": return { id, tipo, fuente: "destacados", n: 4, movil: 2 };
     // Nace vacío A PROPÓSITO: si trajera productos de ejemplo, una automation
     // guardada con ellos se los mandaría a un cliente real. La muestra del
     // editor la pone el preview (`muestraCarrito`), no el dato.
     case "carrito": return { id, tipo, items: [] };
-    case "columnas": return { id, tipo, izq: { imagen: "", url: "" }, der: { imagen: "", url: "" } };
+    // Nace con dos celdas: es el bloque que existió siempre, y el que agrega una
+    // tercera lo hace porque la está mirando. Tres de fábrica sería una perilla
+    // menos para el que arma una fila de beneficios y un hueco de más para todos
+    // los demás.
+    case "columnas": return { id, tipo, celdas: [{ imagen: "", url: "" }, { imagen: "", url: "" }] };
     case "video": return { id, tipo, imagen: "", url: "" };
     case "redes": return { id, tipo, links: [{ red: "Instagram", url: "" }] };
     case "menu": return { id, tipo, links: [{ texto: "Inicio", url: "" }, { texto: "Tienda", url: "" }] };

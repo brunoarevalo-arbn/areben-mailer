@@ -11,7 +11,7 @@
 // y, como `resolverPaleta`, **nunca lanza**: un contenido roto no puede impedir
 // que salga la campaña.
 
-import { TIPOS_BLOQUE, nuevoId, type Bloque, type ContenidoCampania } from "./bloques";
+import { TIPOS_BLOQUE, nuevoId, type Bloque, type Columna, type ContenidoCampania } from "./bloques";
 import { sanearEstilos } from "./estilos";
 import { temaDe } from "./tema";
 
@@ -21,13 +21,39 @@ import { temaDe } from "./tema";
  *   1 → el formato original, sin `v` (todo lo guardado antes del 29-jul-2026)
  *   2 → cada bloque tiene `id` estable, y `estilo`/`estilos` están saneados
  *   3 → el encabezado de marca es un bloque, no HTML fijo del shell
+ *   4 → `columnas` pasa de `izq`/`der` a una lista `celdas` de 2 a 4
  *
  * Cada cambio de forma de un bloque suma UN escalón con su función de migración.
  * No se reescribe un escalón ya publicado: un documento que ya subió a v2 nunca
  * vuelve a pasar por el paso 1→2, así que colgarle algo nuevo ahí no tendría
  * efecto sobre las filas que ya migraron.
  */
-export const V_ACTUAL = 3;
+export const V_ACTUAL = 4;
+
+/** El tope de celdas de un `columnas`. Ver `CantidadCeldas` en `bloques.ts`. */
+const MAX_CELDAS = 4;
+
+/**
+ * `{izq, der}` → `{celdas:[izq, der]}`, para un bloque cualquiera.
+ *
+ * Vive suelta porque la usan los DOS caminos: la migración de escalón (una vez
+ * por documento) y el saneo de cada lectura (siempre). El segundo no es de más:
+ * un Json puede entrar editado a mano o escrito por un script viejo con el `v`
+ * ya en 4, y sin esto el render se quedaría sin celdas y el bloque no se
+ * dibujaría — callado, que es el modo de falla que más caro sale en un mail.
+ *
+ * Devuelve `null` si no hay nada que convertir.
+ */
+function celdasDeLegado(b: Bruto): Columna[] | null {
+  const celda = (v: unknown): Columna | null =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? { imagen: "", url: "", ...(v as Partial<Columna>) } as Columna
+      : null;
+  const izq = celda(b.izq);
+  const der = celda(b.der);
+  if (!izq && !der) return null;
+  return [izq, der].filter((c): c is Columna => c !== null);
+}
 
 type Bruto = Record<string, unknown>;
 type Migracion = (c: Bruto) => Bruto;
@@ -54,6 +80,26 @@ const MIGRACIONES: Record<number, Migracion> = {
     ...c,
     v: 3,
     bloques: [{ tipo: "encabezado" }, ...(Array.isArray(c.bloques) ? c.bloques : [])],
+  }),
+  // 3 → 4 · `columnas` deja de ser "izquierda y derecha" y pasa a ser una fila.
+  //
+  // El bloque nació de a dos y la primera tanda de referencias pidió filas de 3
+  // y de 4 en 15 de 21 mails. Con `izq`/`der` no había forma de decirlo.
+  //
+  // La conversión no puede perder nada: las dos columnas de un documento viejo
+  // son las dos primeras celdas, en ese orden, y `proporcion` sigue queriendo
+  // decir lo mismo porque solo se aplica cuando hay dos.
+  3: (c) => ({
+    ...c,
+    v: 4,
+    bloques: (Array.isArray(c.bloques) ? c.bloques : []).map((b) => {
+      if (!b || typeof b !== "object" || (b as Bruto).tipo !== "columnas") return b;
+      const viejo = b as Bruto;
+      const celdas = celdasDeLegado(viejo);
+      if (!celdas) return b;
+      const { izq: _izq, der: _der, ...resto } = viejo;
+      return { ...resto, celdas };
+    }),
   }),
 };
 
@@ -110,6 +156,23 @@ function sanearBloque(v: unknown, usados: Set<string>): Bloque | null {
   // Zattia saludando en nombre de BDI, otra vez y con el catálogo.
   if (b.tipo === "productos-dinamicos") delete b.items;
 
+  // Una fila tiene entre 2 y 4 celdas, siempre. Un `columnas` con `izq`/`der`
+  // (Json viejo, editado a mano o escrito por un script) se convierte acá; uno
+  // con una sola celda o con siete se acomoda al rango en vez de descartarse:
+  // perder el bloque entero por un dato de más es peor que dibujar cuatro.
+  if (b.tipo === "columnas") {
+    const legado = celdasDeLegado(b);
+    const lista = Array.isArray(b.celdas) && b.celdas.length ? (b.celdas as unknown[]) : legado ?? [];
+    const celdas = lista
+      .filter((c): c is Bruto => !!c && typeof c === "object" && !Array.isArray(c))
+      .slice(0, MAX_CELDAS)
+      .map((c) => ({ imagen: "", url: "", ...c }));
+    while (celdas.length < 2) celdas.push({ imagen: "", url: "" });
+    b.celdas = celdas;
+    delete b.izq;
+    delete b.der;
+  }
+
   return b as unknown as Bloque;
 }
 
@@ -126,6 +189,18 @@ function esActual(v: unknown): v is ContenidoCampania {
   // que el `v` diga 3: si entrara por el camino rápido, el saneo que los tira no
   // correría nunca y el Json quedaría con el catálogo de una marca guardado.
   if (bs.some((b) => (b as Bruto | null)?.tipo === "productos-dinamicos" && (b as Bruto).items !== undefined)) {
+    return false;
+  }
+  // Lo mismo del otro lado: un `columnas` que todavía trae `izq`/`der`, o que no
+  // trae `celdas` usables, NO está en la forma actual por más que el `v` diga 4.
+  // Si entrara por el camino rápido, el render se quedaría sin celdas y el
+  // bloque desaparecería del mail sin que nada avise.
+  if (
+    bs.some((b) => {
+      const x = b as Bruto | null;
+      return x?.tipo === "columnas" && (x.izq !== undefined || x.der !== undefined || !Array.isArray(x.celdas));
+    })
+  ) {
     return false;
   }
   const cabs = bs.filter((b) => (b as Bruto | null)?.tipo === "encabezado");

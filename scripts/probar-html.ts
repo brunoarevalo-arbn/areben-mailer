@@ -113,8 +113,51 @@ titulo("Responsive");
   });
   ok(dinamica.includes(`class="${CLASES.col2}"`), "el bloque dinámico también respeta `movil`");
 
-  const cols = render({ bloques: [{ tipo: "columnas", izq: { imagen: "https://x/a.jpg", url: "#" }, der: { imagen: "https://x/b.jpg", url: "#" } }] });
+  const cols = render({ bloques: [{ tipo: "columnas", celdas: [{ imagen: "https://x/a.jpg", url: "#" }, { imagen: "https://x/b.jpg", url: "#" }] }] });
   ok(cols.includes(`class="${CLASES.col}"`), "las columnas apilan en el celular");
+
+  // Una fila de cuatro reparte 25% y apila igual. El ancho inline es el de
+  // escritorio y la clase solo lo pisa en el celular: la regla del shell.
+  const cuatro = render({
+    bloques: [
+      {
+        tipo: "columnas",
+        celdas: [1, 2, 3, 4].map((n) => ({ imagen: `https://x/${n}.jpg`, url: "#", titulo: `Cat ${n}` })),
+      },
+    ],
+  });
+  ok(cuatro.includes(`width="25%"`), "una fila de cuatro reparte el ancho parejo");
+  ok(cuatro.includes("Cat 4"), "la etiqueta de la celda de imagen se dibuja");
+
+  // La grilla de tres: el ancho inline es el de escritorio (33%) y en el celular
+  // apila. `movil: 2` no puede ganarle — una `<tr>` de tres celdas no se parte
+  // en dos filas con CSS, así que el bloque **ignora** el pedido en vez de
+  // dibujar tres tarjetas de 125px en un teléfono. Ver `PorFila`.
+  const tres = render({ bloques: [{ tipo: "productos", items: ITEMS, movil: 2, porFila: 3 }] });
+  ok(tres.includes(`width="33%"`), "la grilla de tres reparte 33% en escritorio");
+  ok(tres.includes(`class="${CLASES.col}"`), "con tres por fila el celular apila");
+  ok(!tres.includes(`class="${CLASES.col2}"`), "y `movil: 2` no la deja a medio camino");
+
+  // La imagen a sangre sale del contenedor con padding, y no de otra forma: lo
+  // que se está fijando es que NO la envuelva `pad()`.
+  const sangre = render({ bloques: [{ tipo: "imagen", url: "https://x/hero.jpg", alt: "Portada", sangre: true }] });
+  const conMargen = render({ bloques: [{ tipo: "imagen", url: "https://x/hero.jpg", alt: "Portada" }] });
+  ok(!sangre.includes(`<div class="${CLASES.pad}" style="padding:0 32px"><img`), "la imagen a sangre no va adentro del padding");
+  ok(conMargen.includes(`<div class="${CLASES.pad}" style="padding:0 32px"><img`), "y sin `sangre` sigue yendo adentro, como siempre");
+  ok(sangre.includes(`width="100%"`), "la imagen a sangre lleva el ancho como atributo (Outlook ignora max-width)");
+
+  // La banda con foto de fondo es la MISMA en el hero y en la sección: los dos
+  // pasan por `bandaConFoto`, y lo que se fija acá es que la sección también
+  // traiga el camino VML. Sin él, Outlook dibuja la banda sin fondo y el texto
+  // blanco queda sobre blanco.
+  const banda = render({
+    bloques: [
+      { tipo: "seccion", bg: "#101010", titulo: "Nuestra misión", texto: "Cuero ecológico.", botonTexto: "", botonUrl: "", fondoImagen: "https://x/banda.jpg", velo: 55, alto: 240 },
+    ],
+  });
+  ok(banda.includes("<v:rect"), "la sección con foto trae el camino de Outlook");
+  ok(banda.includes("linear-gradient("), "y el velo, que es lo que deja leer el texto");
+  ok(banda.includes("background-color:#101010"), "con el color de respaldo por si la foto no carga");
 }
 {
   // La regla que sostiene todo: una clase es SIEMPRE un override, nunca el

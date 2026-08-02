@@ -4,9 +4,96 @@
 // vean completas el primer día —sin que nadie suba una foto— y distintas cada
 // vez que se mandan.
 
-import { type DefPreset, banda, botonSi, cta, redes, aire } from "../comun";
+import { type DefPreset, banda, botonSi, cta, fila, menuTienda, redes, aire } from "../comun";
 
 export const CATALOGO: readonly DefPreset[] = [
+  {
+    id: "tienda",
+    nombre: "Tu tienda entera",
+    descripcion: "Menú arriba, grilla de tres, un destacado y la banda de beneficios. El mail que manda casi todo ecommerce.",
+    familia: "catalogo",
+    // La anatomía que más se repitió en la primera tanda de referencias
+    // (R-002, R-006, R-018, R-019, R-020): navegación arriba, catálogo en el
+    // medio, un producto que se explica, y por qué comprarte a vos abajo.
+    arma: ({ marca, tienda }) => ({
+      estilos: { imagen: { radio: 12 } },
+      bloques: [
+        ...menuTienda(tienda),
+        {
+          tipo: "hero",
+          imagen: "",
+          titulo: "Todo lo que tenemos, en un mail",
+          subtitulo: `Lo que más sale de ${marca}, elegido para vos.`,
+          bg: "",
+          ...cta("Ver la tienda", tienda),
+        },
+        // Tres por fila: es lo que hacen 16 de las 21 referencias. Seis llenan
+        // dos filas parejas — con `n: 4` la segunda quedaría con un hueco.
+        { tipo: "productos-dinamicos", fuente: "destacados", n: 6, movil: 2, porFila: 3 },
+        ...botonSi("Ver todo el catálogo", tienda, "center"),
+        aire(8),
+        { tipo: "divisor" },
+        { tipo: "titulo", texto: "El que no puede faltar", align: "left" },
+        // Dos columnas imagen + texto: el bloque `columnas` no lo usaba ningún
+        // preset. Nace sin foto y el renderer no dibuja una celda vacía, así
+        // que hasta que suban una la plantilla se ve completa igual.
+        {
+          tipo: "columnas",
+          variante: "imagen-texto",
+          proporcion: 40,
+          celdas: [
+            { imagen: "", url: tienda },
+            {
+              titulo: "Contá por qué este",
+              texto: "Una foto y tres renglones: qué es, para quién y por qué lo elegirían. Es el bloque que más convierte de todo el mail.",
+              imagen: "",
+              url: tienda,
+            },
+          ],
+        },
+        aire(8),
+        fila([
+          { titulo: "Envíos a todo el país", texto: "Con seguimiento del pedido." },
+          { titulo: "Cambios sin vueltas", texto: "Tenés 30 días para cambiarlo." },
+          { titulo: "Te respondemos", texto: "Escribinos y te contestamos." },
+        ]),
+        redes,
+      ],
+    }),
+  },
+  {
+    id: "categorias",
+    nombre: "Por categorías",
+    descripcion: "Una fila de fotos con el nombre de cada rubro y la grilla abajo. Para tiendas con mucho surtido.",
+    familia: "catalogo",
+    // R-004, R-007, R-018 y R-021: la fila de categorías con la etiqueta
+    // debajo de la foto. Es lo que abrió el bloque `columnas` a 3 y 4 celdas.
+    arma: ({ marca, tienda }) => ({
+      estilos: { imagen: { radio: 12 }, boton: { radio: 24 } },
+      bloques: [
+        ...menuTienda(tienda),
+        { tipo: "titulo", texto: "¿Qué estás buscando?", align: "center" },
+        { tipo: "texto", texto: `Hola \${contacto.nombre}, entrá directo al rubro que te interesa de ${marca}.`, align: "center" },
+        // Las cuatro celdas nacen SIN foto: el renderer no dibuja una celda de
+        // imagen vacía, así que la plantilla no muestra un hueco ni un ícono
+        // roto. La etiqueta es el campo `titulo`, que en una celda de imagen se
+        // dibuja debajo de la foto.
+        {
+          tipo: "columnas",
+          celdas: ["Novedades", "Más vendidos", "Ofertas", "Todo el catálogo"].map((titulo) => ({
+            imagen: "",
+            url: tienda,
+            titulo,
+          })),
+        },
+        aire(8),
+        { tipo: "titulo", texto: "Lo más elegido", align: "left" },
+        { tipo: "productos-dinamicos", fuente: "destacados", n: 6, movil: 2, porFila: 3 },
+        ...botonSi("Ver la tienda completa", tienda, "center"),
+        redes,
+      ],
+    }),
+  },
   {
     id: "ecommerce",
     nombre: "E-commerce clásico",

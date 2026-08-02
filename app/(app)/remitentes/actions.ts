@@ -209,6 +209,45 @@ export async function guardarDireccionPropia(texto: string) {
 }
 
 /**
+ * Guarda las redes de la marca, que son las que dibuja el bloque `redes` de
+ * cualquier mail que no traiga links propios.
+ *
+ * 🔑 Vive en la CUENTA y no adentro del mail para que una plantilla pueda cerrar
+ * con redes: un preset que guardara el Instagram de alguien adentro del Json
+ * sería la bienvenida de Zattia linkeando al Instagram de BDI. Es lo mismo que
+ * ya pasa con el logo y con el domicilio.
+ *
+ * ⚠️ Tiendanube **no** las devuelve en `/store`, así que no hay "Traer de mi
+ * tienda" para esto: se escriben a mano, una vez.
+ *
+ * Lo que no tenga URL usable se descarta —lo hace `leerConfigCuenta` al leer,
+ * y acá al guardar—: estas URLs terminan en el `href` de un mail que ya está en
+ * la casilla de otra persona.
+ */
+export async function guardarRedes(redes: { red: string; url: string }[]) {
+  const chk = await chequear("remitentes");
+  if (!chk.ok) return chk;
+  const { cuenta } = chk.ctx;
+
+  const limpias = (Array.isArray(redes) ? redes : [])
+    .map((r) => ({ red: (r?.red ?? "").trim(), url: (r?.url ?? "").trim() }))
+    .filter((r) => r.red && /^https?:\/\//i.test(r.url))
+    .slice(0, 8);
+
+  const config = (cuenta.config as Prisma.JsonObject) ?? {};
+  const nuevo: Prisma.JsonObject = { ...config };
+  // Sin ninguna red se BORRA la clave en vez de guardar `[]`: ausente y lista
+  // vacía significan lo mismo para el render, y una clave menos es una forma
+  // menos de que el Json crezca con basura.
+  if (limpias.length) nuevo.redes = limpias;
+  else delete nuevo.redes;
+
+  await prisma.cuenta.update({ where: { id: cuenta.id }, data: { config: nuevo } });
+  revalidatePath("/remitentes");
+  return { ok: true as const, redes: limpias };
+}
+
+/**
  * Guarda el dominio propio del que cuelgan los links de los mails de esta marca.
  *
  * Vaciarlo vuelve a `APP_URL`, que es como se portó siempre — por eso no hay

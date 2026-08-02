@@ -12,12 +12,12 @@ import {
 import { cabeza, apertura, cierre, botonVml, clase, clasesDe, CLASES } from "./shell";
 import { claveProductos } from "./bloques";
 import { redConIcono, urlIcono } from "./redes";
-import type { Bloque, Columna, ContenidoCampania, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
+import type { Bloque, Columna, ContenidoCampania, PorFila, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
 
 // Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
 // sin ciclo) pero se re-exportan desde acá: media app importa `Bloque` y
 // `nuevoBloque` de "@/lib/email/render" y no hay razón para hacerla cambiar.
-export type { Bloque, BloqueBase, TipoBloque, ContenidoCampania, ProductoEmail, Columna, PorFilaMovil } from "./bloques";
+export type { Bloque, BloqueBase, TipoBloque, ContenidoCampania, ProductoEmail, Columna, PorFilaMovil, PorFila } from "./bloques";
 export { nuevoBloque, duplicarBloque, nuevoId, TIPOS_BLOQUE, ETIQUETA_BLOQUE } from "./bloques";
 
 const esc = (s: string) =>
@@ -88,6 +88,8 @@ interface Ctx extends CtxEstilo {
   urlCuenta: string;
   /** De dónde salen los iconos de `redes`. Ver `RenderOpts.assetsBase`. */
   assetsBase: string;
+  /** Las redes de la marca, para el bloque que no trae links. Ver `RenderOpts`. */
+  redesMarca: { red: string; url: string }[];
   /**
    * ¿Esta CUENTA puede usar el bloque `html`? No es el permiso del usuario que
    * edita —al enviar no hay usuario, solo cuenta—. Ausente/`false` = el bloque
@@ -134,6 +136,67 @@ function botonAnchor(texto: string, url: string, e: EstiloResuelto, pal: Paleta,
   return `${botonVml(esc(texto), esc(url || "#"), e, pal, full)}<!--[if !mso]><!-->${a}<!--<![endif]-->`;
 }
 
+/**
+ * Una banda con una foto de fondo y el texto ENCIMA, no arriba.
+ *
+ * La escribió el `hero` y la usa también `seccion` desde el 1-ago-2026: 4 de las
+ * 21 referencias de la primera tanda ponen una banda así **en el medio del
+ * mail**, no en la portada, y copiarle los 30 renglones al otro bloque era
+ * garantizar que dentro de un mes uno de los dos tuviera el arreglo y el otro no.
+ *
+ * Outlook no entiende `background-image` en un `<div>`, así que necesita su
+ * propio camino con `<v:rect>` — mismo criterio que el botón VML: los dos van
+ * siempre, y el que no aplica se esconde con comentarios condicionales para que
+ * no se dibujen los dos a la vez.
+ */
+function bandaConFoto(o: {
+  foto: string;
+  /** Alto aproximado en px: Outlook no mide el texto y necesita el número. */
+  alto: number;
+  /** 0-100. Ausente = 0, que es como se portó siempre. */
+  velo?: number;
+  /** El color de la banda: es el respaldo Y el color del velo. */
+  bg: string;
+  pal: Paleta;
+  /** Padding y alineación ya resueltos por la caja del bloque. */
+  estiloCaja: string;
+  interior: string;
+}): string {
+  const alto = Math.min(600, Math.max(120, Math.round(o.alto)));
+  // El velo: una capa del color `bg` encima de la foto, para que el texto se
+  // lea. Sin esto, un título claro sobre una foto clara desaparece — es
+  // exactamente lo que hizo descartar esta portada en Zattia.
+  //
+  // Va como CAPA de `background-image` y no como un div encima: un mail no puede
+  // usar `position`, así que superponer dos elementos no es una opción. Es el
+  // mismo truco que el pop-up de Resorty.
+  //
+  // 💡 De paso arregla una mentira vieja: el contraste del título se calcula
+  // contra `bg`, pero lo que había atrás era la FOTO. Con el velo del color
+  // `bg`, el fondo real se parece a lo que el cálculo supone.
+  const velo = Math.min(100, Math.max(0, Math.round(o.velo ?? 0)));
+  const capaVelo = velo > 0 ? `linear-gradient(${rgba(o.bg, velo / 100)},${rgba(o.bg, velo / 100)}),` : "";
+  const fondo = colorCss(o.bg, o.pal.tarjeta);
+  // `background-color` de respaldo: si la imagen no carga —Outlook con las
+  // imágenes bloqueadas, un 404— el texto queda sobre el color y no sobre el
+  // blanco de la tarjeta, que es donde se volvía invisible.
+  return `<!--[if mso]>
+<v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:${o.pal.ancho}px;height:${alto}px">
+<v:fill type="frame" src="${esc(o.foto)}" color="${fondo}"${velo > 0 ? ` opacity="${(1 - velo / 100).toFixed(2)}"` : ""} />
+<v:textbox inset="0,0,0,0">
+<div style="${o.estiloCaja}">
+${o.interior}
+</div>
+</v:textbox>
+</v:rect>
+<![endif]-->
+<!--[if !mso]><!-->
+<div style="background-color:${fondo};background-image:${capaVelo}url(${esc(o.foto)});background-size:cover;background-position:center;min-height:${px(alto)};${o.estiloCaja}">
+${o.interior}
+</div>
+<!--<![endif]-->`;
+}
+
 function fmtPrecio(v: string): string {
   const n = Number(v);
   if (Number.isNaN(n)) return v;
@@ -155,12 +218,12 @@ function detalleHtml(p: ProductoEmail, e: EstiloResuelto): string {
     : "";
 }
 
-function renderCard(p: ProductoEmail, pal: Paleta, eTexto: EstiloResuelto, eNota: EstiloResuelto, eImg: EstiloResuelto, dosEnMovil: boolean): string {
+function renderCard(p: ProductoEmail, pal: Paleta, eTexto: EstiloResuelto, eNota: EstiloResuelto, eImg: EstiloResuelto, dosEnMovil: boolean, pct = 50): string {
   // La única diferencia entre una y dos por fila en el celular es CUÁL de las dos
   // clases lleva la celda: `m-col` la apila y `m-col2` la deja en la mitad. El
-  // `width="50%"` inline —el layout de escritorio— es el mismo en los dos casos,
-  // que es la regla del shell: la clase solo puede ser un override.
-  return `<td width="50%" valign="top"${clase(dosEnMovil ? CLASES.col2 : CLASES.col)} style="padding:8px">
+  // `width` inline —el layout de escritorio— es el mismo en los dos casos, que
+  // es la regla del shell: la clase solo puede ser un override.
+  return `<td width="${pct}%" valign="top"${clase(dosEnMovil ? CLASES.col2 : CLASES.col)} style="padding:8px">
     <a href="${esc(p.url)}" style="text-decoration:none;color:inherit">
       <img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:${px(eImg.radio ?? 8)};display:block" />
       <div style="margin-top:8px;font-size:${px(eTexto.tamano ?? 14)};color:${eTexto.color}${extra(eTexto, ["tamano", "color"])}">${esc(p.nombre)}</div>
@@ -245,26 +308,33 @@ export function renderProductosHtml(items: ProductoEmail[], tema?: Tema, movil?:
   const pal = resolverPaleta(tema);
   // `assetsBase` vacío: esto dibuja una grilla de productos, que no tiene
   // iconos. Vacío es el valor seguro — el bloque `redes` cae al texto.
-  const ctx: Ctx = { pal, muestraCarrito: false, nombreCuenta: "", logoCuenta: "", urlCuenta: "", permiteHtmlCrudo: false, assetsBase: "" };
+  const ctx: Ctx = { pal, muestraCarrito: false, nombreCuenta: "", logoCuenta: "", urlCuenta: "", permiteHtmlCrudo: false, assetsBase: "", redesMarca: [] };
   return renderProductos(items, pal, estProducto("productos", "cuerpo", ctx, undefined), movil);
 }
 
 /**
- * La grilla: filas de a dos tarjetas.
+ * La grilla: filas de dos o de tres tarjetas.
  *
- * `movil` decide qué pasa en el teléfono y **ausente es 1**, apilada, que es
- * como salieron todos los mails hasta ahora (ver `PorFilaMovil`). La fila impar
- * se completa con una celda vacía en los dos casos: con dos por fila, un hueco
- * a la derecha es exactamente lo que corresponde ver.
+ * `porFila` es el layout de escritorio y **ausente son 2**, que es como salieron
+ * todos los mails hasta el 1-ago-2026. `movil` decide qué pasa en el teléfono y
+ * **ausente es 1**, apilada (ver `PorFilaMovil`). La fila incompleta se rellena
+ * con celdas vacías: con la grilla de a dos o de a tres, el hueco a la derecha
+ * es exactamente lo que corresponde ver.
+ *
+ * ⚠️ Con `porFila: 3` el `movil` no se puede respetar —una `<tr>` de tres celdas
+ * no se parte en dos filas con CSS— y la grilla apila. Ver `PorFila`.
  */
-function renderProductos(items: ProductoEmail[], pal: Paleta, e: EstProducto, movil?: PorFilaMovil): string {
+function renderProductos(items: ProductoEmail[], pal: Paleta, e: EstProducto, movil?: PorFilaMovil, porFila?: PorFila): string {
   if (items.length === 0) return "";
-  const dos = movil === 2;
+  const n = porFila === 3 ? 3 : 2;
+  const dos = movil === 2 && n === 2;
+  const pct = Math.round(100 / n);
   const filas: string[] = [];
-  for (let i = 0; i < items.length; i += 2) {
-    const a = renderCard(items[i], pal, e.nombre, e.nota, e.img, dos);
-    const b = items[i + 1] ? renderCard(items[i + 1], pal, e.nombre, e.nota, e.img, dos) : `<td width="50%"></td>`;
-    filas.push(`<tr>${a}${b}</tr>`);
+  for (let i = 0; i < items.length; i += n) {
+    const celdas = Array.from({ length: n }, (_, j) =>
+      items[i + j] ? renderCard(items[i + j], pal, e.nombre, e.nota, e.img, dos, pct) : `<td width="${pct}%"></td>`,
+    );
+    filas.push(`<tr>${celdas.join("")}</tr>`);
   }
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px">${filas.join("")}</table>`;
 }
@@ -360,10 +430,23 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // vez de mandar un hueco. `imagen` era el único que faltaba.
       if (!b.url) return "";
       const t = e("imagen");
+      // A sangre: la foto ocupa la tarjeta de lado a lado, sin el margen lateral
+      // ni las esquinas redondeadas. Es el hero fotográfico de 6 de las 21
+      // referencias de la primera tanda (ver PLANTILLAS.md), y hasta el
+      // 1-ago-2026 no había forma de decirlo.
+      //
+      // El padding lo pone `pad()`, así que "a sangre" es no envolver: no hay
+      // una propiedad nueva en el `<img>`, hay un `<div>` menos. El `width="100%"`
+      // como ATRIBUTO además del style es por Outlook, que ignora `max-width` y
+      // dibujaría la foto a su tamaño original — 2000px de ancho adentro de una
+      // tarjeta de 600.
+      if (b.sangre) {
+        return `<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" width="100%" style="width:100%;max-width:100%;height:auto;display:block;border:0" />`;
+      }
       return pad(`<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" style="max-width:100%;height:auto;border-radius:${px(t.radio ?? 8)};margin:8px 0 16px;display:block${extra(t, ["radio", "align", "tamano", "color"])}" />`, caja());
     }
     case "productos":
-      return pad(renderProductos(b.items ?? [], pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil), caja());
+      return pad(renderProductos(b.items ?? [], pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil, b.porFila), caja());
     // Se dibuja igual que `productos` —es la misma grilla— y la diferencia entera
     // está en de dónde salen los productos: el bloque guarda la consulta y la
     // respuesta llega por `opts`, resuelta contra la tienda minutos antes.
@@ -376,7 +459,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // ⚠️ `movil` NO entra en `claveProductos`: es cómo se dibuja la grilla, no
       // qué se le pide a Tiendanube. Si entrara, dos bloques con la misma
       // consulta y distinto layout costarían dos llamadas a TN.
-      return pad(renderProductos(items, pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil), caja());
+      return pad(renderProductos(items, pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil, b.porFila), caja());
     }
     case "carrito": {
       // Sin items no se inventa nada: si el carrito llegó vacío, el bloque
@@ -388,12 +471,19 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       );
     }
     case "columnas": {
-      // Cuatro variantes, dos formas de celda. `variante` decide, de cada lado,
-      // si va imagen o texto — no hay un quinto caso "mixto libre" a propósito:
-      // menos combinaciones, menos perillas que probar en el panel de estilo.
+      // Cuatro variantes, dos formas de celda. `variante` decide, celda por
+      // celda, si va imagen o texto — no hay un quinto caso "mixto libre" a
+      // propósito: menos combinaciones, menos perillas que probar en el panel.
       const variante = b.variante ?? "imagenes";
-      const izqPct = b.proporcion ?? 50;
-      const derPct = 100 - izqPct;
+      const celdas = b.celdas ?? [];
+      if (!celdas.length) return "";
+      // La proporción es una pregunta de dos celdas: "cuál de las DOS es más
+      // ancha". Con tres o cuatro el reparto es parejo — ver el comentario del
+      // campo en `bloques.ts`.
+      const pcts =
+        celdas.length === 2
+          ? [b.proporcion ?? 50, 100 - (b.proporcion ?? 50)]
+          : celdas.map(() => Math.round(100 / celdas.length));
       const tImg = e("imagen");
       const tTitulo = e("titulo");
       const tCuerpo = e("cuerpo");
@@ -403,10 +493,16 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // celda queda literalmente vacía y el mail se lee partido. Si la columna no
       // tiene título se deja vacío a propósito — ahí la imagen sí es decorativa y
       // un alt inventado sería ruido para un lector de pantalla.
-      const celdaImagen = (c: Columna, pct: number) =>
-        c.imagen
-          ? `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px"><a href="${esc(c.url || "#")}"><img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:${px(tImg.radio ?? 8)};display:block" alt="${esc(c.titulo ?? "")}" /></a></td>`
-          : `<td width="${pct}%"></td>`;
+      const celdaImagen = (c: Columna, pct: number) => {
+        if (!c.imagen) return `<td width="${pct}%"></td>`;
+        // La etiqueta debajo de la foto. Es la fila de categorías de 10 de las
+        // 21 referencias de la primera tanda: sin ella, la celda de imagen es
+        // una foto muda y hay que adivinar a dónde lleva.
+        const label = c.titulo
+          ? `<div style="margin-top:8px;font-size:${px(tTitulo.tamano ?? 15)};font-weight:${tTitulo.peso ?? 600};color:${tTitulo.color};text-align:${tTitulo.align ?? "center"}${extra(tTitulo, ["tamano", "peso", "color", "align"])}">${esc(c.titulo)}</div>`
+          : "";
+        return `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px"><a href="${esc(c.url || "#")}" style="text-decoration:none;color:inherit"><img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:${px(tImg.radio ?? 8)};display:block" alt="${esc(c.titulo ?? "")}" />${label}</a></td>`;
+      };
 
       const celdaTexto = (c: Columna, pct: number) => {
         const titulo = c.titulo
@@ -420,11 +516,19 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         return `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px">${interior}</td>`;
       };
 
-      const celda = (c: Columna, pct: number, comoImagen: boolean) => (comoImagen ? celdaImagen(c, pct) : celdaTexto(c, pct));
-      const izqImagen = variante === "imagenes" || variante === "imagen-texto";
-      const derImagen = variante === "imagenes" || variante === "texto-imagen";
+      // Con dos celdas esto es exactamente lo que hacía antes (`imagen-texto` =
+      // izquierda con foto). Con tres o cuatro, "la primera" y "la última" son
+      // la única lectura que no inventa nada.
+      const esImagen = (i: number) =>
+        variante === "imagenes" ||
+        (variante === "imagen-texto" && i === 0) ||
+        (variante === "texto-imagen" && i === celdas.length - 1);
 
-      return pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px"><tr>${celda(b.izq, izqPct, izqImagen)}${celda(b.der, derPct, derImagen)}</tr></table>`, caja());
+      const html = celdas
+        .map((c, i) => (esImagen(i) ? celdaImagen(c, pcts[i]) : celdaTexto(c, pcts[i])))
+        .join("");
+
+      return pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px"><tr>${html}</tr></table>`, caja());
     }
     case "video": {
       // El ▶ estaba superpuesto con `position:absolute`, y **Gmail elimina
@@ -443,8 +547,20 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // panel sigue haciendo algo en este bloque (lo exige `probar-panel-estilo`)
       // y no hace falta un control nuevo solo para las redes.
       const lado = Math.round((t.tamano ?? 14) * 2);
-      return pad(`<div style="text-align:center;margin:16px 0">${(b.links ?? [])
-        .filter((l) => l.url)
+      // 🔑 Sin links propios, las de la marca. Es lo que permite que una
+      // PLANTILLA cierre con redes: un preset no puede guardar el Instagram de
+      // nadie adentro del Json (regla 1 de PLANTILLAS.md), así que nace con la
+      // lista vacía y cada marca la completa al renderizar — igual que el logo.
+      //
+      // El bloque con links propios manda: quien escribió un link en ESTE mail
+      // quiso ese link, no el de la configuración.
+      const propios = (b.links ?? []).filter((l) => l.url);
+      const lista = propios.length ? propios : ctx.redesMarca;
+      // Sin una sola red que dibujar, el bloque no existe — el mismo criterio
+      // que `imagen`, `video` y `carrito`. Antes dejaba un `<div>` vacío con 32
+      // px de aire adentro de un mail que no muestra nada ahí.
+      if (!lista.length) return "";
+      return pad(`<div style="text-align:center;margin:16px 0">${lista
         .map((l) => {
           const red = redConIcono(l.red);
           const src = red && urlIcono(ctx.assetsBase, red);
@@ -504,39 +620,15 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // caminos van siempre, y el que no aplica se esconde con comentarios
       // condicionales para que no se dibujen los dos a la vez.
       if (b.fondoImagen) {
-        const alto = Math.min(600, Math.max(120, Math.round(b.alto ?? 280)));
-        const estiloCaja = `${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}`;
-        // El velo: una capa del color `bg` encima de la foto, para que el texto
-        // se lea. Sin esto, un título claro sobre una foto clara desaparece —
-        // es exactamente lo que hizo descartar esta portada en Zattia.
-        //
-        // Va como CAPA de `background-image` y no como un div encima: un mail no
-        // puede usar `position`, así que superponer dos elementos no es una
-        // opción. Es el mismo truco que el pop-up de Resorty.
-        //
-        // 💡 De paso arregla una mentira vieja: el contraste del título se
-        // calcula contra `bg`, pero lo que había atrás era la FOTO. Con el velo
-        // del color `bg`, el fondo real se parece a lo que el cálculo supone.
-        const velo = Math.min(100, Math.max(0, Math.round(b.velo ?? 0)));
-        const capaVelo = velo > 0 ? `linear-gradient(${rgba(bg, velo / 100)},${rgba(bg, velo / 100)}),` : "";
-        // `background-color` de respaldo: si la imagen no carga —Outlook con las
-        // imágenes bloqueadas, un 404— el texto queda sobre el color y no sobre
-        // el blanco de la tarjeta, que es donde hoy se volvía invisible.
-        return `<!--[if mso]>
-<v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:${pal.ancho}px;height:${alto}px">
-<v:fill type="frame" src="${esc(b.fondoImagen)}" color="${colorCss(bg, pal.tarjeta)}"${velo > 0 ? ` opacity="${(1 - velo / 100).toFixed(2)}"` : ""} />
-<v:textbox inset="0,0,0,0">
-<div style="${estiloCaja}">
-${interior}
-</div>
-</v:textbox>
-</v:rect>
-<![endif]-->
-<!--[if !mso]><!-->
-<div style="background-color:${colorCss(bg, pal.tarjeta)};background-image:${capaVelo}url(${esc(b.fondoImagen)});background-size:cover;background-position:center;min-height:${px(alto)};${estiloCaja}">
-${interior}
-</div>
-<!--<![endif]-->`;
+        return bandaConFoto({
+          foto: b.fondoImagen,
+          alto: b.alto ?? 280,
+          velo: b.velo,
+          bg,
+          pal,
+          estiloCaja: `${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}`,
+          interior,
+        });
       }
 
       const img = b.imagen ? `<img src="${esc(b.imagen)}" alt="" style="width:100%;display:block;margin:0${extra(t0, ["radio", "align", "color", "tamano"])}" />` : "";
@@ -549,7 +641,13 @@ ${interior}
       const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h2${clase(...clasesTitulo(x))} style="margin:0 0 8px;font-size:${px(x.tamano ?? 22)};line-height:${x.interlinea ?? 1.3};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.titulo)}</h2>`; })() : "";
       const tx = b.texto ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 16px;font-size:${px(x.tamano ?? 16)};line-height:${x.interlinea ?? 1.6};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${nl(b.texto)}</p>`; })() : "";
       const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
-      return `<div style="background:${colorCss(bg, pal.tarjeta)};${padCss(c.padY ?? 32, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}">${t}${tx}${btn}</div>`;
+      const estiloCaja = `${padCss(c.padY ?? 32, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}`;
+      // La misma banda del `hero`, en el medio del mail. Con la foto, el color
+      // pasa a ser el respaldo y el velo; sin ella, es la sección de siempre.
+      if (b.fondoImagen) {
+        return bandaConFoto({ foto: b.fondoImagen, alto: b.alto ?? 220, velo: b.velo, bg, pal, estiloCaja, interior: `${t}${tx}${btn}` });
+      }
+      return `<div style="background:${colorCss(bg, pal.tarjeta)};${estiloCaja}">${t}${tx}${btn}</div>`;
     }
     case "cupon": {
       const c = caja();
@@ -608,6 +706,20 @@ export interface RenderOpts {
    * el nombre en texto es lo que hacía este bloque desde siempre y no falla.
    */
   assetsBase?: string;
+  /**
+   * Las redes de la marca (`Cuenta.config.redes`), para el bloque `redes` que no
+   * trae links propios.
+   *
+   * 🔑 Es lo que permite que una **plantilla** cierre con redes. Un preset no
+   * puede guardar el Instagram de nadie adentro del Json —sería la regla 1 de
+   * `PLANTILLAS.md` al revés, la bienvenida de Zattia linkeando al Instagram de
+   * BDI—, así que el bloque nace con la lista vacía y la marca la completa al
+   * renderizar. Mismo mecanismo que el logo y el nombre.
+   *
+   * Ausente = el bloque no se dibuja, que es lo que ya pasaba con los links
+   * vacíos. Nunca un `href=""`.
+   */
+  redesMarca?: { red: string; url: string }[];
   /** Tema por defecto de la marca (`Cuenta.config.tema`). Lo pisa el de la campaña. */
   temaMarca?: Tema | null;
   /**
@@ -649,6 +761,7 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
     urlCuenta: opts.urlCuenta?.trim() ?? "",
     permiteHtmlCrudo: !!opts.permiteHtmlCrudo,
     assetsBase: opts.assetsBase?.trim().replace(/\/+$/, "") ?? "",
+    redesMarca: (opts.redesMarca ?? []).filter((r) => r?.url),
   };
   // El encabezado se saca de la lista y se dibuja arriba de la tarjeta, que es
   // donde estuvo siempre. `leerContenido` ya garantiza que hay uno solo y que
@@ -738,15 +851,21 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       return lineas.join("\n");
     }
     case "columnas": {
-      // Sirve tanto para la variante de fotos (solo el link) como para la de
-      // texto (título + texto + link) — cada lado aporta lo que tenga.
+      // Sirve tanto para la variante de fotos (etiqueta + link) como para la de
+      // texto (título + texto + link) — cada celda aporta lo que tenga.
       const lado = (c: Columna) => [c.titulo, c.texto, c.url].filter(Boolean).join(" — ");
-      return [lado(b.izq), lado(b.der)].filter(Boolean).join("\n") || null;
+      return (b.celdas ?? []).map(lado).filter(Boolean).join("\n") || null;
     }
     case "video":
       return b.url ? `Ver el video: ${b.url}` : null;
-    case "redes":
-      return (b.links ?? []).filter((l) => l.url).map((l) => link(l.red, l.url)).join("\n") || null;
+    case "redes": {
+      // La misma caída a las redes de la marca que en el HTML. Si el texto plano
+      // mirara solo el bloque, una plantilla que en el mail cierra con cuatro
+      // iconos saldría sin una sola red en la versión de texto.
+      const propias = (b.links ?? []).filter((l) => l.url);
+      const lista = propias.length ? propias : (opts.redesMarca ?? []).filter((l) => l?.url);
+      return lista.map((l) => link(l.red, l.url)).join("\n") || null;
+    }
     case "menu":
       return (b.links ?? []).filter((l) => l.url && l.texto).map((l) => link(l.texto, l.url)).join(" · ") || null;
     case "divisor":

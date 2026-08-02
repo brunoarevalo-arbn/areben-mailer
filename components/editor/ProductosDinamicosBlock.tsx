@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ETIQUETA_FUENTE, type FuenteProductos, type PorFilaMovil } from "@/lib/email/bloques";
+import { ETIQUETA_FUENTE, type FuenteProductos, type PorFila, type PorFilaMovil } from "@/lib/email/bloques";
 import { Select } from "@/components/ui/Select";
 import { Rango } from "@/components/editor/Rango";
-import { PorFilaMovilControl } from "@/components/editor/PorFilaMovilControl";
+import { GrillaControl } from "@/components/editor/GrillaControl";
 
 /**
  * Los controles del bloque de productos automáticos.
@@ -28,13 +28,15 @@ export function ProductosDinamicosBlock({
   categoriaId,
   n,
   movil,
+  porFila,
   onChange,
 }: {
   fuente: FuenteProductos;
   categoriaId?: string;
   n?: number;
   movil?: PorFilaMovil;
-  onChange: (cambio: { fuente?: FuenteProductos; categoriaId?: string; n?: number; movil?: PorFilaMovil }) => void;
+  porFila?: PorFila;
+  onChange: (cambio: { fuente?: FuenteProductos; categoriaId?: string; n?: number; movil?: PorFilaMovil; porFila?: PorFila }) => void;
 }) {
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [error, setError] = useState("");
@@ -107,7 +109,7 @@ export function ProductosDinamicosBlock({
         sufijo=""
       />
 
-      <PorFilaMovilControl movil={movil} onChange={(m) => onChange({ movil: m })} />
+      <GrillaControl movil={movil} porFila={porFila} onChange={onChange} />
 
       <p className="text-sm leading-relaxed text-muted">
         Los productos se buscan en tu tienda <strong>cada vez que el mail sale</strong>, no

@@ -1,6 +1,6 @@
 "use client";
 
-import type { Bloque } from "@/lib/email/render";
+import type { Bloque, Columna } from "@/lib/email/render";
 import { ProductosBlock } from "@/components/ProductosBlock";
 import { ProductosDinamicosBlock } from "@/components/editor/ProductosDinamicosBlock";
 import { ImagenDrop } from "@/components/editor/ImagenDrop";
@@ -208,16 +208,45 @@ export function FormBloque({
       );
     }
 
-    case "seccion":
+    case "seccion": {
+      const conFoto = !!b.fondoImagen;
       return (
         <div className="space-y-3">
           <Input label="Título de la sección" fullWidth value={b.titulo} onChange={(e) => set({ titulo: e.target.value })} />
           <Textarea label="Texto" fullWidth rows={4} value={b.texto} onChange={(e) => set({ texto: e.target.value })} />
           <Input label="Texto del botón" fullWidth value={b.botonTexto} placeholder="Opcional" onChange={(e) => set({ botonTexto: e.target.value })} />
           <Input label="Link del botón" fullWidth value={b.botonUrl} placeholder="https://…" onChange={(e) => set({ botonUrl: e.target.value })} />
-          <ColorFijo label="Fondo de la sección" value={b.bg} onChange={(bg) => set({ bg })} />
+          <Select
+            label="Fondo"
+            fullWidth
+            value={conFoto ? "foto" : "color"}
+            onChange={(e) => {
+              // El velo arranca en 55 acá y no en el documento, igual que en la
+              // portada: la opinión vive en el momento en que alguien ELIGE la
+              // foto; en el Json, ausente = como estaba.
+              if (e.target.value === "foto") set({ fondoImagen: b.fondoImagen || "", velo: b.velo ?? 55 });
+              else set({ fondoImagen: undefined });
+            }}
+          >
+            <option value="color">Un color</option>
+            <option value="foto">Una foto, con el texto encima</option>
+          </Select>
+          {conFoto && (
+            <>
+              <ImagenDrop value={b.fondoImagen ?? ""} onChange={(fondoImagen) => set({ fondoImagen })} placeholder="URL de la imagen de fondo" />
+              <Rango label="Alto aproximado" value={b.alto ?? 220} onChange={(alto) => set({ alto })} min={120} max={500} step={10} />
+              <Rango label="Cuánto se tapa la foto" value={b.velo ?? 0} onChange={(velo) => set({ velo })} min={0} max={90} step={5} />
+              <p className="text-xs text-subtle">
+                Pinta encima el color de abajo, para que el texto se lea: con un color oscuro la{" "}
+                <b>oscurece</b>, con uno claro la <b>aclara</b>. En 0 el texto va directo sobre la
+                foto. Si la foto no carga —Outlook las bloquea— queda el color solo.
+              </p>
+            </>
+          )}
+          <ColorFijo label={conFoto ? "Color de respaldo y del velo" : "Fondo de la sección"} value={b.bg} onChange={(bg) => set({ bg })} />
         </div>
       );
+    }
 
     case "cupon":
       return (
@@ -240,6 +269,16 @@ export function FormBloque({
             onChange={(e) => set({ alt: e.target.value })}
             hint="Lo que se lee cuando el cliente de mail bloquea las imágenes — que es el caso por defecto en Outlook."
           />
+          <Check
+            label="De borde a borde"
+            checked={b.sangre === true}
+            onChange={(sangre) => set({ sangre: sangre || undefined })}
+          />
+          <p className="text-xs leading-relaxed text-muted">
+            Sin margen a los costados ni esquinas redondeadas. Es la portada fotográfica que usan
+            casi todas las tiendas: la foto pegada a los bordes es lo que hace que el mail no se
+            vea como un documento.
+          </p>
         </div>
       );
 
@@ -248,8 +287,9 @@ export function FormBloque({
         <ProductosBlock
           items={b.items}
           movil={b.movil}
+          porFila={b.porFila}
           onChange={(items) => set({ items })}
-          onMovil={(movil) => set({ movil })}
+          onGrilla={(cambio) => set(cambio)}
         />
       );
 
@@ -260,6 +300,7 @@ export function FormBloque({
           categoriaId={b.categoriaId}
           n={b.n}
           movil={b.movil}
+          porFila={b.porFila}
           // `items` no se toca nunca desde acá: el bloque guarda la consulta y
           // los productos los pone quien envía. Si el editor los escribiera, una
           // plantilla compartida saldría con los productos de otra tienda.
@@ -284,13 +325,20 @@ export function FormBloque({
 
     case "columnas": {
       const variante = b.variante ?? "imagenes";
-      // Qué campo se edita en cada lado, según la variante elegida.
-      const campo = (lado: "izq" | "der"): "imagen" | "texto" => {
-        if (variante === "imagenes") return "imagen";
-        if (variante === "textos") return "texto";
-        if (variante === "imagen-texto") return lado === "izq" ? "imagen" : "texto";
-        return lado === "izq" ? "texto" : "imagen"; // texto-imagen
-      };
+      const celdas = b.celdas ?? [];
+      // Misma regla que el renderer: con dos celdas, "imagen-texto" es
+      // izquierda-derecha; con más, es la primera y la última.
+      const esImagen = (i: number) =>
+        variante === "imagenes" ||
+        (variante === "imagen-texto" && i === 0) ||
+        (variante === "texto-imagen" && i === celdas.length - 1);
+      // Se reescribe la lista entera y no la celda suelta: `set` hace un merge
+      // superficial, así que mutar `celdas[i]` sin devolver el array nuevo le
+      // dejaría a React la misma referencia y el panel no se redibujaría.
+      const setCelda = (i: number, campos: Partial<Columna>) =>
+        set({ celdas: celdas.map((c, j) => (j === i ? { ...c, ...campos } : c)) } as Partial<Bloque>);
+      const nombreCelda = (i: number) =>
+        celdas.length === 2 ? (i === 0 ? "Izquierda" : "Derecha") : `Celda ${i + 1}`;
       return (
         <div className="space-y-4">
           <Select
@@ -302,61 +350,87 @@ export function FormBloque({
               set({ variante: v === "imagenes" ? undefined : (v as "textos" | "imagen-texto" | "texto-imagen") });
             }}
           >
-            <option value="imagenes">Dos imágenes</option>
-            <option value="textos">Dos textos</option>
+            <option value="imagenes">Solo imágenes</option>
+            <option value="textos">Solo textos</option>
             <option value="imagen-texto">Imagen + texto</option>
             <option value="texto-imagen">Texto + imagen</option>
           </Select>
           <Select
-            label="Proporción"
+            label="Cuántas"
             fullWidth
-            value={String(b.proporcion ?? 50)}
+            value={String(celdas.length)}
             onChange={(e) => {
-              const v = e.target.value;
-              set({ proporcion: v === "50" ? undefined : (Number(v) as 40 | 60) });
+              const n = Number(e.target.value);
+              // Agrandar agrega celdas vacías; achicar recorta del final y **no
+              // borra lo que había en las que quedan**. Volver a 3 después de
+              // bajar a 2 sí pierde la tercera: guardarla escondida sería un
+              // dato invisible que igual viaja en cada guardado.
+              const nuevas = Array.from({ length: n }, (_, i) => celdas[i] ?? { imagen: "", url: "" });
+              set({ celdas: nuevas } as Partial<Bloque>);
             }}
           >
-            <option value="50">Pareja (50 / 50)</option>
-            <option value="40">Angosta a la izquierda (40 / 60)</option>
-            <option value="60">Angosta a la derecha (60 / 40)</option>
+            <option value="2">2 celdas</option>
+            <option value="3">3 celdas</option>
+            <option value="4">4 celdas</option>
           </Select>
-          {(["izq", "der"] as const).map((lado) => (
-            <div key={lado} className="space-y-2">
-              <div className="text-xs font-semibold text-muted">{lado === "izq" ? "Izquierda" : "Derecha"}</div>
-              {campo(lado) === "imagen" ? (
+          {celdas.length === 2 && (
+            <Select
+              label="Proporción"
+              fullWidth
+              value={String(b.proporcion ?? 50)}
+              onChange={(e) => {
+                const v = e.target.value;
+                set({ proporcion: v === "50" ? undefined : (Number(v) as 40 | 60) });
+              }}
+            >
+              <option value="50">Pareja (50 / 50)</option>
+              <option value="40">Angosta a la izquierda (40 / 60)</option>
+              <option value="60">Angosta a la derecha (60 / 40)</option>
+            </Select>
+          )}
+          {celdas.map((c, i) => (
+            <div key={i} className="space-y-2">
+              <div className="text-xs font-semibold text-muted">{nombreCelda(i)}</div>
+              {esImagen(i) ? (
                 <>
                   <ImagenDrop
-                    value={b[lado].imagen}
-                    onChange={(imagen) => set({ [lado]: { ...b[lado], imagen } } as Partial<Bloque>)}
+                    value={c.imagen}
+                    onChange={(imagen) => setCelda(i, { imagen })}
                     placeholder="URL de la imagen"
                   />
                   <Input
                     fullWidth
-                    value={b[lado].url}
+                    value={c.titulo ?? ""}
+                    placeholder="Texto debajo (opcional)"
+                    onChange={(e) => setCelda(i, { titulo: e.target.value })}
+                  />
+                  <Input
+                    fullWidth
+                    value={c.url}
                     placeholder="Link"
-                    onChange={(e) => set({ [lado]: { ...b[lado], url: e.target.value } } as Partial<Bloque>)}
+                    onChange={(e) => setCelda(i, { url: e.target.value })}
                   />
                 </>
               ) : (
                 <>
                   <Input
                     fullWidth
-                    value={b[lado].titulo ?? ""}
+                    value={c.titulo ?? ""}
                     placeholder="Título"
-                    onChange={(e) => set({ [lado]: { ...b[lado], titulo: e.target.value } } as Partial<Bloque>)}
+                    onChange={(e) => setCelda(i, { titulo: e.target.value })}
                   />
                   <Textarea
                     fullWidth
                     rows={3}
-                    value={b[lado].texto ?? ""}
+                    value={c.texto ?? ""}
                     placeholder="Texto"
-                    onChange={(e) => set({ [lado]: { ...b[lado], texto: e.target.value } } as Partial<Bloque>)}
+                    onChange={(e) => setCelda(i, { texto: e.target.value })}
                   />
                   <Input
                     fullWidth
-                    value={b[lado].url}
+                    value={c.url}
                     placeholder="Link (opcional)"
-                    onChange={(e) => set({ [lado]: { ...b[lado], url: e.target.value } } as Partial<Bloque>)}
+                    onChange={(e) => setCelda(i, { url: e.target.value })}
                   />
                 </>
               )}

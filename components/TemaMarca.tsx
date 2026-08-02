@@ -11,10 +11,14 @@ import {
   guardarDireccionPropia,
   guardarDominioEnvio,
   guardarHtmlCrudoHabilitado,
+  guardarRedes,
   guardarTemaMarca,
   traerMarcaDeTienda,
 } from "@/app/(app)/remitentes/actions";
 import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { REDES } from "@/lib/email/redes";
+import { X } from "lucide-react";
 
 // Aspecto por defecto de los mails de la marca.
 //
@@ -81,6 +85,9 @@ export function TemaMarca({
   const [msgDir, setMsgDir] = useState<string | null>(null);
   // Se muestra sin el `https://` porque es lo que la persona escribe y lo que
   // ve en Cloudflare; la acción lo normaliza igual.
+  const [redes, setRedes] = useState<{ red: string; url: string }[]>(marcaInicial.redesMarca ?? []);
+  const [guardandoRedes, setGuardandoRedes] = useState(false);
+  const [msgRedes, setMsgRedes] = useState<string | null>(null);
   const [dom, setDom] = useState<string>((dominioEnvio ?? "").replace(/^https:\/\//, ""));
   const [domGuardado, setDomGuardado] = useState<string | undefined>(dominioEnvio);
   const [verificando, startDom] = useTransition();
@@ -144,6 +151,19 @@ export function TemaMarca({
         setMsgDir(r.error ?? "No se pudo guardar.");
       }
     });
+  };
+
+  const grabarRedes = async (lista: { red: string; url: string }[]) => {
+    setRedes(lista);
+    setMsgRedes(null);
+    setGuardandoRedes(true);
+    const r = await guardarRedes(lista);
+    setGuardandoRedes(false);
+    if (!r.ok) return setMsgRedes(r.error ?? "No se pudo guardar.");
+    // Se responde con lo que quedó guardado, no con lo que se mandó: una fila a
+    // medio escribir (sin URL) no se guarda, y el panel tiene que mostrar lo que
+    // el mail va a dibujar.
+    setMsgRedes(r.redes.length ? "Guardado." : "Listo: el bloque de redes no se va a dibujar.");
   };
 
   const guardarDominio = () =>
@@ -252,6 +272,64 @@ export function TemaMarca({
               </span>
             </label>
             {msgDir && <p className="mt-1 text-xs text-muted">{msgDir}</p>}
+          </div>
+
+          {/* Las redes de la marca. Se cargan una vez acá y las usa el bloque
+              `redes` de CUALQUIER mail que no traiga links propios — que es lo
+              que permite que una plantilla prearmada cierre con redes sin llevar
+              la cuenta de nadie adentro del Json. */}
+          <div className="mt-3 border-t border-border pt-3">
+            <div className="text-xs font-medium text-foreground">Tus redes</div>
+            <p className="mt-1 text-xs text-muted">
+              Las dibuja el bloque de redes de todos tus mails. Tiendanube no las manda, así que se
+              cargan una vez acá. Instagram, TikTok, WhatsApp, Facebook, YouTube, X y Pinterest van
+              con su ícono; cualquier otra sale con el nombre en texto.
+            </p>
+            <div className="mt-2 space-y-2">
+              {redes.map((r, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Select
+                    value={r.red}
+                    onChange={(e) => setRedes(redes.map((x, j) => (j === i ? { ...x, red: e.target.value } : x)))}
+                    className="w-40 shrink-0"
+                  >
+                    {REDES.map((x) => (
+                      <option key={x.slug} value={x.slug}>
+                        {x.nombre}
+                      </option>
+                    ))}
+                  </Select>
+                  <Input
+                    value={r.url}
+                    onChange={(e) => setRedes(redes.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))}
+                    placeholder="https://instagram.com/tumarca"
+                    fullWidth
+                    className="min-w-0 flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => grabarRedes(redes.filter((_, j) => j !== i))}
+                    className="shrink-0 rounded-lg p-2 text-subtle hover:text-foreground"
+                    aria-label="Sacar esta red"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => setRedes([...redes, { red: REDES[0].slug, url: "" }])}
+                disabled={redes.length >= 8}
+              >
+                Agregar una red
+              </Button>
+              <Button onClick={() => grabarRedes(redes)} disabled={guardandoRedes}>
+                {guardandoRedes ? "Guardando…" : "Guardar redes"}
+              </Button>
+            </div>
+            {msgRedes && <p className="mt-1 text-xs text-muted">{msgRedes}</p>}
           </div>
 
           {/* De dónde cuelgan los links del mail. No es marca (no se dibuja),

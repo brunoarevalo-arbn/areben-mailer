@@ -185,6 +185,44 @@ titulo("El domicilio de la tienda va al pie");
   ok(html.includes(BAJA), "y el link de baja sigue estando");
 }
 
+// ─── Las redes viven en la cuenta, no en el mail ─────────────────────────────
+//
+// Es lo que permite que una PLANTILLA cierre con redes: si el preset guardara
+// los links adentro del Json, la bienvenida de Zattia linkearía al Instagram de
+// BDI — la misma falla que ya tuvo el logo.
+titulo("Las redes las pone la marca, no el documento");
+{
+  const REDES = [
+    { red: "instagram", url: "https://instagram.com/zattia_co" },
+    { red: "tiktok", url: "https://tiktok.com/@zattia" },
+  ];
+  const m = marcaDe({ nombre: "Marca Uno", config: { redes: REDES } });
+  ok(m.redesMarca?.length === 2, "`marcaDe` las devuelve como parte de RenderOpts");
+
+  // El bloque nace con la lista vacía —así lo puede traer un preset— y el mail
+  // igual sale con las dos.
+  const bloque = { tipo: "redes", links: [] };
+  const html = render({ v: V_ACTUAL, bloques: [bloque] }, { ...m, assetsBase: "https://links.zattia.com.ar" });
+  ok(html.includes("instagram.com/zattia_co"), "un bloque sin links dibuja las de la marca");
+  ok(html.includes("/redes/tiktok.png"), "…con su icono");
+
+  // Y sin redes cargadas el bloque no se dibuja: nunca un `href=""`.
+  const vacio = render({ v: V_ACTUAL, bloques: [bloque] }, { nombreCuenta: "Marca Uno" });
+  ok(!vacio.includes('href=""'), "una marca sin redes no emite un link vacío");
+
+  // Lo que el mail escribió gana: quien puso un link en ESTE mail quiso ese.
+  const propio = render(
+    { v: V_ACTUAL, bloques: [{ tipo: "redes", links: [{ red: "instagram", url: "https://instagram.com/otra" }] }] },
+    { ...m, assetsBase: "https://links.zattia.com.ar" },
+  );
+  ok(propio.includes("instagram.com/otra") && !propio.includes("zattia_co"), "el link del bloque le gana al de la marca");
+
+  // Basura adentro del config: una entrada sin URL usable no puede llegar al
+  // `href` de un mail que ya está en la casilla de otra persona.
+  const sucia = leerConfigCuenta({ redes: [{ red: "instagram" }, { red: "x", url: "javascript:alert(1)" }, { red: "", url: "https://a.com" }] });
+  ok(sucia.redes === undefined, "una lista sin ninguna entrada usable queda en `undefined`");
+}
+
 // ─── El domicilio se puede apagar, el link de baja no ───────────────────────
 titulo("Mostrar el domicilio es una decisión de la marca");
 {

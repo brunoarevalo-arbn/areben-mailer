@@ -82,10 +82,15 @@ HTML cambió **a propósito**, se bendice con `--capturar` y el golden se commit
 **junto** con el cambio, así el diff del commit muestra qué se movió en el mail.
 Nunca "para que pase".
 
-⚠️ **`next build` typechequea lo que la app importa, no `scripts/`.** El 30-jul-2026
-tres scripts (`ensayo-motor`, `ensayo-campania`, `ses-e2e-supresion`) llamaban a
-`crearEnvios` con la firma vieja —sin el `cuentaId` que ganó adelante— y reventaban
-recién al correrlos. `npx tsc --noEmit` los agarra a todos; corrélo antes de pushear.
+🔴 **NADA typechequea `scripts/`, ni siquiera `npx tsc --noEmit`.** `tsconfig.json`
+los tiene en `exclude`, así que la línea de arriba —que decía que los agarra a
+todos— era falsa; se verificó el 1-ago-2026 cambiando la forma de un bloque y
+viendo que los dos scripts que la usaban con la forma vieja pasaban en verde.
+Es el mismo agujero del 30-jul (`ensayo-motor`, `ensayo-campania` y
+`ses-e2e-supresion` llamaban a `crearEnvios` con la firma vieja y reventaban
+recién al correrlos). **La única red que hay es correrlos**: si tocaste un tipo
+de `lib/email/` o de `lib/plantillas/`, corré las auditorías de la lista de
+arriba antes de pushear — un `tsx` stripea los tipos y no se queja de nada.
 
 ⚠️ **`.github/workflows/permisos.yml` está en `.git/info/exclude` y nunca corrió
 en CI** (falta el scope `workflow` en el token). Correr esos cinco scripts a mano
@@ -104,6 +109,7 @@ lib/email/…       motor: proveedor.ts (gate+contrato), cola.ts, procesar.ts,
                   enviar.ts, render.ts, tema.ts, tracking.ts, supresion.ts
                   bloques.ts  ← QUÉ es un mail (tipos + nuevoBloque). Sin HTML.
                   esquema.ts  ← leerContenido(): ÚNICA puerta al Json de la base
+                                (v4 desde el 1-ago-2026: `columnas` es `celdas[]`)
                   estilos.ts  ← cascada de estilo por bloque (tokens + lista blanca)
 lib/auth.ts       autorizar/chequear/autorizarApi ← ÚNICO camino de autorización
 lib/permisos.ts   matriz de roles (puro: lo importa server Y cliente)
@@ -335,6 +341,14 @@ en **`Cuenta.config`** (Json libre — sin columna nueva: la base es compartida)
   `https:`. Lo normaliza `normalizarStore()`.
 - El sitio sale de `url_with_protocol` (el dominio propio), no de
   `original_domain`. Sin barra final: los links se arman concatenando.
+- 🔑 **Las redes son parte de la marca, no del mail** (`config.redes`, se cargan a
+  mano en `/remitentes`: TN **no** las devuelve en `/store`). Un bloque `redes`
+  sin links propios dibuja las de la cuenta, igual que el `encabezado` resuelve
+  el logo. Es lo que permite que una **plantilla** cierre con redes sin guardar
+  la cuenta de nadie adentro del Json. ⚠️ Hasta el 1-ago-2026 el helper `redes`
+  de los presets traía tres links VACÍOS: estaba en 12 plantillas y **no dibujó
+  nunca nada**. Sin redes cargadas el bloque sigue sin dibujarse — nunca un
+  `href=""`.
 - **Cómo entra**: sola en el callback del OAuth (una única llamada a `/store`
   para nombre, mail y marca) · el botón **"Traer de mi tienda"** de
   `/remitentes` para las cuentas ya conectadas · `scripts/traer-marcas.ts`

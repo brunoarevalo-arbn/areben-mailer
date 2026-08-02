@@ -75,8 +75,10 @@ function muestra(tipo: TipoBloque): Bloque {
     // `cuerpo`). Con la variante por defecto ("imagenes") los roles de texto
     // nunca tendrían nada que mostrar, sea cual sea el estilo.
     b.variante = "imagen-texto";
-    b.izq = { imagen: "https://ejemplo.com/a.jpg", url: "https://ejemplo.com" };
-    b.der = { titulo: "Título", texto: "Texto", url: "https://ejemplo.com" };
+    b.celdas = [
+      { imagen: "https://ejemplo.com/a.jpg", url: "https://ejemplo.com" },
+      { titulo: "Título", texto: "Texto", url: "https://ejemplo.com" },
+    ];
   }
   if (tipo === "productos" || tipo === "carrito") b.items = PRODUCTO;
   if (tipo === "redes") b.links = [{ red: "Instagram", url: "https://instagram.com/x" }];

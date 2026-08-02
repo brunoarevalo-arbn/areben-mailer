@@ -57,9 +57,12 @@ for (const v of ["instagram", "INSTAGRAM", " Instagram ", "TikTok", "tiktok", "W
 }
 
 console.log("\n4) 🔴 Lo que no tiene icono NO emite una imagen");
-const h2 = html([{ red: "Facebook", url: "https://facebook.com/x" }], HOST);
+// Threads y no Facebook: Facebook tiene icono desde el 1-ago-2026. El fixture
+// tiene que ser una red que de verdad no está en la lista, o esto pasa a probar
+// nada — que es peor que no probarlo.
+const h2 = html([{ red: "Threads", url: "https://threads.net/@x" }], HOST);
 ok(!h2.includes("<img"), "una red sin archivo no emite <img>");
-ok(h2.includes("Facebook"), "…sale el nombre en texto, que es lo que hacía antes");
+ok(h2.includes("Threads"), "…sale el nombre en texto, que es lo que hacía antes");
 
 const h3 = html([{ red: "Instagram", url: "https://instagram.com/x" }]);
 ok(!h3.includes("<img"), "sin assetsBase tampoco emite <img>");

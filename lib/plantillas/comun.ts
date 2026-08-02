@@ -98,25 +98,68 @@ export const botonSi = (texto: string, url: string, align: "left" | "center" = "
   url ? [{ tipo: "boton", texto, url, align, full: false }] : [];
 
 /**
- * Las redes nacen vacías a propósito: Tiendanube no nos las devuelve y no hay de
- * dónde sacarlas. El renderer filtra los links sin URL, así que el bloque no
- * dibuja nada hasta que el comerciante las cargue — no es un link roto, es un
- * lugar reservado en el diseño.
+ * Las redes de la marca.
+ *
+ * 🔑 **La lista va vacía y eso ES el mecanismo**, no una carencia: un bloque
+ * `redes` sin links propios dibuja las de la CUENTA (`Cuenta.config.redes`, que
+ * se cargan en `/remitentes`), resueltas al renderizar igual que el logo. Así la
+ * misma plantilla cierra con las redes de cada marca sin guardar la cuenta de
+ * nadie adentro del Json — que es la regla 1 de `PLANTILLAS.md`.
+ *
+ * ⚠️ Hasta el 1-ago-2026 el bloque venía con tres links VACÍOS y el renderer,
+ * con razón, no dibuja un link vacío: estaba en 12 presets y **no dibujó nunca
+ * nada**. La galería entera terminaba en un bloque invisible mientras 20 de las
+ * 21 referencias de la primera tanda cierran con una fila de iconos.
+ *
+ * Una marca sin redes cargadas sigue sin dibujar el bloque, que es lo correcto:
+ * un `href=""` en un mail ya enviado no se arregla.
  */
-export const redes: Bloque = {
-  tipo: "redes",
-  // Las tres que tienen icono (ver `lib/email/redes.ts`). Antes estaba Facebook,
-  // que no lo tiene: cargarle la URL habría dejado el nombre en texto al lado de
-  // dos iconos. Una red sin archivo se puede seguir escribiendo a mano —sale en
-  // texto, que es el fallback— pero no la ofrecemos de fábrica.
-  links: [
-    { red: "Instagram", url: "" },
-    { red: "TikTok", url: "" },
-    { red: "WhatsApp", url: "" },
-  ],
-};
+export const redes: Bloque = { tipo: "redes", links: [] };
 
 export const aire = (alto: number): Bloque => ({ tipo: "espaciador", alto });
+
+/**
+ * La barra de navegación de arriba: 15 de las 21 referencias de la primera
+ * tanda la tienen, y no la usaba ningún preset.
+ *
+ * ⚠️ Los tres links van a la **home** de la tienda, no a rutas inventadas. No es
+ * pereza: las categorías de Tiendanube son de cada tienda y no hay path
+ * garantizado — un `/ofertas` adivinado es un 404 en un mail ya enviado, que es
+ * exactamente lo que `cta()` existe para evitar. Quien arma el mail cambia el
+ * destino de cada uno en el editor; hasta entonces, los tres llevan a un lugar
+ * que existe.
+ *
+ * Sin tienda cargada no hay bloque: el renderer filtra los links sin URL, así
+ * que un menú entero sin links sería un bloque invisible.
+ */
+export const menuTienda = (tienda: string): Bloque[] =>
+  tienda
+    ? [
+        {
+          tipo: "menu",
+          links: [
+            { texto: "Novedades", url: tienda },
+            { texto: "Más vendidos", url: tienda },
+            { texto: "Ofertas", url: tienda },
+          ],
+        },
+      ]
+    : [];
+
+/**
+ * Una fila de 2 a 4 celdas de texto: título corto arriba, una línea abajo.
+ *
+ * Es la banda de beneficios ("Envíos a todo el país" · "12 cuotas" · "Cambios
+ * sin cargo") que aparece en 15 de las 21 referencias. Va con `textos` y no con
+ * imágenes a propósito: **una plantilla se tiene que ver llena sin que nadie
+ * suba una foto** (regla 3), y los íconos de esas bandas son imágenes que el
+ * comerciante no tiene.
+ */
+export const fila = (celdas: { titulo: string; texto: string }[]): Bloque => ({
+  tipo: "columnas",
+  variante: "textos",
+  celdas: celdas.map((c) => ({ imagen: "", url: "", titulo: c.titulo, texto: c.texto })),
+});
 
 /**
  * La banda de color que se tiñe sola con el tema de la marca.

@@ -5,7 +5,7 @@
 // que es exactamente para lo que existe: un mail se ve distinto sin repetir
 // quince overrides bloque por bloque.
 
-import { type DefPreset, aire, banda, botonSi, redes, sinBoton } from "../comun";
+import { type DefPreset, aire, banda, botonSi, menuTienda, redes, sinBoton } from "../comun";
 
 export const EDITORIAL: readonly DefPreset[] = [
   {
@@ -70,6 +70,49 @@ export const EDITORIAL: readonly DefPreset[] = [
         { tipo: "divisor" },
         ...botonSi("Seguir leyendo en la tienda", tienda),
         aire(8),
+        redes,
+      ],
+    }),
+  },
+  {
+    id: "lookbook",
+    nombre: "Lookbook",
+    descripcion: "Foto grande de borde a borde, un par de fotos al lado y el video. Para mostrar una colección.",
+    familia: "editorial",
+    // R-003, R-005, R-011 y R-020: la portada fotográfica pegada a los bordes.
+    // Es la única plantilla de la galería que PIDE fotos, y va acá a propósito:
+    // el resto se tiene que ver llena sin que nadie suba una (regla 3), pero un
+    // lookbook sin fotos no es un lookbook — el copy lo dice desde el editor.
+    arma: ({ marca, tienda }) => ({
+      tema: { ancho: 600 },
+      estilos: { titulo: { fuente: "georgia", tamano: 32 }, cuerpo: { fuente: "georgia", tamano: 16 } },
+      bloques: [
+        ...menuTienda(tienda),
+        // A sangre: la foto ocupa la tarjeta de lado a lado. Nace vacía y el
+        // renderer no dibuja una `imagen` sin URL, así que la galería no muestra
+        // un ícono roto — pero el bloque queda puesto, que es el punto de una
+        // plantilla prearmada.
+        { tipo: "imagen", url: "", alt: "La foto de portada de la colección", sangre: true },
+        aire(16),
+        { tipo: "titulo", texto: "El nombre de la colección", align: "center" },
+        { tipo: "texto", texto: `Dos renglones sobre de qué se trata: en qué se inspiró, para qué momento es. Después dejá que las fotos hablen.`, align: "center" },
+        ...botonSi("Ver la colección", tienda, "center"),
+        aire(12),
+        // Tres fotos al lado, con su nombre debajo: la fila de `columnas` que
+        // antes no se podía armar. Sin foto, la celda no se dibuja.
+        {
+          tipo: "columnas",
+          celdas: ["El look uno", "El look dos", "El look tres"].map((titulo) => ({ imagen: "", url: tienda, titulo })),
+        },
+        aire(12),
+        // El bloque `video` no lo usaba ningún preset y el motor lo tiene desde
+        // hace rato. Sin miniatura no se dibuja, igual que la imagen.
+        { tipo: "video", imagen: "", url: "" },
+        { tipo: "divisor" },
+        { tipo: "titulo", texto: "Lo último que entró", align: "left" },
+        { tipo: "productos-dinamicos", fuente: "recientes", n: 3, movil: 2, porFila: 3 },
+        aire(8),
+        banda(`Seguí a ${marca}`, "Las fotos nuevas salen primero en nuestras redes."),
         redes,
       ],
     }),

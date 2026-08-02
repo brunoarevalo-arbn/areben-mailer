@@ -21,6 +21,15 @@ export const REDES: Red[] = [
   { slug: "instagram", nombre: "Instagram" },
   { slug: "tiktok", nombre: "TikTok" },
   { slug: "whatsapp", nombre: "WhatsApp" },
+  // Las cuatro del 1-ago-2026. Salen de la primera tanda de referencias: 20 de
+  // los 21 mails cierran con una fila de iconos, y con solo tres archivos la
+  // mitad de esa fila salía en texto al lado de los que sí tenían icono — que
+  // se ve peor que el bloque entero en texto. Mismo formato que los tres
+  // primeros: pastilla de 96px con el color oficial y el glifo en blanco.
+  { slug: "facebook", nombre: "Facebook" },
+  { slug: "youtube", nombre: "YouTube" },
+  { slug: "x", nombre: "X" },
+  { slug: "pinterest", nombre: "Pinterest" },
 ];
 
 /**
