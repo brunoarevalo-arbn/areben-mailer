@@ -16,12 +16,19 @@ const PUBLIC_PREFIXES = [
   '/api/campanias/procesar-cola', // worker de la cola de envío (protegido por CRON_SECRET)
   '/baja', // desuscripción: la abren destinatarios sin login
   '/f/', // formularios de captura públicos (single opt-in)
-  // 🔴 Iconos de redes que van DENTRO del mail. El matcher de abajo solo excluye
-  // `_next/static`, así que lo que vive en `public/` pasa por acá igual y sin
-  // esta línea rebota al login con un 307: en un cliente de mail eso es una
-  // imagen rota para TODOS los destinatarios, y no se puede corregir después de
-  // enviado. Son PNG estáticos, no dicen nada de nadie.
+  // 🔴 **Todo directorio de `public/` que se sirva DENTRO de un mail va acá.**
+  // El matcher de abajo solo excluye `_next/static`, así que lo que vive en
+  // `public/` pasa por este chequeo igual, y sin su línea rebota al login con un
+  // 307: en un cliente de mail eso es una imagen rota para TODOS los
+  // destinatarios, y no se puede corregir después de enviado. Son PNG
+  // estáticos, no dicen nada de nadie.
+  //
+  // ⚠️ Ya pasó: el 2-ago-2026 el pack de `/iconos/` se agregó, se deployó y
+  // devolvía 307 a `/login` con este comentario ya escrito arriba. Por eso hoy
+  // lo fija `scripts/probar-redes.ts`, que compara esta lista contra los
+  // directorios que el renderer sabe pedir.
   '/redes/',
+  '/iconos/',
 ];
 
 export async function proxy(req: NextRequest) {

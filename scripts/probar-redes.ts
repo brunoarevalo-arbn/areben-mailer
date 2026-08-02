@@ -41,7 +41,15 @@ console.log("\n1-bis) 🔴 …y los sirve el servidor SIN sesión");
 // el 100% de los que reciben el mail, y ya no se puede corregir.
 const proxy = readFileSync("proxy.ts", "utf8");
 const prefijos = proxy.slice(proxy.indexOf("PUBLIC_PREFIXES"), proxy.indexOf("export async function proxy"));
-ok(/['"]\/redes\/['"]/.test(prefijos), "'/redes/' está en PUBLIC_PREFIXES del proxy");
+// 🔴 **Los DOS directorios**, y por eso el chequeo es un bucle y no una línea.
+// El 2-ago-2026 entró el pack de `/iconos/` (el ícono por celda de `columnas`),
+// se deployó, y devolvía 307 a `/login` — con este mismo comentario ya escrito
+// tres renglones más arriba y con el chequeo de `/redes/` en verde. Un
+// directorio nuevo de imágenes de mail se agrega en tres lugares: `public/`, el
+// helper que arma la URL, y acá.
+for (const dir of ["/redes/", "/iconos/"]) {
+  ok(new RegExp(`['"]\\${dir}['"]`.replace("\\/", "\\/")).test(prefijos), `'${dir}' está en PUBLIC_PREFIXES del proxy`);
+}
 
 console.log("\n2) Una red conocida sale como icono");
 const h1 = html([{ red: "Instagram", url: "https://instagram.com/zattia_co" }], HOST);
