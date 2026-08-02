@@ -43,6 +43,28 @@ export interface Columna {
    */
   titulo?: string;
   texto?: string;
+  /**
+   * Botón propio de la celda. **Vacío o ausente = no se dibuja**, igual que en
+   * `hero`, `seccion` y `cupon`: vaciar el texto es cómo se lo saca.
+   *
+   * Entró el 2-ago-2026 por la regla de 3: lo piden R-015, R-018 y R-021 de la
+   * tanda de referencias del 1-ago (el contador de `PLANTILLAS.md` decía 2 y
+   * estaba mal). Sin esto, una fila de tres tarjetas con su propio "Comprar"
+   * abajo no es expresable, y son de los patrones más comunes de la galería.
+   *
+   * 🔴 **Con botón, la celda deja de ser un ancla entera**: un `<a>` adentro de
+   * otro no está permitido en HTML y cada cliente lo repara distinto —Gmail
+   * cierra el primero, Outlook anida—, así que el click terminaba yendo a
+   * cualquier lado. El renderer envuelve la celda en el link **solo cuando no
+   * hay botón**; ver el comentario en `celdaImagen`.
+   *
+   * Sin bump de esquema: `V_ACTUAL` existe para cambios de **forma**
+   * (`izq`/`der` → `celdas`) y esto es aditivo. El saneador hace
+   * `{ imagen:"", url:"", ...c }`, así que las dos claves sobreviven el
+   * round-trip sin tocar `esquema.ts`.
+   */
+  botonTexto?: string;
+  botonUrl?: string;
 }
 
 /**

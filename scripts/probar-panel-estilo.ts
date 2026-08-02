@@ -75,8 +75,10 @@ function muestra(tipo: TipoBloque): Bloque {
     // `cuerpo`). Con la variante por defecto ("imagenes") los roles de texto
     // nunca tendrían nada que mostrar, sea cual sea el estilo.
     b.variante = "imagen-texto";
+    // El botón va en la celda de foto y no en las dos: así el fixture ejercita
+    // a la vez el rol `boton` y la celda que SÍ queda envuelta en su ancla.
     b.celdas = [
-      { imagen: "https://ejemplo.com/a.jpg", url: "https://ejemplo.com" },
+      { imagen: "https://ejemplo.com/a.jpg", url: "https://ejemplo.com", botonTexto: "Comprar", botonUrl: "https://ejemplo.com" },
       { titulo: "Título", texto: "Texto", url: "https://ejemplo.com" },
     ];
   }

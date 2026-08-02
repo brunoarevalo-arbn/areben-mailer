@@ -343,7 +343,14 @@ const BASE_POR_TIPO: Partial<Record<TipoBloque, Estilos>> = {
   menu: { cuerpo: { color: "$texto", tamano: 14, peso: 600 } },
   // Medidas de columna, más chicas que un `titulo`/`texto` sueltos porque
   // comparten la mitad del ancho del mail.
-  columnas: { titulo: { tamano: 18, peso: 700, interlinea: 1.3 }, cuerpo: { tamano: 14, interlinea: 1.5 } },
+  // El botón sigue el mismo criterio: adentro de una celda, los 32 px de
+  // padding lateral del botón de cuerpo entero no entran —con cuatro celdas la
+  // columna mide ~138 px— y saldría un botón más ancho que su tarjeta.
+  columnas: {
+    titulo: { tamano: 18, peso: 700, interlinea: 1.3 },
+    cuerpo: { tamano: 14, interlinea: 1.5 },
+    boton: { tamano: 14, padX: 18, padY: 10 },
+  },
   // Sin margen lateral por default: la escotilla de HTML crudo es a sangre
   // salvo que alguien elija lo contrario desde la pestaña Estilo.
   html: { caja: { padX: 0 } },
@@ -373,7 +380,9 @@ export const ROLES_POR_TIPO: Record<TipoBloque, readonly RolEstilo[]> = {
   carrito: ["caja", "titulo", "nota", "imagen"],
   // "imagen" solo pesa en la variante de dos fotos; en las de texto no se dibuja
   // ningún `<img>`, así que ofrecer su control ahí sería una perilla suelta.
-  columnas: ["caja", "imagen", "titulo", "cuerpo"],
+  // "boton" entró con el botón por celda (2-ago-2026): una celda sin botón no
+  // dibuja ninguno, igual que `seccion` con el `botonTexto` vacío.
+  columnas: ["caja", "imagen", "titulo", "cuerpo", "boton"],
   video: ["caja", "imagen", "boton"],
   redes: ["caja", "cuerpo"],
   menu: ["caja", "cuerpo"],

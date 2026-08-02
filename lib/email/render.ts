@@ -128,12 +128,15 @@ const pad = (inner: string, e?: EstiloResuelto) =>
  *
  * Los dos van siempre. El ancla queda envuelta en `<!--[if !mso]><!-->` porque
  * si no Outlook dibuja los dos, uno abajo del otro.
+ *
+ * `anchoCaja` es el ancho disponible en px, y solo lo pasa quien no ocupa el
+ * ancho del mail: hoy, el botón de una celda de `columnas`.
  */
-function botonAnchor(texto: string, url: string, e: EstiloResuelto, pal: Paleta, full = false): string {
+function botonAnchor(texto: string, url: string, e: EstiloResuelto, pal: Paleta, full = false, anchoCaja?: number): string {
   const w = full ? ";width:100%;box-sizing:border-box;text-align:center" : "";
   const resto = extra(e, ["padX", "padY", "tamano", "peso", "color", "fondo", "radio", "align"]);
   const a = `<a href="${esc(url || "#")}" style="display:inline-block;${padCss(e.padY, e.padX)};font-size:${px(e.tamano ?? 16)};font-weight:${e.peso ?? 600};color:${e.color};background:${e.fondo};border-radius:${px(e.radio ?? 8)};text-decoration:none${resto}${w}">${esc(texto)}</a>`;
-  return `${botonVml(esc(texto), esc(url || "#"), e, pal, full)}<!--[if !mso]><!-->${a}<!--<![endif]-->`;
+  return `${botonVml(esc(texto), esc(url || "#"), e, pal, full, anchoCaja)}<!--[if !mso]><!-->${a}<!--<![endif]-->`;
 }
 
 /**
@@ -487,9 +490,13 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // 40% al lado del texto — un hueco en el mail de quien todavía no subió la
       // imagen, que es justo el estado en el que sale una plantilla recién
       // elegida. Con la celda afuera, la que queda ocupa todo el ancho.
+      //
+      // ⚠️ Un botón TAMBIÉN es contenido: si no contara, una celda a la que le
+      // falta la foto se llevaría puesto el CTA sin que nada avise, que es el
+      // modo de falla que este mismo filtro existe para no tener.
       const celdas = todas
         .map((c, i) => ({ c, img: esImagenDe(i) }))
-        .filter(({ c, img }) => (img ? !!c.imagen : !!(c.titulo || c.texto)));
+        .filter(({ c, img }) => !!c.botonTexto || (img ? !!c.imagen : !!(c.titulo || c.texto)));
       if (!celdas.length) return "";
       // La proporción es una pregunta de dos celdas: "cuál de las DOS es más
       // ancha". Con tres o cuatro el reparto es parejo — ver el comentario del
@@ -501,6 +508,22 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const tImg = e("imagen");
       const tTitulo = e("titulo");
       const tCuerpo = e("cuerpo");
+      const tBoton = e("boton");
+
+      // 🔴 El botón de la celda va **afuera** del ancla que envuelve al resto —
+      // por eso lo emite un helper aparte y no forma parte del interior. Un
+      // `<a>` adentro de otro no está permitido en HTML y cada cliente lo
+      // repara distinto, así que el click terminaba yendo a cualquier lado.
+      // La contracara está en cada celda: **con botón no se envuelve nada**.
+      const botonCelda = (c: Columna, pct: number, align: string) => {
+        if (!c.botonTexto) return "";
+        // El ancho de la celda, para que el `<v:roundrect>` de Outlook no salga
+        // más ancho que su `<td>` y descuadre la fila entera: el ancla del
+        // resto de los clientes se acomoda sola, el VML no. Los 12 px son el
+        // `padding:6px` del `<td>`.
+        const anchoCelda = Math.round(((pal.ancho - 64) * pct) / 100) - 12;
+        return `<div style="margin-top:10px;text-align:${align}">${botonAnchor(c.botonTexto, c.botonUrl ?? "", tBoton, pal, false, anchoCelda)}</div>`;
+      };
 
       // El `alt` sale del título de la columna. No es accesibilidad de manual:
       // **Outlook bloquea las imágenes por defecto**, así que con `alt=""` esa
@@ -508,14 +531,21 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // tiene título se deja vacío a propósito — ahí la imagen sí es decorativa y
       // un alt inventado sería ruido para un lector de pantalla.
       const celdaImagen = (c: Columna, pct: number) => {
-        if (!c.imagen) return `<td width="${pct}%"></td>`;
+        // Sin foto y sin botón la celda ya quedó afuera del filtro; acá se llega
+        // solo cuando hay botón y todavía no hay imagen.
+        if (!c.imagen && !c.botonTexto) return `<td width="${pct}%"></td>`;
         // La etiqueta debajo de la foto. Es la fila de categorías de 10 de las
         // 21 referencias de la primera tanda: sin ella, la celda de imagen es
         // una foto muda y hay que adivinar a dónde lleva.
         const label = c.titulo
           ? `<div style="margin-top:8px;font-size:${px(tTitulo.tamano ?? 15)};font-weight:${tTitulo.peso ?? 600};color:${tTitulo.color};text-align:${tTitulo.align ?? "center"}${extra(tTitulo, ["tamano", "peso", "color", "align"])}">${esc(c.titulo)}</div>`
           : "";
-        return `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px"><a href="${esc(c.url || "#")}" style="text-decoration:none;color:inherit"><img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:${px(tImg.radio ?? 8)};display:block" alt="${esc(c.titulo ?? "")}" />${label}</a></td>`;
+        const foto = `${c.imagen ? `<img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:${px(tImg.radio ?? 8)};display:block" alt="${esc(c.titulo ?? "")}" />` : ""}${label}`;
+        // Sin botón la celda entera es el link —como fue siempre, hasta con la
+        // url vacía—; con botón, la foto se queda sin ancla y el click vive en
+        // el botón, que es lo que el lector ve.
+        const interior = c.botonTexto ? foto : `<a href="${esc(c.url || "#")}" style="text-decoration:none;color:inherit">${foto}</a>`;
+        return `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px">${interior}${botonCelda(c, pct, tTitulo.align ?? "center")}</td>`;
       };
 
       const celdaTexto = (c: Columna, pct: number) => {
@@ -526,8 +556,8 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
           ? `<div style="font-size:${px(tCuerpo.tamano ?? 14)};line-height:${tCuerpo.interlinea ?? 1.5};color:${tCuerpo.color};text-align:${tCuerpo.align ?? "left"}${extra(tCuerpo, ["tamano", "interlinea", "color", "align"])}">${nl(c.texto)}</div>`
           : "";
         const contenido = `${titulo}${texto}`;
-        const interior = c.url ? `<a href="${esc(c.url)}" style="text-decoration:none;color:inherit">${contenido}</a>` : contenido;
-        return `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px">${interior}</td>`;
+        const interior = c.url && !c.botonTexto ? `<a href="${esc(c.url)}" style="text-decoration:none;color:inherit">${contenido}</a>` : contenido;
+        return `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px">${interior}${botonCelda(c, pct, tTitulo.align ?? "left")}</td>`;
       };
 
       const html = celdas.map(({ c, img }, i) => (img ? celdaImagen(c, pcts[i]) : celdaTexto(c, pcts[i]))).join("");
@@ -642,8 +672,19 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     case "seccion": {
       const c = caja();
       const bg = c.autoFondo ? b.bg || pal.seccion : c.fondo!;
-      const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h2${clase(...clasesTitulo(x))} style="margin:0 0 8px;font-size:${px(x.tamano ?? 22)};line-height:${x.interlinea ?? 1.3};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.titulo)}</h2>`; })() : "";
-      const tx = b.texto ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 16px;font-size:${px(x.tamano ?? 16)};line-height:${x.interlinea ?? 1.6};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${nl(b.texto)}</p>`; })() : "";
+      // 🔴 El margen de abajo separa de lo que VIENE, no del borde de la caja —
+      // del borde se ocupa `padY`. Estaba cableado, así que una sección de una
+      // sola línea salía 16 px más alta de lo que pedía su padding y no había
+      // forma de achicarla desde el panel: es lo que impedía la barra fina de
+      // aviso (`caja.padY: 6`). ⚠️ Mueve el pixel de las secciones ya
+      // publicadas; es intencional.
+      //
+      // El `hero` tiene lo mismo y **no se toca**: es una portada con 36 px de
+      // padding por diseño, nadie la comprime a una barra, y cambiarlo movería
+      // todas las que ya se enviaron a cambio de nada.
+      const mBtn = b.botonTexto ? 1 : 0;
+      const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h2${clase(...clasesTitulo(x))} style="margin:0 0 ${px(b.texto || mBtn ? 8 : 0)};font-size:${px(x.tamano ?? 22)};line-height:${x.interlinea ?? 1.3};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.titulo)}</h2>`; })() : "";
+      const tx = b.texto ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 ${px(mBtn ? 16 : 0)};font-size:${px(x.tamano ?? 16)};line-height:${x.interlinea ?? 1.6};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${nl(b.texto)}</p>`; })() : "";
       const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
       const estiloCaja = `${padCss(c.padY ?? 32, c.padX ?? 32)};text-align:center${extra(c, ["fondo", "padX", "padY", "align"])}`;
       // La misma banda del `hero`, en el medio del mail. Con la foto, el color
@@ -857,7 +898,12 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
     case "columnas": {
       // Sirve tanto para la variante de fotos (etiqueta + link) como para la de
       // texto (título + texto + link) — cada celda aporta lo que tenga.
-      const lado = (c: Columna) => [c.titulo, c.texto, c.url].filter(Boolean).join(" — ");
+      // El link de la celda o el del botón, nunca los dos: en el HTML, una celda
+      // con botón deja de ser un ancla y su `url` no lleva a ningún lado. Sin
+      // esta rama, la versión de texto de una fila de tarjetas con CTA propio
+      // salía sin un solo link.
+      const lado = (c: Columna) =>
+        [c.titulo, c.texto, c.botonTexto ? link(c.botonTexto, c.botonUrl) : c.url].filter(Boolean).join(" — ");
       return (b.celdas ?? []).map(lado).filter(Boolean).join("\n") || null;
     }
     case "video":

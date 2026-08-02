@@ -136,9 +136,15 @@ export const cierre = `      </td></tr>
  */
 export function botonVml(
   texto: string, url: string, e: EstiloResuelto, pal: Paleta, full: boolean,
+  anchoCaja?: number,
 ): string {
-  // El ancho útil: el del mail menos los dos márgenes laterales.
-  const anchoMax = pal.ancho - 64;
+  // El ancho útil: el del mail menos los dos márgenes laterales, o el de la
+  // caja que lo contiene cuando el botón no ocupa todo el ancho (el de una
+  // celda de `columnas`). ⚠️ Este número es un tope de verdad, no una
+  // estimación: el `<a>` de los demás clientes se acomoda solo, pero un
+  // `<v:roundrect>` más ancho que su `<td>` le descuadra la fila entera a
+  // Outlook.
+  const anchoMax = Math.max(40, anchoCaja ?? pal.ancho - 64);
   const tam = e.tamano ?? 16;
   const padY = e.padY ?? 14;
   const padX = e.padX ?? 32;

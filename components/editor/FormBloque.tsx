@@ -55,6 +55,45 @@ function Alineacion({
   );
 }
 
+/**
+ * El botón propio de una celda de `columnas`, en las dos variantes de celda.
+ *
+ * Los dos campos van juntos y no sueltos porque la regla es una sola y hay que
+ * poder contarla una vez: **sin texto no se dibuja el botón**, así que vaciarlo
+ * es cómo se lo saca. Es la misma convención de `hero`, `seccion` y `cupon`.
+ *
+ * ⚠️ Y con botón, la celda deja de ser un link entero —el "Link" de arriba no
+ * lleva a ningún lado—, porque un `<a>` adentro de otro se rompe distinto en
+ * cada cliente de mail. Lo dice el hint para que no se descubra en la casilla.
+ */
+function BotonDeCelda({
+  c,
+  onChange,
+}: {
+  c: Columna;
+  onChange: (campos: Partial<Columna>) => void;
+}) {
+  return (
+    <>
+      <Input
+        fullWidth
+        value={c.botonTexto ?? ""}
+        placeholder="Texto del botón (opcional)"
+        onChange={(e) => onChange({ botonTexto: e.target.value })}
+        hint={c.botonTexto ? "Con botón, el click de la celda va por el botón: el link de arriba no se usa." : undefined}
+      />
+      {!!c.botonTexto && (
+        <Input
+          fullWidth
+          value={c.botonUrl ?? ""}
+          placeholder="Link del botón"
+          onChange={(e) => onChange({ botonUrl: e.target.value })}
+        />
+      )}
+    </>
+  );
+}
+
 export function FormBloque({
   bloque: b,
   onChange,
@@ -410,6 +449,7 @@ export function FormBloque({
                     placeholder="Link"
                     onChange={(e) => setCelda(i, { url: e.target.value })}
                   />
+                  <BotonDeCelda c={c} onChange={(campos) => setCelda(i, campos)} />
                 </>
               ) : (
                 <>
@@ -432,6 +472,7 @@ export function FormBloque({
                     placeholder="Link (opcional)"
                     onChange={(e) => setCelda(i, { url: e.target.value })}
                   />
+                  <BotonDeCelda c={c} onChange={(campos) => setCelda(i, campos)} />
                 </>
               )}
             </div>
