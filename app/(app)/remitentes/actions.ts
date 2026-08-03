@@ -4,27 +4,46 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { autorizar, chequear } from "@/lib/auth";
-import { getIdentityStatus } from "@/lib/email/proveedores/ses";
+import { altaDominioSes, getIdentityStatus } from "@/lib/email/proveedores/ses";
 import { leerStore } from "@/lib/tn/client";
 import { configConTienda, leerConfigCuenta, marcaDe, normalizarDominioEnvio } from "@/lib/marca";
 import type { Tema } from "@/lib/email/tema";
 
+/**
+ * Alta de remitente: crea la fila **y da de alta el dominio en SES**, para
+ * devolver los CNAME de DKIM que hay que cargar en el DNS.
+ *
+ * 🔑 Hasta el 2-ago-2026 esto escribía una fila y nada más. El alta del dominio
+ * la corría Bruno a mano (`scripts/ses-verify-domain.ts`), así que un
+ * comerciante que instalaba la app **no podía mandar un solo mail** y la
+ * pantalla no se lo decía. Es lo que hacía al producto no vendible, más que
+ * cualquier requisito de Tiendanube.
+ *
+ * ⚠️ **Si SES falla, el remitente igual se crea.** Queda `PENDIENTE` con el
+ * aviso a la vista y el botón "Ver CNAME" reintenta: perder el alta entera
+ * porque AWS no contestó sería peor que quedar a mitad de camino.
+ */
 export async function crearRemitente(input: {
   nombre: string;
   email: string;
   responderA: string;
 }) {
   const auth = await chequear("remitentes");
-  if (!auth.ok) return { ok: false, error: auth.error };
+  if (!auth.ok) return { ok: false as const, error: auth.error };
   const cuenta = auth.ctx.cuenta;
 
   const email = input.email.trim().toLowerCase();
   const nombre = input.nombre.trim();
-  if (!email.includes("@")) return { ok: false, error: "Email inválido" };
-  if (!nombre) return { ok: false, error: "Falta el nombre" };
+  if (!email.includes("@")) return { ok: false as const, error: "Email inválido" };
+  if (!nombre) return { ok: false as const, error: "Falta el nombre" };
 
   const dominio = email.split("@")[1];
   const yaHay = await prisma.remitente.count({ where: { cuentaId: cuenta.id } });
+
+  // Antes de escribir: si el dominio ya está verificado (una segunda marca del
+  // mismo dominio, o uno dado de alta hace rato) el remitente nace pudiendo
+  // enviar, sin obligar a nadie a apretar "Verificar".
+  const alta = await altaDominioSes(dominio);
 
   try {
     await prisma.remitente.create({
@@ -34,14 +53,52 @@ export async function crearRemitente(input: {
         email,
         responderA: input.responderA.trim() || null,
         dominio,
+        estado: alta.estado,
         esPrincipal: yaHay === 0, // el primero queda principal
       },
     });
   } catch {
-    return { ok: false, error: "Ese email ya existe como remitente" };
+    return { ok: false as const, error: "Ese email ya existe como remitente" };
   }
   revalidatePath("/remitentes");
-  return { ok: true };
+  return {
+    ok: true as const,
+    estado: alta.estado,
+    dominio,
+    registros: alta.registros,
+    aviso: alta.error,
+  };
+}
+
+/**
+ * Los CNAME de DKIM de un remitente, pedidos a SES en vivo.
+ *
+ * No se guardan en la base a propósito (ver `altaDominioSes`): SES los devuelve
+ * iguales cada vez, y una copia guardada es una copia que se desincroniza.
+ */
+export async function registrosDkim(id: string) {
+  const auth = await chequear("remitentes");
+  if (!auth.ok) return { ok: false as const, error: auth.error };
+  const cuenta = auth.ctx.cuenta;
+
+  const rem = await prisma.remitente.findFirst({
+    where: { id, cuentaId: cuenta.id },
+    select: { id: true, dominio: true, estado: true },
+  });
+  if (!rem) return { ok: false as const, error: "No encontrado" };
+
+  const alta = await altaDominioSes(rem.dominio);
+  if (alta.estado !== rem.estado) {
+    await prisma.remitente.update({ where: { id }, data: { estado: alta.estado } });
+    revalidatePath("/remitentes");
+  }
+  return {
+    ok: true as const,
+    dominio: rem.dominio,
+    estado: alta.estado,
+    registros: alta.registros,
+    aviso: alta.error,
+  };
 }
 
 export async function eliminarRemitente(id: string): Promise<void> {

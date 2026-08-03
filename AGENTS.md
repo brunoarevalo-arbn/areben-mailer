@@ -55,6 +55,7 @@ node --import tsx scripts/auditar-responsive.ts # el panel no vuelve a nacer sol
 node --import tsx scripts/probar-permisos.ts   # invariantes de la matriz
 node --import tsx scripts/probar-gate.ts       # el gate no se abre solo
 node --import tsx scripts/probar-webhooks.ts   # los webhooks de rebotes fallan CERRADO
+node --import tsx scripts/probar-supresion.ts  # una queja no cruza de tienda; un rebote duro sí
 node --import tsx scripts/probar-carrito.ts    # el carrito de muestra no sale en un envío real
 node --import tsx scripts/probar-bienvenida.ts # el cupón del pop-up entra, el placeholder nunca sale, y NUEVO_SUSCRIPTOR no lo alcanza ningún evento de TN
 node --import tsx scripts/probar-productos-dinamicos.ts # la consulta se guarda, los productos no
@@ -493,6 +494,18 @@ una sola vez); está en `lib/` porque es la misma que necesita `importarCSV` de
   CSV**. Es lo único que frena a los 638 rebotados que estaban `ACTIVO` en BDI
   porque los había traído el sync de Tiendanube: sin eso el primer envío propio
   arranca con 3,8% de rebote y AWS revisa arriba de 5%.
+- 🔴 **Un CSV no se auto-declara consentido** (2-ago-2026). `importarCSV` pide una
+  **declaración explícita** —tildar que esa gente pidió recibir mails, y contar de
+  dónde salió la lista— y sin ella los contactos entran **apagados**
+  (`tnAcceptsMkt: false` ⇒ afuera de `MANDABLE`) con `source:
+  "import_csv_sin_declarar"`. Antes había un `tnAcceptsMkt: true` fijo: es por
+  donde entra una lista comprada que quema la cuenta SES de **todas** las marcas.
+  La declaración queda pegada al contacto (`custom.consentimiento` = origen,
+  fecha y quién), que es la respuesta el día que AWS pregunta. Pide `integrar`
+  (ADMIN), no `editar`. ⛔ **No hay ningún toggle masivo para prenderlos**:
+  activarlos es volver a importar el archivo con la declaración, o sería el mismo
+  agujero con otra puerta. ⚠️ Lo que la declaración mueve es el consentimiento,
+  **nunca el `estado`**: quien se dio de baja o rebotó sigue suprimido.
 - ⚠️ **El consentimiento de un import sale de la pertenencia al archivo, no del
   campo.** `tn_accepts_marketing` es el espejo del casillero de Tiendanube y
   viene `false`/vacío para gente que sí se anotó en un pop-up. En BDI eran 4.423
@@ -674,6 +687,24 @@ nada.** Hasta el 30-jul-2026 hacían `if (secret) { verificar }`, así que sin l
 antes de que la env esté puesta no se pierden. Lo fija `scripts/probar-webhooks.ts`,
 verificado que se pone **rojo** si se restaura la forma vieja.
 
+### A quién alcanza la supresión (2-ago-2026)
+
+🔴 **Un rebote duro es del BUZÓN; una queja es de la RELACIÓN.** Lo decide
+`lib/email/supresion-alcance.ts` (puro), no la consulta:
+
+- **Rebote permanente ⇒ todas las cuentas.** Una casilla que no existe no existe
+  para nadie, y la cuenta de SES es **una sola para todas las marcas**: si BDI le
+  sigue pegando a un buzón muerto, la reputación que se quema es la de Zattia
+  también.
+- **Queja ⇒ solo la tienda que mandó ese mail**, resuelta por `sesMessageId` (que
+  está indexado y es lo único que dice de quién era el envío). Hasta hoy acá
+  había un `updateMany` por email **sin `cuentaId`**: una queja contra Zattia
+  marcaba `SPAM` al mismo contacto en BDI, y la supresión no vuelve atrás.
+- ⚠️ **Una queja que no se puede atribuir NO se aplica** y sale en el log como
+  `sinAtribuir`. Elegir "todas" ante la duda es exactamente el bug.
+
+Lo fija `probar-supresion.ts`, verificado en rojo (9 fallas) contra la forma vieja.
+
 **Alta del webhook de Resend**: `POST https://api.resend.com/webhooks` con
 `{endpoint, events:["email.bounced","email.complained"]}` devuelve el `signing_secret`.
 ⚠️ **La `RESEND_API_KEY` del `.env` es de solo-envío** (`restricted_api_key`): para
@@ -754,6 +785,22 @@ que se anota en un pop-up y el que compra por primera vez.
   ⚠️ No hay índice único en la base a propósito: dos carritos abandonados con
   esperas distintas (1 h y 24 h) es un caso legítimo, y un `@@unique` es DDL que
   después no se saca.
+- 🔴 **Una marca sin remitente VERIFICADO no manda** (2-ago-2026). No alcanza con
+  tener la fila: `getRemitenteEnvio` mira `estado` y, si dice `PENDIENTE`, **le
+  pregunta a SES en el momento** y deja la columna al día — esperar a que alguien
+  apriete "Verificar" hacía que el estado fuera una foto vieja (el remitente de
+  BDI figuró `PENDIENTE` durante días con el dominio ya verificado). El camino
+  normal no toca la red: un dominio autenticado no consulta nada.
+  - **El alta del dominio la hace la app**, no un script: `crearRemitente` llama
+    a `altaDominioSes()` (Easy DKIM) y `/remitentes` muestra los tres CNAME para
+    copiar mientras el dominio no esté verificado. Sin esto, un comerciante que
+    instalaba la app no podía mandar un solo mail y la pantalla no se lo decía —
+    era lo que hacía al producto no vendible, más que cualquier requisito de TN.
+    ⚠️ Si SES no contesta, el remitente **igual se crea** (`PENDIENTE`) y el botón
+    reintenta. Los tokens **no se guardan**: SES los devuelve iguales siempre.
+  - **El modo de falla dejó de ser mudo**: `motivoEnTexto()` (en `proveedor.ts`,
+    puro) distingue "no hay remitente" de "falta verificar el dominio X" de
+    "SES lo rechazó", y lo usan las guardas de campañas, automations y el lote.
 - 🔴 **Una marca sin fila en `Remitente` NO manda** (30-jul-2026). Antes caía al
   default de `SES_FROM_EMAIL`, que es **uno solo para todo el proyecto**
   (`info@bdiaccesorios.com.ar`): un mail de Stunned o de Resorty Lab salía

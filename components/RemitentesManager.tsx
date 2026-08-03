@@ -11,8 +11,14 @@ import {
   crearRemitente,
   eliminarRemitente,
   hacerPrincipal,
+  registrosDkim,
   verificarRemitente,
 } from "@/app/(app)/remitentes/actions";
+
+interface RegistroDkim {
+  nombre: string;
+  valor: string;
+}
 
 interface Remitente {
   id: string;
@@ -49,14 +55,19 @@ export function RemitentesManager({
   const crear = () =>
     start(async () => {
       const r = await crearRemitente({ nombre, email, responderA });
-      if (r.ok) {
-        setEmail("");
-        setResponderA("");
-        setMsg("Remitente agregado ✓");
-      } else {
+      if (!r.ok) {
         setMsg(r.error ?? "Error");
+        setTimeout(() => setMsg(null), 3000);
+        return;
       }
-      setTimeout(() => setMsg(null), 3000);
+      setEmail("");
+      setResponderA("");
+      setMsg(
+        r.estado === "AUTENTICADO"
+          ? "Remitente agregado ✓ El dominio ya estaba verificado."
+          : "Remitente agregado ✓ Falta cargar los CNAME de abajo en tu DNS.",
+      );
+      setTimeout(() => setMsg(null), 6000);
     });
 
   return (
@@ -125,10 +136,30 @@ export function RemitentesManager({
 function RemitenteRow({ r }: { r: Remitente }) {
   const [pending, start] = useTransition();
   const [nota, setNota] = useState<string | null>(null);
-  const est = ESTADO[r.estado];
+  const [registros, setRegistros] = useState<RegistroDkim[] | null>(null);
+  const [estado, setEstado] = useState(r.estado);
+  const est = ESTADO[estado];
+
+  // Se piden con un click y no al montar: son una llamada a SES por fila, y la
+  // pantalla se abre muchas más veces de las que alguien carga un DNS.
+  const verCnames = () =>
+    start(async () => {
+      const res = await registrosDkim(r.id);
+      if (!res.ok) {
+        setNota(res.error ?? "Error consultando SES");
+        return;
+      }
+      setEstado(res.estado);
+      setRegistros(res.registros);
+      if (res.aviso) setNota(`SES devolvió: ${res.aviso}`);
+      else if (res.estado === "AUTENTICADO") setNota("El dominio ya está verificado ✓");
+      else if (!res.registros.length)
+        setNota("SES todavía no devolvió los CNAME. Probá de nuevo en un minuto.");
+    });
 
   return (
-    <Card className="flex flex-wrap items-center justify-between gap-3">
+    <Card className="flex flex-col gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-medium text-foreground">{r.nombre}</span>
@@ -161,14 +192,14 @@ function RemitenteRow({ r }: { r: Remitente }) {
           onClick={() =>
             start(async () => {
               const res = await verificarRemitente(r.id);
+              if (res.ok && res.estado) setEstado(res.estado);
               setNota(
                 res.ok
                   ? res.estado === "AUTENTICADO"
                     ? "Dominio verificado en SES ✓"
-                    : "Todavía no verificado en SES (revisá los CNAME de DKIM)."
+                    : "Todavía no verificado. El DNS puede tardar hasta 48 h en propagar."
                   : "Error consultando SES"
               );
-              setTimeout(() => setNota(null), 4000);
             })
           }
         >
@@ -197,6 +228,69 @@ function RemitenteRow({ r }: { r: Remitente }) {
           </button>
         </form>
       </div>
+    </div>
+
+    {/* Mientras el dominio no esté verificado, esta marca NO manda: el envío lo
+        exige (`getRemitenteEnvio`). Antes el estado era un badge y nada más, y
+        el modo de falla quedaba mudo del otro lado. */}
+    {estado !== "AUTENTICADO" && (
+      <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+        <p className="text-foreground">
+          <b>{r.dominio}</b> todavía no está verificado, así que esta marca no puede enviar.
+          Cargá estos tres CNAME en tu DNS y volvé a apretar Verificar.
+        </p>
+        {registros === null ? (
+          <Button variant="secondary" size="sm" className="mt-2" disabled={pending} onClick={verCnames}>
+            Ver los CNAME
+          </Button>
+        ) : registros.length === 0 ? (
+          <Button variant="secondary" size="sm" className="mt-2" disabled={pending} onClick={verCnames}>
+            Reintentar
+          </Button>
+        ) : (
+          <div className="mt-2 space-y-2">
+            {registros.map((reg) => (
+              <ParaCopiar key={reg.nombre} reg={reg} />
+            ))}
+            <p className="text-xs text-subtle">
+              En Cloudflare van con la nube <b>gris</b> (DNS only): con la naranja, SES no verifica.
+            </p>
+          </div>
+        )}
+      </div>
+    )}
     </Card>
+  );
+}
+
+/** Un CNAME con su botón de copiar: escribirlo a mano es como se erra un token. */
+function ParaCopiar({ reg }: { reg: RegistroDkim }) {
+  const [copiado, setCopiado] = useState<"" | "nombre" | "valor">("");
+  const copiar = (que: "nombre" | "valor", texto: string) => {
+    navigator.clipboard?.writeText(texto);
+    setCopiado(que);
+    setTimeout(() => setCopiado(""), 1500);
+  };
+
+  return (
+    <div className="grid grid-cols-1 gap-1 rounded-lg bg-surface p-2 sm:grid-cols-2">
+      {(["nombre", "valor"] as const).map((que) => (
+        <button
+          key={que}
+          type="button"
+          onClick={() => copiar(que, reg[que])}
+          className="min-w-0 text-left"
+          title="Copiar"
+        >
+          <span className="block text-[11px] uppercase tracking-wide text-subtle">
+            {que === "nombre" ? "Nombre" : "Valor"}
+            {copiado === que && <span className="ml-1 text-accent">copiado ✓</span>}
+          </span>
+          {/* `break-all`: un token de DKIM no tiene espacios y a 343px se sale
+              de la tarjeta si no se lo deja cortar. */}
+          <code className="block break-all font-mono text-xs text-foreground">{reg[que]}</code>
+        </button>
+      ))}
+    </div>
   );
 }

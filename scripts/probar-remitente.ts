@@ -15,7 +15,12 @@
 // nombre de una marca) y en el bloque `encabezado` (`texto` vacío = el nombre de
 // la cuenta, resuelto al renderizar). Ningún dato de una marca es el default de
 // otra.
-import { armarFrom, EmailError, MSG_SIN_REMITENTE } from "../lib/email/proveedor";
+import {
+  armarFrom,
+  EmailError,
+  motivoEnTexto,
+  MSG_SIN_REMITENTE,
+} from "../lib/email/proveedor";
 
 let fallas = 0;
 let corridas = 0;
@@ -78,6 +83,28 @@ else process.env.SES_FROM_NAME = guardadoNombre;
 
 // El mensaje tiene que decir dónde se arregla: es lo que ve quien aprieta enviar.
 ok(MSG_SIN_REMITENTE.includes("/remitentes"), "el mensaje dice dónde cargarlo");
+
+// ── El modo de falla no puede ser mudo (2-ago-2026) ─────────────────────────
+// Tener la fila cargada y tener el dominio verificado son dos cosas distintas, y
+// desde hoy el envío exige las dos. Si el cartel no las distingue, quien acaba
+// de instalar la app lee "cargá un remitente" con el remitente ya cargado.
+ok(motivoEnTexto({ ok: true }) === "", "si puede enviar, no hay nada que decir");
+
+const sinFila = motivoEnTexto({ ok: false, motivo: "SIN_REMITENTE" });
+const pendiente = motivoEnTexto({ ok: false, motivo: "PENDIENTE", dominio: "zattia.com.ar" });
+const rechazado = motivoEnTexto({ ok: false, motivo: "RECHAZADO", dominio: "zattia.com.ar" });
+
+ok(sinFila !== pendiente, "🔴 'no hay remitente' y 'falta verificar' NO dicen lo mismo");
+ok(pendiente.includes("zattia.com.ar"), "el pendiente nombra el dominio que falta");
+ok(rechazado.includes("zattia.com.ar"), "el rechazado también lo nombra");
+ok(
+  pendiente.includes("DKIM") && rechazado.includes("DKIM"),
+  "los dos dicen qué hay que cargar, no solo que falta algo",
+);
+ok(
+  [sinFila, pendiente, rechazado].every((m) => m.includes("/remitentes")),
+  "los tres dicen dónde se arregla",
+);
 
 console.log(
   fallas === 0

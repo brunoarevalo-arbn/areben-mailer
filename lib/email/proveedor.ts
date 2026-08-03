@@ -132,8 +132,41 @@ export class EmailError extends Error {
   }
 }
 
+// Cubre los dos casos porque este texto sale del fondo del motor, donde ya no
+// se sabe cuál de los dos era: sin fila, o con fila y el dominio sin verificar
+// (desde el 2-ago-2026 `getRemitenteEnvio` exige lo segundo). Las guardas de
+// arriba sí distinguen — ver `motivoEnTexto` en lib/remitentes.
 export const MSG_SIN_REMITENTE =
-  'La marca no tiene remitente propio cargado. Se carga en /remitentes: sin eso el mail saldría firmado por otra marca.';
+  'La marca no tiene un remitente propio con el dominio verificado. Se carga y se verifica en /remitentes: sin eso el mail saldría firmado por otra marca o sin DKIM.';
+
+/** Por qué una marca no puede enviar. */
+export type MotivoSinRemitente = 'SIN_REMITENTE' | 'PENDIENTE' | 'RECHAZADO';
+
+export interface EstadoEnvioMarca {
+  ok: boolean;
+  motivo?: MotivoSinRemitente;
+  /** El dominio que falta verificar, para poder nombrarlo en el mensaje. */
+  dominio?: string;
+}
+
+/**
+ * El texto que ve una persona cuando la marca no puede enviar.
+ *
+ * 🔑 **"No cargaste remitente" y "falta el DNS" son dos problemas distintos con
+ * dos soluciones distintas.** Hasta el 2-ago-2026 los dos salían con el mismo
+ * cartel —cuando salían: el lote se marcaba `bloqueado` y nada más—, que para la
+ * operación propia era un detalle y para alguien que acaba de instalar la app es
+ * "no anda y no dice por qué". Vive acá, junto al mensaje viejo y sin tocar la
+ * base, para que `probar-remitente.ts` lo pueda fijar sin conexión.
+ */
+export function motivoEnTexto(e: EstadoEnvioMarca): string {
+  if (e.ok) return '';
+  if (e.motivo === 'SIN_REMITENTE')
+    return 'Esta marca todavía no tiene remitente propio. Cargalo en /remitentes.';
+  if (e.motivo === 'RECHAZADO')
+    return `El dominio ${e.dominio ?? ''} quedó rechazado en SES. Revisá los CNAME de DKIM en /remitentes.`;
+  return `Falta verificar el dominio ${e.dominio ?? ''}: cargá los CNAME de DKIM que están en /remitentes y volvé a intentar.`;
+}
 
 /**
  * Arma el `Nombre <email>` a partir del remitente de la marca.

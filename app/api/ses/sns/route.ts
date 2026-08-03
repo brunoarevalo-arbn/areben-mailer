@@ -114,6 +114,10 @@ export async function POST(req: Request) {
           destinatarios: supresion.emails.map(ofuscar),
           contactos: res.contactos,
           envios: res.envios,
+          cuentas: res.cuentaIds,
+          // Una queja sin message id casado no se aplica (ver supresion-alcance).
+          // Que aparezca acá es la única forma de enterarse.
+          sinAtribuir: res.sinAtribuir.map(ofuscar),
           ms: Date.now() - t0,
         });
       } catch (e) {

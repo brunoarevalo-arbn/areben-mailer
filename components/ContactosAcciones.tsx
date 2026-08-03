@@ -29,6 +29,10 @@ export function ContactosAcciones({
   const [csv, setCsv] = useState("");
   const [listaId, setListaId] = useState("");
   const [importing, startImport] = useTransition();
+  // La declaración arranca SIN tildar a propósito: el default es el caso seguro
+  // (entra apagado), no el que compromete la reputación de envío.
+  const [declara, setDeclara] = useState(false);
+  const [origen, setOrigen] = useState("");
 
   const sync = () =>
     startSync(async () => {
@@ -39,12 +43,23 @@ export function ContactosAcciones({
 
   const importar = () =>
     startImport(async () => {
-      const r = await importarCSV(listaId, csv);
-      setMsg(r.ok ? `Importados: ${r.creados} nuevos de ${r.total}` : "Error");
-      if (r.ok) { setCsv(""); setShowCsv(false); }
+      const r = await importarCSV(listaId, csv, declara ? { origen } : null);
+      if (!r.ok) {
+        setMsg(`Error: ${r.error}`);
+        return;
+      }
+      setMsg(
+        r.apagados
+          ? `Importados: ${r.creados} nuevos de ${r.total}. Los ${r.apagados} quedaron sin recibir mails hasta que declares el origen.`
+          : `Importados: ${r.creados} nuevos de ${r.total}`,
+      );
+      setCsv("");
+      setOrigen("");
+      setDeclara(false);
+      setShowCsv(false);
     });
 
-  const { puede, soloLectura } = usePermisos();
+  const { puede } = usePermisos();
   const puedeIntegrar = puede("integrar");
 
 
@@ -66,7 +81,9 @@ export function ContactosAcciones({
               Conectar Tiendanube de {marca}
             </a>
           ))}
-        {!soloLectura && (
+        {/* Importar es ADMIN: quien declara el consentimiento de una lista
+            compromete la reputación de envío de todas las marcas. */}
+        {puedeIntegrar && (
           <Button variant="secondary" onClick={() => setShowCsv((v) => !v)}>
             Importar CSV
           </Button>
@@ -84,9 +101,37 @@ export function ContactosAcciones({
       {showCsv && (
         <div className="space-y-2 rounded-xl border border-border bg-surface p-4 shadow-sm">
           <div className="text-sm text-muted">
-            Pegá un email por línea (o <code>email,nombre</code>). Se marcan como que aceptan marketing.
+            Pegá un email por línea (o <code>email,nombre</code>).
           </div>
           <textarea className={`${campoBase} w-full font-mono`} rows={5} value={csv} onChange={(e) => setCsv(e.target.value)} placeholder="juan@mail.com,Juan Pérez&#10;ana@mail.com" />
+
+          {/* Sin esto, lo importado entra APAGADO. El texto dice qué pasa en
+              cada caso porque el default silencioso —"se marcan como que
+              aceptan marketing"— era el que dejaba entrar una lista comprada. */}
+          <label className="flex cursor-pointer items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
+              checked={declara}
+              onChange={(e) => setDeclara(e.target.checked)}
+            />
+            <span className="text-muted">
+              Declaro que estas personas <b>pidieron</b> recibir mails de {marca}.
+            </span>
+          </label>
+          {declara ? (
+            <input
+              className={`${campoBase} w-full`}
+              value={origen}
+              onChange={(e) => setOrigen(e.target.value)}
+              placeholder="¿De dónde salió esta lista? Ej: se anotaron en el local durante 2025"
+            />
+          ) : (
+            <p className="text-xs text-subtle">
+              Sin declarar, los contactos se guardan pero <b>no reciben ningún mail</b>. Podés
+              volver a importar el mismo archivo con la declaración para activarlos.
+            </p>
+          )}
           {/* `flex-wrap` + `min-w-0`: el <select> de listas crece con el nombre
               más largo, y sin envolver empujaba a "Importar" fuera de la tarjeta
               a 343px. */}

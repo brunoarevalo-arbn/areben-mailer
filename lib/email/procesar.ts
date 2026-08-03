@@ -6,7 +6,7 @@ import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { inyectarTracking } from "@/lib/email/tracking";
 import { sendEmail, esThrottle } from "@/lib/email/enviar";
 import { destinatarioPermitido, modoEnvio, MSG_SIN_REMITENTE } from "@/lib/email/proveedor";
-import { getRemitenteEnvio } from "@/lib/remitentes";
+import { estadoEnvioMarca, getRemitenteEnvio, motivoEnTexto } from "@/lib/remitentes";
 
 const BATCH = 20;
 
@@ -50,9 +50,21 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
   // remitente exista.
   const rem = await getRemitenteEnvio(campania.cuentaId);
   if (!rem) {
-    console.log(JSON.stringify({ ev: "lote-bloqueado", motivo: "sin-remitente", campaniaId }));
+    // El motivo exacto se busca solo en el camino de falla: es una consulta más
+    // (y una llamada a SES si el dominio está pendiente) que no vale la pena
+    // pagar en cada lote que sí manda.
+    const estado = await estadoEnvioMarca(campania.cuentaId);
+    console.log(
+      JSON.stringify({ ev: "lote-bloqueado", motivo: estado.motivo ?? "sin-remitente", campaniaId }),
+    );
     const restantes = await prisma.envio.count({ where: { campaniaId, estado: "ENCOLADO" } });
-    return { enviados: 0, fallidos: 0, restantes, throttled: false, bloqueado: MSG_SIN_REMITENTE };
+    return {
+      enviados: 0,
+      fallidos: 0,
+      restantes,
+      throttled: false,
+      bloqueado: motivoEnTexto(estado) || MSG_SIN_REMITENTE,
+    };
   }
 
   // Los productos automáticos se resuelven ACÁ, **antes** del loop: una vez por

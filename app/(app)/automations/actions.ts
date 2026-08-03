@@ -8,8 +8,7 @@ import { leerContenido } from "@/lib/email/esquema";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { sendEmail } from "@/lib/email/enviar";
-import { MSG_SIN_REMITENTE } from "@/lib/email/proveedor";
-import { getRemitenteEnvio } from "@/lib/remitentes";
+import { estadoEnvioMarca, getRemitenteEnvio, motivoEnTexto } from "@/lib/remitentes";
 import { automationDelTrigger, motivoNoBorrable, type Trigger } from "@/lib/automations";
 import { presetDeTrigger } from "@/lib/plantillas/presets";
 import { revalidatePath } from "next/cache";
@@ -100,8 +99,11 @@ export async function toggleAutomation(id: string) {
   // Encender sin remitente dejaría la automation disparando runs que el cron no
   // puede mandar: se acumularían PENDIENTE hasta que alguien mire. Pausar nunca
   // se frena — la acción segura no se bloquea por un dato que falta.
-  if (nuevoEstado === "ACTIVO" && !(await getRemitenteEnvio(cuenta.id)))
-    return { ok: false, error: `${cuenta.nombre}: ${MSG_SIN_REMITENTE}` };
+  if (nuevoEstado === "ACTIVO") {
+    const marcaLista = await estadoEnvioMarca(cuenta.id);
+    if (!marcaLista.ok)
+      return { ok: false, error: `${cuenta.nombre}: ${motivoEnTexto(marcaLista)}` };
+  }
 
   // ⚠️ `event` puede no existir: `NUEVO_SUSCRIPTOR` no sale de ningún evento de
   // Tiendanube —lo encola quien captura el lead— y sin la guarda esto le pediría
