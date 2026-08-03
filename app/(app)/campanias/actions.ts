@@ -203,6 +203,49 @@ export async function promoverGanador(id: string, ganador: "A" | "B") {
 }
 
 /**
+ * Copia una campaña para mandar "otra igual" sin tocar la original.
+ *
+ * Existe por el ramp: los siete tramos de Zattia son **el mismo mail siete
+ * veces** con distinto destino, y hasta hoy la única forma de reusar uno era
+ * guardarlo como plantilla y crear una campaña desde ahí — tres pasos que además
+ * **pierden el asunto y el preheader** (una `Plantilla` solo guarda el
+ * `contenido`) y dejan una plantilla de más en la galería.
+ *
+ * 🔴 **El destino NO se copia, y es la decisión de diseño de toda la función.**
+ * Duplicar el T01 y que la copia venga apuntando al T01 es exactamente cómo se
+ * le manda dos veces al mismo tramo, que en este ramp es el error caro: la lista
+ * *es* el registro de a quién se le escribió. Que haya que elegirlo a mano
+ * obliga a mirar una vez adónde va.
+ *
+ * Tampoco se copia el `html` —es la compilación del contenido, se rehace al
+ * enviar— ni nada de la resolución del A/B (`abGanador`, `abResueltoAt`): la
+ * copia nace como un test sin resolver, no con el ganador de la anterior puesto.
+ *
+ * Pide `editar` y no `enviar`: lo que deja es un BORRADOR sin destino, que no
+ * puede salir. Mandarlo sigue siendo cosa de un ADMIN.
+ */
+export async function duplicarCampania(id: string) {
+  const { cuenta } = await autorizar("editar");
+  const c = await prisma.campania.findFirst({ where: { id, cuentaId: cuenta.id } });
+  if (!c) return;
+  const copia = await prisma.campania.create({
+    data: {
+      cuentaId: cuenta.id,
+      nombre: `${c.nombre} (copia)`,
+      asunto: c.asunto,
+      preheader: c.preheader,
+      // El Json tal cual: los ids de bloque son únicos DENTRO de un documento,
+      // así que dos campañas pueden compartirlos sin molestarse.
+      contenido: c.contenido as object,
+      remitenteId: c.remitenteId,
+      asuntoB: c.asuntoB,
+      abTestPct: c.abTestPct,
+    },
+  });
+  redirect(`/campanias/${copia.id}`);
+}
+
+/**
  * Borra una campaña **en borrador**. Nada más.
  *
  * Existe porque la galería creaba una campaña para cada plantilla que alguien

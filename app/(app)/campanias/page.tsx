@@ -8,9 +8,10 @@ import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
 import { BotonVistaPrevia } from "@/components/BotonVistaPrevia";
 import { BotonEliminar } from "@/components/BotonEliminar";
+import { BotonDuplicar } from "@/components/BotonDuplicar";
 import { tapTarget } from "@/lib/ui";
 import { horaLocal } from "@/lib/fechas";
-import { crearCampania, eliminarCampania } from "./actions";
+import { crearCampania, eliminarCampania, duplicarCampania } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -146,6 +147,10 @@ export default async function CampaniasPage({
                       </Link>
                     }
                   />
+                  {/* Para CUALQUIER estado, y sobre todo para las enviadas: el
+                      caso que lo motiva es el ramp, donde el tramo siguiente es
+                      el mail anterior con otro destino. */}
+                  <BotonDuplicar accion={duplicarCampania.bind(null, c.id)} />
                   {/* Solo los borradores. Una campaña que ya salió no muestra el
                       botón: de sus `Envio` cuelga la supresión por rebote. */}
                   {c.estado === "BORRADOR" && c._count.envios === 0 && (
