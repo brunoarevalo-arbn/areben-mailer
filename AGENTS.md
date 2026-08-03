@@ -78,6 +78,7 @@ node --import tsx scripts/probar-redes.ts      # cada red de la lista tiene su P
 node --import tsx scripts/probar-negritas.ts   # `**negrita**` se resuelve DESPUÉS de escapar, y solo en los cuatro campos que se escriben
 node --env-file=.env --import tsx scripts/probar-segmentos.ts # el "no abrió/no clickeó" es RECIBIÓ y no lo hizo, nunca "no me consta"
 node --import tsx scripts/probar-automations.ts # una automation por trigger: dos son dos mails a la misma persona
+node --import tsx scripts/probar-fechas.ts      # el día de las métricas es el del calendario local, no el día UTC
 ```
 
 ⚠️ `probar-render.ts` compara contra `scripts/fixtures/render-golden.json`. Si el
@@ -116,6 +117,9 @@ lib/email/…       motor: proveedor.ts (gate+contrato), cola.ts, procesar.ts,
                   estilos.ts  ← cascada de estilo por bloque (tokens + lista blanca)
 lib/auth.ts       autorizar/chequear/autorizarApi ← ÚNICO camino de autorización
 lib/permisos.ts   matriz de roles (puro: lo importa server Y cliente)
+lib/fechas.ts     ZONA + el día del calendario ← ÚNICO lugar con una zona horaria.
+                  ⛔ Ningún `date_trunc('day', …)` pelado: agrupar en UTC hace que
+                  a las 21:00 el panel estrene el día siguiente
 lib/tn/…          cliente Tiendanube, import de contactos/órdenes, webhooks
 components/ui/    Button, Card, Badge, Input, Select, Textarea, NumInput, Desplegable,
                   PageHeader, EmptyState, LoadingState, ErrorState → reusar, no reinventar
