@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/Badge";
 import { TablaResponsive } from "@/components/ui/TablaResponsive";
 import { EnviosChart, type PuntoSerie } from "@/components/EnviosChart";
 import { prisma } from "@/lib/prisma";
+import { ZONA, ultimosDias, desdeUtc } from "@/lib/fechas";
 import { getCuentaActiva } from "@/lib/cuenta";
 import { authorizeUrl } from "@/lib/tn/client";
 import { PrimerosPasos } from "@/components/PrimerosPasos";
@@ -72,14 +73,12 @@ export default async function Home() {
   // mails que mandan las automations, que no tienen campaña detrás.
   const scope = { cuentaId: cid };
 
-  // Serie temporal: 30 días (UTC) para envíos/aperturas/clicks.
-  const dias: string[] = [];
-  const hoy = new Date();
-  for (let k = 29; k >= 0; k--) {
-    const dt = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate() - k));
-    dias.push(dt.toISOString().slice(0, 10));
-  }
-  const desde = new Date(`${dias[0]}T00:00:00.000Z`);
+  // Serie temporal: los últimos 30 días del CALENDARIO LOCAL (ver `lib/fechas`).
+  // 🔴 Iban en UTC, así que a las 21:00 de Argentina el gráfico ya estrenaba el
+  // día siguiente y los envíos de la noche se contaban en un día que todavía no
+  // había empezado para quien mira.
+  const dias = ultimosDias(30);
+  const desde = desdeUtc(dias[0]);
 
   const [
     contactosByEstado,
@@ -111,17 +110,23 @@ export default async function Home() {
       take: 6,
       select: { id: true, nombre: true, asunto: true, estado: true },
     }),
+    // ⚠️ El doble `AT TIME ZONE` no es redundante y el orden importa: las
+    // columnas son `timestamp` SIN zona y guardan UTC (convención de Prisma), así
+    // que el primero les dice "esto que parece pelado en realidad es UTC" y el
+    // segundo las trae a la zona del negocio. Recién ahí `date_trunc` corta por
+    // el día que ve una persona. Con un solo `AT TIME ZONE` Postgres asume la
+    // zona del servidor, que en Vercel es UTC, y es exactamente el bug.
     prisma.$queryRaw<{ dia: string; metric: string; n: number }[]>`
       SELECT d AS dia, m AS metric, COUNT(*)::int AS n FROM (
-        SELECT to_char(date_trunc('day', e."enviadoAt"), 'YYYY-MM-DD') AS d, 'env' AS m
+        SELECT to_char(date_trunc('day', e."enviadoAt" AT TIME ZONE 'UTC' AT TIME ZONE ${ZONA}), 'YYYY-MM-DD') AS d, 'env' AS m
           FROM "Envio" e
           WHERE e."cuentaId" = ${cid} AND e."enviadoAt" >= ${desde}
         UNION ALL
-        SELECT to_char(date_trunc('day', e."abiertoAt"), 'YYYY-MM-DD'), 'abr'
+        SELECT to_char(date_trunc('day', e."abiertoAt" AT TIME ZONE 'UTC' AT TIME ZONE ${ZONA}), 'YYYY-MM-DD'), 'abr'
           FROM "Envio" e
           WHERE e."cuentaId" = ${cid} AND e."abiertoAt" >= ${desde}
         UNION ALL
-        SELECT to_char(date_trunc('day', e."clickAt"), 'YYYY-MM-DD'), 'clk'
+        SELECT to_char(date_trunc('day', e."clickAt" AT TIME ZONE 'UTC' AT TIME ZONE ${ZONA}), 'YYYY-MM-DD'), 'clk'
           FROM "Envio" e
           WHERE e."cuentaId" = ${cid} AND e."clickAt" >= ${desde}
       ) t GROUP BY d, m

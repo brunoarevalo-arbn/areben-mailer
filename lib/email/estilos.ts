@@ -445,6 +445,15 @@ function propsCaja(tipo: TipoBloque): readonly (keyof EstiloBloque)[] {
     case "hero":
     case "seccion":
       return ["fondo", "padX", "padY", "align"];
+    // 🔑 El menú es el quinto que puede dibujar su propio contenedor, y solo
+    // cuando alguien elige el fondo: sin `fondo` sigue pasando por `pad()`. Entró
+    // por la regla 5 de `PLANTILLAS.md` (6 referencias con el menú adentro de una
+    // banda). ⚠️ `align` NO va acá: la alineación de la barra la gobierna
+    // `cuerpo.align`, y dos perillas para lo mismo es el bug que documenta
+    // `SIN_EFECTO`. `padY` mueve el margen incluso sin banda, así que no es una
+    // perilla que dependa de otra.
+    case "menu":
+      return ["fondo", "padX", "padY", "ocultarMovil", "ocultarEscritorio"];
     case "cupon":
       return ["fondo", "padX", "padY", "radio", "bordeAncho", "bordeEstilo", "bordeColor"];
     case "divisor":

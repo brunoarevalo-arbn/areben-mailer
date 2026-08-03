@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 
 export interface PuntoSerie {
-  dia: string; // YYYY-MM-DD (UTC)
+  // `YYYY-MM-DD` del calendario LOCAL, ya resuelto por el servidor (`lib/fechas`).
+  // ⛔ Acá no se convierte nada: si este componente reinterpretara la fecha con
+  // la zona del navegador, el mismo gráfico diría distinto según desde dónde se
+  // abra. Llega como etiqueta y se dibuja como etiqueta.
+  dia: string;
   env: number;
   abr: number;
   clk: number;

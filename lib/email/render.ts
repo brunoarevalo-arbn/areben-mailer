@@ -770,9 +770,26 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         .join("")}</div>`, caja());
     }
     case "menu": {
-      const t = e("cuerpo");
+      const c = caja();
       const enlaces = (b.links ?? []).filter((l) => l.url && l.texto);
       if (!enlaces.length) return "";
+      // 🔑 **Con `caja.fondo` la barra deja de pasar por `pad()` y dibuja su
+      // propia banda**, que es el camino de `hero` y `seccion` — los bloques que
+      // arman su propio contenedor. Entró por la regla 5 de `PLANTILLAS.md`:
+      // seis referencias ponen el menú adentro de una banda de color (003 · 005
+      // · 010 · 014 · 016 · 021), pegado al encabezado en cuatro y al pie en una.
+      // En R-005 es donde más se notaba: links **lima sobre negro** que sin esto
+      // salían negros sobre blanco.
+      //
+      // ⚠️ **Con banda el aire va ADENTRO** (`padding`) y no como margen: un
+      // margen dejaría una franja del fondo de página entre el encabezado y el
+      // menú, que es justo lo que esas referencias tienen pegado. Sin banda
+      // sigue siendo margen, y `padY ?? 12` reproduce el `margin:12px 0` de
+      // siempre ⇒ **un mail que no elige fondo sale byte por byte como salía**.
+      const banda = !c.autoFondo;
+      // Legibilidad contextual: sobre una banda oscura los links se recalculan
+      // solos si nadie eligió el color, igual que el título de una portada.
+      const t = e("cuerpo", banda ? c.fondo : undefined);
       // 🔴 `alineacion()` y no `t.align ?? "center"`: ese `??` es letra muerta
       // —`BASE.cuerpo` ya escribe `align:"left"`, así que `t.align` nunca es
       // `undefined`— y por eso la barra de navegación salió **pegada a la
@@ -781,15 +798,14 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // etiqueta de la fila de categorías, encontrado el 2-ago-2026 al mirar
       // `negro-y-dorado` al lado de R-016. Ver `alineacion()` en `estilos.ts`.
       const align = alineacion(t, "center");
-      return pad(
-        `<div style="text-align:${align};margin:12px 0">${enlaces
-          .map(
-            (l) =>
-              `<a href="${esc(l.url)}" style="display:inline-block;margin:0 12px;font-size:${px(t.tamano ?? 14)};font-weight:${t.peso ?? 600};color:${t.color};text-decoration:none${extra(t, ["tamano", "peso", "color", "align"])}">${esc(l.texto)}</a>`,
-          )
-          .join("")}</div>`,
-        caja(),
-      );
+      const links = enlaces
+        .map(
+          (l) =>
+            `<a href="${esc(l.url)}" style="display:inline-block;margin:0 12px;font-size:${px(t.tamano ?? 14)};font-weight:${t.peso ?? 600};color:${t.color};text-decoration:none${extra(t, ["tamano", "peso", "color", "align"])}">${esc(l.texto)}</a>`,
+        )
+        .join("");
+      if (!banda) return pad(`<div style="text-align:${align};margin:${px(c.padY ?? 12)} 0">${links}</div>`, c);
+      return `<div${clase(...clasesDe(c))} style="background:${c.fondo};${padCss(c.padY ?? 12, c.padX ?? 32)};text-align:${align}${extra(c, ["fondo", "align"])}">${links}</div>`;
     }
     case "divisor": {
       const t = e("caja");

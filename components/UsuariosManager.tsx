@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ROL_LABEL, ROL_DESCRIPCION, type Rol } from "@/lib/permisos";
+import { ZONA } from "@/lib/fechas";
 import {
   crearUsuario,
   cambiarRol,
@@ -182,7 +183,9 @@ export function UsuariosManager({
                   <div className="text-sm text-muted truncate">
                     {u.nombre ? `${u.email} · ` : ""}
                     {u.ultimoLoginAt
-                      ? `último ingreso ${new Date(u.ultimoLoginAt).toLocaleDateString("es-AR")}`
+                      ? // La zona va explícita por la misma razón que en las métricas: es la
+                        // del negocio, no la del navegador de quien mira. Ver `lib/fechas`.
+                        `último ingreso ${new Date(u.ultimoLoginAt).toLocaleDateString("es-AR", { timeZone: ZONA })}`
                       : "nunca ingresó"}
                   </div>
                 </div>
