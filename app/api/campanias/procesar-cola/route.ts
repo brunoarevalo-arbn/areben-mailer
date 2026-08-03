@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { procesarCola, arrancarCola } from "@/lib/email/cola";
+import { encolarProgramadas } from "@/lib/email/programadas";
 
 export const maxDuration = 60;
 
@@ -10,6 +11,14 @@ export async function POST(req: Request) {
   const secret = new URL(req.url).searchParams.get("secret");
   if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
     return new Response("unauthorized", { status: 401 });
+  }
+
+  // Las campañas programadas se levantan ACÁ y ANTES de la cola: lo que venza a
+  // las 19:00 queda ENVIANDO y sale en esta misma invocación, sin esperar los 15
+  // minutos del ciclo siguiente.
+  const prog = await encolarProgramadas();
+  if (prog.encoladas || prog.canceladas || prog.fallidas) {
+    console.log(JSON.stringify({ ev: "programadas", ...prog }));
   }
 
   const r = await procesarCola();

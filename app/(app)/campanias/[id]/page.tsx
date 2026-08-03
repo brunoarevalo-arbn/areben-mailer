@@ -125,6 +125,7 @@ export default async function CampaniaEditorPage({
         segmentos={segmentos}
         emailPrueba={email}
         estado={campania.estado}
+        programadaAt={campania.programadaAt?.toISOString() ?? null}
         abInfo={abInfo}
       />
     </div>

@@ -9,8 +9,17 @@
 // Es puro: no toca la base ni la red.
 //
 //   node --import tsx scripts/probar-fechas.ts
+//
+// 🔴 **Y también con el reloj de la máquina en otro huso**, que es lo único que
+// prueba de verdad la mitad de "programar un envío":
+//
+//   TZ=Asia/Tokyo node --import tsx scripts/probar-fechas.ts
+//
+// Los dos tienen que dar verde. Si `instanteLocal` se escribiera como
+// `new Date(dia + "T" + hora)` —la forma natural y equivocada— el primero pasa y
+// el segundo se cae: ahí está todo el sentido de este archivo.
 
-import { ZONA, diaLocal, ultimosDias, desdeUtc } from "../lib/fechas";
+import { ZONA, diaLocal, ultimosDias, desdeUtc, instanteLocal, horaLocal } from "../lib/fechas";
 
 let fallas = 0;
 const ok = (cond: boolean, msg: string) => {
@@ -77,6 +86,61 @@ ok(ZONA === "America/Argentina/Buenos_Aires", "es la del negocio y vive en un so
 const mediodiaUtc = new Date("2026-08-02T12:00:00.000Z");
 ok(diaLocal(mediodiaUtc) === "2026-08-02", "el runtime la entiende y no la ignora en silencio");
 ok(diaLocal(new Date("2026-08-02T02:00:00.000Z")) === "2026-08-01", "el corrimiento es real: 23:00 del día anterior");
+
+console.log("\nDe 'el 3 a las 19:00' al instante (programar un envío):");
+
+// El caso del día: el T02 se programa para las 19:00 de Argentina.
+ok(
+  instanteLocal("2026-08-03", "19:00").toISOString() === "2026-08-03T22:00:00.000Z",
+  "las 19:00 de Argentina son las 22:00 UTC, corra donde corra este proceso",
+);
+// El mismo instante del bug de las métricas, ahora al revés.
+ok(
+  instanteLocal("2026-08-02", "21:30").toISOString() === "2026-08-03T00:30:00.000Z",
+  "las 21:30 del 2 caen en el 3 UTC — que es de dónde venía el otro bug",
+);
+ok(
+  instanteLocal("2026-08-03", "00:00").toISOString() === "2026-08-03T03:00:00.000Z",
+  "la medianoche local son las 03:00 UTC, no las 00:00",
+);
+
+// Ida y vuelta: el día que se eligió es el día que se lee.
+for (const [dia, hora] of [
+  ["2026-08-03", "19:00"],
+  ["2026-01-01", "00:00"],
+  ["2026-12-31", "23:59"],
+  ["2026-02-28", "12:00"],
+] as const) {
+  ok(diaLocal(instanteLocal(dia, hora)) === dia, `ida y vuelta: ${dia} ${hora} sigue cayendo en ${dia}`);
+}
+
+// Que sea creciente descarta que el corrimiento se aplique al revés (un signo
+// invertido igual daría "un instante", pero seis horas para el otro lado).
+ok(
+  instanteLocal("2026-08-03", "20:00").getTime() - instanteLocal("2026-08-03", "19:00").getTime() === 3_600_000,
+  "una hora más tarde es exactamente una hora más tarde",
+);
+
+const tira = (dia: string, hora: string) => {
+  try {
+    instanteLocal(dia, hora);
+    return false;
+  } catch {
+    return true;
+  }
+};
+ok(tira("3/8/2026", "19:00"), "una fecha con otro formato no pasa callada");
+ok(tira("2026-08-03", "19"), "una hora sin minutos tampoco");
+ok(tira("2026-08-03", ""), "ni una hora vacía");
+
+console.log("\nLa fecha escrita para el panel:");
+
+const t02 = new Date("2026-08-03T22:00:00.000Z");
+ok(horaLocal(t02) === "lunes 3 de agosto, 19:00", `se lee como lo diría una persona (dio "${horaLocal(t02)}")`);
+ok(
+  horaLocal(new Date("2026-08-03T00:30:00.000Z")) === "domingo 2 de agosto, 21:30",
+  "y a las 21:30 dice el domingo 2, no el lunes 3",
+);
 
 console.log();
 if (fallas) {

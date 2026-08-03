@@ -9,6 +9,8 @@ import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { sendEmail } from "@/lib/email/enviar";
 import { estadoEnvioMarca, getRemitenteEnvio, motivoEnTexto } from "@/lib/remitentes";
 import { contactosElegibles, crearEnvios } from "@/lib/campanias";
+import { encolarCampania, validarEnvio, type ResultadoEncolar } from "@/lib/email/encolar";
+import { instanteLocal, horaLocal } from "@/lib/fechas";
 import { arrancarCola } from "@/lib/email/cola";
 import { after } from "next/server";
 import {
@@ -76,82 +78,87 @@ export async function guardarCampania(input: GuardarInput) {
   return { ok: true };
 }
 
-/** Fisher-Yates in-place. */
-function shuffle<T>(arr: T[]): T[] {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-/** Encola una campaña: crea los Envío para los contactos elegibles y la pone ENVIANDO. */
-export async function enviarCampania(id: string) {
+/**
+ * Encola una campaña: crea los Envío para los contactos elegibles y la pone
+ * ENVIANDO.
+ *
+ * El trabajo vive en `lib/email/encolar.ts` porque **el cron también lo hace**
+ * (una campaña programada) y ahí no hay sesión. Acá queda lo único que el cron
+ * no puede hacer: preguntar quién está pidiendo.
+ */
+export async function enviarCampania(id: string): Promise<ResultadoEncolar> {
   // El envío a la lista completa es la acción más cara de la app: no se deshace
   // y una lista mal armada quema la reputación del dominio. Solo ADMIN.
   const auth = await chequear("enviar");
   if (!auth.ok) return { ok: false, error: auth.error };
+  return encolarCampania(auth.ctx.cuenta, id);
+}
+
+/**
+ * Deja una campaña lista para salir sola a una hora. El envío lo dispara después
+ * `encolarProgramadas()` desde el cron.
+ *
+ * Mismo permiso que enviar, y no uno más blando: **programar ES enviar**, solo
+ * que más tarde. Un EDITOR que no puede mandar tampoco puede dejar agendado que
+ * se mande.
+ *
+ * 🔑 Corre `validarEnvio` **ahora**, con alguien mirando la pantalla, para que un
+ * remitente sin verificar o un gate cerrado no se descubran a las 19:00 con la
+ * campaña sin salir.
+ */
+export async function programarCampania(
+  id: string,
+  dia: string,
+  hora: string,
+): Promise<{ ok: true; cuando: string; texto: string } | { ok: false; error: string }> {
+  const auth = await chequear("enviar");
+  if (!auth.ok) return { ok: false, error: auth.error };
   const cuenta = auth.ctx.cuenta;
+
+  let cuando: Date;
+  try {
+    // ⚠️ Por acá, nunca `new Date(dia + "T" + hora)`: eso lo interpreta en la
+    // zona del NAVEGADOR y la campaña saldría a otra hora desde otra máquina.
+    cuando = instanteLocal(dia, hora);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+  if (cuando.getTime() <= Date.now()) return { ok: false, error: "Esa hora ya pasó" };
 
   const campania = await prisma.campania.findFirst({ where: { id, cuentaId: cuenta.id } });
   if (!campania) return { ok: false, error: "Campaña no encontrada" };
-  if (!campania.asunto) return { ok: false, error: "Falta el asunto" };
-  if (!campania.listaId && !campania.segmentoId) return { ok: false, error: "Falta el destino (lista o segmento)" };
   if (campania.estado === "ENVIANDO" || campania.estado === "ENVIADA")
     return { ok: false, error: "La campaña ya fue enviada" };
 
-  // Guard: mientras el proveedor no esté aprobado para producción no dejamos
-  // enviar a la lista real (los destinos no verificados rebotarían en masa).
-  const modo = modoEnvio();
-  if (modo === "bloqueado")
-    return { ok: false, error: `${MSG_ENVIO_BLOQUEADO} Mientras tanto usá "Enviar prueba".` };
+  const motivo = await validarEnvio(cuenta, campania);
+  if (motivo) return { ok: false, error: motivo };
 
-  // Sin remitente propio VERIFICADO no se manda, y se avisa ACÁ: llegar a
-  // `armarFrom` con 5.000 envíos ya encolados sería descubrirlo cuando la
-  // campaña está en curso. El mensaje distingue "no cargaste remitente" de
-  // "falta el DNS": son dos problemas con dos soluciones distintas.
-  const marcaLista = await estadoEnvioMarca(cuenta.id);
-  if (!marcaLista.ok)
-    return { ok: false, error: `${cuenta.nombre}: ${motivoEnTexto(marcaLista)}` };
+  await prisma.campania.update({
+    where: { id, cuentaId: cuenta.id },
+    data: { estado: "PROGRAMADA", programadaAt: cuando },
+  });
+  revalidatePath(`/campanias/${id}`);
+  return { ok: true, cuando: cuando.toISOString(), texto: horaLocal(cuando) };
+}
 
-  const esAB = campania.abTestPct != null;
-  if (esAB && !campania.asuntoB) return { ok: false, error: "Falta el asunto B" };
+/** Desprograma una campaña: vuelve a BORRADOR y se olvida la hora. */
+export async function cancelarProgramacion(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  // El mismo permiso que programar, por simetría: partir un eje en dos permisos
+  // distintos es una regla que después nadie recuerda.
+  const auth = await chequear("enviar");
+  if (!auth.ok) return { ok: false, error: auth.error };
 
-  const todos = await contactosElegibles(cuenta.id, campania);
-  if (todos === null) return { ok: false, error: "Segmento no encontrado" };
-  if (todos.length === 0) return { ok: false, error: "No hay contactos elegibles" };
-
-  // En ensayo recortamos acá para no crear miles de Envío que nacen condenados.
-  // El corte que de verdad protege está en procesarLote, pegado al envío.
-  const contactos = modo === "ensayo" ? todos.filter((c) => destinatarioPermitido(c.email)) : todos;
-  const omitidos = todos.length - contactos.length;
-  if (contactos.length === 0)
-    return {
-      ok: false,
-      error: `Modo ensayo: ninguno de los ${todos.length} contactos elegibles está en ENVIO_ENSAYO.`,
-    };
-
-  if (esAB) {
-    // Test A/B: mandar A y B a una muestra; el resto espera al ganador.
-    const pct = campania.abTestPct!;
-    // Muestra total (mín. 2 para que haya al menos 1 por variante), sin pasar el total.
-    const testTotal = Math.min(contactos.length, Math.max(2, Math.floor((contactos.length * pct) / 100)));
-    const muestra = shuffle([...contactos]).slice(0, testTotal);
-    const mitad = Math.ceil(muestra.length / 2);
-    await crearEnvios(cuenta.id, id, muestra.slice(0, mitad), "A");
-    await crearEnvios(cuenta.id, id, muestra.slice(mitad), "B");
-    await prisma.campania.update({ where: { id }, data: { estado: "ENVIANDO" } });
-    const total = await prisma.envio.count({ where: { campaniaId: id } });
-    after(() => arrancarCola());
-    return { ok: true, total, esTest: true, modo, omitidos };
-  }
-
-  // Envío normal (sin A/B).
-  await crearEnvios(cuenta.id, id, contactos, null);
-  await prisma.campania.update({ where: { id }, data: { estado: "ENVIANDO" } });
-  const total = await prisma.envio.count({ where: { campaniaId: id } });
-  after(() => arrancarCola());
-  return { ok: true, total, modo, omitidos };
+  // El estado va en el WHERE y no en un `if` de antes: entre leer y escribir, el
+  // cron puede haberla disparado, y eso no se pisa.
+  const r = await prisma.campania.updateMany({
+    where: { id, cuentaId: auth.ctx.cuenta.id, estado: "PROGRAMADA" },
+    data: { estado: "BORRADOR", programadaAt: null },
+  });
+  if (r.count === 0) return { ok: false, error: "La campaña ya no estaba programada" };
+  revalidatePath(`/campanias/${id}`);
+  return { ok: true };
 }
 
 /** Promueve el asunto ganador al resto de la lista (holdout). Manual. */

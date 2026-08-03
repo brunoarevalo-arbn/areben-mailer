@@ -9,6 +9,7 @@ import { getCuentaActiva } from "@/lib/cuenta";
 import { BotonVistaPrevia } from "@/components/BotonVistaPrevia";
 import { BotonEliminar } from "@/components/BotonEliminar";
 import { tapTarget } from "@/lib/ui";
+import { horaLocal } from "@/lib/fechas";
 import { crearCampania, eliminarCampania } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -25,13 +26,16 @@ const estadoBadge: Record<string, "default" | "amber" | "blue" | "success"> = {
  * Los filtros de arriba. Mismo mecanismo que las familias de la galería: un link
  * con querystring, sin estado de cliente ni un `"use client"` de más.
  *
- * Son dos y no cinco a propósito: `PROGRAMADA` y `CANCELADA` existen en el enum
- * pero **no las escribe nadie** —las únicas transiciones son BORRADOR→ENVIANDO y
- * ENVIANDO→ENVIADA—, así que una pestaña para ellas siempre saldría vacía.
+ * Son tres y no cinco: `PROGRAMADA` la escribe `programarCampania` desde el
+ * 3-ago-2026 y por eso tiene su pestaña. `CANCELADA` sigue sin tener una — la
+ * escribe solo la ventana de gracia del cron (`lib/email/programadas.ts`) cuando
+ * una programada no pudo salir en 2 horas, que es un caso raro y que no se busca
+ * por pestaña: aparece igual en "Todas".
  */
 const FILTROS: readonly { id: string; label: string; estados: EstadoCampania[] | null }[] = [
   { id: "todas", label: "Todas", estados: null },
   { id: "borradores", label: "Borradores", estados: ["BORRADOR"] },
+  { id: "programadas", label: "Programadas", estados: ["PROGRAMADA"] },
   { id: "enviadas", label: "Enviadas", estados: ["ENVIANDO", "ENVIADA"] },
 ];
 
@@ -121,6 +125,13 @@ export default async function CampaniasPage({
                     <span className="text-sm text-subtle tabular-nums">
                       {c._count.envios.toLocaleString("es-AR")} envíos
                     </span>
+                  )}
+                  {/* La hora va PEGADA al badge: "PROGRAMADA" sin cuándo obliga a
+                      abrir la campaña para saber lo único que importa de ese
+                      estado. Se esconde abajo de `sm` porque ahí la fila ya está
+                      llena — el editor la sigue mostrando entera. */}
+                  {c.estado === "PROGRAMADA" && c.programadaAt && (
+                    <span className="hidden text-sm text-subtle sm:inline">{horaLocal(c.programadaAt)}</span>
                   )}
                   <Badge variant={estadoBadge[c.estado] ?? "default"}>{c.estado}</Badge>
                   <BotonVistaPrevia

@@ -7,6 +7,8 @@ import {
   guardarCampania,
   enviarPrueba,
   enviarCampania,
+  programarCampania,
+  cancelarProgramacion,
   guardarComoPlantilla,
   promoverGanador,
 } from "@/app/(app)/campanias/actions";
@@ -17,7 +19,9 @@ import { Button } from "@/components/ui/Button";
 import { usePermisos } from "@/components/PermisosProvider";
 import { AISoonButton } from "@/components/ui/AISoonButton";
 import { Desplegable } from "@/components/ui/Desplegable";
-import { inputClass } from "@/lib/ui";
+import { inputClass, campoBase } from "@/lib/ui";
+import { Badge } from "@/components/ui/Badge";
+import { diaLocal, horaLocal } from "@/lib/fechas";
 
 interface Lista {
   id: string;
@@ -55,14 +59,24 @@ interface Props {
   segmentos: Segmento[];
   emailPrueba: string;
   estado: string;
+  /** ISO del instante programado, si la campaña está PROGRAMADA. */
+  programadaAt?: string | null;
   abInfo?: AbInfo;
 }
 
 const PCT_OPCIONES = [10, 20, 30, 50];
+/**
+ * La hora que se ofrece de fábrica al programar.
+ *
+ * No es un número al azar: la curva de aperturas del T01 de Zattia (2-ago-2026)
+ * puso 74 de 112 aperturas entre las 20 y las 00. Sale a las 19 para estar
+ * arriba en la bandeja cuando llega ese pico.
+ */
+const HORA_SUGERIDA = "19:00";
 const tasa = (ap: number, env: number) => (env ? Math.round((ap / env) * 100) : 0);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPrueba, estado, abInfo }: Props) {
+export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPrueba, estado, programadaAt, abInfo }: Props) {
   const router = useRouter();
   const [nombre, setNombre] = useState(initial.nombre);
   const [asunto, setAsunto] = useState(initial.asunto);
@@ -115,9 +129,27 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
       setTimeout(() => setMsg(null), 5000);
     });
 
+  // ⚠️ `PROGRAMADA` NO entra acá: una campaña programada no está enviada ni en
+  // curso — todavía se puede editar, cancelar o mandar antes de hora.
   const [enviado, setEnviado] = useState(estado === "ENVIADA" || estado === "ENVIANDO");
   const [progreso, setProgreso] = useState<string | null>(null);
   const [promoviendo, setPromoviendo] = useState(false);
+
+  /**
+   * La programación, ya escrita en palabras ("lunes 3 de agosto, 19:00") o null.
+   *
+   * 🔑 El texto sale de `horaLocal`, que resuelve en la zona del **negocio**: el
+   * panel dice la misma hora se abra desde donde se abra, y el servidor y el
+   * cliente pintan el mismo string (si no, sería un mismatch de hidratación).
+   */
+  const [programada, setProgramada] = useState<string | null>(
+    programadaAt ? horaLocal(new Date(programadaAt)) : null,
+  );
+  // Mismo motivo para el día de fábrica: `diaLocal` y no `toISOString()`, que a
+  // partir de las 21:00 propondría mañana.
+  const [dia, setDia] = useState(() => diaLocal(new Date()));
+  const [hora, setHora] = useState(HORA_SUGERIDA);
+  const [programando, setProgramando] = useState(false);
 
   // El envío lo maneja la cola del servidor: acá solo se mira el progreso, así
   // que cerrar la pestaña ya no corta nada.
@@ -152,6 +184,35 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
     // "Enviados 4/4" se lee como si la campaña hubiera salido entera.
     if (r.modo === "ensayo") setMsg(`Modo ensayo: salió a ${r.total} casilla${r.total === 1 ? "" : "s"} habilitada${r.total === 1 ? "" : "s"}; se omitieron ${r.omitidos}.`);
     await seguirProgreso(r.total ?? 0, abActivo ? "Test enviado" : "Enviados");
+    router.refresh();
+  };
+
+  /**
+   * Deja la campaña agendada. Guarda primero: lo que se programa tiene que ser
+   * lo que está en pantalla, no lo último que alguien guardó a mano.
+   *
+   * Las guardas de destino y asunto B se repiten acá y en el servidor a
+   * propósito: acá para avisar sin viaje, allá porque es la que vale.
+   */
+  const programar = async () => {
+    if (!destino) { setMsg("Elegí un destino primero"); return; }
+    if (abActivo && !asuntoB.trim()) { setMsg("Completá el asunto B"); return; }
+    setProgramando(true);
+    await guardarCampania(campData());
+    const r = await programarCampania(id, dia, hora);
+    setProgramando(false);
+    if (!r.ok) { setProgreso(`Error: ${r.error}`); return; }
+    setProgreso(null);
+    setProgramada(r.texto);
+    router.refresh();
+  };
+
+  const desprogramar = async () => {
+    setProgramando(true);
+    const r = await cancelarProgramacion(id);
+    setProgramando(false);
+    if (!r.ok) { setProgreso(`Error: ${r.error}`); return; }
+    setProgramada(null);
     router.refresh();
   };
 
@@ -432,8 +493,60 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
               disabled={enviado || !puedeEnviar}
               title={puedeEnviar ? undefined : motivo("enviar")}
             >
-              {enviado ? "Enviada / en curso" : abActivo ? "Enviar test A/B" : "Enviar a la lista"}
+              {enviado
+                ? "Enviada / en curso"
+                : programada
+                  ? "Enviar ahora"
+                  : abActivo
+                    ? "Enviar test A/B"
+                    : "Enviar a la lista"}
             </Button>
+
+            {/* Programar. Solo para quien puede enviar: programar ES enviar, más
+                tarde. Y no se ofrece cuando la campaña ya salió. */}
+            {puedeEnviar && !enviado && (
+              programada ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface p-3">
+                  <Badge variant="amber">Programada</Badge>
+                  <span className="text-sm text-foreground">para el {programada}</span>
+                  <Button variant="secondary" size="sm" onClick={desprogramar} disabled={programando}>
+                    {programando ? "…" : "Cancelar programación"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-end gap-2 border-t border-accent-subtle-foreground/20 pt-3">
+                  <label className="text-xs text-muted">
+                    Día
+                    <input
+                      type="date"
+                      className={`${campoBase} mt-1 block`}
+                      value={dia}
+                      min={diaLocal(new Date())}
+                      onChange={(e) => setDia(e.target.value)}
+                    />
+                  </label>
+                  <label className="text-xs text-muted">
+                    Hora
+                    <input
+                      type="time"
+                      className={`${campoBase} mt-1 block`}
+                      value={hora}
+                      onChange={(e) => setHora(e.target.value)}
+                    />
+                  </label>
+                  <Button variant="secondary" onClick={programar} disabled={programando}>
+                    {programando ? "Programando…" : "Programar"}
+                  </Button>
+                  {/* La letra chica es honesta a propósito: el cron corre cada 15
+                      minutos, así que prometer la hora exacta sería prometer algo
+                      que el sistema no puede cumplir. */}
+                  <p className="w-full text-xs text-subtle">
+                    Sale a esa hora o hasta 15 minutos después. Si a esa hora algo lo impide, reintenta
+                    durante 2 horas y después se cancela — nunca sale a una hora que no elegiste.
+                  </p>
+                </div>
+              )
+            )}
             {progreso && <div className="text-sm text-foreground">{progreso}</div>}
           </div>
         )}
