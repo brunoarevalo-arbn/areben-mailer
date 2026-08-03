@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
 import { reglasToWhere, type Reglas } from "@/lib/segmentos";
+import { MANDABLE } from "@/lib/campanias";
 import { crearSegmento } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +20,10 @@ export default async function SegmentosPage() {
   const conCount = await Promise.all(
     segmentos.map(async (s) => ({
       ...s,
+      // MANDABLE, no `estado: "ACTIVO"` a secas: el número de la lista tiene que
+      // ser el mismo que va a mandar `contactosElegibles`. Ver `contarSegmento`.
       count: await prisma.contacto.count({
-        where: { cuentaId: cuenta.id, estado: "ACTIVO", ...reglasToWhere(s.reglas as unknown as Reglas) },
+        where: { cuentaId: cuenta.id, ...MANDABLE, ...reglasToWhere(s.reglas as unknown as Reglas) },
       }),
     })),
   );
