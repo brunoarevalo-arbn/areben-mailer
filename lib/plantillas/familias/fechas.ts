@@ -368,10 +368,14 @@ export const FECHAS: readonly DefPreset[] = [
         imagen: { radio: 0 },
       },
       bloques: [
-        // 🟡 En la captura el menú va **adentro** de la banda negra del
-        // encabezado. `caja.fondo` no existe en `menu` (⛔ está en el backlog con
-        // 2 pedidos), así que queda sobre el blanco de la tarjeta.
-        ...menuTienda(tienda, { cuerpo: { tamano: 13 } }),
+        // ✅ El menú va **adentro** de la banda negra del encabezado, como en la
+        // captura. El fondo es el **negro de página** (`#000000`) y no el
+        // `#111111` de las barras: la banda arranca el borde de arriba de la
+        // tarjeta y tiene que fundirse con el fondo sobre el que se dibuja el
+        // encabezado, que es lo que hace leer las dos cosas como una sola banda.
+        // Los links salen blancos solos — nadie eligió `color`, así que se
+        // recalculan contra la banda.
+        ...menuTienda(tienda, { cuerpo: { tamano: 13 } , caja: { fondo: "#000000", padY: 14 } }),
         // La portada de la referencia es texto a la izquierda y foto recortada a
         // la derecha: eso no es un `hero` —que es de una columna— sino dos
         // celdas. `texto-imagen` es "la última con foto".

@@ -123,12 +123,17 @@ export const VENTA: readonly DefPreset[] = [
         imagen: { radio: 32 },
       },
       bloques: [
-        // 🟡 **El menú de la captura va sobre una banda celeste y eso no es
-        // expresable**: `caja.fondo` solo lo dibujan `hero`, `seccion` y `cupon`
-        // —los tres bloques que arman su propio contenedor—; los demás pasan por
-        // `pad()`, que es margen lateral y nada más (`propsCaja` en
-        // `estilos.ts`). Queda en blanco, con el peso de la captura.
-        ...menuTienda(tienda, { cuerpo: { peso: 700 } }),
+        // ✅ El menú va sobre la banda celeste, como en la captura. Es el mismo
+        // `#18a8e8` del fondo de página: la banda de arriba con el logo y esta
+        // son **una sola** en la referencia, y la tarjeta empieza justo acá.
+        //
+        // 🔴 **El color va escrito.** Es el único de los seis con banda de
+        // contraste MEDIO, y ahí el recálculo automático no sirve: sale un
+        // celeste apenas más oscuro sobre el celeste, ilegible. Los links de la
+        // captura son casi negros, el mismo `#111111` de los CTA. La lección es
+        // del brillo del fondo, no del bloque: sobre negro o sobre rosa el
+        // automático acierta, sobre un color de saturación media no.
+        ...menuTienda(tienda, { cuerpo: { peso: 700, color: "#111111" }, caja: { fondo: "#18a8e8", padY: 14 } }),
         portada("portada-verano-1", {
           titulo: "Final sale",
           subtitulo: `Últimas unidades de la temporada en ${marca}. Lo que se va, se va.`,
@@ -300,6 +305,14 @@ export const VENTA: readonly DefPreset[] = [
         imagen: { radio: 4 },
       },
       bloques: [
+        // ⛔ **Este NO lleva `caja.fondo`, y no es un olvido.** R-021 figura en la
+        // lista de las seis referencias con "el menú adentro de una banda", pero
+        // mirando la captura al lado es la excepción: los links van sobre BLANCO,
+        // entre la banda oscura del logo y la portada negra. Ese blanco ya es la
+        // tarjeta, así que el bloque sale bien sin tocar nada — ponerle banda lo
+        // alejaría de la referencia en vez de acercarlo. Verificado el 3-ago-2026
+        // con `mirar-preset`. Las otras cinco (003 · 005 · 010 · 014 · 016) sí la
+        // llevan.
         ...menuTienda(tienda),
         portada("portada-deco-1", {
           titulo: "Mega oferta",

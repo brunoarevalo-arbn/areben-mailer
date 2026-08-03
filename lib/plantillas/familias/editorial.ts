@@ -55,13 +55,13 @@ export const EDITORIAL: readonly DefPreset[] = [
         imagen: { radio: 0 },
       },
       bloques: [
-        // 🟡 En la captura el menú va sobre el rosa de la banda de arriba, que
-        // es el fondo de PÁGINA; el bloque `menu` vive adentro de la tarjeta, o
-        // sea sobre el blanco. `caja.fondo` no existe en `menu` (⛔ ver
-        // `PLANTILLAS.md`) y con esta referencia ese pedido llega a **5**. Acá
-        // la diferencia es de dos tonos casi iguales, no de blanco contra negro
-        // como en `vuelta-al-cole`.
-        ...menuTienda(tienda, { cuerpo: { tamano: 14 } }),
+        // ✅ El menú va sobre el rosa de la banda de arriba, que es el mismo
+        // `#fcf0ec` del fondo de PÁGINA: en la captura el logo y los links
+        // comparten una sola banda, y la tarjeta blanca arranca recién en la
+        // portada. Es la más suave de las seis —dos tonos casi iguales, no
+        // blanco contra negro como en `vuelta-al-cole`— pero es la que hace que
+        // el mail empiece con la franja rosa en vez de con un filo blanco.
+        ...menuTienda(tienda, { cuerpo: { tamano: 14 }, caja: { fondo: "#fcf0ec", padY: 14 } }),
         // ⚠️ La portada de la referencia es una persona de frente y **el pack
         // excluye las caras reconocibles a propósito**: la plantilla la manda un
         // tercero a su propia lista.
@@ -189,12 +189,15 @@ export const EDITORIAL: readonly DefPreset[] = [
         imagen: { radio: 0 },
       },
       bloques: [
-        // 🟡 Acá sí duele: en la captura el menú va en lima **adentro de la
-        // banda negra** de arriba, pegado al logo. Sobre el blanco de la tarjeta
-        // los links salen negros. Es el mismo 🟡 de `vuelta-al-cole` y
-        // `negro-y-dorado`, y el que lleva el pedido de `caja.fondo` en `menu`
-        // a **5** referencias.
-        ...menuTienda(tienda, { cuerpo: { tamano: 13, peso: 700 } }),
+        // ✅ El menú va en lima **adentro de la banda negra** de arriba, pegado
+        // al logo, como en la captura. Es el caso donde más se notaba: sobre el
+        // blanco de la tarjeta los links salían negros.
+        //
+        // 🔴 **El lima va escrito**, no recalculado: el motor recolorea los links
+        // contra la banda solo cuando nadie eligió `color`, y sobre negro eso da
+        // BLANCO. Acá el lima es el rasgo de la referencia —el único color
+        // saturado del mail— así que se clava.
+        ...menuTienda(tienda, { cuerpo: { tamano: 13, peso: 700, color: "#d8fc54" }, caja: { fondo: "#000000", padY: 14 } }),
         // La portada con el texto abajo a la IZQUIERDA: `caja.align` desde el
         // 2-ago-2026 es una sola perilla para todo el interior.
         portada("portada-verano-1", {

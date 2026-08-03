@@ -185,6 +185,15 @@ solo cuando cambia el tema) · **`#f59e0b`** (elegido a mano, queda clavado) ·
 `null`: `EstiloResuelto.elegidas` responde "¿lo eligió una persona?" y de eso
 dependen la legibilidad contextual y el modo oscuro.
 
+🔴 **La legibilidad contextual sirve para fondos EXTREMOS, no para los del medio**
+(medido el 3-ago-2026 aplicando `caja.fondo` a los presets). Sobre negro o sobre
+un rosa muy claro el recálculo acierta solo; sobre el celeste `#18a8e8` de
+`final-sale` devolvió un celeste apenas más oscuro —links ilegibles sobre su
+propia banda— y hubo que clavar el color a mano. **En una banda de saturación
+media el color se escribe**, no se hereda. (El otro motivo para clavarlo es que
+el color *sea* el rasgo: el lima de `dos-colores` sobre negro es legible como
+blanco, pero blanco no es esa referencia.)
+
 **El panel de estilo no ofrece lo que el mail no hace.** Los controles salen de
 `propsDeRol(tipo, rol)` en `estilos.ts`, y `probar-panel-estilo.ts` renderiza el
 bloque con y sin cada propiedad para exigir que el HTML cambie. Encontró 24
@@ -768,10 +777,19 @@ que se anota en un pop-up y el que compra por primera vez.
 
 ## Estado del trabajo
 
-- **Nada está enviando hoy.** El gate está cerrado y ninguna automation está
-  prendida en producción — prenderlas se hace **desde la UI**, que es lo que
-  registra el webhook en Tiendanube (un `UPDATE` a mano deja la automation
-  activa y sorda).
+- 🟢 **El mailer ESTÁ ENVIANDO** (medido contra prod el 3-ago-2026). El gate está
+  **abierto** (`ENVIO_REAL=true`), el proveedor es **SES** y hay dos cosas en el aire:
+  - **La bienvenida de Zattia** (`NUEVO_SUSCRIPTOR`) está **`ACTIVO`** y lleva **20 runs
+    `ENVIADO`**, de a ~1 por día, disparados por los leads del pop-up de Resorty.
+  - **El primer masivo propio salió el 2-ago 20:13**: T01 de Zattia, **500 envíos**, 8
+    rebotes (1,6%), **0 quejas**, 1 baja, 39 aperturas y 3 clicks. Quedan **6 tramos**
+    (`Todos los contactos — T02…T07`), y el siguiente escalón va **entre días, no entre
+    horas**: lo que Gmail mide es el volumen diario de un dominio que hasta ayer valía cero.
+  - ⚠️ **Las otras 7 automations siguen `PAUSADO`**, incluida la bienvenida de BDI, que
+    tiene **360 leads de la Ruleta con 0 runs** entrando a ~50 por día. Prenderlas se hace
+    **desde la UI**, que es lo que registra el webhook en Tiendanube (un `UPDATE` a mano
+    deja la automation activa y sorda).
+  - **Nada trabado**: 0 envíos `ENCOLADO` y 0 `FALLIDO` en toda la base.
 - ✅ **Ya no se pueden duplicar** (31-jul-2026). BDI llegó a tener dos bienvenidas
   (`cmrwf6j3m…` y `cms6kpmqg…`) porque `/automations` dibujaba "Crear" siempre,
   sin mirar si ya había una con ese trigger; activar las dos encolaba **354 runs
@@ -811,13 +829,29 @@ que se anota en un pop-up y el que compra por primera vez.
     devuelve `bloqueado`; el cron de automations deja el run **PENDIENTE**.
     `FALLIDO` es terminal y sin reintento: quemaría un tramo entero —o la única
     bienvenida que un contacto recibe en su vida— por un dato de diez segundos.
-  - Hoy **solo Zattia** tiene remitente (`info@zattia.com.ar`). BDI, Stunned,
-    Resorty Lab y la cuenta de QA no ⇒ **BDI no puede enviar hasta cargarlo**,
-    con `scripts/set-remitente.ts` o desde `/remitentes`.
-- **Proveedor sin decidir.** Resend está activo; SES quedó aprobado. Falta el
-  ensayo comparativo y el webhook de Resend.
+  - Medido el 3-ago-2026: **Zattia (`info@zattia.com.ar`) y BDI
+    (`info@bdiaccesorios.com.ar`) tienen remitente y los dos figuran `AUTENTICADO`.**
+    **Stunned, Resorty Lab y la cuenta de QA no tienen ⇒ esas tres no pueden enviar**
+    hasta cargarlo, con `scripts/set-remitente.ts` o desde `/remitentes`.
+- ✅ **El proveedor está decidido: SES en producción desde el 30-jul-2026** (detalle en
+  "Envío: gate, modos y proveedor"). Lo que sigue sin construirse es el **webhook de
+  rebotes de Resend**, y no hace falta mientras el proveedor sea SES.
+  - ⚠️ **Ningún envío llega jamás a `ENTREGADO`**: el event destination de SES solo está
+    suscripto a `BOUNCE` y `COMPLAINT` (`scripts/setup-sns.ts:110`). La entrega se
+    **calcula** (enviados − rebotes), no se mide. No es un bug — lo que decide la
+    reputación sí llega — pero explica el `DELIVERY=0` al mirar eventos.
 - **Verificar en browser lo de permisos** con el usuario EDITOR de prueba: las
   4 fases están deployadas pero solo se probaron por script.
+- ▶️ **Dos huecos medidos el 3-ago-2026, los dos con reloj:**
+  - **28 leads de pop-up de Zattia sin bienvenida**, todos del 28 al 31-jul, o sea de
+    *antes* de que la automation se prendiera (no hay fuga: todo lo que entró después
+    tiene run). 🔴 **Sus 28 cupones SIGUEN VIGENTES** —validez 7 días, el más viejo vence
+    el 4-ago— y el código de cada uno está guardado en `PopupEvento.cupon`. El
+    `backfill-bienvenida.ts` los manda **sin cupón**, por una premisa (*"los códigos ya
+    vencieron"*) que hoy es falsa y que en dos días deja de serlo.
+  - **85 contactos de Zattia quedaron fuera de los tramos**: la lista madre creció a
+    6.823 y los 7 tramos suman 6.738. Re-correr `listas-por-tramo` los agrega **al
+    final** sin re-asignar a nadie; si no, son gente que nunca recibe el masivo.
 - **✅ El import de Perfit está APLICADO** (29-jul-2026,
   `scripts/importar-nuby-perfit.ts`). BDI pasó de 16.976 a **21.225 contactos**:
   4.249 nuevos, **650 suprimidos (615 rebotes + 22 bajas + 1 queja + 12 creados

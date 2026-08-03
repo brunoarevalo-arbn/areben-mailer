@@ -245,9 +245,10 @@ Cuatro cosas, todas de la primera comparación:
 - **La fila de personas con foto** (R-017): 🔴 **el pack excluye las caras reconocibles a
   propósito** —la plantilla la manda un tercero a su propia lista—, así que nombre y cargo van
   en una fila de texto. No es una limitación del motor: es el criterio del pack.
-- **El menú adentro de una banda de color** (R-014, R-015): `caja.fondo` no existe en `menu`.
-  🔑 Con R-014 el contador llegó a **3** y pasa el umbral de la regla 5 ⇒ queda esperando que
-  Bruno decida si entra al motor.
+- ~~**El menú adentro de una banda de color**~~ (R-014, R-015): ✅ **resuelto el 3-ago-2026**.
+  `caja.fondo` entró en `menu` por la regla 5 y está aplicado en `ocasion`, `dos-colores`,
+  `final-sale`, `vuelta-al-cole` y `negro-y-dorado`. 🔴 Al aplicarlo apareció que **R-021 no
+  era de este grupo**: su menú va sobre blanco, así que `mega-oferta` se queda sin banda.
 - **La segunda columna del hero** (R-015: el "40% OFF" al costado del título) y **la letra
   gigante de fondo** (R-011): el `hero` es de una columna y `position` está prohibido.
 - **El pie con color propio**: el fondo de página es uno solo y arriba tiene que ser el de la

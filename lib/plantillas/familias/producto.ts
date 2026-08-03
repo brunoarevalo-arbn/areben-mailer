@@ -209,11 +209,12 @@ export const PRODUCTO: readonly DefPreset[] = [
         // —la plantilla la manda un tercero a su propia lista— así que va una
         // textura del mismo mundo.
         { tipo: "imagen", url: foto("banda-tela"), alt: alt("banda-tela"), sangre: true },
-        // 🟡 En la captura el menú va **adentro** de la banda negra del pie.
-        // `caja.fondo` no existe en `menu` (⛔ ver `PLANTILLAS.md`): queda sobre
-        // el blanco de la tarjeta, igual que en `vuelta-al-cole`. Con esta
-        // referencia el contador de ese pedido llega a **4**.
-        ...menuTienda(tienda, { cuerpo: { tamano: 13 } }),
+        // ✅ El menú va **adentro** de la banda negra del pie, como en la
+        // captura. Es el único de los seis donde la banda cierra el mail en vez
+        // de abrirlo, y va pegada a la foto a sangre de arriba: con `caja.fondo`
+        // el aire es padding y no margen, así que no queda una franja blanca
+        // entre la foto y la banda.
+        ...menuTienda(tienda, { cuerpo: { tamano: 13 }, caja: { fondo: "#000000", padY: 16 } }),
         redes,
       ],
     }),
