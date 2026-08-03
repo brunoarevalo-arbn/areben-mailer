@@ -86,6 +86,19 @@ export async function encolarProgramadas(): Promise<ResultadoProgramadas> {
 
     const res = await encolarCampania(c.cuenta, c.id);
     if (res.ok) {
+      // 🔴 **El lease se suelta ACÁ, y no es opcional.** Medido en el E2E del
+      // 3-ago-2026: dejándolo tomado, la campaña quedaba ENVIANDO con sus envíos
+      // ENCOLADO y `procesarCola()` —que corre a continuación, en esta misma
+      // invocación— la salteaba por "lease ajeno"… que era el nuestro. El
+      // auto-encadenamiento chocaba contra la misma pared, así que la campaña se
+      // quedaba quieta hasta que el arriendo venciera solo (2 min) o pasara el
+      // cron siguiente (15 min). O sea: exactamente el "sale 15 minutos tarde y
+      // nadie sabe por qué" que esta función existe para evitar.
+      //
+      // Soltarlo es seguro: la campaña ya está ENVIANDO, así que ni este levante
+      // (que solo mira PROGRAMADA) ni otro worker la pueden volver a encolar, y
+      // de acá en más el que manda es el lease de la cola.
+      await prisma.campania.update({ where: { id: c.id }, data: { procesandoHasta: null } });
       r.encoladas++;
       r.detalle.push(`${c.nombre}: ${res.total} envíos encolados`);
       continue;
