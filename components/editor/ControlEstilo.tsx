@@ -6,7 +6,7 @@ import {
   type ValorColor,
 } from "@/lib/email/estilos";
 import type { Paleta } from "@/lib/email/tema";
-import { campoCompacto } from "@/lib/ui";
+import { campoCompacto, tapTarget } from "@/lib/ui";
 import { Pipette, RotateCcw } from "lucide-react";
 
 /**
@@ -226,25 +226,63 @@ export function ControlEnum<T extends string | number>({
   );
 }
 
+/**
+ * Heredar · Sí · No. **Tres estados y no una casilla**, y el tercero es el que
+ * importa.
+ *
+ * 🔴 Una casilla solo sabe decir dos cosas, y acá hacen falta tres: *heredar*
+ * (que es la ausencia de la clave), *sí* y *no*. Mientras fue casilla,
+ * destildarla escribía **heredar**, así que un `mayusculas: true` puesto por la
+ * plantilla en la capa de documento **no se podía apagar desde el bloque**: se
+ * escribía en minúscula y el mail salía en mayúscula igual. El `false` que hace
+ * falta para eso ahora lo conserva `sanearBool` (ver `lib/email/estilos.ts`).
+ *
+ * `Heredar` muestra entre paréntesis qué está heredando, igual que el
+ * "Automático (…)" de `ControlEnum`: sin eso las tres opciones se ven iguales y
+ * no hay forma de saber qué pasa si no se toca nada.
+ */
 export function ControlBool({
   label,
   valor,
+  resuelto,
   onChange,
 }: {
   label: string;
   valor: boolean | undefined;
-  /** Solo se guarda `true`: un `false` es lo mismo que no estar. */
-  onChange: (v: true | undefined) => void;
+  /** Lo que da la cascada si este bloque no dice nada. */
+  resuelto?: boolean;
+  onChange: (v: boolean | undefined) => void;
 }) {
+  const opciones: { v: boolean | undefined; label: string }[] = [
+    { v: undefined, label: resuelto === undefined ? "Heredar" : `Heredar (${resuelto ? "sí" : "no"})` },
+    { v: true, label: "Sí" },
+    { v: false, label: "No" },
+  ];
   return (
-    <label className="flex items-center gap-2 text-sm text-muted">
-      <input
-        type="checkbox"
-        checked={!!valor}
-        onChange={(e) => onChange(e.target.checked ? true : undefined)}
-        className="accent-accent"
-      />
-      {label}
-    </label>
+    <div>
+      <span className="mb-1 block text-xs font-semibold text-muted">{label}</span>
+      {/* Botones y no un `<select>` de tres: son tres opciones de una palabra y
+          el panel ya viene denso de desplegables. Mismo patrón que el toggle
+          Escritorio/Celular del preview. `tapTarget` porque abajo de `lg` esto
+          se toca con el dedo. */}
+      <div className="flex items-center gap-1 rounded-lg border border-border p-0.5">
+        {opciones.map((o) => {
+          const puesto = valor === o.v;
+          return (
+            <button
+              key={String(o.v)}
+              type="button"
+              onClick={() => onChange(o.v)}
+              aria-pressed={puesto}
+              className={`${tapTarget} flex-1 rounded-md px-2 py-1 text-xs transition-colors ${
+                puesto ? "bg-accent-subtle text-accent-subtle-foreground" : "text-muted hover:text-foreground"
+              }`}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }

@@ -7,6 +7,7 @@ import { useHistorial } from "@/components/editor/useHistorial";
 import type { Marca } from "@/lib/marca";
 import { guardarPlantilla, usarPlantilla, duplicarPlantilla } from "@/app/(app)/plantillas/actions";
 import { Button } from "@/components/ui/Button";
+import { BarraAcciones } from "@/components/ui/BarraAcciones";
 import { usePermisos } from "@/components/PermisosProvider";
 import { inputClass } from "@/lib/ui";
 
@@ -48,7 +49,7 @@ export function PlantillaEditor({
     });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-24">
       <label className="block max-w-md text-sm">
         <span className="text-muted">Nombre de la plantilla</span>
         <input className={inputClass} value={nombre} onChange={(e) => setNombre(e.target.value)} />
@@ -69,10 +70,7 @@ export function PlantillaEditor({
           Estás viendo esta plantilla en modo lectura.
         </div>
       ) : (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface p-4 shadow-sm">
-          <Button variant="primary" onClick={guardar} disabled={saving}>
-            {saving ? "Guardando…" : "Guardar"}
-          </Button>
+        <BarraAcciones onGuardar={guardar} guardando={saving} mensaje={msg}>
           <Button
             variant="accent"
             disabled={usando}
@@ -90,8 +88,7 @@ export function PlantillaEditor({
           <Button variant="secondary" onClick={() => duplicarPlantilla(id)}>
             Duplicar
           </Button>
-          {msg && <span className="text-sm text-muted">{msg}</span>}
-        </div>
+        </BarraAcciones>
       )}
     </div>
   );

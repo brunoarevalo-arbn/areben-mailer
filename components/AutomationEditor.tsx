@@ -7,6 +7,7 @@ import { useHistorial } from "@/components/editor/useHistorial";
 import type { Marca } from "@/lib/marca";
 import { guardarAutomation, enviarPruebaAutomation, toggleAutomation } from "@/app/(app)/automations/actions";
 import { Button } from "@/components/ui/Button";
+import { BarraAcciones } from "@/components/ui/BarraAcciones";
 import { usePermisos } from "@/components/PermisosProvider";
 import { Pause, Play } from "lucide-react";
 import { campoBase } from "@/lib/ui";
@@ -55,7 +56,7 @@ export function AutomationEditor({
   const toggle = () => startToggle(async () => { await guardarAutomation(payload()); const r = await toggleAutomation(id); if (r.ok && r.estado) setEstado(r.estado); });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-24">
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-accent-subtle-foreground/30 bg-accent-subtle p-4">
         <div className="text-sm text-foreground">
           <span className="text-muted">Disparador:</span> <b>{triggerLabel}</b>
@@ -113,16 +114,12 @@ export function AutomationEditor({
           Estás viendo esta automation en modo lectura.
         </div>
       ) : (
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface p-4 shadow-sm">
-        <Button variant="primary" onClick={guardar} disabled={saving}>
-          {saving ? "Guardando…" : "Guardar"}
-        </Button>
+      <BarraAcciones onGuardar={guardar} guardando={saving} mensaje={msg}>
         <input className={`${campoBase} max-w-56`} value={pruebaEmail} onChange={(e) => setPruebaEmail(e.target.value)} />
         <Button variant="accent" onClick={prueba} disabled={sending}>
           {sending ? "Enviando…" : "Enviar prueba"}
         </Button>
-        {msg && <span className="text-sm text-muted">{msg}</span>}
-      </div>
+      </BarraAcciones>
       )}
     </div>
   );

@@ -38,6 +38,22 @@ export interface Tema {
  * Sans con un `<link>` a Google Fonts, y **Outlook y Gmail lo descartan**: el
  * mail cae al stack de respaldo igual, pero diseñado para una tipografía que
  * nadie ve. Estas se renderizan en todos lados sin descargar nada.
+ *
+ * 🔑 **Un mail no lleva la tipografía adentro: manda el NOMBRE.** La letra tiene
+ * que estar ya instalada en el aparato de quien abre, y por eso el que importa
+ * de cada stack es **el último**: `serif` / `sans-serif` / `monospace`.
+ * **Android no trae casi ninguna fuente con nombre** —solo Roboto y Noto—, así
+ * que ahí Georgia, Verdana y Tahoma caen TODAS al mismo lugar y lo único que
+ * queda de la elección es con serifa o sin serifa. Una fuente nueva no se agrega
+ * eligiendo un nombre lindo: se agrega eligiendo bien su cadena de caída.
+ *
+ * ⚠️ **"Web-safe" tampoco quiere decir "en todos lados"**: Tahoma no existe en
+ * iPhone, y las cuatro que se sumaron el 4-ago-2026 (Garamond, Century Gothic,
+ * Impact y la mitad de Palatino) son de escritorio. No se rompen: caen.
+ *
+ * ⛔ **No se pasa de once.** Todo nombre de más cae al mismo `serif`/`sans-serif`
+ * en iPhone y Android: sería un desplegable largo prometiendo diferencias que la
+ * mitad de la audiencia no puede ver.
  */
 export const FUENTES = {
   sistema: "Arial, Helvetica, sans-serif",
@@ -45,15 +61,31 @@ export const FUENTES = {
   verdana: "Verdana, Geneva, sans-serif",
   trebuchet: "'Trebuchet MS', Helvetica, Arial, sans-serif",
   tahoma: "Tahoma, Verdana, Segoe, sans-serif",
+  times: "'Times New Roman', Times, Georgia, serif",
+  palatino: "Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif",
+  garamond: "Garamond, 'EB Garamond', 'Times New Roman', Georgia, serif",
+  gothic: "'Century Gothic', AppleGothic, 'URW Gothic', Verdana, sans-serif",
+  impact: "Impact, Haettenschweiler, 'Arial Narrow Bold', 'Arial Black', sans-serif",
   mono: "'Courier New', Courier, monospace",
 } as const;
 
+/**
+ * ⚠️ La etiqueta dice **dónde se ve tal cual**, no solo cómo se llama: es el
+ * único lugar donde quien elige se entera de que en un teléfono puede caer. Y
+ * lo de Impact no es un adorno: en un párrafo es ilegible, y eso el motor no lo
+ * puede hacer cumplir sin una lista de props por rol paralela a `PROPS_POR_ROL`.
+ */
 export const FUENTE_LABEL: Record<keyof typeof FUENTES, string> = {
   sistema: "Arial (la de siempre)",
   georgia: "Georgia (con serifa)",
   verdana: "Verdana",
   trebuchet: "Trebuchet",
-  tahoma: "Tahoma",
+  tahoma: "Tahoma (en iPhone cae a Verdana)",
+  times: "Times New Roman (con serifa)",
+  palatino: "Palatino (con serifa, elegante)",
+  garamond: "Garamond (con serifa, fina · solo computadora)",
+  gothic: "Century Gothic (redonda · solo computadora)",
+  impact: "Impact (solo para títulos · solo computadora)",
   mono: "Monoespaciada",
 };
 

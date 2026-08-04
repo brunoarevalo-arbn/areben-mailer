@@ -125,7 +125,8 @@ titulo("El saneo de estilos");
             peso: 123,          // no está en el enum → se cae
             align: "justify",   // no está en el enum → se cae
             position: "absolute", // no está en la lista blanca → ni se mira
-            mayusculas: false,  // false es lo mismo que ausente
+            mayusculas: false,  // se GUARDA: es "apagado", que no es "heredar"
+            subrayado: "sí",    // no es booleano → se cae
           },
           inventado: { color: "#000" }, // rol que no existe
         },
@@ -141,7 +142,11 @@ titulo("El saneo de estilos");
   ok(e?.peso === undefined, "un peso fuera del enum se descarta");
   ok(e?.align === undefined, "un align fuera del enum se descarta");
   ok(!("position" in (e ?? {})), "position ni siquiera se copia");
-  ok(!("mayusculas" in (e ?? {})), "un false no se guarda: es lo mismo que heredar");
+  // 🔴 El `false` SÍ se guarda: en una cascada "apagado" y "heredar" son cosas
+  // distintas, y sin poder escribir el primero no hay forma de apagar desde el
+  // bloque algo que la plantilla prendió en la capa de documento.
+  ok(e?.mayusculas === false, "un false se guarda: apagar no es heredar", `quedó ${String(e?.mayusculas)}`);
+  ok(!("subrayado" in (e ?? {})), "lo que no es booleano se descarta igual que antes");
   ok(!("inventado" in (cuerpo(c)[0].estilo ?? {})), "un rol inexistente se descarta");
 }
 {

@@ -128,6 +128,13 @@ for (const archivo of [...DIRS.flatMap((d) => archivos(d)), ...SUELTOS]) {
   }
   for (const m of src.matchAll(/<(input|select|textarea)\b/g)) {
     const ventana = src.slice(m.index!, m.index! + 400);
+    // ⚠️ **Un `type="hidden"` no se enfoca, así que iOS no lo puede zoomear.**
+    // La regla no le aplica, y sin esta línea da un falso positivo doble: el
+    // campo no lleva `className` propio, así que la ventana de 400 caracteres
+    // se pasa a la etiqueta SIGUIENTE y termina midiendo la letra de otra cosa.
+    // Se mira solo el tramo de sus propios atributos, no la ventana entera.
+    const corte = ventana.indexOf('>');
+    if (/type="hidden"/.test(ventana.slice(0, corte < 0 ? 400 : corte))) continue;
     const cn = ventana.match(/className=(?:\{([^}]*(?:\}[^}]*)?)\}|"([^"]*)")/);
     if (!cn) continue;
     const expr = cn[1] ?? cn[2] ?? '';

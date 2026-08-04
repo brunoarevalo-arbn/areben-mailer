@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Monitor, Smartphone } from "lucide-react";
 
 /**
@@ -52,12 +52,19 @@ export function VistaPreviaMail({
   altoClase = ALTO_EDITOR,
   className = "",
   /**
-   * ⚠️ El default es `sandbox=""` **sin permisos**, y así se queda salvo que
-   * quien lo use tenga una razón escrita: el contenido sale de un Json que pudo
-   * escribir otro usuario de la cuenta y el iframe hereda el origen del panel.
-   * Sin esto, un color con comillas es XSS almacenado.
+   * ⚠️ **`allow-same-origin` y nada más.** Sin `allow-scripts` el navegador no
+   * ejecuta NADA de adentro —ni `<script>`, ni `onerror=`, ni `javascript:`—,
+   * así que el XSS almacenado que motivó el `sandbox=""` original sigue tapado:
+   * el contenido sale de un Json que pudo escribir otro usuario de la cuenta.
+   * Tampoco van `allow-forms`, `allow-popups` ni `allow-top-navigation`.
+   *
+   * Hace falta para poder **leer el `contentDocument` y frenar los clicks** (ver
+   * abajo). Con `sandbox=""` el origen es opaco, `contentDocument` es `null` y
+   * no hay forma de evitar que el mail navegue.
    */
-  sandbox = "",
+  sandbox = "allow-same-origin",
+  /** Tocar una parte del mail avisa qué bloque fue. Sin esto igual no navega. */
+  onBloque,
   /** El iframe recién montado, para quien necesite colgarle algo (el editor). */
   onIframe,
 }: {
@@ -68,8 +75,17 @@ export function VistaPreviaMail({
   altoClase?: string;
   className?: string;
   sandbox?: string;
+  onBloque?: (id: string) => void;
   onIframe?: (el: HTMLIFrameElement | null) => void;
 }) {
+  const [frame, setFrame] = useState<HTMLIFrameElement | null>(null);
+  const refIframe = useCallback(
+    (el: HTMLIFrameElement | null) => {
+      setFrame(el);
+      onIframe?.(el);
+    },
+    [onIframe],
+  );
   // Arranca en CELULAR a propósito: es donde el mail se lee de verdad, así que
   // es el default que empuja a diseñar para ahí. Escritorio queda a un click.
   const [movil, setMovil] = useState(true);
@@ -85,6 +101,40 @@ export function VistaPreviaMail({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  /**
+   * 🔴 **Un click adentro del mail nunca navega, se mire desde donde se mire.**
+   *
+   * Tocar un botón o un producto hacía que el iframe se fuera a la tienda —que
+   * no se deja enmarcar— y quedaba **un cuadro en blanco** hasta la próxima
+   * tecla. Vivía en `editor/PreviewMail.tsx`, y por eso seguía pasando en los
+   * dos lugares que no eran el editor: el modal de la galería y el ojo de las
+   * listas. Frenar la navegación es del **marco**, no del editor: no hay ningún
+   * lugar de la app donde irse de acá sea lo que alguien quiso.
+   *
+   * ⛔ `pointer-events-none` (lo que hace la miniatura de la galería) no sirve:
+   * el mail es más alto que el marco y hay que poder scrollearlo adentro.
+   *
+   * ⚠️ El listener se recuelga en cada `load`: el `srcDoc` se reemplaza entero
+   * cuando cambia el HTML, y con él el documento donde estaba colgado.
+   */
+  useEffect(() => {
+    if (!frame) return;
+    const alClick = (e: MouseEvent) => {
+      e.preventDefault();
+      const cerca = (e.target as Element | null)?.closest?.("[data-b]");
+      const id = cerca?.getAttribute("data-b");
+      if (id) onBloque?.(id);
+    };
+    const enganchar = () => frame.contentDocument?.addEventListener("click", alClick);
+    frame.addEventListener("load", enganchar);
+    // Por si el documento ya está montado cuando corre el efecto.
+    enganchar();
+    return () => {
+      frame.removeEventListener("load", enganchar);
+      frame.contentDocument?.removeEventListener("click", alClick);
+    };
+  }, [frame, onBloque, html]);
 
   const anchoMarco = movil ? ANCHO_MOVIL : Math.max(640, anchoMail);
   // Solo se achica, nunca se agranda: un mail de 600px estirado a 900 se vería
@@ -136,7 +186,7 @@ export function VistaPreviaMail({
         >
           <iframe
             title="Vista previa del mail"
-            ref={onIframe}
+            ref={refIframe}
             sandbox={sandbox}
             srcDoc={html}
             style={{

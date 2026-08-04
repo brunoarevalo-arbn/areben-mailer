@@ -16,6 +16,7 @@ import { EditorMail } from "@/components/editor/EditorMail";
 import { useHistorial } from "@/components/editor/useHistorial";
 import type { Marca } from "@/lib/marca";
 import { Button } from "@/components/ui/Button";
+import { BarraAcciones } from "@/components/ui/BarraAcciones";
 import { usePermisos } from "@/components/PermisosProvider";
 import { AISoonButton } from "@/components/ui/AISoonButton";
 import { Desplegable } from "@/components/ui/Desplegable";
@@ -260,7 +261,7 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
   const mejorEsB = abInfo ? tasa(abInfo.b.aperturas, abInfo.b.enviados) > tasa(abInfo.a.aperturas, abInfo.a.enviados) : false;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-24">
       {/* Los datos de envío arriba, a lo ancho: el editor de abajo necesita las
           tres columnas enteras y antes estaba metido en media pantalla.
 
@@ -377,10 +378,9 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
             Estás viendo esta campaña en modo lectura.
           </div>
         ) : (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface p-4 shadow-sm">
-          <Button variant="primary" onClick={guardar} disabled={saving}>
-            {saving ? "Guardando…" : "Guardar"}
-          </Button>
+        // El Guardar y sus vecinos viven en la barra fija de abajo; esto es solo
+        // el hueco donde estaban, que ya no dibuja nada.
+        <BarraAcciones onGuardar={guardar} guardando={saving} mensaje={msg}>
           <Button
             variant="secondary"
             onClick={async () => {
@@ -402,8 +402,7 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
           <Button variant="accent" onClick={prueba} disabled={sending}>
             {sending ? "Enviando…" : "Enviar prueba"}
           </Button>
-          {msg && <span className="text-sm text-muted">{msg}</span>}
-        </div>
+        </BarraAcciones>
         )}
 
         {/* Panel de resultados A/B — elegir ganador.

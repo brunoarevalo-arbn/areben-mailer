@@ -1,6 +1,7 @@
 "use client";
 
 import { Select } from "@/components/ui/Select";
+import { tapTarget } from "@/lib/ui";
 import type { PorFila, PorFilaMovil } from "@/lib/email/bloques";
 
 /**
@@ -42,10 +43,17 @@ export function GrillaControl({
       <Select
         label="En el celular"
         fullWidth
-        // Con tres por fila la grilla apila sí o sí, así que el control muestra
-        // "1" y se apaga: dejarlo elegible sería prometer algo que el mail no
-        // hace. El porqué está en `PorFila`, en bloques.ts.
-        value={String(tres ? 1 : movil ?? 1)}
+        // Con tres por fila la grilla apila sí o sí y el control se apaga:
+        // dejarlo elegible sería prometer algo que el mail no hace. El porqué
+        // está en `PorFila`, en bloques.ts.
+        //
+        // 🔴 Muestra el valor GUARDADO, no un "1" inventado. Hasta el
+        // 4-ago-2026 decía `tres ? 1 : movil ?? 1`, así que un bloque con
+        // `movil: 2` —que es lo que traen siete plantillas, todas junto con
+        // `porFila: 3`— se veía en "1". El dato en pantalla no era el del
+        // bloque, y al bajar la computadora a 2 el celular "cambiaba solo" a un
+        // valor que en realidad ya estaba puesto.
+        value={String(movil ?? 1)}
         disabled={tres}
         onChange={(e) => onChange({ movil: Number(e.target.value) === 2 ? 2 : 1 })}
         hint={
@@ -57,6 +65,19 @@ export function GrillaControl({
         <option value="1">1 producto por fila</option>
         <option value="2">2 productos por fila</option>
       </Select>
+      {tres && (
+        // El control apagado decía el MOTIVO y no el CAMINO. Que haya que
+        // deducir "entonces bajá el de arriba a 2" es lo que lo hace parecer
+        // roto en vez de decidido: el hint está abajo, en 12px y en gris, y lo
+        // que uno mira es el select que no responde.
+        <button
+          type="button"
+          onClick={() => onChange({ porFila: 2 })}
+          className={`${tapTarget} self-start rounded-lg border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:border-accent hover:text-foreground`}
+        >
+          Poner 2 en la computadora para poder elegir acá
+        </button>
+      )}
     </>
   );
 }

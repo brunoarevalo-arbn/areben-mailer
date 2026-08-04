@@ -21,6 +21,52 @@ import { marcaDe } from "@/lib/marca";
  * (contacto de ejemplo) y el carrito de muestra, igual que en la galería.
  */
 
+/**
+ * El mismo mail, pero como PÁGINA de verdad, para probar que los links lleven a
+ * donde tienen que llevar.
+ *
+ * Adentro del panel el mail vive en un iframe donde **todo click se frena**: es
+ * lo que evita que tocar un botón deje el preview en blanco. Eso está bien para
+ * editar y es inútil para lo otro que uno quiere hacer con un mail terminado,
+ * que es apretar un producto y ver si existe.
+ *
+ * Va por POST y con el HTML adentro del body —en vez de un `?id=` que lo lea de
+ * la base— porque lo que hay que probar es **lo que está en pantalla**, no lo
+ * último guardado: si el botón obligara a guardar antes, probar un link sería
+ * escribir en la base.
+ *
+ * 🔴 **`script-src 'none'` no es opcional.** Esto sirve HTML escrito por un
+ * usuario, en el ORIGEN del panel y como documento de primer nivel: sin CSP, el
+ * bloque de `html` crudo —que un ADMIN puede prender— correría con la cookie de
+ * sesión al lado. La CSP mata todo script y **no toca los links**, que es
+ * exactamente lo que hace falta. Es el equivalente del `sandbox` sin
+ * `allow-scripts` del iframe, del lado del servidor.
+ */
+export async function POST(req: Request) {
+  const auth = await autorizarApi("ver");
+  if (auth instanceof Response) return auth;
+
+  const form = await req.formData();
+  const html = form.get("html");
+  if (typeof html !== "string" || !html) {
+    return Response.json({ error: "falta el html" }, { status: 400 });
+  }
+
+  return new Response(html, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      // ⛔ `frame-ancestors 'none'` de yapa: esta página no se enmarca desde
+      // ningún lado, así que no puede usarse para disfrazar nada.
+      "content-security-policy": "script-src 'none'; object-src 'none'; frame-ancestors 'none'",
+      "x-content-type-options": "nosniff",
+      // No queda en el historial de nadie ni en un caché intermedio: es una
+      // pantalla de trabajo, no una URL para compartir.
+      "cache-control": "no-store",
+      "referrer-policy": "no-referrer",
+    },
+  });
+}
+
 const TIPOS = ["campania", "automation", "plantilla"] as const;
 type Tipo = (typeof TIPOS)[number];
 

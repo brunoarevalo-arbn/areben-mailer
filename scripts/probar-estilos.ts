@@ -125,9 +125,26 @@ titulo("extra() emite lo elegido, no el base");
   const dup = resolverEstilo("titulo", "titulo", { pal: PAL, propio: { titulo: { tamano: 40 } } });
   ok(!extra(dup, ["tamano"]).includes("font-size"), "lo que la plantilla ya escribió no se duplica");
 
-  // `false` no es una elección: el saneo lo borra, así que nunca llega acá.
   const falso = resolverEstilo("titulo", "titulo", { pal: PAL, propio: { titulo: { mayusculas: false } } });
   ok(!extra(falso).includes("uppercase"), "un `false` no emite nada");
+
+  // 🔴 El caso que motivó los tres estados (4-ago-2026), y el que hay que
+  // mirar si algún día alguien quiere volver a tirar el `false` en el saneo.
+  //
+  // La plantilla prende las mayúsculas para TODO el mail (capa de documento) y
+  // un bloque las apaga. Mientras el `false` se descartaba, el bloque escribía
+  // "heredar" y el documento ganaba: se escribía en minúscula y salía en
+  // mayúscula igual, sin forma de arreglarlo desde el editor.
+  const apagaAlDoc = resolverEstilo("titulo", "titulo", {
+    pal: PAL,
+    doc: { titulo: { mayusculas: true } },
+    propio: { titulo: { mayusculas: false } },
+  });
+  ok(!extra(apagaAlDoc).includes("uppercase"), "un `false` del bloque APAGA el `true` del documento");
+
+  // Y la contracara: sin el `false`, el documento sigue mandando.
+  const heredaDelDoc = resolverEstilo("titulo", "titulo", { pal: PAL, doc: { titulo: { mayusculas: true } } });
+  ok(extra(heredaDelDoc).includes("uppercase"), "sin decir nada, el bloque hereda el `true` del documento");
 }
 
 // ─── El padding simétrico se escribe corto ───────────────────────────────────

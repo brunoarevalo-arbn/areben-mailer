@@ -52,6 +52,7 @@ const VALORES: Record<string, readonly unknown[]> = {
   align: ["right", "center"],
   mayusculas: [true],
   subrayado: [true],
+  italica: [true],
   padX: [61],
   padY: [59],
   radio: [27],

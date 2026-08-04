@@ -121,6 +121,12 @@ export interface EstiloBloque {
   align?: "left" | "center" | "right";
   mayusculas?: boolean;
   subrayado?: boolean;
+  /**
+   * ⚠️ A diferencia de `fuente`, esta se ve en TODOS lados: `font-style` no
+   * descarga nada, el aparato usa la versión inclinada de la letra que ya tiene.
+   * La excepción es Impact, que no tiene una y el sistema la sintetiza torcida.
+   */
+  italica?: boolean;
   /* caja */
   padX?: number;
   padY?: number;
@@ -217,10 +223,25 @@ function sanearEnum<T extends string | number>(v: unknown, valores: readonly T[]
   return (valores as readonly unknown[]).includes(v) ? (v as T) : undefined;
 }
 
-function sanearBool(v: unknown): true | undefined {
-  // Solo `true` se guarda: un `false` es lo mismo que no estar, y guardarlo
-  // engorda el Json y arruina el "¿lo puso una persona?" de la cascada.
-  return v === true ? true : undefined;
+function sanearBool(v: unknown): boolean | undefined {
+  // 🔴 **El `false` se guarda, y guardarlo es todo el punto.** Hasta el
+  // 4-ago-2026 acá se tiraba, con el argumento de que "un false es lo mismo que
+  // no estar". No lo es: en una cascada, *no estar* significa **heredar**, y una
+  // capa de abajo puede traer un `true`. Sin poder escribir un `false` no había
+  // forma de APAGAR desde el bloque algo que la plantilla prendió en la capa de
+  // documento — destildar la casilla escribía "heredar" y el documento seguía
+  // ganando.
+  //
+  // Se veía como "escribo el título en minúscula y me sale en mayúscula igual":
+  // siete presets ponen `titulo.mayusculas: true` a nivel documento. El caso ya
+  // estaba anotado como bug conocido en `familias/editorial.ts`, donde un
+  // `mayusculas: false` no apagaba el "VER COLECCIÓN" de la portada.
+  //
+  // ⚠️ Los cuatro consumidores preguntan por el VALOR, nunca por la presencia
+  // (`extra()` acá, y las dos clases de `shell.ts`), así que un `false` explícito
+  // no emite nada — que es exactamente lo que se quiere— y encima le gana a la
+  // capa de abajo porque la clave existe en `elegidas`.
+  return typeof v === "boolean" ? v : undefined;
 }
 
 /**
@@ -251,6 +272,7 @@ export function sanearEstiloBloque(v: unknown): EstiloBloque | undefined {
   poner("align", sanearEnum(x.align, ALINEACIONES));
   poner("mayusculas", sanearBool(x.mayusculas));
   poner("subrayado", sanearBool(x.subrayado));
+  poner("italica", sanearBool(x.italica));
 
   poner("padX", sanearNum(x.padX, RANGOS.padX));
   poner("padY", sanearNum(x.padY, RANGOS.padY));
@@ -411,7 +433,7 @@ export const ROLES_POR_TIPO: Record<TipoBloque, readonly RolEstilo[]> = {
  */
 const TIPOGRAFIA = [
   "color", "tamano", "peso", "interlinea", "espaciado", "align",
-  "fuente", "mayusculas", "subrayado",
+  "fuente", "mayusculas", "subrayado", "italica",
 ] as const satisfies readonly (keyof EstiloBloque)[];
 
 const PROPS_POR_ROL: Record<RolEstilo, readonly (keyof EstiloBloque)[]> = {
@@ -422,8 +444,8 @@ const PROPS_POR_ROL: Record<RolEstilo, readonly (keyof EstiloBloque)[]> = {
   cuerpo: TIPOGRAFIA,
   // La nota (precio tachado, variante, "y 3 más") se dibuja sin `text-align`
   // propio: sigue al bloque que la contiene.
-  nota: ["color", "tamano", "peso", "espaciado", "fuente", "mayusculas", "subrayado"],
-  boton: ["color", "fondo", "tamano", "peso", "radio", "padX", "padY", "fuente", "espaciado", "mayusculas"],
+  nota: ["color", "tamano", "peso", "espaciado", "fuente", "mayusculas", "subrayado", "italica"],
+  boton: ["color", "fondo", "tamano", "peso", "radio", "padX", "padY", "fuente", "espaciado", "mayusculas", "italica"],
   imagen: ["radio"],
 };
 
@@ -503,7 +525,7 @@ const SIN_EFECTO: Partial<Record<TipoBloque, Partial<Record<RolEstilo, readonly 
   cupon: { titulo: ["align", "interlinea"], cuerpo: ["align"] },
   // El "botón" del video es el círculo con el ▶ encima de la miniatura: toma
   // color, fondo y redondeo, y nada de tipografía porque no tiene texto.
-  video: { boton: ["tamano", "peso", "padX", "padY", "fuente", "espaciado", "mayusculas"] },
+  video: { boton: ["tamano", "peso", "padX", "padY", "fuente", "espaciado", "mayusculas", "italica"] },
 };
 
 /** Los controles que el panel puede ofrecer para un rol de un bloque. */
@@ -710,6 +732,7 @@ export function extra(e: EstiloResuelto, yaUsadas: readonly (keyof EstiloResuelt
   poner("align", `text-align:${e.align}`);
   if (!usadas.has("mayusculas") && e.elegidas.has("mayusculas") && e.mayusculas) out.push("text-transform:uppercase");
   if (!usadas.has("subrayado") && e.elegidas.has("subrayado") && e.subrayado) out.push("text-decoration:underline");
+  if (!usadas.has("italica") && e.elegidas.has("italica") && e.italica) out.push("font-style:italic");
   poner("fondo", `background:${e.fondo}`);
   poner("radio", `border-radius:${px(e.radio!)}`);
   if (!usadas.has("bordeAncho") && e.elegidas.has("bordeAncho") && e.bordeAncho) {

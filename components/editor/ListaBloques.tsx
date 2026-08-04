@@ -302,11 +302,12 @@ export function ListaBloques({
                   <GripVertical className="h-4 w-4" aria-hidden />
                 </span>
                 <Icono className={`h-4 w-4 shrink-0 ${sel ? "text-accent-subtle-foreground" : "text-muted"}`} aria-hidden />
-                <button
-                  type="button"
-                  className="min-w-0 flex-1 text-left"
-                  onClick={() => b.id && onSeleccionar(b.id)}
-                >
+                {/* Sin `onClick` propio: el de la fila ya lo cubre y el click
+                    de este botón burbujea hasta ahí —también el que dispara un
+                    Enter con el foco puesto, que es para lo que el botón
+                    existe—. Tenerlo en los dos lados hacía correr `elegir()`
+                    dos veces por click. */}
+                <button type="button" className="min-w-0 flex-1 text-left">
                   <span className={`block truncate text-sm ${sel ? "font-medium text-accent-subtle-foreground" : "text-foreground"}`}>
                     {ETIQUETA_BLOQUE[b.tipo]}
                   </span>

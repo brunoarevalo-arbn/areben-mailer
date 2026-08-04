@@ -5,6 +5,7 @@ import { renderEmailHtml, type ContenidoCampania } from "@/lib/email/render";
 import { claveProductos, type ConsultaProductos, type ProductoEmail } from "@/lib/email/bloques";
 import type { Marca } from "@/lib/marca";
 import { VistaPreviaMail } from "@/components/VistaPreviaMail";
+import { AbrirEnPestana } from "@/components/editor/AbrirEnPestana";
 
 /**
  * El mail, dibujado con el MISMO `renderEmailHtml` que el envío.
@@ -120,37 +121,11 @@ export function PreviewMail({
     [contenidoDif, preheaderDif, marca, productos],
   );
 
-  /**
-   * Un click adentro del mail abre el formulario de ESA parte.
-   *
-   * 🔴 Y de paso arregla el bug que se veía como "el preview se pone en blanco":
-   * tocar un botón del mail navegaba el iframe a la tienda, que no se deja
-   * enmarcar, y quedaba un cuadro vacío hasta la próxima tecla. Apagar el mouse
-   * (`pointer-events-none`, como la miniatura de la galería) no servía: el mail
-   * es más alto que el marco y hay que poder scrollearlo adentro.
-   *
-   * ⚠️ El listener se recuelga en cada `load`: el `srcDoc` se reemplaza entero
-   * cada vez que cambia el HTML, y con él el documento donde estaba colgado.
-   */
-  useEffect(() => {
-    if (!frame || !onSeleccionar) return;
-    const alClick = (e: MouseEvent) => {
-      // TODO click se frena, no solo los links: adentro del mail no hay nada a
-      // dónde ir. Lo que decide es el `data-b` más cercano hacia arriba.
-      e.preventDefault();
-      const cerca = (e.target as Element | null)?.closest?.("[data-b]");
-      const id = cerca?.getAttribute("data-b");
-      if (id) onSeleccionar(id);
-    };
-    const enganchar = () => frame.contentDocument?.addEventListener("click", alClick);
-    frame.addEventListener("load", enganchar);
-    // Por si el documento ya está montado cuando corre el efecto.
-    enganchar();
-    return () => {
-      frame.removeEventListener("load", enganchar);
-      frame.contentDocument?.removeEventListener("click", alClick);
-    };
-  }, [frame, onSeleccionar, html]);
+  // ⛔ Acá NO va el listener que frena los clicks: vive en `VistaPreviaMail`,
+  // que es el marco que comparten el editor, la galería y las listas. Estaba
+  // acá y por eso el preview del modal se seguía poniendo en blanco, y un
+  // usuario VIEWER —que no recibe `onSeleccionar`— tampoco quedaba protegido.
+  // Este componente solo dice QUÉ hacer con el bloque tocado (`onBloque`).
 
   // El contorno del bloque elegido, del lado de adentro. Se pinta por DOM y no
   // en el HTML del mail: lo que se renderiza tiene que seguir siendo el mail que
@@ -167,11 +142,28 @@ export function PreviewMail({
 
   // Llevar el mail hasta el bloque elegido. Solo cuando cambia la selección: si
   // dependiera del html, scrollearía en cada tecla que se escribe.
+  //
+  // 🔴 **A mano, y NUNCA con `scrollIntoView`.** El iframe es same-origin, así
+  // que el navegador no frena en el borde del documento del mail: sigue subiendo
+  // por los contenedores scrolleables, **cruza al documento del panel** y lo
+  // mueve para dejar el iframe centrado en la pantalla. Se veía como "cada vez
+  // que toco un bloque, la página se va sola para arriba" — y era eso, no un
+  // remonte ni un submit.
+  //
+  // ⚠️ Las tres medidas salen de adentro del iframe (`getBoundingClientRect`,
+  // `scrollY`, `innerHeight`), así que están en su propio sistema de
+  // coordenadas y el `transform: scale()` que el marco le aplica desde afuera
+  // no las toca. Mezclar una medida de afuera acá erraría por el factor de
+  // escala.
   useEffect(() => {
     if (!seleccionadoId) return;
-    frame?.contentDocument
-      ?.querySelector(`[data-b="${CSS.escape(seleccionadoId)}"]`)
-      ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const win = frame?.contentWindow;
+    const el = frame?.contentDocument?.querySelector<HTMLElement>(
+      `[data-b="${CSS.escape(seleccionadoId)}"]`,
+    );
+    if (!win || !el) return;
+    const y = el.getBoundingClientRect().top + win.scrollY - win.innerHeight / 2;
+    win.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seleccionadoId]);
 
@@ -180,15 +172,19 @@ export function PreviewMail({
       html={html}
       anchoMail={anchoMail}
       className={className}
+      // El frame se pide igual: el contorno del bloque elegido y el scroll hasta
+      // él se pintan por DOM, y eso sigue siendo del editor.
       onIframe={setFrame}
-      // 🔴 `allow-same-origin` **sin `allow-scripts`**: el panel necesita leer el
-      // documento para saber qué bloque se tocó, y sin `allow-scripts` el
-      // navegador no ejecuta NADA de adentro —ni `<script>`, ni `onerror=`, ni
-      // `javascript:`—, así que el XSS almacenado que motivó el `sandbox=""`
-      // sigue tapado. Tampoco van `allow-forms`, `allow-popups` ni
-      // `allow-top-navigation`: el documento queda inerte, solo legible.
-      // ⚠️ La miniatura de la galería NO cambia: sigue `sandbox=""`.
-      sandbox="allow-same-origin"
+      // Tocar una parte del mail abre su formulario. Que el click además **no
+      // navegue** ya lo garantiza el marco, con o sin esto.
+      onBloque={onSeleccionar}
+      // La otra pregunta que se le hace a un mail: ¿los links llevan a algún
+      // lado? Acá adentro no se puede contestar —todo click está frenado—, así
+      // que se abre en una pestaña donde sí andan.
+      extra={<AbrirEnPestana html={html} />}
+      // ⚠️ El `sandbox` no se pasa: el default de `VistaPreviaMail` ya es
+      // `allow-same-origin` sin `allow-scripts`, que es lo que hace falta acá.
+      // La miniatura de la galería NO usa este componente y sigue con el suyo.
     />
   );
 }

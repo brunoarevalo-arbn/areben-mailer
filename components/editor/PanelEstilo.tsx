@@ -82,11 +82,17 @@ const CAMPO: Record<Prop, Def> = {
 
   align: { tipo: "enum", label: "Alineación", opciones: ALIGN },
   peso: { tipo: "enum", label: "Grosor", opciones: PESOS, avanzado: true },
-  fuente: { tipo: "enum", label: "Tipografía", opciones: TIPOGRAFIAS, avanzado: true },
+  // 🔑 **Sin `avanzado`, y es la única del panel que lo perdió** (4-ago-2026).
+  // Elegir la letra es una decisión de MARCA, que es exactamente lo que un
+  // comerciante de Tiendanube quiere tomar; el interlineado y el espacio entre
+  // letras no lo son y siguen gateados, que es para lo que el permiso existe.
+  // Mientras estuvo acá, el comerciante no podía elegir ni una de las fuentes.
+  fuente: { tipo: "enum", label: "Tipografía", opciones: TIPOGRAFIAS },
   bordeEstilo: { tipo: "enum", label: "Estilo del borde", opciones: BORDES, avanzado: true },
 
   mayusculas: { tipo: "bool", label: "En mayúsculas", avanzado: true },
   subrayado: { tipo: "bool", label: "Subrayado", avanzado: true },
+  italica: { tipo: "bool", label: "Itálica", avanzado: true },
   ocultarMovil: { tipo: "bool", label: "Ocultar en el celular", avanzado: true },
   ocultarEscritorio: { tipo: "bool", label: "Ocultar en escritorio", avanzado: true },
 };
@@ -232,6 +238,7 @@ export function PanelEstilo({
                       key={k}
                       label={def.label}
                       valor={bruto as boolean | undefined}
+                      resuelto={res[k as keyof EstiloResuelto] as boolean | undefined}
                       onChange={(v) => set(rol, k, v)}
                     />
                   );
