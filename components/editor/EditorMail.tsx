@@ -559,24 +559,26 @@ export function EditorMail({
     // los dos `1fr`. Medido, no supuesto — el 62rem del plan daba 350 y el
     // primer corte que probé, 240.
     //
-    // ⚠️ Eso cae en **1360px de viewport**: 1056 + 64 de padding + 240 del
-    // sidebar. Una pantalla de 1280 ve UNA vista a la vez, y es a propósito —
-    // ahí el espacio real es 976 y las tres columnas no existen sin que la del
-    // medio quede inservible.
+    // ⚠️ Eso cae en **1360px de viewport** con el menú desplegado: 1056 + 64 de
+    // padding + 240 del sidebar. Con el menú **plegado** (64px) el mismo umbral
+    // cae en 1184, y ésa es la mitad de lo que el plegado resuelve.
     //
-    // 🔴 **Sacar el editor del `max-w-6xl` NO baja ese umbral**, aunque este
-    // comentario dijo lo contrario hasta el 5-ago-2026. `max-w-6xl` son 1152px
-    // y el sidebar 240, así que a 1280 el ancho útil es 1280−240−64 = 976 **con
-    // cap y sin cap por igual**: a ese tamaño el cap ni siquiera está actuando.
-    // El umbral no se mueve un pixel.
+    // 🔴 **Sacar el editor del cap NO baja ese umbral**, aunque este comentario
+    // dijo lo contrario hasta el 5-ago-2026: a 1280 el ancho útil es
+    // 1280−240−64 = 976 **con cap y sin cap por igual**, porque a ese tamaño el
+    // cap ni siquiera está actuando. Lo que el cap SÍ hacía es congelar la
+    // columna del medio en **398px** a partir de ~1392px de ventana — a 1440, a
+    // 1512 y a 1920 por igual.
     //
-    // Lo que el cap SÍ hace es otra cosa, y es lo que habría que arreglar si
-    // alguna vez molesta: se activa a partir de ~**1392px de ventana** (240+1152)
-    // y de ahí en adelante la columna del medio queda **congelada en 398px** —
-    // a 1440, a 1512 y a 1920 por igual. Descongelarla es subir el cap sólo para
-    // el editor (`app/(app)/layout.tsx` y su espejo en `ui/BarraAcciones.tsx`,
-    // que se mueven JUNTOS), nunca sacarlo: sin tope, en un monitor de 1920 el
-    // campo "Asunto" mide 1616px de línea.
+    // ✅ **Las dos cosas se resolvieron el 5-ago-2026, y hacían falta las dos.**
+    // El cap de estas tres pantallas subió a `--ancho-editor` (90rem) vía el
+    // `has-[[data-editor]]` de `app/(app)/layout.tsx`, y el menú se pliega a
+    // 4rem. Por separado ninguna alcanzaba: plegar sin subir el cap devuelve
+    // **cero** pixeles arriba de 1400 (el cap ya era el que mandaba), y subir el
+    // cap sin plegar deja 120 de los 296 posibles. Juntas, a 1512 el editor pasa
+    // de 1088 a 1376 útiles y la columna del medio de 398 a ~542.
+    // ⛔ Subir el cap, nunca sacarlo: sin tope, en un monitor de 1920 el campo
+    // "Asunto" mediría 1616px de línea.
     //
     // ⚠️ `container-type` implica `contain: layout`, así que este div es el
     // bloque de referencia de todo `position: fixed` que cuelgue adentro. Por

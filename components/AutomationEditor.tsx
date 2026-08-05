@@ -56,7 +56,9 @@ export function AutomationEditor({
   const toggle = () => startToggle(async () => { await guardarAutomation(payload()); const r = await toggleAutomation(id); if (r.ok && r.estado) setEstado(r.estado); });
 
   return (
-    <div className="space-y-4 pb-24">
+    // `data-editor` levanta el cap de 1152px del layout (ver el `has-[]` de
+    // `app/(app)/layout.tsx`): en el editor el ancho ES la herramienta.
+    <div data-editor className="space-y-4 pb-24">
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-accent-subtle-foreground/30 bg-accent-subtle p-4">
         <div className="text-sm text-foreground">
           <span className="text-muted">Disparador:</span> <b>{triggerLabel}</b>
@@ -114,7 +116,7 @@ export function AutomationEditor({
           Estás viendo esta automation en modo lectura.
         </div>
       ) : (
-      <BarraAcciones onGuardar={guardar} guardando={saving} mensaje={msg}>
+      <BarraAcciones onGuardar={guardar} guardando={saving} mensaje={msg} ancho="amplio">
         <input className={`${campoBase} max-w-56`} value={pruebaEmail} onChange={(e) => setPruebaEmail(e.target.value)} />
         <Button variant="accent" onClick={prueba} disabled={sending}>
           {sending ? "Enviando…" : "Enviar prueba"}

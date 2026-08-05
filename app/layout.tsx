@@ -24,14 +24,20 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   // Tema desde cookie (SSR) → sin flash. El toggle actualiza cookie + clase.
-  const isDark = (await cookies()).get("theme")?.value === "dark";
+  const galletas = await cookies();
+  const isDark = galletas.get("theme")?.value === "dark";
+  // Mismo mecanismo para el ancho del menú: la clase define `--ancho-menu`
+  // (ver globals.css) y de ahí la leen el sidebar y la barra de guardar.
+  // Resuelto en el servidor porque el ancho ES layout: sin esto la página
+  // pinta un cuadro con el menú desplegado y el editor salta.
+  const plegado = galletas.get("menu")?.value === "plegado";
 
   return (
     <html
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased ${
         isDark ? "dark" : ""
-      }`}
+      } ${plegado ? "menu-plegado" : ""}`}
       suppressHydrationWarning
     >
       <body className="min-h-full bg-background text-foreground">{children}</body>

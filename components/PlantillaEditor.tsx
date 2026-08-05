@@ -49,7 +49,9 @@ export function PlantillaEditor({
     });
 
   return (
-    <div className="space-y-4 pb-24">
+    // `data-editor` levanta el cap de 1152px del layout (ver el `has-[]` de
+    // `app/(app)/layout.tsx`): en el editor el ancho ES la herramienta.
+    <div data-editor className="space-y-4 pb-24">
       <label className="block max-w-md text-sm">
         <span className="text-muted">Nombre de la plantilla</span>
         <input className={inputClass} value={nombre} onChange={(e) => setNombre(e.target.value)} />
@@ -70,7 +72,7 @@ export function PlantillaEditor({
           Estás viendo esta plantilla en modo lectura.
         </div>
       ) : (
-        <BarraAcciones onGuardar={guardar} guardando={saving} mensaje={msg}>
+        <BarraAcciones onGuardar={guardar} guardando={saving} mensaje={msg} ancho="amplio">
           <Button
             variant="accent"
             disabled={usando}

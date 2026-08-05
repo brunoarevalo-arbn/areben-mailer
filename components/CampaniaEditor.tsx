@@ -261,7 +261,9 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
   const mejorEsB = abInfo ? tasa(abInfo.b.aperturas, abInfo.b.enviados) > tasa(abInfo.a.aperturas, abInfo.a.enviados) : false;
 
   return (
-    <div className="space-y-4 pb-24">
+    // `data-editor` levanta el cap de 1152px del layout (ver el `has-[]` de
+    // `app/(app)/layout.tsx`): en el editor el ancho ES la herramienta.
+    <div data-editor className="space-y-4 pb-24">
       {/* Los datos de envío arriba, a lo ancho: el editor de abajo necesita las
           tres columnas enteras y antes estaba metido en media pantalla.
 
@@ -380,7 +382,7 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
         ) : (
         // El Guardar y sus vecinos viven en la barra fija de abajo; esto es solo
         // el hueco donde estaban, que ya no dibuja nada.
-        <BarraAcciones onGuardar={guardar} guardando={saving} mensaje={msg}>
+        <BarraAcciones onGuardar={guardar} guardando={saving} mensaje={msg} ancho="amplio">
           <Button
             variant="secondary"
             onClick={async () => {

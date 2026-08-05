@@ -164,6 +164,42 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* ─────────────────────────────────────────────────────────────
+   El ancho del menú, en una variable
+   ─────────────────────────────────────────────────────────────
+   La escribe el layout raíz desde la cookie `menu` (SSR, igual que el tema:
+   sin cookie no hay parpadeo), y la leen DOS elementos que no se conocen
+   entre sí: el <aside> del sidebar y la BarraAcciones fija, que hasta hoy
+   espejaba el `w-60` a mano con un `lg:left-60`.
+
+   🔑 Va por variable CSS y no por estado de React a propósito: la barra de
+   guardar es hermana lejana del sidebar —cuelga de la página, no del shell—
+   y con estado habría que atravesar tres capas de componentes o inventar un
+   provider. Una variable heredada llega sola, y `var()` se resuelve por el
+   árbol del DOM, no por el layout: que la barra sea `position: fixed` no la
+   saca de la herencia.
+
+   Sólo actúa en `lg+`. Abajo de eso el sidebar es un cajón de 17rem que se
+   corre con transform y este número no lo toca nadie. */
+:root {
+  --ancho-menu: 15rem; /* = w-60, lo que midió siempre */
+
+  /* El cap de las pantallas de editor. El resto de la app sigue en `max-w-6xl`
+     (72rem): una tabla de contactos a 1900px de ancho se lee peor, no mejor.
+     🔑 90rem = 1440px NO es "sacar el tope", es subirlo: a 1512 de ventana con
+     el menú plegado quedan 1376px útiles (contra 1088 hoy, y contra un máximo
+     teórico de 1384), y en un monitor de 1920 el campo "Asunto" se planta ahí
+     en vez de estirarse a 1616px de línea.
+     ⚠️ Lo leen DOS lugares que tienen que coincidir o el botón de guardar deja
+     de estar alineado con el contenido: `app/(app)/layout.tsx` y
+     `components/ui/BarraAcciones.tsx`. Por eso el número vive acá y no en cada
+     uno — antes eran dos `max-w-6xl` escritos a mano. */
+  --ancho-editor: 90rem;
+}
+.menu-plegado {
+  --ancho-menu: 4rem; /* iconos solos */
+}
+
 /* Geist manda (antes lo pisaba Arial). */
 body {
   background: var(--background);
