@@ -115,6 +115,8 @@ export function PanelEstilo({
   pal,
   roles,
   avanzado,
+  abiertos,
+  onAbiertosChange,
 }: {
   /** Contra qué bloque se resuelve el "automático". */
   tipo: TipoBloque;
@@ -127,6 +129,18 @@ export function PanelEstilo({
   roles?: readonly RolEstilo[];
   /** ¿Se ven las perillas finas? Cuelga del rol, no de una preferencia del navegador. */
   avanzado: boolean;
+  /**
+   * Qué secciones dejó abiertas la persona, para que sobrevivan al remonte.
+   *
+   * Tres valores distintos, y los tres significan cosas distintas:
+   * `undefined`/`null` = nunca tocó nada ⇒ abre la primera · `[]` = cerró todo
+   * a propósito ⇒ no abre ninguna · con roles = abre esos.
+   *
+   * Sin esta prop el panel se porta como siempre (abre la primera), que es lo
+   * que quiere la capa de documento: esa no se remonta nunca.
+   */
+  abiertos?: readonly RolEstilo[] | null;
+  onAbiertosChange?: (roles: RolEstilo[]) => void;
 }) {
   const lista = roles ?? ROLES_POR_TIPO[tipo];
 
@@ -172,6 +186,28 @@ export function PanelEstilo({
     .map((rol) => ({ rol, visibles: (propsDeRol(tipo, rol) as readonly Prop[]).filter((k) => avanzado || !CAMPO[k].avanzado) }))
     .filter((s) => s.visibles.length);
 
+  /**
+   * Qué secciones arrancan abiertas en ESTE montaje.
+   *
+   * 🔑 El valor tiene que **seguir** al DOM, nunca pelearse con él: cada vez que
+   * la persona abre o cierra algo, `onAbiertosChange` deja la lista igual a lo
+   * que el `<details>` ya hizo solo, así el único `open` que React llega a
+   * escribir es el que coincide con lo que se ve. Es la condición que pide
+   * `Desplegable` para que la prop no pise a la persona.
+   *
+   * Un rol recordado que este bloque no dibuja se descarta —cambiar de un
+   * `titulo` a un `divisor` no puede dejar el panel entero cerrado—, pero
+   * "cerré todo" (lista vacía) sí se respeta: si no, cerrar la última sección la
+   * haría saltar de vuelta.
+   */
+  const presentes = abiertos?.filter((r) => secciones.some((s) => s.rol === r));
+  const efectivos =
+    presentes && (presentes.length > 0 || abiertos!.length === 0)
+      ? presentes
+      : secciones.length
+        ? [secciones[0].rol]
+        : [];
+
   return (
     // Un desplegable por rol, y NO abajo de un breakpoint: cinco roles por seis
     // a dieciocho propiedades en una sola columna continua también son malos a
@@ -181,12 +217,27 @@ export function PanelEstilo({
     // excluyen (Contenido / Estilo). Los roles son de 1 a 5 y son ADITIVOS —
     // querés el color del título Y el del cuerpo abiertos a la vez.
     <div className="space-y-4">
-      {secciones.map(({ rol, visibles }, i) => {
+      {secciones.map(({ rol, visibles }) => {
         const propio = valor?.[rol];
         const res = resolver(rol);
 
         return (
-          <Desplegable key={rol} titulo={ROL_LABEL[rol]} tono="rol" abiertoDeFabrica={i === 0}>
+          <Desplegable
+            key={rol}
+            titulo={ROL_LABEL[rol]}
+            tono="rol"
+            abiertoDeFabrica={efectivos.includes(rol)}
+            onToggle={
+              onAbiertosChange &&
+              // El `filter` corre en las dos ramas a propósito: así la lista es
+              // la misma se dispare el evento una vez o dos, y nunca guarda un
+              // rol repetido.
+              ((abierto) => {
+                const resto = efectivos.filter((r) => r !== rol);
+                onAbiertosChange(abierto ? [...resto, rol] : resto);
+              })
+            }
+          >
             {visibles.map((k) => {
               const def = CAMPO[k];
               const bruto = propio?.[k];

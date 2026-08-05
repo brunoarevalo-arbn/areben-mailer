@@ -40,7 +40,25 @@ const REPRESENTA: Record<RolEstilo, TipoBloque> = {
 };
 
 /**
- * Qué roles ofrece la pestaña Estilo para ESTE bloque puntual.
+ * `caja` al final, siempre.
+ *
+ * 🔑 Todos los `ROLES_POR_TIPO` **empiezan** por `caja` —margen lateral, ocultar
+ * en celular— y `PanelEstilo` abre de fábrica la primera sección que se ve. El
+ * resultado era que estilar un `titulo` abría "Caja del bloque" y dejaba el
+ * color un click más adentro, en cada bloque de cada mail.
+ *
+ * El orden vive acá y **no** en `ROLES_POR_TIPO` porque es una decisión de
+ * presentación: qué roles tiene un bloque es del motor, en qué orden se
+ * muestran es del panel. `probar-panel-estilo.ts` itera esa tabla y no le
+ * importa el orden en que la dibujemos.
+ */
+function cajaAlFinal(roles: readonly RolEstilo[]): readonly RolEstilo[] {
+  if (roles.length < 2 || roles[0] !== "caja") return roles;
+  return [...roles.slice(1), "caja"];
+}
+
+/**
+ * Qué roles ofrece el panel de estilo para ESTE bloque puntual.
  *
  * `ROLES_POR_TIPO` es por TIPO, así que no sabe que un `columnas` en variante
  * "imagenes" no dibuja ningún texto: ofrecer `titulo`/`cuerpo` ahí sería la
@@ -48,11 +66,15 @@ const REPRESENTA: Record<RolEstilo, TipoBloque> = {
  * cazar, nada más que a nivel de instancia y no de tipo.
  */
 function rolesDe(b: Bloque): readonly RolEstilo[] {
-  if (b.tipo !== "columnas") return ROLES_POR_TIPO[b.tipo];
+  if (b.tipo !== "columnas") return cajaAlFinal(ROLES_POR_TIPO[b.tipo]);
   const variante = b.variante ?? "imagenes";
   const conImagen = variante === "imagenes" || variante === "imagen-texto" || variante === "texto-imagen";
   const conTexto = variante === "textos" || variante === "imagen-texto" || variante === "texto-imagen";
-  return ["caja", ...(conImagen ? (["imagen"] as const) : []), ...(conTexto ? (["titulo", "cuerpo"] as const) : [])];
+  return cajaAlFinal([
+    "caja",
+    ...(conImagen ? (["imagen"] as const) : []),
+    ...(conTexto ? (["titulo", "cuerpo"] as const) : []),
+  ]);
 }
 
 /** Los roles que tiene sentido fijar para todo el mail de una sola vez. */
@@ -109,6 +131,16 @@ export function EditorMail({
   const bloques = contenido.bloques ?? [];
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
   const [pestana, setPestana] = useState<"contenido" | "estilo">("contenido");
+  /**
+   * Qué secciones del panel de estilo dejó abiertas la persona.
+   *
+   * 🔑 Vive **acá y no adentro de `PanelEstilo`**, que se remonta en cada cambio
+   * de bloque (`key={seleccionado.id}`). Sin esto, poner el mismo color en cinco
+   * títulos seguidos obliga a abrir "Título" cinco veces.
+   *
+   * `null` = nunca tocó nada ⇒ que el panel decida (abre la primera).
+   */
+  const [rolesAbiertos, setRolesAbiertos] = useState<RolEstilo[] | null>(null);
   // Cuál de las tres columnas se muestra cuando NO entran las tres. Arranca en
   // la lista: el mapa del mail es desde donde se elige qué tocar.
   const [vistaMovil, setVistaMovil] = useState<VistaMovil>("lista");
@@ -365,6 +397,8 @@ export function EditorMail({
                   pal={pal}
                   roles={rolesDe(seleccionado)}
                   avanzado={avanzado}
+                  abiertos={rolesAbiertos}
+                  onAbiertosChange={setRolesAbiertos}
                 />
               )}
             </fieldset>

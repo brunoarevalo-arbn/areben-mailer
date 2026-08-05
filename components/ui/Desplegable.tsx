@@ -31,6 +31,7 @@ export function Desplegable({
   titulo,
   resumen,
   abiertoDeFabrica = false,
+  onToggle,
   /** `seccion` = título normal (una caja del editor) · `rol` = rotulito del panel de estilo. */
   tono = "seccion",
   children,
@@ -39,6 +40,17 @@ export function Desplegable({
   titulo: ReactNode;
   resumen?: ReactNode;
   abiertoDeFabrica?: boolean;
+  /**
+   * Avisa que la persona abrió o cerró la sección. Existe para que un padre
+   * pueda **recordar** el estado a través de un remonte, no para controlarla:
+   * quien lo use tiene que devolver el mismo valor por `abiertoDeFabrica`, así
+   * la prop va SIGUIENDO al DOM y nunca peleándose con él. Ver `PanelEstilo`.
+   *
+   * ⚠️ El evento `toggle` de `<details>` **no burbujea**. React lo engancha
+   * directo al nodo, así que anda igual — pero por eso no se puede escuchar
+   * desde un contenedor.
+   */
+  onToggle?: (abierto: boolean) => void;
   tono?: "seccion" | "rol";
   children: ReactNode;
   className?: string;
@@ -47,6 +59,7 @@ export function Desplegable({
   return (
     <details
       open={abiertoDeFabrica}
+      onToggle={onToggle ? (e) => onToggle(e.currentTarget.open) : undefined}
       className={`group ${esRol ? "border-t border-border pt-3 first:border-0 first:pt-0" : ""} ${className}`}
     >
       <summary
