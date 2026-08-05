@@ -65,6 +65,8 @@ export function VistaPreviaMail({
   sandbox = "allow-same-origin",
   /** Tocar una parte del mail avisa qué bloque fue. Sin esto igual no navega. */
   onBloque,
+  /** El bloque que se está editando: se le pinta un contorno y se lo trae a la vista. */
+  resaltado,
   /** El iframe recién montado, para quien necesite colgarle algo (el editor). */
   onIframe,
 }: {
@@ -76,9 +78,11 @@ export function VistaPreviaMail({
   className?: string;
   sandbox?: string;
   onBloque?: (id: string) => void;
+  resaltado?: string | null;
   onIframe?: (el: HTMLIFrameElement | null) => void;
 }) {
   const [frame, setFrame] = useState<HTMLIFrameElement | null>(null);
+  const scroller = useRef<HTMLDivElement>(null);
   const refIframe = useCallback(
     (el: HTMLIFrameElement | null) => {
       setFrame(el);
@@ -102,44 +106,135 @@ export function VistaPreviaMail({
     return () => ro.disconnect();
   }, []);
 
-  /**
-   * 🔴 **Un click adentro del mail nunca navega, se mire desde donde se mire.**
-   *
-   * Tocar un botón o un producto hacía que el iframe se fuera a la tienda —que
-   * no se deja enmarcar— y quedaba **un cuadro en blanco** hasta la próxima
-   * tecla. Vivía en `editor/PreviewMail.tsx`, y por eso seguía pasando en los
-   * dos lugares que no eran el editor: el modal de la galería y el ojo de las
-   * listas. Frenar la navegación es del **marco**, no del editor: no hay ningún
-   * lugar de la app donde irse de acá sea lo que alguien quiso.
-   *
-   * ⛔ `pointer-events-none` (lo que hace la miniatura de la galería) no sirve:
-   * el mail es más alto que el marco y hay que poder scrollearlo adentro.
-   *
-   * ⚠️ El listener se recuelga en cada `load`: el `srcDoc` se reemplaza entero
-   * cuando cambia el HTML, y con él el documento donde estaba colgado.
-   */
-  useEffect(() => {
-    if (!frame) return;
-    const alClick = (e: MouseEvent) => {
-      e.preventDefault();
-      const cerca = (e.target as Element | null)?.closest?.("[data-b]");
-      const id = cerca?.getAttribute("data-b");
-      if (id) onBloque?.(id);
-    };
-    const enganchar = () => frame.contentDocument?.addEventListener("click", alClick);
-    frame.addEventListener("load", enganchar);
-    // Por si el documento ya está montado cuando corre el efecto.
-    enganchar();
-    return () => {
-      frame.removeEventListener("load", enganchar);
-      frame.contentDocument?.removeEventListener("click", alClick);
-    };
-  }, [frame, onBloque, html]);
-
   const anchoMarco = movil ? ANCHO_MOVIL : Math.max(640, anchoMail);
   // Solo se achica, nunca se agranda: un mail de 600px estirado a 900 se vería
   // borroso y encima mentiría sobre el tamaño de la tipografía.
   const escala = caja.w ? Math.min(1, caja.w / anchoMarco) : 1;
+
+  /**
+   * El alto REAL del mail, medido adentro del iframe.
+   *
+   * Existe porque el mail dejó de scrollear adentro del iframe y pasó a
+   * scrollear el contenedor (ver el `pointer-events` de abajo): para eso el
+   * iframe tiene que medir todo lo que dibuja, no el alto del marco.
+   *
+   * ⚠️ Se mide en el `load` **y** en el momento: cuando cambia el `srcDoc` el
+   * documento se reemplaza de forma asíncrona, así que leerlo justo después del
+   * render devuelve el alto del documento anterior.
+   */
+  const [altoMail, setAltoMail] = useState(0);
+  useEffect(() => {
+    if (!frame) return;
+    const medir = () => {
+      const d = frame.contentDocument;
+      if (d) setAltoMail(d.documentElement.scrollHeight);
+    };
+    frame.addEventListener("load", medir);
+    medir();
+    return () => frame.removeEventListener("load", medir);
+  }, [frame, html]);
+
+  /**
+   * 🔴 **Un click adentro del mail nunca navega, y no por un handler.**
+   *
+   * Hasta el 4-ago-2026 acá había un listener que hacía `preventDefault()` sobre
+   * el documento del iframe. **No corría nunca**, y el modo de falla es de los
+   * que no se ven leyendo: con `sandbox` sin `allow-scripts`, el navegador
+   * pregunta si en el contexto del target se puede ejecutar script **antes de
+   * despachar cualquier evento**, y descarta todos los listeners — también los
+   * que colgó el panel desde afuera. `addEventListener` no falla, no devuelve
+   * nada y no avisa. Resultado: tocar un producto navegaba el iframe a la tienda
+   * —que no se deja enmarcar— y **el preview quedaba en blanco**, que es el
+   * síntoma que se reportó dos veces.
+   *
+   * ⚠️ Lo que confundía es que el contorno del bloque elegido y el auto-scroll
+   * **sí** funcionan: son escrituras directas del padre sobre el DOM del hijo,
+   * no eventos. El preview parece vivo y el click está muerto.
+   *
+   * ⛔ **La salida NO es agregar `allow-scripts`**: junto con `allow-same-origin`
+   * anula el sandbox entero y el bloque de `html` crudo pasaría a correr con la
+   * cookie de sesión al lado.
+   *
+   * La salida es que el iframe **no reciba el click**, que es lo único de este
+   * mecanismo que siempre funcionó (la miniatura de la galería hace exactamente
+   * esto). Y no depende de que el diagnóstico de arriba sea correcto: un iframe
+   * con `pointer-events: none` no puede navegar por un click, pase lo que pase.
+   *
+   * Lo que había frenado esta solución —"el mail es más alto que el marco y hay
+   * que poder scrollearlo adentro"— se resuelve sacando el scroll AFUERA: el
+   * iframe mide todo el mail y el que scrollea es el contenedor. El scroll queda
+   * nativo, con la rueda y con el dedo, sin reimplementar nada.
+   */
+  const alClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const d = frame?.contentDocument;
+    if (!d || !onBloque) return;
+    const caja = frame!.getBoundingClientRect();
+    // Las coordenadas del iframe están SIN escalar: el `scale()` es de afuera.
+    // Y no hace falta sumar scroll interno — el iframe ya no scrollea.
+    const el = d.elementFromPoint((e.clientX - caja.left) / escala, (e.clientY - caja.top) / escala);
+    const id = el?.closest("[data-b]")?.getAttribute("data-b");
+    if (id) onBloque(id);
+  };
+
+  /**
+   * El contorno del bloque elegido, del lado de adentro.
+   *
+   * Se pinta por DOM y no en el HTML del mail: lo que se renderiza tiene que
+   * seguir siendo el mail que sale, y un borde de más ahí saldría en el envío.
+   *
+   * ⚠️ **Va colgado del `load`, no solo del render.** Cuando lo que cambia es el
+   * `html`, el efecto corre ANTES de que el navegador reemplace el documento por
+   * el `srcDoc` nuevo, así que pintaba el documento que estaba por descartarse:
+   * se escribía una letra en un título y el bloque elegido se quedaba sin borde
+   * hasta volver a clickearlo.
+   */
+  useEffect(() => {
+    if (!frame) return;
+    const pintar = () => {
+      const d = frame.contentDocument;
+      if (!d) return;
+      for (const el of d.querySelectorAll<HTMLElement>("[data-b]")) {
+        const puesto = el.getAttribute("data-b") === resaltado;
+        el.style.outline = puesto ? "2px solid #f59e0b" : "";
+        el.style.outlineOffset = puesto ? "-2px" : "";
+      }
+    };
+    frame.addEventListener("load", pintar);
+    pintar();
+    return () => frame.removeEventListener("load", pintar);
+  }, [frame, resaltado, html]);
+
+  /**
+   * Traer a la vista el bloque elegido. Solo cuando cambia la selección: si
+   * dependiera del `html`, scrollearía en cada tecla que se escribe.
+   *
+   * 🔴 **Nunca con `scrollIntoView`.** El iframe es same-origin, así que el
+   * navegador no frena en el borde del documento del mail: sigue subiendo por
+   * los contenedores scrolleables, **cruza al documento del panel** y lo mueve
+   * para dejar el iframe centrado en la pantalla. Se veía como "cada vez que
+   * toco un bloque, la página se va sola para arriba".
+   *
+   * ⚠️ Dos conversiones, y las dos son fáciles de errar:
+   *
+   * - **Por la escala.** La medida sale de adentro del iframe, sin escalar, y el
+   *   contenedor vive afuera, donde todo está multiplicado por `escala`.
+   * - **`top` acá YA es absoluto.** `getBoundingClientRect` es relativo al
+   *   viewport del iframe, pero el iframe mide todo el mail y **nunca scrollea
+   *   por dentro**, así que ese viewport no se mueve y `top` es la distancia
+   *   desde el principio del mail. Sumarle el `scrollTop` del contenedor —el
+   *   reflejo de cuando el que scrolleaba era el iframe— lo corre de más
+   *   justamente cuando ya estabas scrolleado.
+   */
+  useEffect(() => {
+    const cajaScroll = scroller.current;
+    const el = resaltado
+      ? frame?.contentDocument?.querySelector<HTMLElement>(`[data-b="${CSS.escape(resaltado)}"]`)
+      : null;
+    if (!cajaScroll || !el) return;
+    const y = el.getBoundingClientRect().top * escala - cajaScroll.clientHeight / 2;
+    cajaScroll.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resaltado]);
 
   return (
     <div className={className}>
@@ -181,24 +276,38 @@ export function VistaPreviaMail({
           veía y parecía "que no actualiza". */}
       <div ref={cont} className={`flex w-full justify-center ${altoClase}`}>
         <div
-          className="h-full overflow-hidden rounded-xl border border-border bg-white"
+          ref={scroller}
+          onClick={alClick}
+          // `overflow-y-auto` y no `hidden`: **este** es el que scrollea el mail
+          // desde que el iframe dejó de recibir eventos.
+          className="h-full overflow-y-auto rounded-xl border border-border bg-white"
           style={{ width: caja.w ? anchoMarco * escala : "100%" }}
         >
-          <iframe
-            title="Vista previa del mail"
-            ref={refIframe}
-            sandbox={sandbox}
-            srcDoc={html}
-            style={{
-              width: anchoMarco,
-              // Alto compensado, para que después de escalar ocupe exactamente el
-              // alto del contenedor y no quede una franja blanca abajo.
-              height: caja.h ? caja.h / escala : "100%",
-              transform: `scale(${escala})`,
-              transformOrigin: "top left",
-              border: 0,
-            }}
-          />
+          {/* 🔴 El tercer div no es decorativo. `transform: scale()` **no cambia
+              el tamaño de layout**: un mail de 4.000px escalado al 60% sigue
+              ocupando 4.000px, y el contenedor scrollearía casi el doble de lo
+              que se ve. Esta caja reserva el alto YA ESCALADO — el mismo truco
+              que la de afuera usa para el ancho. */}
+          <div style={{ height: altoMail ? altoMail * escala : "100%" }}>
+            <iframe
+              title="Vista previa del mail"
+              ref={refIframe}
+              sandbox={sandbox}
+              srcDoc={html}
+              style={{
+                width: anchoMarco,
+                // Todo el mail, no el alto del marco: el que scrollea es el
+                // contenedor.
+                height: altoMail || "100%",
+                transform: `scale(${escala})`,
+                transformOrigin: "top left",
+                border: 0,
+                // ⛔ Lo que impide que un click navegue el iframe y deje el
+                // preview en blanco. El porqué está arriba, en `alClick`.
+                pointerEvents: "none",
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>

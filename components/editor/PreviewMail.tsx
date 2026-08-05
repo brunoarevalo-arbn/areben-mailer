@@ -42,7 +42,6 @@ export function PreviewMail({
   onSeleccionar?: (id: string) => void;
   className?: string;
 }) {
-  const [frame, setFrame] = useState<HTMLIFrameElement | null>(null);
   // ⚠️ Cada valor se difiere por separado y nunca un objeto armado en el render:
   // un literal nuevo en cada pasada hace que el diferido nunca alcance al actual
   // y el componente se re-renderice para siempre.
@@ -121,63 +120,24 @@ export function PreviewMail({
     [contenidoDif, preheaderDif, marca, productos],
   );
 
-  // ⛔ Acá NO va el listener que frena los clicks: vive en `VistaPreviaMail`,
-  // que es el marco que comparten el editor, la galería y las listas. Estaba
-  // acá y por eso el preview del modal se seguía poniendo en blanco, y un
-  // usuario VIEWER —que no recibe `onSeleccionar`— tampoco quedaba protegido.
-  // Este componente solo dice QUÉ hacer con el bloque tocado (`onBloque`).
-
-  // El contorno del bloque elegido, del lado de adentro. Se pinta por DOM y no
-  // en el HTML del mail: lo que se renderiza tiene que seguir siendo el mail que
-  // sale, y un borde de más ahí saldría en el envío.
-  useEffect(() => {
-    const d = frame?.contentDocument;
-    if (!d) return;
-    for (const el of d.querySelectorAll<HTMLElement>("[data-b]")) {
-      const puesto = el.getAttribute("data-b") === seleccionadoId;
-      el.style.outline = puesto ? "2px solid #f59e0b" : "";
-      el.style.outlineOffset = puesto ? "-2px" : "";
-    }
-  }, [frame, seleccionadoId, html]);
-
-  // Llevar el mail hasta el bloque elegido. Solo cuando cambia la selección: si
-  // dependiera del html, scrollearía en cada tecla que se escribe.
-  //
-  // 🔴 **A mano, y NUNCA con `scrollIntoView`.** El iframe es same-origin, así
-  // que el navegador no frena en el borde del documento del mail: sigue subiendo
-  // por los contenedores scrolleables, **cruza al documento del panel** y lo
-  // mueve para dejar el iframe centrado en la pantalla. Se veía como "cada vez
-  // que toco un bloque, la página se va sola para arriba" — y era eso, no un
-  // remonte ni un submit.
-  //
-  // ⚠️ Las tres medidas salen de adentro del iframe (`getBoundingClientRect`,
-  // `scrollY`, `innerHeight`), así que están en su propio sistema de
-  // coordenadas y el `transform: scale()` que el marco le aplica desde afuera
-  // no las toca. Mezclar una medida de afuera acá erraría por el factor de
-  // escala.
-  useEffect(() => {
-    if (!seleccionadoId) return;
-    const win = frame?.contentWindow;
-    const el = frame?.contentDocument?.querySelector<HTMLElement>(
-      `[data-b="${CSS.escape(seleccionadoId)}"]`,
-    );
-    if (!win || !el) return;
-    const y = el.getBoundingClientRect().top + win.scrollY - win.innerHeight / 2;
-    win.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seleccionadoId]);
+  // ⛔ Acá no queda NADA que toque el iframe: ni el freno del click, ni el
+  // contorno del bloque elegido, ni el scroll hasta él. Los tres viven en
+  // `VistaPreviaMail`, que es el marco que comparten el editor, la galería y las
+  // listas — y los tres necesitan el contenedor que scrollea, que es de ahí.
+  // Repartidos, el modal se seguía poniendo en blanco y el contorno se perdía en
+  // cada tecla. Este componente decide QUÉ se dibuja y nada más.
 
   return (
     <VistaPreviaMail
       html={html}
       anchoMail={anchoMail}
       className={className}
-      // El frame se pide igual: el contorno del bloque elegido y el scroll hasta
-      // él se pintan por DOM, y eso sigue siendo del editor.
-      onIframe={setFrame}
       // Tocar una parte del mail abre su formulario. Que el click además **no
       // navegue** ya lo garantiza el marco, con o sin esto.
       onBloque={onSeleccionar}
+      // El bloque que se está editando: el marco le pinta el contorno adentro
+      // del mail y lo trae a la vista.
+      resaltado={seleccionadoId}
       // La otra pregunta que se le hace a un mail: ¿los links llevan a algún
       // lado? Acá adentro no se puede contestar —todo click está frenado—, así
       // que se abre en una pestaña donde sí andan.

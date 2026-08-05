@@ -251,6 +251,29 @@ iframe a la tienda —que no se deja enmarcar— y **dejaba el preview en blanco
   la migración materializa un encabezado con id NUEVO y el click no selecciona
   nada. Los documentos reales ya vienen en la versión actual; los tests tienen
   que pasar `v: V_ACTUAL` o prueban otra cosa.
+- 🔴 **El click NO se frena con un listener: se frena con `pointer-events: none`**
+  (corregido el 4-ago-2026). Hasta entonces había un `preventDefault()` colgado
+  del documento del iframe, y **en Safari no corre nunca**: WebKit, antes de
+  despachar un evento, chequea si en ese contexto se puede ejecutar script, y en
+  un frame sandboxeado sin `allow-scripts` la respuesta es no ⇒ descarta todos
+  los listeners, **también los que colgó el padre**. Blink no hace ese chequeo,
+  así que en Chrome andaba. Costó dos rondas de "ya está arreglado" contra un
+  usuario que veía el preview en blanco.
+  - ⚠️ **Lo que confunde: el contorno del bloque y el auto-scroll SÍ andan en los
+    dos navegadores.** Son escrituras directas del padre sobre el DOM del hijo,
+    no eventos. El preview parece vivo y el click está muerto.
+  - ⛔ **La salida no es `allow-scripts`**: junto con `allow-same-origin` anula el
+    sandbox entero y el bloque de `html` crudo correría con la cookie de sesión.
+  - El precio de `pointer-events: none` es que el mail ya no scrollea adentro del
+    iframe: **el iframe mide todo el mail y el que scrollea es el contenedor**.
+    Como `transform: scale()` no cambia el tamaño de layout, hace falta una caja
+    intermedia con el alto YA ESCALADO o el contenedor scrollea de más.
+  - Qué bloque se tocó lo resuelve `elementFromPoint()` **desde el padre** —otra
+    lectura directa, no un evento—, con las coordenadas divididas por la escala.
+- 🔴 **Ningún script de Node puede ver esto.** `probar-marcado.ts` estaba en verde
+  todo el tiempo: mira el HTML, y el HTML estaba bien. Lo que fallaba era el
+  navegador. **Un cambio en el preview se verifica abriendo un navegador —y si el
+  usuario usa Safari, ese navegador es Safari.**
 - El iframe del editor va con **`sandbox="allow-same-origin"`**, sin
   `allow-scripts`: el panel necesita leer el `contentDocument` para saber qué se
   tocó, y sin `allow-scripts` no corre **nada** de adentro —ni `<script>`, ni
