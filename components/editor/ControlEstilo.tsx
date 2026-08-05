@@ -153,7 +153,15 @@ export function ControlNumero({
   const [min, max] = rango;
   // Sin valor propio, el control muestra el que se está usando igual: un campo
   // en cero cuando el texto mide 26px hace pensar que el panel está roto.
-  const mostrado = valor ?? resuelto ?? min;
+  //
+  // 🔴 Y sin NINGUNO de los dos, muestra el neutro (0 acotado al rango), no el
+  // mínimo. La diferencia la destapó pasar de barra a campo el 5-ago-2026:
+  // `espaciado` no tiene BASE en casi ningún rol, así que caía al mínimo del
+  // rango y **"Espacio entre letras" decía −1 en todo el panel** — un número
+  // concreto y falso (el mail no emite `letter-spacing`, o sea 0), con el `−`
+  // deshabilitado sugiriendo que ya estaba en el piso. Con una barra el pulgar
+  // pegado al extremo izquierdo no afirmaba nada; un campo sí.
+  const mostrado = valor ?? resuelto ?? Math.min(max, Math.max(min, 0));
   return (
     // ⚠️ `<div>` y no `<label>`: adentro hay tres cosas enfocables (los dos
     // botones y el campo) y un `<label>` que envuelve a varias manda el click de
