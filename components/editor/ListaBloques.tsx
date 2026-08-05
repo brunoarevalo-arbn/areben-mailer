@@ -337,6 +337,9 @@ export function ListaBloques({
                           type="button"
                           onClick={(e) => { e.stopPropagation(); onReorder(i, i - 1); }}
                           disabled={i <= primerLibre}
+                          // Los atajos se anuncian acá y en ningún lado más: es
+                          // dónde mira el que ya está usando el botón lento.
+                          title="Subir (⌥↑)"
                           aria-label="Subir"
                           className={`px-0.5 transition-colors hover:text-foreground disabled:opacity-25 ${accionFila}`}
                         >
@@ -346,6 +349,7 @@ export function ListaBloques({
                           type="button"
                           onClick={(e) => { e.stopPropagation(); onReorder(i, i + 1); }}
                           disabled={i >= bloques.length - 1}
+                          title="Bajar (⌥↓)"
                           aria-label="Bajar"
                           className={`px-0.5 transition-colors hover:text-foreground disabled:opacity-25 ${accionFila}`}
                         >
@@ -356,6 +360,7 @@ export function ListaBloques({
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onDuplicar(i); }}
+                      title="Duplicar (⌘D)"
                       aria-label="Duplicar"
                       className={`px-0.5 transition-colors hover:text-foreground ${accionFila}`}
                     >
@@ -364,6 +369,7 @@ export function ListaBloques({
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onBorrar(i); }}
+                      title="Eliminar (⌫)"
                       aria-label="Eliminar"
                       className={`px-0.5 text-danger-foreground transition-opacity hover:opacity-70 ${accionFila}`}
                     >

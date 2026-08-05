@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   duplicarBloque, nuevoBloque, ETIQUETA_BLOQUE,
   type Bloque, type ContenidoCampania, type TipoBloque,
@@ -79,6 +79,44 @@ function rolesDe(b: Bloque): readonly RolEstilo[] {
 
 /** Los roles que tiene sentido fijar para todo el mail de una sola vez. */
 const ROLES_DOC: readonly RolEstilo[] = ["titulo", "subtitulo", "cuerpo", "boton", "nota"];
+
+/**
+ * ¿El foco está adentro de algo donde se escribe?
+ *
+ * La guarda de los atajos que se pisan con el tecleo: sin ella, borrar una letra
+ * del asunto con ⌫ borra el bloque elegido, y las flechas que mueven el cursor
+ * saltan de bloque. ⚠️ **No es uniforme para todos los atajos** —⌥↑/⌥↓ y ⌘D
+ * corren igual adentro de un campo, ver el efecto de abajo—, por eso vive suelta
+ * y no adentro del listener.
+ */
+function enCampo(t: EventTarget | null): boolean {
+  const el = t as HTMLElement | null;
+  if (!el || typeof el.tagName !== "string") return false;
+  return (
+    el.tagName === "INPUT" ||
+    el.tagName === "TEXTAREA" ||
+    el.tagName === "SELECT" ||
+    el.isContentEditable === true
+  );
+}
+
+/**
+ * ¿Hay un modal abierto por encima del editor?
+ *
+ * 🔴 `ImagenPicker` y `ModalVistaPrevia` se dibujan con un **portal a
+ * `document.body`** —`container-type` implica `contain: layout`, así que adentro
+ * del editor un `fixed inset-0` mediría una columna—, y el foco ahí adentro
+ * suele quedar en el `body`. O sea: abrir la biblioteca de imágenes y apretar ⌫
+ * borraba el bloque de atrás, con el modal todavía abierto mostrando las fotos
+ * de un bloque que ya no existe.
+ *
+ * Se pregunta por `aria-modal`, que es el atributo que ya tienen que llevar por
+ * accesibilidad, y no por una clase de Tailwind: un `z-50` es una decisión de
+ * pintura y se puede cambiar sin que nadie se acuerde de este archivo.
+ */
+function hayModal(): boolean {
+  return typeof document !== "undefined" && document.querySelector('[aria-modal="true"]') !== null;
+}
 
 /** Cuál de las tres columnas se está mirando cuando no entran las tres. */
 type VistaMovil = "lista" | "panel" | "preview";
@@ -214,6 +252,116 @@ export function EditorMail({
     copia.splice(hasta, 0, x);
     setBloques(copia, { marcar: true });
   };
+
+  /**
+   * El teclado de bloques: `⌥↑`/`⌥↓` mover · `⌘D` duplicar · `⌫` borrar ·
+   * `↑`/`↓` elegir.
+   *
+   * Cero UI nueva: las cinco funciones ya existían acá arriba y son las mismas
+   * que llaman los botones de `ListaBloques`. Lo que resuelve es la puntería:
+   * llevar un bloque de la posición 10 a la 1 son ocho clicks sobre un chevron
+   * de 16px que además está en `opacity-0` hasta el hover. Con `⌥↑` mantenido,
+   * el autorepetido del `keydown` lo hace en un segundo y medio.
+   *
+   * 🔑 **La guarda de foco NO es uniforme, y es lo único que decide si esto
+   * sirve o estorba:**
+   *
+   * - **`⌥↑`/`⌥↓` y `⌘D` corren también con el cursor adentro de un campo.** El
+   *   90% del tiempo se está tipeando: obligar a clickear afuera antes de mover
+   *   un bloque mataría la tanda. Es el mismo criterio que ya tomó `useHistorial`
+   *   con ⌘Z, que pisa el deshacer nativo adentro de un `<input>` a propósito.
+   * - **`⌫`, `↑` y `↓` sólo con el foco FUERA de un campo.** Son las que tienen
+   *   un significado nativo que se usa todo el tiempo mientras se escribe.
+   *
+   * ⚠️ **`⌘D` lleva `preventDefault()` incondicional**: es "Agregar marcador" en
+   * Safari y en Chrome, y abrir ese diálogo es peor respuesta que no hacer nada,
+   * haya bloque elegido o no. Mismo motivo por el que `BarraAcciones` lo hace
+   * con ⌘S.
+   *
+   * ⚠️ **Con nada elegido, `↑`/`↓` no se apropian de la tecla**: el editor es una
+   * página larga y las flechas son cómo se scrollea. Recién cuando hay un bloque
+   * elegido —o sea, cuando ya estás "adentro" de la lista— pasan a navegarla.
+   *
+   * ⛔ **`Esc` no entra.** `ImagenPicker` ya lo escucha en `window`: los dos
+   * listeners dispararían y cerrarías el modal **y** perderías la selección. Era
+   * el atajo de menos valor de la lista.
+   *
+   * Los cinco reusan las operaciones marcadas (`{ marcar: true }`), así que cada
+   * uno es **un** paso de ⌘Z aunque venga pegado a una ráfaga de tecleo.
+   */
+  const alTeclado = (ev: KeyboardEvent) => {
+    // Con la biblioteca de imágenes o la vista previa abiertas, el editor de
+    // atrás no escucha nada: ahí el foco vive en el `body` y ⌫ borraba un
+    // bloque que no se estaba mirando.
+    if (hayModal()) return;
+    const i = bloques.findIndex((b) => b.id === seleccionadoId);
+
+    // ⌘D / Ctrl+D — duplicar. `metaKey` en Mac y `ctrlKey` en Windows: los
+    // dos, no uno u otro, que es el criterio que ya usan ⌘Z y ⌘S.
+    if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "d") {
+      ev.preventDefault();
+      if (i >= 0) duplicar(i);
+      return;
+    }
+
+    // ⌥↑ / ⌥↓ — mover. El clamp del encabezado y el de los extremos ya viven
+    // adentro de `mover`, así que acá no se repiten.
+    if (ev.altKey && (ev.key === "ArrowUp" || ev.key === "ArrowDown")) {
+      if (i < 0) return;
+      ev.preventDefault();
+      mover(i, ev.key === "ArrowUp" ? i - 1 : i + 1);
+      return;
+    }
+
+    // De acá para abajo, sólo teclas peladas y con el foco fuera de un campo.
+    if (ev.metaKey || ev.ctrlKey || ev.altKey || ev.shiftKey) return;
+    if (enCampo(ev.target)) return;
+
+    if (ev.key === "Backspace" || ev.key === "Delete") {
+      if (i < 0) return;
+      ev.preventDefault();
+      borrar(i);
+      return;
+    }
+
+    if (ev.key === "ArrowUp" || ev.key === "ArrowDown") {
+      if (i < 0) return;
+      const destino = bloques[ev.key === "ArrowUp" ? i - 1 : i + 1];
+      // Sin vecino la tecla se devuelve al navegador: en el primer y el último
+      // bloque las flechas siguen scrolleando, que es lo que uno espera al
+      // llegar a la punta de una lista.
+      if (!destino?.id) return;
+      ev.preventDefault();
+      elegir(destino.id);
+    }
+  };
+
+  /**
+   * El handler vivo, en un ref, y el listener registrado UNA sola vez.
+   *
+   * 🔑 `alTeclado` cierra sobre `bloques` y sobre las cinco operaciones, y las
+   * seis cosas se rehacen en **cada render** — o sea en cada tecla que se
+   * escribe, porque el estado de este editor es el documento entero. Colgándolo
+   * de las dependencias del efecto, el listener de `window` se daba de baja y de
+   * alta una vez por letra tipeada; en dependencias vacías, en cambio, el
+   * listener se queda con el `bloques` del primer render y mueve el bloque
+   * equivocado. El ref es lo que rompe el falso dilema.
+   *
+   * ⚠️ Se escribe desde un efecto y **nunca durante el render** — escribir un ref
+   * mientras se renderiza es justo lo que frena el lint de React (es el mismo
+   * cuidado que documenta `useHistorial`).
+   */
+  const atajos = useRef(alTeclado);
+  useEffect(() => {
+    atajos.current = alTeclado;
+  });
+
+  useEffect(() => {
+    if (soloLectura) return;
+    const onKey = (ev: KeyboardEvent) => atajos.current(ev);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [soloLectura]);
 
   const setTema = (t: Tema | undefined) => {
     const c = { ...contenido };

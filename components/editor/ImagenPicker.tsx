@@ -101,7 +101,17 @@ export function ImagenPicker({
   // Nunca se dibuja en el servidor —solo existe después de un click—, así que
   // el guardia de `document` es formal y no hace falta ningún estado montado.
   const modal = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCerrar}>
+    // `role`/`aria-modal` no son sólo accesibilidad: es de lo que cuelga la
+    // guarda de los atajos de teclado del editor (`hayModal()` en
+    // `EditorMail.tsx`). Con este modal abierto el foco vive en el `body`, así
+    // que sin la marca un ⌫ le borraba el bloque de atrás.
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Biblioteca de imágenes"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onCerrar}
+    >
       <div
         className="flex max-h-[80vh] w-full max-w-3xl flex-col rounded-xl border border-border bg-surface shadow-lg"
         onClick={(e) => e.stopPropagation()}
