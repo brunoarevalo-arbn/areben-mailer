@@ -41,16 +41,36 @@ export const REDES: Red[] = [
 /**
  * Cómo se dibujan los iconos de un bloque `redes`.
  *
- * **Ausente = `marca`**, los PNG de color oficial de siempre: cualquier otro
- * default le cambiaría el cierre a todo mail ya guardado.
+ * **Ausente = `marca`**, la pastilla cuadrada de color de siempre: cualquier
+ * otro default le cambiaría el cierre a todo mail ya guardado.
  *
- * `pleno` los dibuja en un solo color, y **cuál lo decide el renderer** según el
- * fondo (`Paleta.esOscuro`), nunca quien arma el mail. Es exactamente el mismo
- * criterio que los iconos de celda de `columnas` (`iconos.ts`): un PNG no se
- * tiñe, así que ofrecer "blanco o negro" a mano es ofrecer la forma de dejar un
- * icono blanco sobre fondo blanco.
+ * - `marca` — pastilla cuadrada, color oficial, glifo blanco.
+ * - `simple` — el símbolo solo, con su forma y color propios y sin la pastilla.
+ *   Cuatro los dibujó la diseñadora (5-ago-2026); los otros cuatro salieron de
+ *   sacarle el cuadrado a los de `marca`.
+ * - `pleno` — un solo color.
+ *
+ * 🔑 En `pleno`, **cuál color lo decide el renderer** según el fondo
+ * (`Paleta.esOscuro`), nunca quien arma el mail. Mismo criterio que los iconos
+ * de celda de `columnas` (`iconos.ts`): un PNG no se tiñe, así que ofrecer
+ * "blanco o negro" a mano es ofrecer la forma de dejar un icono blanco sobre
+ * fondo blanco.
  */
-export type EstiloIconos = "marca" | "pleno";
+export type EstiloIconos = "marca" | "simple" | "pleno";
+
+/**
+ * Las del set `simple` que además necesitan versión para fondo oscuro.
+ *
+ * 🔴 Son las dos cuyo símbolo nativo es NEGRO. Sobre un mail de tema oscuro el
+ * TikTok deja sólo el halo cian y rosa —el cuerpo de la nota desaparece— y la X
+ * no deja nada. El resto trae su propio color o su propia forma blanca, así que
+ * se lee sobre cualquier fondo y **no** necesita un archivo más.
+ *
+ * Es una lista y no una regla porque es un dato del símbolo, no del sistema: la
+ * red que entre mañana se mira y se decide. Lo custodia `probar-redes.ts`, que
+ * exige el archivo de cada slug que esté acá.
+ */
+export const SIMPLE_CON_CLARO: readonly string[] = ["tiktok", "x"];
 
 /**
  * ¿Este nombre de red tiene icono? Devuelve `undefined` si no lo conocemos.
@@ -88,6 +108,15 @@ export function urlIcono(
 ): string | undefined {
   const b = (base ?? "").replace(/\/+$/, "");
   if (!b) return undefined;
-  const suf = estilo === "pleno" ? (oscuro ? "-claro" : "-oscuro") : "";
+  const suf =
+    estilo === "pleno"
+      ? oscuro
+        ? "-claro"
+        : "-oscuro"
+      : estilo === "simple"
+        ? oscuro && SIMPLE_CON_CLARO.includes(red.slug)
+          ? "-simple-claro"
+          : "-simple"
+        : "";
   return `${b}/redes/${red.slug}${suf}.png`;
 }

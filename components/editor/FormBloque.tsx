@@ -619,16 +619,19 @@ export function FormBloque({
               ofrecerlo a mano es ofrecer un icono blanco sobre fondo blanco. */}
           <Select
             label="Iconos"
-            className="w-48"
+            className="w-56"
             value={b.iconos ?? "marca"}
             hint={
-              (b.iconos ?? "marca") === "pleno"
-                ? "En un color solo, elegido según el fondo del mail."
-                : "Los colores oficiales de cada red."
+              {
+                marca: "Cada red en su color, sobre un cuadrado.",
+                simple: "El símbolo solo, en su color, sin cuadrado.",
+                pleno: "En un color solo, elegido según el fondo del mail.",
+              }[b.iconos ?? "marca"]
             }
             onChange={(e) => set({ iconos: e.target.value as EstiloIconos })}
           >
-            <option value="marca">De color</option>
+            <option value="marca">Con fondo de color</option>
+            <option value="simple">Sólo el símbolo</option>
             <option value="pleno">De un solo color</option>
           </Select>
         </div>

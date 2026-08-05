@@ -10,7 +10,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import sharp from "sharp";
 import { renderEmailHtml } from "../lib/email/render";
-import { REDES, redConIcono } from "../lib/email/redes";
+import { REDES, redConIcono, SIMPLE_CON_CLARO } from "../lib/email/redes";
 import type { Bloque } from "../lib/email/bloques";
 
 let fallos = 0;
@@ -30,11 +30,14 @@ const html = (links: { red: string; url: string }[], assetsBase?: string) =>
 console.log("\n1) 🔴 Cada red de la lista TIENE su archivo");
 // Es la invariante que hace imposible el cuadradito roto. Si alguien agrega una
 // red a REDES y se olvida del PNG, esto se pone rojo el mismo día.
-// ⚠️ Son TRES archivos por red desde el 5-ago-2026: el de color y las dos
-// variantes plenas. El bloque puede pedir cualquiera de los tres y la que falte
-// es un cuadradito roto en la casilla de otra persona, exactamente igual.
+// ⚠️ Son CUATRO archivos por red desde el 5-ago-2026 —el de la pastilla, el del
+// símbolo solo y las dos variantes plenas—, más un quinto en las dos de
+// `SIMPLE_CON_CLARO`. El bloque puede pedir cualquiera y la que falte es un
+// cuadradito roto en la casilla de otra persona, exactamente igual.
 for (const r of REDES) {
-  for (const suf of ["", "-claro", "-oscuro"]) {
+  const sufijos = ["", "-simple", "-claro", "-oscuro"];
+  if (SIMPLE_CON_CLARO.includes(r.slug)) sufijos.push("-simple-claro");
+  for (const suf of sufijos) {
     ok(existsSync(`public/redes/${r.slug}${suf}.png`), `public/redes/${r.slug}${suf}.png existe (${r.nombre})`);
   }
 }
@@ -82,6 +85,24 @@ ok(plenoOscuro.includes("/redes/instagram-claro.png"), "sobre un tema oscuro va 
 // Ausente = como salió siempre. Es lo que impide que un default nuevo le cambie
 // el cierre a toda campaña y plantilla ya guardada.
 ok(h1.includes("/redes/instagram.png"), "sin `iconos`, el de color de siempre");
+
+console.log("\n2-quater) 🔴 `simple` sólo cambia de archivo en las dos que lo necesitan");
+// El símbolo de TikTok y el de X son NEGROS: sobre un mail oscuro el TikTok deja
+// sólo el halo cian y rosa, y la X no deja nada. El resto trae su propio color y
+// **no** tiene que cambiar de archivo — si lo hiciera, sería un 404.
+const simple = (red: string, oscuro: boolean) =>
+  renderEmailHtml(
+    {
+      bloques: [{ tipo: "redes", iconos: "simple", links: [{ red, url: "https://x/y" }] } as Bloque],
+      ...(oscuro ? { tema: { fondo: "#0b0b0b", fondoContenido: "#141414" } } : {}),
+    } as never,
+    { ...OPTS, assetsBase: HOST },
+  );
+ok(simple("TikTok", false).includes("/redes/tiktok-simple.png"), "TikTok sobre claro: el símbolo negro");
+ok(simple("TikTok", true).includes("/redes/tiktok-simple-claro.png"), "TikTok sobre oscuro: la versión clara");
+ok(simple("X", true).includes("/redes/x-simple-claro.png"), "X sobre oscuro: la versión clara");
+ok(simple("WhatsApp", true).includes("/redes/whatsapp-simple.png"), "WhatsApp sobre oscuro: el MISMO archivo (ya trae color)");
+ok(simple("Facebook", true).includes("/redes/facebook-simple.png"), "Facebook sobre oscuro: el MISMO archivo");
 
 console.log("\n2-ter) 🔴 Un sitio web tiene icono y no sale como «Otra»");
 // Era el agujero de la lista: la única salida para la web propia era la opción
