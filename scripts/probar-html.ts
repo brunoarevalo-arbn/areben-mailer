@@ -114,7 +114,48 @@ titulo("Responsive");
   ok(dinamica.includes(`class="${CLASES.col2}"`), "el bloque dinámico también respeta `movil`");
 
   const cols = render({ bloques: [{ tipo: "columnas", celdas: [{ imagen: "https://x/a.jpg", url: "#" }, { imagen: "https://x/b.jpg", url: "#" }] }] });
-  ok(cols.includes(`class="${CLASES.col}"`), "las columnas apilan en el celular");
+  ok(cols.includes(`class="${CLASES.col}"`), "sin `movil`, las columnas apilan en el celular");
+
+  // La escotilla: la fila se queda en fila. Mismo mecanismo que la grilla —cuál
+  // de las dos clases lleva el `<td>`— y el mismo motivo para fijarlo en las dos
+  // direcciones: con las dos clases puestas, apilaría igual.
+  const TRES = [
+    { titulo: "Envíos gratis", texto: "En tu compra" },
+    { titulo: "3 cuotas sin interés", texto: "En todos" },
+    { titulo: "Cambios y devoluciones fáciles", texto: "Sin vueltas" },
+  ];
+  const enFila = render({ bloques: [{ tipo: "columnas", variante: "textos", celdas: TRES, movil: "fila" }] });
+  ok(enFila.includes(`class="${CLASES.col2}"`), "con `movil:\"fila\"` la celda lleva la clase que NO apila");
+  ok(!enFila.includes(`class="${CLASES.col}"`), "y no lleva la que apila: con las dos, la fila se apilaría igual");
+  ok(enFila.includes(`.${CLASES.col2}{`), "la media query define la regla de no apilar");
+  // El layout de escritorio es el mismo en los dos casos: es lo que ve Outlook,
+  // que descarta el <style> entero. La regla del shell.
+  const apilada = render({ bloques: [{ tipo: "columnas", variante: "textos", celdas: TRES }] });
+  ok((enFila.match(/<td width="33%"/g) ?? []).length === 3, "en escritorio siguen siendo tres celdas de 33%");
+  ok((apilada.match(/<td width="33%"/g) ?? []).length === 3, "y el ancho inline es el MISMO con y sin `movil`");
+
+  // Con tres en fila cada celda queda en ~104px a 375px: un título de 18px en
+  // mayúsculas no entra y una palabra más ancha que su <td> descuadra la fila.
+  ok(enFila.includes(`class="${CLASES.colTitulo}"`), "con 3 en fila el título se achica en el celular");
+  ok(enFila.includes(`class="${CLASES.colTexto}"`), "y el texto también");
+  ok(enFila.includes(`.${CLASES.colTitulo}{`), "la media query define el achique");
+  ok(!apilada.includes(`class="${CLASES.colTitulo}"`), "apilada no se achica nada: la celda mide todo el ancho");
+
+  // ⚠️ Con un tamaño elegido a mano la media query no se cuelga, o el control
+  // del panel sería mentira. Mismo criterio que `m-h1`.
+  const elegido = render({
+    bloques: [{ tipo: "columnas", variante: "textos", celdas: TRES, movil: "fila", estilo: { titulo: { tamano: 22 } } }],
+  });
+  ok(!elegido.includes(`class="${CLASES.colTitulo}"`), "con el tamaño elegido a mano, el título no se achica solo");
+  ok(elegido.includes(`class="${CLASES.colTexto}"`), "y el del cuerpo, que nadie eligió, sí");
+
+  // Con dos celdas en fila cada una mide ~160px y el título entra como está:
+  // achicarlo sería empeorarlo.
+  const dosEnFila = render({
+    bloques: [{ tipo: "columnas", variante: "textos", celdas: TRES.slice(0, 2), movil: "fila" }],
+  });
+  ok(dosEnFila.includes(`class="${CLASES.col2}"`), "con dos celdas la fila también puede no apilar");
+  ok(!dosEnFila.includes(`class="${CLASES.colTitulo}"`), "pero con dos no se achica el texto");
 
   // Una fila de cuatro reparte 25% y apila igual. El ancho inline es el de
   // escritorio y la clase solo lo pisa en el celular: la regla del shell.

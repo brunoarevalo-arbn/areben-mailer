@@ -660,6 +660,30 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const tCuerpo = e("cuerpo");
       const tBoton = e("boton");
 
+      // 🔑 La única diferencia entre apilar y no apilar es CUÁL de las dos clases
+      // lleva la celda: `m-col` la pasa a ancho completo en el corte móvil y
+      // `m-col2` la deja con el ancho que ya tiene, achicándole el margen
+      // lateral. El `width` inline —el layout de escritorio— es el mismo en los
+      // dos casos, que es la regla del shell: la clase solo puede ser un
+      // override. Es el mismo mecanismo que `movil` en la grilla de productos.
+      //
+      // Acá la regla juega a favor: el cliente que descarta el `<style>`
+      // —Outlook, o Gmail cuando recorta arriba de ~102 KB— ve la fila, que es
+      // justo lo que se pidió.
+      const enFila = b.movil === "fila";
+      const claseCelda = enFila ? CLASES.col2 : CLASES.col;
+      // El texto se achica solo cuando la celda se angosta de verdad: con tres
+      // en fila son ~104px a 375px y un título de 18px en mayúsculas no entra
+      // —"DEVOLUCIONES" mide ~140px y una palabra más ancha que su `<td>`
+      // descuadra la fila entera—. Con dos son ~159px y entra como está.
+      //
+      // ⚠️ Y solo si NADIE eligió el tamaño, igual que `clasesTitulo()`: con un
+      // valor puesto a mano, la media query lo estaría desmintiendo y el control
+      // del panel sería mentira.
+      const achica = enFila && celdas.length >= 3;
+      const claseTitulo = achica && !tTitulo.elegidas.has("tamano") ? CLASES.colTitulo : undefined;
+      const claseTexto = achica && !tCuerpo.elegidas.has("tamano") ? CLASES.colTexto : undefined;
+
       // 🔴 El botón de la celda va **afuera** del ancla que envuelve al resto —
       // por eso lo emite un helper aparte y no forma parte del interior. Un
       // `<a>` adentro de otro no está permitido en HTML y cada cliente lo
@@ -699,14 +723,14 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         // salió a la izquierda desde el día uno, contra las seis referencias que
         // la centran (002 · 006 · 007 · 018 · 020 · 021). Ver `alineacion()`.
         const label = c.titulo
-          ? `<div style="margin-top:8px;font-size:${px(tTitulo.tamano ?? 15)};font-weight:${tTitulo.peso ?? 600};color:${tTitulo.color};text-align:${alineacion(tTitulo, "center")}${extra(tTitulo, ["tamano", "peso", "color", "align"])}">${esc(c.titulo)}</div>`
+          ? `<div${clase(claseTitulo)} style="margin-top:8px;font-size:${px(tTitulo.tamano ?? 15)};font-weight:${tTitulo.peso ?? 600};color:${tTitulo.color};text-align:${alineacion(tTitulo, "center")}${extra(tTitulo, ["tamano", "peso", "color", "align"])}">${esc(c.titulo)}</div>`
           : "";
         const foto = `${c.imagen ? `<img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:${px(tImg.radio ?? 8)};display:block" alt="${esc(c.titulo ?? "")}" />` : ""}${label}`;
         // Sin botón la celda entera es el link —como fue siempre, hasta con la
         // url vacía—; con botón, la foto se queda sin ancla y el click vive en
         // el botón, que es lo que el lector ve.
         const interior = c.botonTexto ? foto : `<a href="${esc(c.url || "#")}" style="text-decoration:none;color:inherit">${foto}</a>`;
-        return `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px">${interior}${botonCelda(c, pct, alineacion(tTitulo, "center"))}</td>`;
+        return `<td width="${pct}%" valign="top"${clase(claseCelda)} style="padding:6px">${interior}${botonCelda(c, pct, alineacion(tTitulo, "center"))}</td>`;
       };
 
       // El ícono de la celda: chico, arriba del título, alineado como él.
@@ -731,14 +755,14 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
 
       const celdaTexto = (c: Columna, pct: number) => {
         const titulo = c.titulo
-          ? `<div style="margin:0 0 6px;font-size:${px(tTitulo.tamano ?? 18)};font-weight:${tTitulo.peso ?? 700};line-height:${tTitulo.interlinea ?? 1.3};color:${tTitulo.color};text-align:${tTitulo.align ?? "left"}${extra(tTitulo, ["tamano", "peso", "interlinea", "color", "align"])}">${esc(c.titulo)}</div>`
+          ? `<div${clase(claseTitulo)} style="margin:0 0 6px;font-size:${px(tTitulo.tamano ?? 18)};font-weight:${tTitulo.peso ?? 700};line-height:${tTitulo.interlinea ?? 1.3};color:${tTitulo.color};text-align:${tTitulo.align ?? "left"}${extra(tTitulo, ["tamano", "peso", "interlinea", "color", "align"])}">${esc(c.titulo)}</div>`
           : "";
         const texto = c.texto
-          ? `<div style="font-size:${px(tCuerpo.tamano ?? 14)};line-height:${tCuerpo.interlinea ?? 1.5};color:${tCuerpo.color};text-align:${tCuerpo.align ?? "left"}${extra(tCuerpo, ["tamano", "interlinea", "color", "align"])}">${nl(c.texto)}</div>`
+          ? `<div${clase(claseTexto)} style="font-size:${px(tCuerpo.tamano ?? 14)};line-height:${tCuerpo.interlinea ?? 1.5};color:${tCuerpo.color};text-align:${tCuerpo.align ?? "left"}${extra(tCuerpo, ["tamano", "interlinea", "color", "align"])}">${nl(c.texto)}</div>`
           : "";
         const contenido = `${iconoCelda(c, tTitulo.align ?? "left")}${titulo}${texto}`;
         const interior = c.url && !c.botonTexto ? `<a href="${esc(c.url)}" style="text-decoration:none;color:inherit">${contenido}</a>` : contenido;
-        return `<td width="${pct}%" valign="top"${clase(CLASES.col)} style="padding:6px">${interior}${botonCelda(c, pct, tTitulo.align ?? "left")}</td>`;
+        return `<td width="${pct}%" valign="top"${clase(claseCelda)} style="padding:6px">${interior}${botonCelda(c, pct, tTitulo.align ?? "left")}</td>`;
       };
 
       const html = celdas.map(({ c, img }, i) => (img ? celdaImagen(c, pcts[i]) : celdaTexto(c, pcts[i]))).join("");

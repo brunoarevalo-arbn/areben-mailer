@@ -23,12 +23,19 @@ export const CLASES = {
   /** Celda que en el celular pasa a ocupar el ancho completo. */
   col: "m-col",
   /**
-   * Celda que en el celular SIGUE midiendo la mitad: dos tarjetas por fila.
+   * Celda que en el celular **NO apila**: se queda con el ancho de escritorio.
    *
-   * Existe sobre todo para *no* llevar `m-col` — la grilla ya se dibuja de a dos
-   * `<td width="50%">` y lo único que la apila es esa clase. Lo que sí hace la
-   * regla es achicar el margen lateral: a 375px cada tarjeta queda en ~171px, y
-   * los 8px de cada lado se le notan a la foto.
+   * Existe sobre todo para *no* llevar `m-col` — la celda ya trae su
+   * `<td width="N%">` inline y lo único que la apila es esa clase. Lo que sí
+   * hace la regla es achicar el margen lateral, que es lo que se nota apenas la
+   * celda se angosta.
+   *
+   * Dos usuarios, y por eso el nombre se quedó corto:
+   * - la **grilla de productos** con `movil: 2` — dos tarjetas por fila, ~171px
+   *   cada una a 375px, y los 8px de cada lado se le notan a la foto;
+   * - la **fila de celdas** (`columnas`) con `movil: "fila"`, desde el
+   *   5-ago-2026 — de 2 a 4 celdas, donde los 4px valen todavía más: con tres,
+   *   cada celda queda en ~104px.
    */
   col2: "m-col2",
   /** Contenedor con margen lateral: se achica en pantalla chica. */
@@ -42,6 +49,21 @@ export const CLASES = {
    */
   titulo: "m-h1",
   subtitulo: "m-h2",
+  /**
+   * Achican el título y el texto de una celda que **no apila** en el celular.
+   *
+   * Con tres celdas en fila, a 375px cada una queda en ~104px de ancho útil, y
+   * un título de 18px en mayúsculas no entra: "DEVOLUCIONES" mide ~140px. Y una
+   * palabra más ancha que su `<td>` no se corta — **ensancha la celda y
+   * descuadra la fila entera**, que es peor que una letra chica.
+   *
+   * ⚠️ Se cuelgan **solo si nadie eligió el tamaño**, igual que `m-h1`: con un
+   * tamaño puesto a mano, el control del panel tiene que ser la verdad.
+   * Y solo con 3 o 4 celdas — con dos la celda mide ~159px y el título entra
+   * como está, así que achicarlo sería empeorarlo.
+   */
+  colTitulo: "m-c1",
+  colTexto: "m-c2",
   ocultarMovil: "m-hide",
   ocultarEscritorio: "d-hide",
   /** La tabla del cuerpo, para que no se pase del ancho de la pantalla. */
@@ -96,6 +118,8 @@ export function cabeza(pal: Paleta): string {
     .${CLASES.pad}{padding-left:20px!important;padding-right:20px!important}
     .${CLASES.titulo}{font-size:22px!important}
     .${CLASES.subtitulo}{font-size:19px!important}
+    .${CLASES.colTitulo}{font-size:13px!important}
+    .${CLASES.colTexto}{font-size:12px!important}
     .${CLASES.ocultarMovil}{display:none!important;max-height:0!important;overflow:hidden!important;mso-hide:all}
     .${CLASES.ocultarEscritorio}{display:block!important;mso-hide:none}
   }

@@ -379,6 +379,27 @@ export type Bloque = BloqueBase &
          * lectura que no inventa nada es ignorarlo.
          */
         proporcion?: 40 | 50 | 60;
+        /**
+         * Qué hace la fila en el CELULAR. **Ausente = `"apilar"`**, que es como
+         * se vio toda fila hasta el 5-ago-2026: la clase `m-col` las pasa a
+         * ancho completo en el corte móvil y quedan una debajo de la otra.
+         *
+         * `"fila"` es la escotilla: la celda no lleva esa clase y se queda con
+         * el ancho de escritorio. Existe porque tres beneficios apilados ocupan
+         * una pantalla entera de teléfono —"se aplana la lista y se hace larga,
+         * y capaz representa el 30% del mail"— y una banda de beneficios se lee
+         * de un vistazo o no se lee.
+         *
+         * ⚠️ Cualquier otro default le cambiaría el aspecto en el teléfono a
+         * toda campaña y plantilla ya guardada sin que nadie las toque. Mismo
+         * criterio que `PorFilaMovil`, `precioOculto` y `direccionOculta`.
+         *
+         * 🔑 Enum y no booleano: `movil` ya significa "qué pasa en el celular"
+         * en este motor, y deja lugar a un valor más el día que se pueda 2×2
+         * —hoy no se puede: una `<tr>` de cuatro `<td>` no se parte en dos filas
+         * con CSS, ver `PorFila`—.
+         */
+        movil?: "apilar" | "fila";
         /** De 2 a 4. Lo garantiza `leerContenido`, no el tipo. */
         celdas: Columna[];
       }

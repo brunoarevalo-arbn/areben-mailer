@@ -420,6 +420,12 @@ export function FormBloque({
         set({ celdas: celdas.map((c, j) => (j === i ? { ...c, ...campos } : c)) } as Partial<Bloque>);
       const nombreCelda = (i: number) =>
         celdas.length === 2 ? (i === 0 ? "Izquierda" : "Derecha") : `Celda ${i + 1}`;
+      // Cuánto mide cada celda en un celular de 375px si la fila NO apila: los
+      // 40px son el margen lateral del mail en pantalla chica (`m-pad`) y los 8
+      // el padding del `<td>` con la fila en modo angosto. Es una cuenta y no un
+      // número escrito: con 2 da ~160px, con 3 ~104px y con 4 ~76px, y esa
+      // diferencia es toda la decisión.
+      const anchoEnMovil = Math.round((375 - 40) / Math.max(1, celdas.length)) - 8;
       return (
         <div className="space-y-4">
           <Select
@@ -453,6 +459,32 @@ export function FormBloque({
             <option value="2">2 celdas</option>
             <option value="3">3 celdas</option>
             <option value="4">4 celdas</option>
+          </Select>
+          {/* La forma del bloque en el celular, al lado de "cuántas" y no en el
+              panel de estilo: no es una propiedad de un rol. Mismo criterio que
+              `GrillaControl`. */}
+          <Select
+            label="En el celular"
+            fullWidth
+            value={b.movil ?? "apilar"}
+            // Ausente = apilar, que es como se vio toda fila hasta hoy: se
+            // guarda la ausencia y no el string, así el Json no engorda con el
+            // valor de fábrica.
+            onChange={(e) => set({ movil: e.target.value === "fila" ? "fila" : undefined } as Partial<Bloque>)}
+            hint={
+              b.movil === "fila"
+                ? `Cada celda queda en ~${anchoEnMovil}px en un celular de 375px.${
+                    celdas.length >= 4
+                      ? " Con cuatro es muy angosto para un título largo."
+                      : celdas.length >= 3
+                        ? " El título y el texto se achican solos en el celular para que entren."
+                        : ""
+                  }`
+                : "Apiladas, tres celdas ocupan una pantalla entera de teléfono. En fila se leen de un vistazo, pero cada una queda angosta."
+            }
+          >
+            <option value="apilar">Una debajo de otra</option>
+            <option value="fila">Todas en fila</option>
           </Select>
           {celdas.length === 2 && (
             <Select
