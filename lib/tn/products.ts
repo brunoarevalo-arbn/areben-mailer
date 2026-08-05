@@ -11,6 +11,15 @@ export interface ProductoTN {
   precioPromo?: string;
   imagen: string;
   url: string;
+  /**
+   * No está publicado en la tienda (5-ago-2026). Sólo lo devuelve el BUSCADOR;
+   * el bloque no lo guarda.
+   *
+   * 🔑 Es un dato de la tienda de HOY, no del mail: guardarlo adentro del Json
+   * lo dejaría mintiendo el día que el producto se publica. Lo que el mail sí
+   * guarda es la URL, y de esa se vuelve a preguntar cuando hace falta.
+   */
+  oculto?: boolean;
 }
 
 interface TnVariantRaw {
@@ -29,6 +38,7 @@ interface TnProductRaw {
   name?: Record<string, string> | string;
   canonical_url?: string;
   has_stock?: boolean;
+  published?: boolean;
   images?: { src: string }[];
   variants?: TnVariantRaw[];
 }
@@ -48,6 +58,9 @@ function normalizar(p: TnProductRaw): ProductoTN {
     precioPromo: v?.promotional_price ?? undefined,
     imagen: p.images?.[0]?.src ?? "",
     url: p.canonical_url ?? "#",
+    // `undefined` y no `false`: es la convención del motor —ausente = lo normal—
+    // y además así no se escribe una clave de más en cada item que se guarda.
+    ...(p.published === false ? { oculto: true } : {}),
   };
 }
 
@@ -68,13 +81,31 @@ function hayStock(p: TnProductRaw): boolean {
 const enOferta = (p: TnProductRaw): boolean =>
   (p.variants ?? []).some((v) => Number(v.promotional_price) > 0);
 
-/** Busca productos publicados en la tienda TN (para el bloque Producto). */
+/**
+ * Busca productos de la tienda TN, para elegir a mano (bloque `productos`).
+ *
+ * 🔑 **Los ocultos entran, marcados** (5-ago-2026). Hasta ese día iba
+ * `published: "true"` y quedaban afuera en silencio, que es lo correcto para un
+ * mail que sale hoy y lo incorrecto para el caso que existe de verdad: la
+ * **preventa**. El mail se arma con el producto todavía oculto y se publica el
+ * día del lanzamiento.
+ *
+ * ⚠️ Medido el 5-ago contra las cuatro tiendas: la ficha de un producto oculto
+ * devuelve **404**, no una página sin botón de compra. Por eso el `oculto` no es
+ * decorativo — es lo que sostiene el aviso del editor y el freno de
+ * `procesarLote`, que es donde se comprueba de nuevo, en el único momento que
+ * importa: cuando el mail está por salir.
+ *
+ * ⚠️ Sin foto sigue sin entrar: la grilla es de tarjetas con imagen y una sin
+ * imagen deja un agujero blanco al lado de las que sí la tienen. Es el otro
+ * motivo por el que un producto "no aparece" en el buscador.
+ */
 export async function buscarProductos(
   storeId: string,
   token: string,
   q: string,
 ): Promise<ProductoTN[]> {
-  const params: Record<string, string | number> = { per_page: 20, published: "true" };
+  const params: Record<string, string | number> = { per_page: 20 };
   if (q) params.q = q;
   const { data } = await tnGet<TnProductRaw[]>(storeId, token, "products", params);
   return (Array.isArray(data) ? data : []).map(normalizar).filter((p) => p.imagen);

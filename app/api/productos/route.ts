@@ -1,5 +1,7 @@
 import { autorizarApi } from "@/lib/auth";
 import { buscarProductos, traerProductos } from "@/lib/tn/products";
+import { esDeLaTienda, linksRotos } from "@/lib/email/links-productos";
+import { marcaDe } from "@/lib/marca";
 import type { FuenteProductos } from "@/lib/email/bloques";
 
 const FUENTES: readonly string[] = ["destacados", "recientes", "oferta", "categoria"];
@@ -18,6 +20,7 @@ export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
   const q = sp.get("q") ?? "";
   const fuente = sp.get("fuente");
+  const revisar = sp.get("revisar");
 
   // Antes usaba getCuentaActiva(), que LANZA sin sesión: devolvía un 500 donde
   // corresponde un 401. Además el editor consume esto por fetch, así que la
@@ -25,6 +28,23 @@ export async function GET(req: Request) {
   const auth = await autorizarApi("ver");
   if (auth instanceof Response) return auth;
   const { cuenta } = auth;
+
+  // `?revisar=url1,url2` → cuáles de esas fichas dan 404 (o sea, están sin
+  // publicar, borradas o renombradas). Es el MISMO chequeo que frena el envío en
+  // `procesarLote`, para que el editor lo avise antes y no se descubra con la
+  // campaña encolada.
+  //
+  // 🔴 Va detrás del filtro `esDeLaTienda`: sin él, esto es un SSRF de manual —
+  // cualquiera con sesión haría que el servidor visite la URL que quiera. El
+  // único destino legítimo es la tienda de la cuenta.
+  if (revisar) {
+    const urls = revisar
+      .split(",")
+      .map((u) => u.trim())
+      .filter((u) => esDeLaTienda(u, marcaDe(cuenta, process.env.APP_URL ?? "").urlCuenta))
+      .slice(0, 12);
+    return Response.json({ rotos: urls.length ? await linksRotos(urls) : [] });
+  }
 
   if (!cuenta.tnStoreId || !cuenta.tnToken) {
     return Response.json({ productos: [], error: "TN no conectada" }, { status: 400 });

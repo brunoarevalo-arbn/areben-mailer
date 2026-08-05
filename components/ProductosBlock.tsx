@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { PorFila, PorFilaMovil, ProductoEmail } from "@/lib/email/render";
+// Sólo el TIPO: `import type` se borra al compilar, así que el cliente de la API
+// de Tiendanube no entra al bundle del editor.
+import type { ProductoTN } from "@/lib/tn/products";
 import { RotateCcw, X } from "lucide-react";
 import { campoBase } from "@/lib/ui";
 import { GrillaControl } from "@/components/editor/GrillaControl";
@@ -31,9 +34,40 @@ export function ProductosBlock({
   onGrilla: (cambio: { movil?: PorFilaMovil; porFila?: PorFila }) => void;
 }) {
   const [q, setQ] = useState("");
-  const [resultados, setResultados] = useState<ProductoEmail[]>([]);
+  const [resultados, setResultados] = useState<ProductoTN[]>([]);
   const [buscando, setBuscando] = useState(false);
   const [editandoFoto, setEditandoFoto] = useState<number | null>(null);
+  /** Las URLs cuya ficha da 404: sin publicar, borrada o renombrada. */
+  const [rotas, setRotas] = useState<Set<string>>(new Set());
+
+  // 🔑 El `oculto` que devuelve el buscador NO se guarda en el bloque: es un
+  // dato de la tienda de hoy y quedaría mintiendo el día que el producto se
+  // publica. Así que para los que ya están elegidos se vuelve a preguntar, con
+  // el MISMO chequeo que frena el envío — si la ficha da 404, el mail llevaría
+  // a una página que no existe.
+  const urls = items
+    .map((p) => p.url)
+    .filter(Boolean)
+    .join(",");
+  useEffect(() => {
+    if (!urls) return;
+    let vivo = true;
+    fetch(`/api/productos?revisar=${encodeURIComponent(urls)}`)
+      .then((r) => r.json())
+      .then((d) => vivo && setRotas(new Set<string>(d.rotos ?? [])))
+      .catch(() => {
+        // Sin respuesta no se afirma nada: el aviso desaparece, el freno del
+        // envío sigue estando. Es el único lugar donde se puede fallar abierto.
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [urls]);
+  // Sin productos no hay nada que avisar. Se DERIVA en vez de limpiar el estado
+  // desde el efecto: un `setState` síncrono ahí adentro dispara un render en
+  // cascada (lo frena el lint) y acá no hace falta ninguno — la lista vieja no
+  // molesta, porque sólo se pregunta por las URLs que siguen estando.
+  const sinPublicar = (u: string) => !!urls && rotas.has(u);
 
   const buscar = async () => {
     setBuscando(true);
@@ -46,8 +80,14 @@ export function ProductosBlock({
     }
   };
 
-  const agregar = (p: ProductoEmail) => {
+  const agregar = ({ oculto, id, ...p }: ProductoTN) => {
     if (items.some((x) => x.url === p.url)) return;
+    // 🔑 `oculto` e `id` se descartan al guardar. El primero es un dato de la
+    // tienda de HOY —quedaría mintiendo apenas se publique el producto— y el
+    // segundo no lo usa nadie: lo que el mail necesita es la URL, que es lo que
+    // se vuelve a preguntar tanto en el editor como antes de enviar.
+    void oculto;
+    void id;
     onChange([...items, p]);
   };
   const quitar = (i: number) => onChange(items.filter((_, j) => j !== i));
@@ -86,7 +126,14 @@ export function ProductosBlock({
             <div key={i} className="rounded-lg border border-border bg-surface-muted p-1.5">
               <div className="flex items-center gap-2">
                 {p.imagen && <img src={p.imagen} alt="" className="h-8 w-8 shrink-0 rounded object-cover" />}
-                <span className="min-w-0 flex-1 truncate text-xs text-foreground">{p.nombre}</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-foreground">
+                  {p.nombre}
+                  {sinPublicar(p.url) && (
+                    <span className="ml-1.5 rounded border border-warning-border bg-warning px-1 py-0.5 text-[10px] font-semibold text-warning-foreground">
+                      sin publicar
+                    </span>
+                  )}
+                </span>
                 <button
                   type="button"
                   onClick={() => setEditandoFoto(editandoFoto === i ? null : i)}
@@ -143,15 +190,44 @@ export function ProductosBlock({
 
       {/* Resultados */}
       {resultados.length > 0 && (
-        <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto rounded-lg border border-border p-2">
-          {resultados.map((p) => (
-            <button key={p.url} onClick={() => agregar(p)} className="rounded-lg border border-border p-1.5 text-left hover:border-accent">
-              {p.imagen && <img src={p.imagen} alt="" className="mb-1 aspect-square w-full rounded object-cover" />}
-              <div className="truncate text-xs text-foreground">{p.nombre}</div>
-              <div className="text-xs text-muted">${Number(p.precioPromo || p.precio).toLocaleString("es-AR")}</div>
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto rounded-lg border border-border p-2">
+            {resultados.map((p) => (
+              <button key={p.url} onClick={() => agregar(p)} className="rounded-lg border border-border p-1.5 text-left hover:border-accent">
+                {p.imagen && <img src={p.imagen} alt="" className="mb-1 aspect-square w-full rounded object-cover" />}
+                <div className="truncate text-xs text-foreground">{p.nombre}</div>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted">
+                    ${Number(p.precioPromo || p.precio).toLocaleString("es-AR")}
+                  </span>
+                  {/* El buscador SÍ sabe si está publicado: se lo pregunta a
+                      Tiendanube en el momento. Lo que no se guarda es la
+                      respuesta — ver el efecto de arriba. */}
+                  {p.oculto && (
+                    <span className="rounded border border-warning-border bg-warning px-1 text-[10px] font-semibold text-warning-foreground">
+                      oculto
+                    </span>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-subtle">
+            Sólo aparecen los productos que tienen al menos una foto cargada.
+          </p>
+        </>
+      )}
+
+      {/* La explicación va acá abajo y no como alerta arriba: elegir un producto
+          oculto es LEGÍTIMO —es cómo se arma una preventa— y lo que hace falta
+          es decir qué pasa después, no impedirlo. */}
+      {items.some((p) => sinPublicar(p.url)) && (
+        <p className="rounded-lg border border-warning-border bg-warning p-2 text-xs leading-relaxed text-warning-foreground">
+          Hay productos sin publicar en tu tienda. Su página da 404, así que{" "}
+          <strong>el mail no va a salir hasta que los publiques</strong>: queda en cola y se
+          manda solo apenas estén online. Sirve para armar una preventa hoy y lanzarla después
+          — pero si te olvidás de publicar, el envío no arranca.
+        </p>
       )}
 
       {/* El botón de cada tarjeta. El motor lo dibuja desde que existe la grilla

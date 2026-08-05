@@ -59,6 +59,7 @@ node --import tsx scripts/probar-supresion.ts  # una queja no cruza de tienda; u
 node --import tsx scripts/probar-carrito.ts    # el carrito de muestra no sale en un envío real
 node --import tsx scripts/probar-bienvenida.ts # el cupón del pop-up entra, el placeholder nunca sale, y NUEVO_SUSCRIPTOR no lo alcanza ningún evento de TN
 node --import tsx scripts/probar-productos-dinamicos.ts # la consulta se guarda, los productos no
+node --import tsx scripts/probar-links-productos.ts # un producto sin publicar no sale, y nada más frena
 node --env-file=.env --import tsx scripts/verificar-productos-tn.ts # ↑ pero contra la API real de TN
 node --import tsx scripts/probar-tema.ts       # un tema no deja el mail ilegible
 node --import tsx scripts/probar-marcado.ts    # el `data-b` del preview NO sale en un envío

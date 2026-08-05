@@ -7,6 +7,13 @@ import { inyectarTracking } from "@/lib/email/tracking";
 import { sendEmail, esThrottle } from "@/lib/email/enviar";
 import { destinatarioPermitido, modoEnvio, MSG_SIN_REMITENTE } from "@/lib/email/proveedor";
 import { estadoEnvioMarca, getRemitenteEnvio, motivoEnTexto } from "@/lib/remitentes";
+import {
+  esDeLaTienda,
+  linksRotos,
+  motivoLinksRotos,
+  nombresPorUrl,
+  urlsDeProductos,
+} from "./links-productos";
 
 const BATCH = 20;
 
@@ -65,6 +72,38 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
       throttled: false,
       bloqueado: motivoEnTexto(estado) || MSG_SIN_REMITENTE,
     };
+  }
+
+  // 🔴 Un producto elegido a mano puede haber quedado sin publicar — es el caso
+  // de la PREVENTA, donde el mail se arma con el producto oculto a propósito y
+  // hay que acordarse de publicarlo el día del lanzamiento. Medido el 5-ago-2026:
+  // la ficha de un producto oculto en TN devuelve **404**, así que el mail
+  // llevaría a miles de personas a una página que no existe.
+  //
+  // Se corta acá por lo mismo que el remitente: **nada se marca FALLIDO**, que
+  // es terminal y sin reintento. Todo queda ENCOLADO y el cron lo manda solo
+  // cuando el producto se publique — o sea que publicar ES el arreglo, sin
+  // tocar nada más.
+  //
+  // ⚠️ Sólo se miran las URLs de la propia tienda: la lista sale de un Json que
+  // escribió una persona, y hacer que el servidor visite cualquier URL que
+  // alguien escriba es un SSRF con disfraz de chequeo.
+  const urlsProducto = urlsDeProductos(contenido.bloques).filter((u) =>
+    esDeLaTienda(u, marcaDe(campania.cuenta, process.env.APP_URL ?? "").urlCuenta),
+  );
+  if (urlsProducto.length) {
+    const rotos = await linksRotos(urlsProducto);
+    if (rotos.length) {
+      console.log(JSON.stringify({ ev: "lote-bloqueado", motivo: "producto-sin-publicar", campaniaId, rotos }));
+      const restantes = await prisma.envio.count({ where: { campaniaId, estado: "ENCOLADO" } });
+      return {
+        enviados: 0,
+        fallidos: 0,
+        restantes,
+        throttled: false,
+        bloqueado: motivoLinksRotos(rotos, nombresPorUrl(contenido.bloques)),
+      };
+    }
   }
 
   // Los productos automáticos se resuelven ACÁ, **antes** del loop: una vez por
