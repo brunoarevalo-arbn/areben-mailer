@@ -104,6 +104,7 @@ export const ROL_LABEL: Record<RolEstilo, string> = {
   cuerpo: "Texto",
   boton: "Botón",
   imagen: "Imagen",
+  precio: "Precio",
   nota: "Detalles",
 };
 

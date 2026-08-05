@@ -265,6 +265,8 @@ export type Bloque = BloqueBase &
         porFila?: PorFila;
         /** Ver `botonTexto` de `productos-dinamicos`: es el mismo campo. */
         botonTexto?: string;
+        /** Ver `precioOculto` de `productos-dinamicos`: es el mismo campo. */
+        precioOculto?: boolean;
       }
     /**
      * La grilla de `productos`, pero guardando **la consulta y no los productos**.
@@ -289,6 +291,20 @@ export type Bloque = BloqueBase &
         movil?: PorFilaMovil;
         /** Cuántos por fila en escritorio. Ausente = 2. Ver `PorFila`. */
         porFila?: PorFila;
+        /**
+         * Esconder el precio (5-ago-2026).
+         *
+         * 🔑 La clave es **ocultar** y no "mostrar" para que ausente signifique
+         * "se ve", que es lo que hacen todos los mails ya guardados: al revés,
+         * un default nuevo le sacaría el precio a toda grilla existente. Mismo
+         * criterio que `direccionOculta` en `lib/marca.ts`.
+         *
+         * Sale de una devolución de diseño: *«capaz sacaría el precio, para que
+         * la gente entre a ver el producto»*. Es una decisión de campaña —en un
+         * mail de novedades el precio distrae, en uno de ofertas es el titular—
+         * y por eso es un flag del bloque y no un estilo.
+         */
+        precioOculto?: boolean;
         /**
          * El texto del botón que lleva **cada tarjeta**. Vacío o ausente = sin
          * botón, igual que en `seccion` y en una celda de `columnas`.

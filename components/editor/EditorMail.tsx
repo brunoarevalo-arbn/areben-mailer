@@ -37,6 +37,7 @@ const REPRESENTA: Record<RolEstilo, TipoBloque> = {
   cuerpo: "texto",
   boton: "boton",
   imagen: "imagen",
+  precio: "productos",
   nota: "productos",
 };
 

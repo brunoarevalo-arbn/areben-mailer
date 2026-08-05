@@ -89,11 +89,23 @@ export type RolEstilo =
   | "cuerpo"
   | "boton"
   | "imagen"
+  /**
+   * El precio vigente de una tarjeta de producto o de una línea de carrito.
+   *
+   * 🔑 Rol propio y no `cuerpo` (5-ago-2026). Hasta ese día el precio era HTML
+   * escrito a mano —`color:$texto`, `font-weight:600`— y su tamaño salía del rol
+   * `cuerpo`, o sea del NOMBRE del producto: no había forma de agrandarlo sin
+   * agrandar el nombre. La devolución de la diseñadora fue exactamente eso
+   * («el precio queda muy chico en relación al botón» y «poder destacarlo en
+   * colores distintos para hot sale / Black Friday»), y son dos decisiones
+   * distintas de la misma tarjeta.
+   */
+  | "precio"
   /** Precio tachado, variante, cantidad, "y 3 productos más". */
   | "nota";
 
 export const ROLES: readonly RolEstilo[] = [
-  "caja", "titulo", "subtitulo", "cuerpo", "boton", "imagen", "nota",
+  "caja", "titulo", "subtitulo", "cuerpo", "boton", "imagen", "precio", "nota",
 ];
 
 /**
@@ -325,6 +337,11 @@ const BASE: Record<RolEstilo, EstiloBloque> = {
   cuerpo: { color: "$cuerpo", tamano: 16, interlinea: 1.6, align: "left" },
   boton: { color: "$sobreAcento", fondo: "$acento", tamano: 16, peso: 600, radio: 8, padX: 32, padY: 14 },
   imagen: { radio: 8 },
+  // ⚠️ Exactamente lo que `precioHtml` escribía a mano hasta el 5-ago-2026:
+  // `color:${pal.texto};font-weight:600`. Que el BASE sea idéntico al hardcode
+  // viejo es lo que deja el golden quieto — el rol nace sin cambiar un byte.
+  // Sin `tamano`: ausente significa "el del nombre", que es lo que hacía.
+  precio: { color: "$texto", peso: 600 },
   nota: { color: "$tenue", tamano: 13 },
 };
 
@@ -404,9 +421,9 @@ export const ROLES_POR_TIPO: Record<TipoBloque, readonly RolEstilo[]> = {
   imagen: ["caja", "imagen"],
   // "boton" entró con el botón por tarjeta (2-ago-2026): una grilla sin
   // `botonTexto` no dibuja ninguno, igual que `seccion` con el texto vacío.
-  productos: ["caja", "cuerpo", "nota", "imagen", "boton"],
-  "productos-dinamicos": ["caja", "cuerpo", "nota", "imagen", "boton"],
-  carrito: ["caja", "titulo", "nota", "imagen"],
+  productos: ["caja", "cuerpo", "precio", "nota", "imagen", "boton"],
+  "productos-dinamicos": ["caja", "cuerpo", "precio", "nota", "imagen", "boton"],
+  carrito: ["caja", "titulo", "precio", "nota", "imagen"],
   // "imagen" solo pesa en la variante de dos fotos; en las de texto no se dibuja
   // ningún `<img>`, así que ofrecer su control ahí sería una perilla suelta.
   // "boton" entró con el botón por celda (2-ago-2026): una celda sin botón no
@@ -449,6 +466,10 @@ const PROPS_POR_ROL: Record<RolEstilo, readonly (keyof EstiloBloque)[]> = {
   cuerpo: TIPOGRAFIA,
   // La nota (precio tachado, variante, "y 3 más") se dibuja sin `text-align`
   // propio: sigue al bloque que la contiene.
+  // El precio se dibuja adentro del renglón del nombre, así que no lleva
+  // `align` ni `interlinea` propios: los gana la celda. Lo demás es la
+  // devolución literal —color, tipografía, estilo de texto y BOLD.
+  precio: ["color", "tamano", "peso", "espaciado", "fuente", "mayusculas", "subrayado", "italica"],
   nota: ["color", "tamano", "peso", "espaciado", "fuente", "mayusculas", "subrayado", "italica"],
   boton: ["color", "fondo", "tamano", "peso", "radio", "padX", "padY", "fuente", "espaciado", "mayusculas", "italica"],
   imagen: ["radio"],

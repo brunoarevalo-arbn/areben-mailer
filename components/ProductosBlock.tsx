@@ -12,18 +12,22 @@ import { Input } from "@/components/ui/Input";
 export function ProductosBlock({
   items,
   botonTexto,
+  precioOculto,
   movil,
   porFila,
   onChange,
   onBoton,
+  onPrecioOculto,
   onGrilla,
 }: {
   items: ProductoEmail[];
   botonTexto?: string;
+  precioOculto?: boolean;
   movil?: PorFilaMovil;
   porFila?: PorFila;
   onChange: (items: ProductoEmail[]) => void;
   onBoton: (botonTexto: string) => void;
+  onPrecioOculto: (precioOculto: boolean) => void;
   onGrilla: (cambio: { movil?: PorFilaMovil; porFila?: PorFila }) => void;
 }) {
   const [q, setQ] = useState("");
@@ -162,6 +166,25 @@ export function ProductosBlock({
         hint="Va debajo de cada producto y lleva a su página. Vacío, no se dibuja."
         onChange={(e) => onBoton(e.target.value)}
       />
+
+
+      {/* Esconder el precio. La clave del bloque es `precioOculto` (ausente = se
+          ve) para que ninguna grilla ya guardada cambie sola; ver bloques.ts. */}
+      <label className="flex items-start gap-2 text-sm text-muted">
+        <input
+          type="checkbox"
+          checked={precioOculto ?? false}
+          onChange={(e) => onPrecioOculto(e.target.checked)}
+          className="mt-0.5 accent-accent"
+        />
+        <span>
+          Sin precio
+          <span className="block text-xs text-subtle">
+            La tarjeta muestra sólo la foto y el nombre. Sirve cuando lo que querés es que
+            entren a ver el producto.
+          </span>
+        </span>
+      </label>
 
       {/* Cómo se acomoda la grilla en el teléfono. Va último: primero se eligen
           los productos, después se decide cómo se ven. */}

@@ -364,8 +364,10 @@ export function FormBloque({
           botonTexto={b.botonTexto}
           movil={b.movil}
           porFila={b.porFila}
+          precioOculto={b.precioOculto}
           onChange={(items) => set({ items })}
           onBoton={(botonTexto) => set({ botonTexto })}
+          onPrecioOculto={(precioOculto) => set({ precioOculto })}
           onGrilla={(cambio) => set(cambio)}
         />
       );
@@ -377,6 +379,7 @@ export function FormBloque({
           categoriaId={b.categoriaId}
           n={b.n}
           botonTexto={b.botonTexto}
+          precioOculto={b.precioOculto}
           movil={b.movil}
           porFila={b.porFila}
           // `items` no se toca nunca desde acá: el bloque guarda la consulta y

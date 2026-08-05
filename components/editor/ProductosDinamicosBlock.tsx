@@ -29,6 +29,7 @@ export function ProductosDinamicosBlock({
   categoriaId,
   n,
   botonTexto,
+  precioOculto,
   movil,
   porFila,
   onChange,
@@ -37,9 +38,10 @@ export function ProductosDinamicosBlock({
   categoriaId?: string;
   n?: number;
   botonTexto?: string;
+  precioOculto?: boolean;
   movil?: PorFilaMovil;
   porFila?: PorFila;
-  onChange: (cambio: { fuente?: FuenteProductos; categoriaId?: string; n?: number; botonTexto?: string; movil?: PorFilaMovil; porFila?: PorFila }) => void;
+  onChange: (cambio: { fuente?: FuenteProductos; categoriaId?: string; n?: number; botonTexto?: string; precioOculto?: boolean; movil?: PorFilaMovil; porFila?: PorFila }) => void;
 }) {
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [error, setError] = useState("");
@@ -122,6 +124,25 @@ export function ProductosDinamicosBlock({
         hint="Va debajo de cada producto y lleva a su página. Vacío, no se dibuja."
         onChange={(e) => onChange({ botonTexto: e.target.value })}
       />
+
+
+      {/* Esconder el precio. La clave del bloque es `precioOculto` (ausente = se
+          ve) para que ninguna grilla ya guardada cambie sola; ver bloques.ts. */}
+      <label className="flex items-start gap-2 text-sm text-muted">
+        <input
+          type="checkbox"
+          checked={precioOculto ?? false}
+          onChange={(e) => onChange({ precioOculto: e.target.checked })}
+          className="mt-0.5 accent-accent"
+        />
+        <span>
+          Sin precio
+          <span className="block text-xs text-subtle">
+            La tarjeta muestra sólo la foto y el nombre. Sirve cuando lo que querés es que
+            entren a ver el producto.
+          </span>
+        </span>
+      </label>
 
       <GrillaControl movil={movil} porFila={porFila} onChange={onChange} />
 

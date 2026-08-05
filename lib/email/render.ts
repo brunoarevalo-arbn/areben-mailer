@@ -274,11 +274,30 @@ function fmtPrecio(v: string): string {
   return "$" + n.toLocaleString("es-AR");
 }
 
-/** Precio, con el de lista tachado si hay promo. Compartido por la grilla y el carrito. */
-function precioHtml(p: ProductoEmail, pal: Paleta): string {
+/**
+ * Precio, con el de lista tachado si hay promo. Compartido por la grilla y el carrito.
+ *
+ * ⚠️ **Escribe lo que siempre escribió y `extra()` agrega sólo lo elegido**, que
+ * es la regla de todo el motor: si `extra()` emitiera también el BASE, un mail
+ * sin estilos saldría distinto al de ayer. Por eso el `color` y el `font-weight`
+ * siguen literales acá aunque ahora existan como rol —y por eso el BASE del rol
+ * `precio` es exactamente esos dos valores—: sin nadie tocando nada, el HTML
+ * sale byte por byte igual que antes del 5-ago-2026, y lo custodia el golden.
+ *
+ * 🔑 **El tachado pasó a consumir el rol `nota`**, cuyo BASE (`$tenue`, 13px) ya
+ * era literalmente el hardcode que estaba acá. Cierra una desconexión vieja: la
+ * definición de `RolEstilo` describe `nota` como "precio tachado" desde el día
+ * uno y el código nunca lo había usado así.
+ */
+function precioHtml(p: ProductoEmail, e: EstiloResuelto, eNota: EstiloResuelto): string {
+  // Sin `tamano` elegido no se emite ninguno: el precio hereda el del renglón,
+  // que es lo que hacía. Emitir uno por defecto le clavaría el tamaño a toda
+  // grilla ya guardada.
+  const vigente = `color:${e.color};font-weight:${e.peso ?? 600}${extra(e, ["color", "peso"])}`;
+  const tachado = `color:${eNota.color};text-decoration:line-through;font-size:${px(eNota.tamano ?? 13)}${extra(eNota, ["color", "tamano", "subrayado"])}`;
   return p.precioPromo
-    ? `<span style="color:${pal.tenue};text-decoration:line-through;font-size:13px">${fmtPrecio(p.precio)}</span> <span style="color:${pal.texto};font-weight:600">${fmtPrecio(p.precioPromo)}</span>`
-    : `<span style="color:${pal.texto};font-weight:600">${fmtPrecio(p.precio)}</span>`;
+    ? `<span style="${tachado}">${fmtPrecio(p.precio)}</span> <span style="${vigente}">${fmtPrecio(p.precioPromo)}</span>`
+    : `<span style="${vigente}">${fmtPrecio(p.precio)}</span>`;
 }
 
 /** Renglón "iPhone 11 · Marrón — 2 u." Vacío si el producto no aporta ninguno de los dos. */
@@ -297,8 +316,9 @@ function renderCard(
   pct = 50,
   botonTexto?: string,
   anchoGrilla?: number,
+  precioOculto?: boolean,
 ): string {
-  const { nombre: eTexto, nota: eNota, img: eImg, boton: eBoton } = e;
+  const { nombre: eTexto, precio: ePrecio, nota: eNota, img: eImg, boton: eBoton } = e;
   // 🔑 La alineación va en el `<td>` y no en el nombre.
   //
   // Hasta el 2-ago-2026 el `align` del rol `cuerpo` salía por `extra()` en el
@@ -318,7 +338,7 @@ function renderCard(
   const interior = `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:${px(eImg.radio ?? 8)};display:block" />
       <div style="margin-top:8px;font-size:${px(eTexto.tamano ?? 14)};color:${eTexto.color}${extra(eTexto, ["tamano", "color", "align"])}">${esc(p.nombre)}</div>
       ${detalleHtml(p, eNota)}
-      <div style="margin-top:2px;font-size:${px(eTexto.tamano ?? 14)}">${precioHtml(p, pal)}</div>`;
+      ${precioOculto ? "" : `<div style="margin-top:2px;font-size:${px(ePrecio.tamano ?? eTexto.tamano ?? 14)}">${precioHtml(p, ePrecio, eNota)}</div>`}`;
 
   // 🔴 Con botón, la tarjeta deja de ser un ancla entera — la misma lección que
   // el botón por celda de `columnas`: un `<a>` adentro de otro no está
@@ -345,7 +365,7 @@ function renderCard(
  * Es la diferencia de fondo con `renderCard`: una grilla de tarjetas dice "mirá
  * estos productos", y un carrito abandonado tiene que decir "esto dejaste".
  */
-function renderLineaCarrito(p: ProductoEmail, pal: Paleta, eNombre: EstiloResuelto, eNota: EstiloResuelto, eImg: EstiloResuelto): string {
+function renderLineaCarrito(p: ProductoEmail, eNombre: EstiloResuelto, ePrecio: EstiloResuelto, eNota: EstiloResuelto, eImg: EstiloResuelto): string {
   const foto = p.imagen
     ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:${px(eImg.radio ?? 8)};display:block" />`
     : "";
@@ -360,7 +380,7 @@ function renderLineaCarrito(p: ProductoEmail, pal: Paleta, eNombre: EstiloResuel
         ${detalleHtml(p, eNota)}
       </a>
     </td>
-    <td width="22%" valign="top" align="right" style="padding:10px 0;font-size:14px;white-space:nowrap">${precioHtml(p, pal)}</td>
+    <td width="22%" valign="top" align="right" style="padding:10px 0;font-size:${px(ePrecio.tamano ?? 14)};white-space:nowrap">${precioHtml(p, ePrecio, eNota)}</td>
   </tr>`;
 }
 
@@ -374,7 +394,7 @@ function renderLineaCarrito(p: ProductoEmail, pal: Paleta, eNombre: EstiloResuel
 function renderCarrito(items: ProductoEmail[], pal: Paleta, e: EstProducto, restantes = 0): string {
   if (items.length === 0) return "";
   const filas = items
-    .map((p) => renderLineaCarrito(p, pal, e.nombre, e.nota, e.img))
+    .map((p) => renderLineaCarrito(p, e.nombre, e.precio, e.nota, e.img))
     .join(`<tr><td colspan="3" style="border-top:1px solid ${pal.borde};font-size:0;line-height:0">&nbsp;</td></tr>`);
   const mas =
     restantes > 0
@@ -397,6 +417,7 @@ const CARRITO_MUESTRA: ProductoEmail[] = [
  */
 interface EstProducto {
   nombre: EstiloResuelto;
+  precio: EstiloResuelto;
   nota: EstiloResuelto;
   img: EstiloResuelto;
   /** El botón por tarjeta. Se resuelve siempre; solo se dibuja si hay texto. */
@@ -406,6 +427,7 @@ interface EstProducto {
 function estProducto(tipo: TipoBloque, rolNombre: RolEstilo, ctx: Ctx, propio: Estilos | undefined): EstProducto {
   return {
     nombre: est(tipo, rolNombre, ctx, propio),
+    precio: est(tipo, "precio", ctx, propio),
     nota: est(tipo, "nota", ctx, propio),
     img: est(tipo, "imagen", ctx, propio),
     boton: est(tipo, "boton", ctx, propio),
@@ -440,6 +462,7 @@ function renderProductos(
   movil?: PorFilaMovil,
   porFila?: PorFila,
   botonTexto?: string,
+  precioOculto?: boolean,
 ): string {
   if (items.length === 0) return "";
   const n = porFila === 3 ? 3 : 2;
@@ -454,7 +477,7 @@ function renderProductos(
   for (let i = 0; i < items.length; i += n) {
     const celdas = Array.from({ length: n }, (_, j) =>
       items[i + j]
-        ? renderCard(items[i + j], pal, e, dos, pct, botonTexto, anchoCelda)
+        ? renderCard(items[i + j], pal, e, dos, pct, botonTexto, anchoCelda, precioOculto)
         : `<td width="${pct}%"></td>`,
     );
     filas.push(`<tr>${celdas.join("")}</tr>`);
@@ -570,7 +593,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     }
     case "productos":
       return pad(
-        renderProductos(b.items ?? [], pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil, b.porFila, b.botonTexto),
+        renderProductos(b.items ?? [], pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil, b.porFila, b.botonTexto, b.precioOculto),
         caja(),
       );
     // Se dibuja igual que `productos` —es la misma grilla— y la diferencia entera
@@ -586,7 +609,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // qué se le pide a Tiendanube. Si entrara, dos bloques con la misma
       // consulta y distinto layout costarían dos llamadas a TN.
       return pad(
-        renderProductos(items, pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil, b.porFila, b.botonTexto),
+        renderProductos(items, pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil, b.porFila, b.botonTexto, b.precioOculto),
         caja(),
       );
     }
