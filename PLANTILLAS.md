@@ -153,17 +153,17 @@ Los patrones que van apareciendo en las referencias, y qué puede hacer el motor
 
 | patrón | estado | cómo se hace hoy / qué falta | referencias |
 |---|---|---|---|
-| portada con título grande | ✅ | `hero` sin `imagen`, con `bg` o sin él | 001 · 009 · 013 · 014 · 016 |
+| portada con título grande | ✅ | `hero` sin `imagen`, con `bg` o sin él | 001 · 009 · 013 · 014 · 016 · 022 |
 | portada con foto de fondo y texto encima | ✅ | `hero.fondoImagen` + `velo` (VML para Outlook ya resuelto) | 002 · 003 · 004 · 005 · 007 · 008 · 011 · 012 · 015 · 017 · 018 · 019 · 020 |
 | menú de navegación | ✅ | `menu`. **Lo pide casi toda la tanda y no lo usaba NINGÚN preset**. 🔴 Y hasta el 2-ago salía **pegado a la izquierda**: el `t.align ?? "center"` del renderer era letra muerta —`BASE.cuerpo` ya escribe `align:"left"`—, contra las 15 referencias que lo centran sin una excepción. Va por `alineacion()`, igual que la etiqueta de la fila de categorías | 002 · 003 · 004 · 005 · 006 · 007 · 010 · 011 · 014 · 015 · 016 · 017 · 018 · 019 · 020 · 021 |
-| redes con ícono al cierre | ✅ | `redes`. Los 7 íconos desde el 1-ago; **los links los trae la marca**, no el Json | las 21 menos 014 |
+| redes con ícono al cierre | ✅ | `redes`. Los 7 íconos desde el 1-ago; **los links los trae la marca**, no el Json. Los **planos, sin pastilla**, desde el 5-ago: es como los dibuja R-022 | las 21 menos 014 · 022 |
 | grilla de productos | ✅ | `productos-dinamicos`, `movil: 2`, `porFila: 3` desde el 1-ago | 001 · 002 · 003 · 004 · 005 · 006 · 007 · 008 · 010 · 011 · 012 · 016 · 018 · 019 · 020 · 021 |
 | precio de lista tachado | ✅ | sale solo: es el `promotional_price` de TN | 001 · 004 · 008 · 010 · 021 |
-| cupón destacado | ✅ | `cupon` (borde punteado, ámbar de la paleta) | 015 · 021 |
+| cupón destacado | ✅ | `cupon` (borde punteado, ámbar de la paleta). 🔑 R-022 lo pone **arriba de todo, antes que el logo grande**, y como barra negra, no como caja | 015 · 021 · 022 |
 | banda de color con título y bajada | ✅ | `seccion` con `bg: ""` | 004 · 006 · 009 · 012 · 018 |
-| dos columnas imagen+texto | ✅ | `columnas`, 4 variantes, proporción 40/50/60 | 002 · 003 · 010 · 012 · 017 · 018 |
-| fila de 3 o 4 celdas (beneficios · categorías · gente) | ✅ | `columnas` de 2 a 4 celdas desde el 1-ago. La variante `textos` no pide foto | 002 · 004 · 005 · 006 · 007 · 008 · 010 · 011 · 013 · 015 · 017 · 018 · 019 · 020 · 021 |
-| imagen a sangre (borde a borde) | ✅ | `imagen.sangre` desde el 1-ago: saltea el `pad()`, que es donde vivía el padding | 001 · 004 · 005 · 008 · 016 · 020 |
+| dos columnas imagen+texto | ✅ | `columnas`, 4 variantes, proporción 40/50/60 | 002 · 003 · 010 · 012 · 017 · 018 · 022 |
+| fila de 3 o 4 celdas (beneficios · categorías · gente) | ✅ | `columnas` de 2 a 4 celdas desde el 1-ago. La variante `textos` no pide foto | 002 · 004 · 005 · 006 · 007 · 008 · 010 · 011 · 013 · 015 · 017 · 018 · 019 · 020 · 021 · 022 |
+| imagen a sangre (borde a borde) | ✅ | `imagen.sangre` desde el 1-ago: saltea el `pad()`, que es donde vivía el padding | 001 · 004 · 005 · 008 · 016 · 020 · 022 |
 | `fondoImagen` en `seccion` | ✅ | desde el 1-ago, por el mismo camino VML del `hero` | 002 · 007 · 012 · 019 |
 | video | ✅ | `video` (miniatura + link) | 006 |
 | carrito real de la persona | ✅ | `carrito` (lo llena el procesador) | — (son mails de campaña) |
@@ -184,12 +184,17 @@ Los patrones que van apareciendo en las referencias, y qué puede hacer el motor
 | grilla de 4 por fila | 🔴 | `PorFila` es `2 \| 3`. ⚠️ **No cuesta una llamada más a TN**: `claveProductos` es `fuente\|categoriaId\|n` y `porFila` no entra en la llave | 004 · 007 · 011 · 021 |
 | badge de descuento sobre la foto | 🔴 | ⚠️ `position` está prohibido en un mail: va como fila de tabla, no overlay | 015 · 021 |
 | producto único destacado grande | 🔴 | `productos` con 1 item dibuja media grilla. 🟡 `bodega` lo arma **a mano** —`imagen` + `titulo` + `texto` + `boton`, todo centrado— y sale igual que la captura: el bloque sigue faltando, la aproximación no | 002 · 009 |
-| barra fina de aviso ("Envío gratis a partir de…") | ✅ | `barra()` de `comun.ts`: un `seccion` sin título con `caja.padY`. Se pudo cuando el `<p>` dejó de arrastrar 16px de margen cableado | 007 · 008 |
+| barra fina de aviso ("Envío gratis a partir de…") | ✅ | `barra()` de `comun.ts`: un `seccion` sin título con `caja.padY`. Se pudo cuando el `<p>` dejó de arrastrar 16px de margen cableado. R-022 la usa **dos veces**, negra, para abrir y para cerrar | 007 · 008 · 022 |
 | menú lateral adentro de la portada | 🔴 | el `hero` es una columna: el menú al costado es otra tabla | 006 · 019 |
 | reseña / testimonio con estrellas | 🔴 | no hay bloque | — |
 | contador regresivo | 🔴 | un mail no tiene JS: sería un GIF servido, con fecha adentro | 017 |
 | letra gigante de fondo detrás del texto | 🔴 | es superposición: `position` prohibido | 011 |
 | grilla de 4 fotos tipo lookbook | 🔴 | | 005 |
+| dos tipografías en el mismo renglón | 🔴 | `negritas()` sólo entiende `**bold**`; `italica`, `fuente` y `mayusculas` son **por rol**, no dentro de una frase. Se aproxima partiendo el título en dos renglones, que es otro diseño | 022 |
+| cinta de texto repetido cruzando una foto | 🔴 | superposición ⇒ `position`, prohibido en un mail. Se aproxima con `barra()` pegada abajo de la foto, sin el corte contra los bordes | 022 |
+| celda con la foto al costado de la etiqueta | 🔴 | la celda de `columnas` dibuja foto **arriba** y etiqueta **abajo**, y sin líneas divisorias entre celdas. 🟡 Se aproxima con la fila de categorías de siempre | 022 |
+| código de descuento distinto por contacto | 🔴 | ⚠️ **no es diseño, es dato** — como las cuotas. Pide generar un cupón por destinatario en TN y resolverlo al enviar, igual que `productos-dinamicos` | 022 |
+| centro de preferencias en el pie | 🔴 | "elegí qué querés recibir" en vez de sólo darse de baja. Es plataforma, no bloque, y va con el `pie` editable, que está diferido | 022 |
 
 ---
 
@@ -213,6 +218,10 @@ Las fichas de la tanda **2026-08-01 (21 mails)** viven en
 archivo pasó su propio umbral de 40 KB. Son 20 KB de detalle referencia por referencia: se
 abren **cuando se clona una de esas 21**, y no hacen falta para sumar una plantilla nueva.
 Cada tanda que venga estrena su propio `docs/referencias/tanda-AAAA-MM-DD.md`.
+
+La ficha de la tanda **2026-08-05 (1 mail)** está en
+**`docs/referencias/tanda-2026-08-05.md`**. 🔑 Es la primera referencia que **no** salió de una
+galería: es un mail real, de una marca del rubro de BDI, y es una **bienvenida**.
 
 🔑 Lo que la tanda enseñó **de conjunto** no se fue con las fichas: está repartido entre el
 *Vocabulario* (los contadores) y el *Backlog*, que es donde se lee sin abrir nada más.
@@ -245,6 +254,11 @@ Ordenado por cuántas referencias lo pidieron. **Nada de acá se implementa hast
 | 1 | contador regresivo | sin JS: sería un GIF servido con la fecha adentro. Caro y con un servicio atrás |
 | 1 | letra gigante de fondo | superposición ⇒ `position` ⇒ prohibido. Se aproxima con una imagen |
 | 1 | grilla de 4 fotos | |
+| 1 | dos tipografías en el mismo renglón | dentro de una frase el motor no cambia de fuente: `negritas()` es el único marcado inline y sólo hace `**bold**` |
+| 1 | cinta de texto cruzando una foto | `position` prohibido. Sin superposición no es el mismo efecto: lo que se puede es una barra **abajo** de la foto |
+| 1 | celda con la foto al costado de la etiqueta | + líneas divisorias entre celdas. Hoy la celda es foto arriba / etiqueta abajo y sin bordes |
+| 1 | **código de descuento por contacto** | ⚠️ no es un bloque: es un cupón generado por destinatario en TN y resuelto al enviar. Toca el procesador, no el renderer |
+| 1 | centro de preferencias en el pie | plataforma, con su propia decisión de privacidad. Va junto al `pie` editable |
 | 0 | reseña con estrellas | las estrellas van en texto (`★★★★★`), no en imagen: sobreviven a las imágenes bloqueadas |
 
 ---
