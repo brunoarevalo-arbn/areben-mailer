@@ -361,9 +361,11 @@ export function FormBloque({
       return (
         <ProductosBlock
           items={b.items}
+          botonTexto={b.botonTexto}
           movil={b.movil}
           porFila={b.porFila}
           onChange={(items) => set({ items })}
+          onBoton={(botonTexto) => set({ botonTexto })}
           onGrilla={(cambio) => set(cambio)}
         />
       );
@@ -374,6 +376,7 @@ export function FormBloque({
           fuente={b.fuente}
           categoriaId={b.categoriaId}
           n={b.n}
+          botonTexto={b.botonTexto}
           movil={b.movil}
           porFila={b.porFila}
           // `items` no se toca nunca desde acá: el bloque guarda la consulta y

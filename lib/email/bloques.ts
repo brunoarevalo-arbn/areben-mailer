@@ -16,6 +16,19 @@ export interface ProductoEmail {
   precio: string;
   precioPromo?: string;
   imagen: string;
+  /**
+   * La foto que trajo la tienda, guardada cuando `imagen` se pisa con una
+   * propia (5-ago-2026).
+   *
+   * 🔑 Existe **sólo para poder volver atrás**: el renderer no la mira nunca.
+   * Sin ella, deshacer una foto propia sería sacar el producto de la lista y
+   * volver a buscarlo, que además le cambia el orden en la grilla.
+   *
+   * Se escribe la primera vez que se pisa la foto y no se toca más: si se
+   * reescribiera en cada cambio, la segunda foto propia pasaría a ser "la de la
+   * tienda" y el botón de volver dejaría de volver a ningún lado.
+   */
+  imagenTienda?: string;
   url: string;
   /**
    * Variante elegida, ya legible: "iPhone 17 Pro Max · ROSA".

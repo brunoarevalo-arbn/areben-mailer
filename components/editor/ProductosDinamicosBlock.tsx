@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ETIQUETA_FUENTE, type FuenteProductos, type PorFila, type PorFilaMovil } from "@/lib/email/bloques";
 import { Select } from "@/components/ui/Select";
+import { Input } from "@/components/ui/Input";
 import { Rango } from "@/components/editor/Rango";
 import { GrillaControl } from "@/components/editor/GrillaControl";
 
@@ -27,6 +28,7 @@ export function ProductosDinamicosBlock({
   fuente,
   categoriaId,
   n,
+  botonTexto,
   movil,
   porFila,
   onChange,
@@ -34,9 +36,10 @@ export function ProductosDinamicosBlock({
   fuente: FuenteProductos;
   categoriaId?: string;
   n?: number;
+  botonTexto?: string;
   movil?: PorFilaMovil;
   porFila?: PorFila;
-  onChange: (cambio: { fuente?: FuenteProductos; categoriaId?: string; n?: number; movil?: PorFilaMovil; porFila?: PorFila }) => void;
+  onChange: (cambio: { fuente?: FuenteProductos; categoriaId?: string; n?: number; botonTexto?: string; movil?: PorFilaMovil; porFila?: PorFila }) => void;
 }) {
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [error, setError] = useState("");
@@ -109,6 +112,17 @@ export function ProductosDinamicosBlock({
         sufijo=""
       />
 
+      {/* Mismo campo que en productos elegidos. El motor lo dibuja desde
+          siempre; el input faltaba en los dos bloques. */}
+      <Input
+        label="Texto del botón"
+        fullWidth
+        value={botonTexto ?? ""}
+        placeholder="Sin botón"
+        hint="Va debajo de cada producto y lleva a su página. Vacío, no se dibuja."
+        onChange={(e) => onChange({ botonTexto: e.target.value })}
+      />
+
       <GrillaControl movil={movil} porFila={porFila} onChange={onChange} />
 
       <p className="text-sm leading-relaxed text-muted">
@@ -118,6 +132,14 @@ export function ProductosDinamicosBlock({
         <br />
         Si en ese momento no hay ninguno —porque no quedó nada en oferta, o porque se
         agotaron— el bloque simplemente no aparece, en vez de dejar un hueco.
+        <br />
+        <br />
+        {/* La contracara de la foto propia de productos elegidos. Decirlo acá
+            evita el camino de buscarla diez minutos: no está, y no puede estar. */}
+        Las fotos son las de cada producto y no se pueden cambiar desde el mail: este
+        bloque guarda <strong>la pregunta</strong>, no los productos, así que hoy no sabe
+        cuáles va a traer. Para pisar una foto va el bloque de{" "}
+        <strong>productos elegidos</strong>.
       </p>
     </div>
   );
