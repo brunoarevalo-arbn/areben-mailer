@@ -121,18 +121,39 @@ export function VistaPreviaMail({
    * ⚠️ Se mide en el `load` **y** en el momento: cuando cambia el `srcDoc` el
    * documento se reemplaza de forma asíncrona, así que leerlo justo después del
    * render devuelve el alto del documento anterior.
+   *
+   * 🔴 **Y además con un `ResizeObserver`, que es lo que lo hace confiable.** Un
+   * mail tiene fotos de producto: en el `load` casi ninguna terminó de bajar, así
+   * que esa primera medida sale corta y el final del mail queda inalcanzable.
+   * El observador también cubre el cambio de Escritorio a Celular —el mail se
+   * redibuja a otro ancho y cambia de alto— sin tener que acordarse de listar
+   * cada cosa que lo mueve.
+   *
+   * ⚠️ Se observa el **`body`, no el `documentElement`**: el alto del segundo es
+   * `max(contenido, viewport)`, y como el viewport del iframe es justamente el
+   * alto que estamos fijando, se realimenta y nunca vuelve a bajar. El `body` del
+   * mail no declara alto, así que mide su contenido y nada más.
    */
   const [altoMail, setAltoMail] = useState(0);
   useEffect(() => {
     if (!frame) return;
-    const medir = () => {
+    let ro: ResizeObserver | undefined;
+    const enganchar = () => {
       const d = frame.contentDocument;
-      if (d) setAltoMail(d.documentElement.scrollHeight);
+      if (!d?.body) return;
+      const medir = () => setAltoMail(d.body.scrollHeight);
+      medir();
+      ro?.disconnect();
+      ro = new ResizeObserver(medir);
+      ro.observe(d.body);
     };
-    frame.addEventListener("load", medir);
-    medir();
-    return () => frame.removeEventListener("load", medir);
-  }, [frame, html]);
+    frame.addEventListener("load", enganchar);
+    enganchar();
+    return () => {
+      frame.removeEventListener("load", enganchar);
+      ro?.disconnect();
+    };
+  }, [frame, html, anchoMarco]);
 
   /**
    * 🔴 **Un click adentro del mail nunca navega, y no por un handler.**
