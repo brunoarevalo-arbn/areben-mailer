@@ -147,8 +147,8 @@ export function PanelEstilo({
   if (!lista.length) {
     return (
       <p className="text-sm text-muted">
-        Este bloque no tiene nada de estilo para tocar: es alto y nada más, y el alto está en
-        la pestaña Contenido.
+        Este bloque no tiene nada de estilo para tocar: es alto y nada más, y el alto está
+        acá arriba.
       </p>
     );
   }
@@ -213,9 +213,10 @@ export function PanelEstilo({
     // a dieciocho propiedades en una sola columna continua también son malos a
     // 1440. El porqué de que sea nativo está en `Desplegable`.
     //
-    // ⛔ No se reusa `pestana`: eso es un binario entre dos paneles que se
-    // excluyen (Contenido / Estilo). Los roles son de 1 a 5 y son ADITIVOS —
-    // querés el color del título Y el del cuerpo abiertos a la vez.
+    // ⛔ Y **no** son un binario tipo "uno abierto a la vez": los roles van de 1
+    // a 5 y son ADITIVOS — querés el color del título Y el del cuerpo abiertos
+    // juntos. Es lo que obliga a que `abiertos` sea una lista y no un solo rol,
+    // y a que el valor siga al DOM en vez de gobernarlo.
     <div className="space-y-4">
       {secciones.map(({ rol, visibles }) => {
         const propio = valor?.[rol];

@@ -645,7 +645,7 @@ export function FormBloque({
       );
 
     case "divisor":
-      return <p className="text-sm text-muted">Una línea horizontal para separar secciones. No tiene nada que configurar acá; el color y el grosor van en la pestaña Estilo.</p>;
+      return <p className="text-sm text-muted">Una línea horizontal para separar secciones. El color y el grosor van acá abajo, en «Caja del bloque».</p>;
 
     case "html":
       return (

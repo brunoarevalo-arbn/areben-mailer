@@ -130,7 +130,6 @@ export function EditorMail({
 }) {
   const bloques = contenido.bloques ?? [];
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
-  const [pestana, setPestana] = useState<"contenido" | "estilo">("contenido");
   /**
    * Qué secciones del panel de estilo dejó abiertas la persona.
    *
@@ -138,9 +137,15 @@ export function EditorMail({
    * de bloque (`key={seleccionado.id}`). Sin esto, poner el mismo color en cinco
    * títulos seguidos obliga a abrir "Título" cinco veces.
    *
-   * `null` = nunca tocó nada ⇒ que el panel decida (abre la primera).
+   * Arranca en **`[]` y no en `null`**, y la diferencia importa: `null` sería
+   * "que el panel decida", o sea abrir la primera sección en cada bloque que se
+   * elige. Desde que el estilo comparte columna con el contenido eso es ruido
+   * —la mayoría de las veces se entra a escribir, no a pintar—, así que el
+   * estilo entra plegado y **el primer click se paga una sola vez**: lo que se
+   * abre queda abierto en los bloques siguientes. La capa de documento sí usa el
+   * default, porque esa no se remonta nunca.
    */
-  const [rolesAbiertos, setRolesAbiertos] = useState<RolEstilo[] | null>(null);
+  const [rolesAbiertos, setRolesAbiertos] = useState<RolEstilo[] | null>([]);
   // Cuál de las tres columnas se muestra cuando NO entran las tres. Arranca en
   // la lista: el mapa del mail es desde donde se elige qué tocar.
   const [vistaMovil, setVistaMovil] = useState<VistaMovil>("lista");
@@ -247,12 +252,24 @@ export function EditorMail({
     // los dos `1fr`. Medido, no supuesto — el 62rem del plan daba 350 y el
     // primer corte que probé, 240.
     //
-    // ⚠️ Con el `max-w-6xl` del layout eso cae recién a **1360px de viewport**,
-    // así que una pantalla de 1280 ahora ve UNA vista a la vez en vez de tres
-    // columnas. Es a propósito: a 1280 el espacio real es 976 y ahí las tres
-    // columnas no existen sin que la del medio quede inservible. Lo que devuelve
-    // 1280 al modo de tres columnas es sacar el editor del `max-w-6xl`, que es
-    // la Etapa 2.
+    // ⚠️ Eso cae en **1360px de viewport**: 1056 + 64 de padding + 240 del
+    // sidebar. Una pantalla de 1280 ve UNA vista a la vez, y es a propósito —
+    // ahí el espacio real es 976 y las tres columnas no existen sin que la del
+    // medio quede inservible.
+    //
+    // 🔴 **Sacar el editor del `max-w-6xl` NO baja ese umbral**, aunque este
+    // comentario dijo lo contrario hasta el 5-ago-2026. `max-w-6xl` son 1152px
+    // y el sidebar 240, así que a 1280 el ancho útil es 1280−240−64 = 976 **con
+    // cap y sin cap por igual**: a ese tamaño el cap ni siquiera está actuando.
+    // El umbral no se mueve un pixel.
+    //
+    // Lo que el cap SÍ hace es otra cosa, y es lo que habría que arreglar si
+    // alguna vez molesta: se activa a partir de ~**1392px de ventana** (240+1152)
+    // y de ahí en adelante la columna del medio queda **congelada en 398px** —
+    // a 1440, a 1512 y a 1920 por igual. Descongelarla es subir el cap sólo para
+    // el editor (`app/(app)/layout.tsx` y su espejo en `ui/BarraAcciones.tsx`,
+    // que se mueven JUNTOS), nunca sacarlo: sin tope, en un monitor de 1920 el
+    // campo "Asunto" mide 1616px de línea.
     //
     // ⚠️ `container-type` implica `contain: layout`, así que este div es el
     // bloque de referencia de todo `position: fixed` que cuelgue adentro. Por
@@ -357,32 +374,30 @@ export function EditorMail({
         {/* Columna 2 · el panel de propiedades. Sin nada elegido muestra el
             diseño del mail, que ya trae su propia tarjeta. */}
         {seleccionado ? (
+          // 🔑 **Contenido y estilo, en una sola columna.** Hasta el 5-ago-2026
+          // eran dos pestañas, y `pestana` era un `useState` del editor que NO
+          // se reseteaba al cambiar de bloque: si tocabas "Estilo" en uno, el
+          // siguiente que elegías también abría en Estilo — clickeabas un texto
+          // en el preview para escribirlo y te aparecía un panel de colores.
+          //
+          // ⛔ Resetear la pestaña a "contenido" al cambiar de selección NO era
+          // el arreglo: rompe el flujo inverso, que es poner el mismo color en
+          // cinco bloques seguidos. Un modo global tiene dos usuarios con
+          // necesidades opuestas; una columna scrolleable no tiene ese problema.
+          //
+          // El panel crece exactamente un `<summary>` por rol respecto de la
+          // vieja pestaña Contenido: el estilo entra **plegado** (`rolesAbiertos`
+          // arranca en `[]`) y lo que se abra se recuerda de un bloque al otro.
           <div className={`space-y-3 rounded-xl border border-border bg-surface p-4 shadow-sm ${soloSi("panel")}`}>
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-foreground">{ETIQUETA_BLOQUE[seleccionado.tipo]}</h3>
-              <div className="flex items-center gap-1 rounded-lg border border-border p-0.5">
-                {(["contenido", "estilo"] as const).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setPestana(p)}
-                    aria-pressed={pestana === p}
-                    className={`rounded-md px-2.5 py-1 text-xs capitalize transition-colors ${
-                      pestana === p ? "bg-accent-subtle text-accent-subtle-foreground" : "text-muted hover:text-foreground"
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <fieldset disabled={soloLectura} className="space-y-3 disabled:opacity-60">
-              {pestana === "contenido" ? (
-                <FormBloque bloque={seleccionado} onChange={editar} marca={marca} />
-              ) : (
+            <h3 className="text-sm font-semibold text-foreground">{ETIQUETA_BLOQUE[seleccionado.tipo]}</h3>
+            <fieldset disabled={soloLectura} className="space-y-4 disabled:opacity-60">
+              <FormBloque bloque={seleccionado} onChange={editar} marca={marca} />
+              <div className="border-t border-border pt-4">
                 <PanelEstilo
                   // Remonta al cambiar de bloque: si no, el picker libre que
-                  // quedó abierto en uno aparece abierto en el siguiente.
+                  // quedó abierto en uno aparece abierto en el siguiente. Lo que
+                  // SÍ sobrevive es qué secciones estaban abiertas, que vive
+                  // arriba justamente porque esto se remonta.
                   key={seleccionado.id}
                   tipo={seleccionado.tipo}
                   valor={seleccionado.estilo}
@@ -400,7 +415,7 @@ export function EditorMail({
                   abiertos={rolesAbiertos}
                   onAbiertosChange={setRolesAbiertos}
                 />
-              )}
+              </div>
             </fieldset>
           </div>
         ) : (
@@ -418,8 +433,8 @@ export function EditorMail({
                 resumen="tamaños, colores y alineación por rol"
               >
               <p className="text-xs text-muted">
-                Vale para todos los bloques de este mail. Un bloque suelto puede pisarlo desde su
-                pestaña Estilo.
+                Vale para todos los bloques de este mail. Un bloque suelto puede pisarlo desde
+                su propio panel, eligiéndolo en la lista.
               </p>
               <fieldset disabled={soloLectura} className="space-y-3 disabled:opacity-60">
                 <PanelEstilo

@@ -374,7 +374,7 @@ const BASE_POR_TIPO: Partial<Record<TipoBloque, Estilos>> = {
     boton: { tamano: 14, padX: 18, padY: 10 },
   },
   // Sin margen lateral por default: la escotilla de HTML crudo es a sangre
-  // salvo que alguien elija lo contrario desde la pestaña Estilo.
+  // salvo que alguien elija lo contrario desde el panel del bloque.
   html: { caja: { padX: 0 } },
 };
 
