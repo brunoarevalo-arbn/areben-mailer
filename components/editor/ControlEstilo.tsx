@@ -7,6 +7,7 @@ import {
 } from "@/lib/email/estilos";
 import type { Paleta } from "@/lib/email/tema";
 import { campoCompacto, tapTarget } from "@/lib/ui";
+import { Stepper } from "@/components/ui/Stepper";
 import { Pipette, RotateCcw } from "lucide-react";
 
 /**
@@ -150,41 +151,46 @@ export function ControlNumero({
   onChange: (v: number | undefined) => void;
 }) {
   const [min, max] = rango;
-  // Sin valor propio, el control muestra el que se está usando igual: un slider
+  // Sin valor propio, el control muestra el que se está usando igual: un campo
   // en cero cuando el texto mide 26px hace pensar que el panel está roto.
   const mostrado = valor ?? resuelto ?? min;
   return (
-    <label className="block">
+    // ⚠️ `<div>` y no `<label>`: adentro hay tres cosas enfocables (los dos
+    // botones y el campo) y un `<label>` que envuelve a varias manda el click de
+    // cualquier parte al primer control, así que apretar `+` movía el foco al
+    // campo. El nombre lo lleva el `aria-label` del Stepper.
+    <div className="block">
       <div className="mb-1 flex items-baseline justify-between gap-2">
         <span className="text-xs font-semibold text-muted">{label}</span>
-        <span className="flex items-center gap-1.5">
-          <span className={`text-xs tabular-nums ${valor === undefined ? "text-subtle" : "text-foreground"}`}>
-            {mostrado}
-            {sufijo}
-            {valor === undefined ? " · auto" : ""}
-          </span>
-          {valor !== undefined && (
-            <button
-              type="button"
-              onClick={() => onChange(undefined)}
-              aria-label={`Volver ${label} al automático`}
-              className="text-muted transition-colors hover:text-foreground"
-            >
-              <RotateCcw className="h-3 w-3" aria-hidden />
-            </button>
-          )}
-        </span>
+        {valor === undefined ? (
+          // El "auto" ya no puede ir pegado al número —ahora el número vive
+          // adentro del campo— pero sigue siendo la señal de que esto lo está
+          // decidiendo la cascada y no la persona.
+          <span className="text-xs text-subtle">auto</span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onChange(undefined)}
+            aria-label={`Volver ${label} al automático`}
+            title="Volver al automático"
+            className="flex items-center gap-1 text-xs text-muted transition-colors hover:text-foreground"
+          >
+            <RotateCcw className="h-3 w-3" aria-hidden />
+            auto
+          </button>
+        )}
       </div>
-      <input
-        type="range"
+      <Stepper
+        value={mostrado}
         min={min}
         max={max}
-        step={paso}
-        value={mostrado}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-accent"
+        paso={paso}
+        sufijo={sufijo}
+        etiqueta={label}
+        atenuado={valor === undefined}
+        onChange={onChange}
       />
-    </label>
+    </div>
   );
 }
 

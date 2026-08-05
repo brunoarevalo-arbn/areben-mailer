@@ -164,7 +164,12 @@ export type Estilos = Partial<Record<RolEstilo, EstiloBloque>>;
 /** Rango de cada número, en un solo lugar. */
 export const RANGOS = {
   //     mín  máx     por qué el tope
-  tamano:      [10, 48],  // <10 ilegible; >48 desborda 600px y explota en móvil
+  // El piso bajó de 10 a 8 el 5-ago-2026, a pedido de la diseñadora: el 10 se
+  // eligió como "más chico que esto no se lee", pero eso vale para un párrafo,
+  // no para una aclaración de tres palabras al pie de una tarjeta. El tope no se
+  // mueve. ⚠️ Bajar un mínimo sólo ENSANCHA lo aceptado: `sanearNum` clampea
+  // contra esta misma constante, así que nada ya guardado se invalida.
+  tamano:      [8, 48],   // >48 desborda 600px y explota en móvil
   interlinea:  [1, 2.4],  // debajo de 1 los renglones se pisan
   espaciado:   [-1, 10],  // negativo fuerte pega las letras en Outlook
   padX:        [0, 64],   // 64 ya deja 470px útiles sobre 600

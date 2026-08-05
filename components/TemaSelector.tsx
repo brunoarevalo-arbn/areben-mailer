@@ -3,6 +3,7 @@
 import { FUENTES, FUENTE_LABEL, resolverPaleta, type Tema } from "@/lib/email/tema";
 import { Card } from "@/components/ui/Card";
 import { Desplegable } from "@/components/ui/Desplegable";
+import { Stepper } from "@/components/ui/Stepper";
 import { campoCompacto } from "@/lib/ui";
 import { RotateCcw } from "lucide-react";
 
@@ -146,21 +147,17 @@ export function TemaSelector({
       </div>
 
       <div className="space-y-3 border-t border-border pt-3">
-        <label className="block">
-          <div className="mb-1 flex items-baseline justify-between">
-            <span className="text-xs text-muted">Ancho del contenido</span>
-            <span className="text-xs tabular-nums text-foreground">{base.ancho}px</span>
-          </div>
-          <input
-            type="range"
+        <div className="block">
+          <div className="mb-1 text-xs text-muted">Ancho del contenido</div>
+          <Stepper
+            value={base.ancho}
             min={600}
             max={700}
-            step={10}
-            value={base.ancho}
-            onChange={(e) => set({ ancho: Number(e.target.value) })}
-            className="w-full accent-accent"
+            paso={10}
+            etiqueta="Ancho del contenido"
+            onChange={(v) => set({ ancho: v })}
           />
-        </label>
+        </div>
 
         <label className="block">
           <span className="mb-1 block text-xs text-muted">Fuente</span>

@@ -1,12 +1,20 @@
 "use client";
 
+import { Stepper } from "@/components/ui/Stepper";
+
 /**
- * Un número que se elige arrastrando, con el valor a la vista.
+ * Un número del formulario de contenido: ancho del logo, alto de un hero, velo,
+ * alto del espaciador, cuántos productos mostrar.
  *
  * Vivía adentro de `FormBloque.tsx`. Salió a su propio archivo cuando el bloque
  * de productos automáticos —que tiene su propio componente por el fetch de
- * categorías— necesitó el mismo control: copiarlo hubiera dejado dos sliders
+ * categorías— necesitó el mismo control: copiarlo hubiera dejado dos controles
  * que se ven distinto en el mismo panel.
+ *
+ * ⚠️ **Se llama `Rango` por historia, no por forma**: era un
+ * `<input type="range">` hasta el 5-ago-2026. Hoy es el `Stepper`, igual que el
+ * `ControlNumero` del panel de estilo — el nombre quedó porque lo importan seis
+ * lugares y renombrarlo no cambia nada de lo que hace.
  */
 export function Rango({
   label,
@@ -26,23 +34,17 @@ export function Rango({
   sufijo?: string;
 }) {
   return (
-    <label className="block">
-      <div className="mb-1 flex items-baseline justify-between">
-        <span className="text-xs font-semibold text-muted">{label}</span>
-        <span className="text-xs tabular-nums text-foreground">
-          {value}
-          {sufijo}
-        </span>
-      </div>
-      <input
-        type="range"
+    <div className="block">
+      <div className="mb-1 text-xs font-semibold text-muted">{label}</div>
+      <Stepper
+        value={value}
+        onChange={onChange}
         min={min}
         max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-accent"
+        paso={step}
+        sufijo={sufijo}
+        etiqueta={label}
       />
-    </label>
+    </div>
   );
 }
