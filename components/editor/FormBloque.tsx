@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import type { Marca } from "@/lib/marca";
-import { REDES, redConIcono } from "@/lib/email/redes";
+import { REDES, redConIcono, type EstiloIconos } from "@/lib/email/redes";
 import { Desplegable } from "@/components/ui/Desplegable";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
@@ -572,6 +572,10 @@ export function FormBloque({
                       {r.nombre}
                     </option>
                   ))}
+                  {/* ⚠️ Sigue existiendo, pero desde que hay icono de "Sitio
+                      web" (5-ago-2026) dejó de ser el camino obligado de quien
+                      quería poner su propia página: eso salía como la palabra
+                      «Otra» en el mail. */}
                   <option value="Otra">Otra (sin icono)</option>
                 </Select>
               ) : (
@@ -608,6 +612,25 @@ export function FormBloque({
           >
             + Agregar red
           </button>
+
+          {/* Cómo se dibujan. Ausente = `marca`, o le cambiaría el cierre a todo
+              mail ya guardado. En `pleno` el blanco o el negro NO se elige: lo
+              decide el renderer según el fondo, igual que los iconos de celda —
+              ofrecerlo a mano es ofrecer un icono blanco sobre fondo blanco. */}
+          <Select
+            label="Iconos"
+            className="w-48"
+            value={b.iconos ?? "marca"}
+            hint={
+              (b.iconos ?? "marca") === "pleno"
+                ? "En un color solo, elegido según el fondo del mail."
+                : "Los colores oficiales de cada red."
+            }
+            onChange={(e) => set({ iconos: e.target.value as EstiloIconos })}
+          >
+            <option value="marca">De color</option>
+            <option value="pleno">De un solo color</option>
+          </Select>
         </div>
       );
 

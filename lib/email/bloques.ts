@@ -9,6 +9,7 @@
 // Para no romper los imports que ya existen, render.ts re-exporta todo esto.
 
 import type { Estilos } from "./estilos";
+import type { EstiloIconos } from "./redes";
 import type { Tema } from "./tema";
 
 export interface ProductoEmail {
@@ -382,7 +383,12 @@ export type Bloque = BloqueBase &
         celdas: Columna[];
       }
     | { tipo: "video"; imagen: string; url: string }
-    | { tipo: "redes"; links: { red: string; url: string }[] }
+    | {
+        tipo: "redes";
+        links: { red: string; url: string }[];
+        /** Ausente = `marca`, los iconos de color de siempre. Ver `EstiloIconos`. */
+        iconos?: EstiloIconos;
+      }
     /** Barra de navegación: un puñado de links de texto en fila. */
     | { tipo: "menu"; links: { texto: string; url: string }[] }
     | { tipo: "divisor" }

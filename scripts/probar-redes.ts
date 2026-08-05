@@ -30,8 +30,13 @@ const html = (links: { red: string; url: string }[], assetsBase?: string) =>
 console.log("\n1) 🔴 Cada red de la lista TIENE su archivo");
 // Es la invariante que hace imposible el cuadradito roto. Si alguien agrega una
 // red a REDES y se olvida del PNG, esto se pone rojo el mismo día.
+// ⚠️ Son TRES archivos por red desde el 5-ago-2026: el de color y las dos
+// variantes plenas. El bloque puede pedir cualquiera de los tres y la que falte
+// es un cuadradito roto en la casilla de otra persona, exactamente igual.
 for (const r of REDES) {
-  ok(existsSync(`public/redes/${r.slug}.png`), `public/redes/${r.slug}.png existe (${r.nombre})`);
+  for (const suf of ["", "-claro", "-oscuro"]) {
+    ok(existsSync(`public/redes/${r.slug}${suf}.png`), `public/redes/${r.slug}${suf}.png existe (${r.nombre})`);
+  }
 }
 
 console.log("\n1-bis) 🔴 …y los sirve el servidor SIN sesión");
@@ -57,6 +62,33 @@ ok(h1.includes(`src="${HOST}/redes/instagram.png"`), "el src cuelga del host que
 ok(h1.includes('alt="Instagram"'), "lleva alt (Outlook bloquea imágenes: el alt es lo único que se ve)");
 ok(/<img[^>]*\bwidth="\d+"[^>]*\bheight="\d+"/.test(h1), "width/height como ATRIBUTOS, no solo en el style (Outlook ignora el CSS)");
 ok(h1.includes('href="https://instagram.com/zattia_co"'), "el link sigue estando");
+
+console.log("\n2-bis) 🔴 `pleno` elige la tinta por el FONDO, no por quien arma el mail");
+// El sufijo es el color de la TINTA: `-claro` va sobre fondo oscuro. Invertirlo
+// deja un icono blanco sobre fondo blanco, que no falla — desaparece.
+const plenoClaro = renderEmailHtml(
+  { bloques: [{ tipo: "redes", iconos: "pleno", links: [{ red: "Instagram", url: "https://x/y" }] } as Bloque] },
+  { ...OPTS, assetsBase: HOST },
+);
+ok(plenoClaro.includes("/redes/instagram-oscuro.png"), "sobre el tema claro va la tinta OSCURA");
+const plenoOscuro = renderEmailHtml(
+  {
+    bloques: [{ tipo: "redes", iconos: "pleno", links: [{ red: "Instagram", url: "https://x/y" }] } as Bloque],
+    tema: { fondo: "#0b0b0b", fondoContenido: "#141414" },
+  } as never,
+  { ...OPTS, assetsBase: HOST },
+);
+ok(plenoOscuro.includes("/redes/instagram-claro.png"), "sobre un tema oscuro va la tinta CLARA");
+// Ausente = como salió siempre. Es lo que impide que un default nuevo le cambie
+// el cierre a toda campaña y plantilla ya guardada.
+ok(h1.includes("/redes/instagram.png"), "sin `iconos`, el de color de siempre");
+
+console.log("\n2-ter) 🔴 Un sitio web tiene icono y no sale como «Otra»");
+// Era el agujero de la lista: la única salida para la web propia era la opción
+// "Otra (sin icono)", y el mail salía con la palabra «Otra» en texto.
+const hWeb = html([{ red: "Sitio web", url: "https://zattia.com.ar" }], HOST);
+ok(hWeb.includes("/redes/web.png"), "«Sitio web» dibuja su icono");
+ok(!hWeb.includes(">Otra<"), "no queda ningún «Otra» de texto");
 
 console.log("\n3) El nombre se reconoce escrito de cualquier forma");
 // El campo era texto libre antes del selector: en la base ya hay variantes.

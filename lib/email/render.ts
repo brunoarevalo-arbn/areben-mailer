@@ -778,7 +778,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       return pad(`<div style="text-align:center;margin:16px 0">${lista
         .map((l) => {
           const red = redConIcono(l.red);
-          const src = red && urlIcono(ctx.assetsBase, red);
+          const src = red && urlIcono(ctx.assetsBase, red, b.iconos, pal.esOscuro);
           // 🔴 Con icono o con texto, NUNCA con una imagen rota: si la red no
           // está en la lista o no hay `assetsBase`, sale el nombre — que es
           // exactamente lo que este bloque dibujó siempre.

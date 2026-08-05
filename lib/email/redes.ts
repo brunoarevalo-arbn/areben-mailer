@@ -30,7 +30,27 @@ export const REDES: Red[] = [
   { slug: "youtube", nombre: "YouTube" },
   { slug: "x", nombre: "X" },
   { slug: "pinterest", nombre: "Pinterest" },
+  // 🔴 El sitio web, 5-ago-2026. No es una red más: era **el agujero** de la
+  // lista. Un comercio que quiere cerrar el mail con su propia web no tenía
+  // ninguna opción que la dibujara, así que la única salida era "Otra (sin
+  // icono)" y el mail salía con la palabra «Otra» en texto al lado de los
+  // iconos. Lo reportó la diseñadora armando un mail de verdad.
+  { slug: "web", nombre: "Sitio web" },
 ];
+
+/**
+ * Cómo se dibujan los iconos de un bloque `redes`.
+ *
+ * **Ausente = `marca`**, los PNG de color oficial de siempre: cualquier otro
+ * default le cambiaría el cierre a todo mail ya guardado.
+ *
+ * `pleno` los dibuja en un solo color, y **cuál lo decide el renderer** según el
+ * fondo (`Paleta.esOscuro`), nunca quien arma el mail. Es exactamente el mismo
+ * criterio que los iconos de celda de `columnas` (`iconos.ts`): un PNG no se
+ * tiñe, así que ofrecer "blanco o negro" a mano es ofrecer la forma de dejar un
+ * icono blanco sobre fondo blanco.
+ */
+export type EstiloIconos = "marca" | "pleno";
 
 /**
  * ¿Este nombre de red tiene icono? Devuelve `undefined` si no lo conocemos.
@@ -42,13 +62,32 @@ export const REDES: Red[] = [
  * matchee cae al texto de siempre.
  */
 export function redConIcono(nombre: string | undefined): Red | undefined {
-  const k = (nombre ?? "").trim().toLowerCase().replace(/\s+/g, "");
+  // 🔴 La normalización va de LOS DOS LADOS. Hasta el 5-ago-2026 el lado del
+  // catálogo era un `toLowerCase()` pelado, y como ningún nombre tenía espacio
+  // nadie lo notó: la primera red con nombre de dos palabras —"Sitio web"—
+  // quedaba sin icono, porque del texto de entrada se sacaban los espacios y
+  // del nombre no. Lo agarró `probar-redes.ts` el mismo día.
+  const norm = (v: string) => v.trim().toLowerCase().replace(/\s+/g, "");
+  const k = norm(nombre ?? "");
   if (!k) return undefined;
-  return REDES.find((r) => r.slug === k || r.nombre.toLowerCase() === k);
+  return REDES.find((r) => r.slug === k || norm(r.nombre) === k);
 }
 
-/** La URL absoluta del icono. Sin `base` no hay icono: ver el comentario del renderer. */
-export function urlIcono(base: string | undefined, red: Red): string | undefined {
+/**
+ * La URL absoluta del icono. Sin `base` no hay icono: ver el comentario del renderer.
+ *
+ * ⚠️ En `pleno`, el sufijo es el color de la **tinta**, no el del fondo:
+ * `x-claro.png` es el icono claro, que es el que va sobre fondo oscuro. Mismo
+ * criterio (y mismos nombres) que `urlIconoCelda` en `iconos.ts`.
+ */
+export function urlIcono(
+  base: string | undefined,
+  red: Red,
+  estilo: EstiloIconos = "marca",
+  oscuro = false,
+): string | undefined {
   const b = (base ?? "").replace(/\/+$/, "");
-  return b ? `${b}/redes/${red.slug}.png` : undefined;
+  if (!b) return undefined;
+  const suf = estilo === "pleno" ? (oscuro ? "-claro" : "-oscuro") : "";
+  return `${b}/redes/${red.slug}${suf}.png`;
 }
