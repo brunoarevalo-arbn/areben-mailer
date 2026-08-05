@@ -7,6 +7,7 @@ import {
 } from "@/lib/email/render";
 import { resolverPaleta, type Tema } from "@/lib/email/tema";
 import { resolverEstilo, ROLES_POR_TIPO, type Estilos, type RolEstilo } from "@/lib/email/estilos";
+import { armarClip, leerClip, type Pegado } from "@/lib/email/portapapeles";
 import { ListaBloques } from "@/components/editor/ListaBloques";
 import { FormBloque } from "@/components/editor/FormBloque";
 import { PanelEstilo } from "@/components/editor/PanelEstilo";
@@ -187,6 +188,20 @@ export function EditorMail({
   // Cuál de las tres columnas se muestra cuando NO entran las tres. Arranca en
   // la lista: el mapa del mail es desde donde se elige qué tocar.
   const [vistaMovil, setVistaMovil] = useState<VistaMovil>("lista");
+  /**
+   * El renglón efímero que cuenta qué acaba de pasar con el portapapeles.
+   *
+   * Copiar y pegar son las dos únicas operaciones del editor **sin consecuencia
+   * visible en el lugar donde se hace el gesto**: mover, duplicar y borrar se
+   * ven en la lista, pero un ⌘C no mueve un pixel y un ⌘V mete bloques que
+   * pueden caer fuera de la parte visible de una lista larga. Sin este renglón,
+   * la única forma de saber si copió es probar pegando.
+   *
+   * ⚠️ Va con `n` además del texto: copiar dos veces el mismo bloque tiene que
+   * volver a encender el aviso, y con un `string` pelado el `setState` sería el
+   * mismo valor y el efecto que lo apaga no se volvería a correr.
+   */
+  const [aviso, setAviso] = useState<{ txt: string; n: number } | null>(null);
   // El panel avanzado cuelga del ROL, no de `localStorage`: es lo que permite
   // empaquetarlo en un plan y bajarle el ruido a quien no lo necesita.
   const { puede } = usePermisos();
@@ -253,9 +268,99 @@ export function EditorMail({
     setBloques(copia, { marcar: true });
   };
 
+  const avisar = (txt: string) => setAviso((a) => ({ txt, n: (a?.n ?? 0) + 1 }));
+
+  // Se apaga solo. El renglón es una confirmación, no un estado: dejarlo puesto
+  // haría que el "Título copiado" de hace diez minutos parezca de recién.
+  useEffect(() => {
+    if (!aviso) return;
+    const t = setTimeout(() => setAviso(null), 5000);
+    return () => clearTimeout(t);
+  }, [aviso]);
+
   /**
-   * El teclado de bloques: `⌥↑`/`⌥↓` mover · `⌘D` duplicar · `⌫` borrar ·
-   * `↑`/`↓` elegir.
+   * ⌘C — el bloque elegido al portapapeles del sistema.
+   *
+   * 🔴 **Portapapeles real y no un `sessionStorage`**, porque el caso es Zattia
+   * en una pestaña y BDI en otra: dos sesiones del panel que no comparten nada.
+   *
+   * ⚠️ `writeText` y no el evento `copy`: es la mitad de la API que **no** pide
+   * confirmación en Safari (la que pregunta es `readText`, y por eso pegar va
+   * por el evento nativo y no por acá). Corre adentro del `keydown`, que es un
+   * gesto del usuario — sin gesto, WebKit lo rechaza.
+   */
+  const copiar = (b: Bloque) => {
+    if (!navigator.clipboard) {
+      // Sin `https` no existe `navigator.clipboard`. En prod y en localhost está;
+      // decirlo es mejor que un atajo que no hace nada y nadie sabe por qué.
+      avisar("Este navegador no deja copiar desde acá");
+      return;
+    }
+    navigator.clipboard.writeText(armarClip([b], marca.nombreCuenta)).then(
+      () => avisar(`${ETIQUETA_BLOQUE[b.tipo]} copiado`),
+      () => avisar("No se pudo copiar"),
+    );
+  };
+
+  /**
+   * ⌘V — los bloques del portapapeles, abajo del que está elegido.
+   *
+   * 🔑 **`leerClip` primero (que llama a `leerContenido`, regla 6) y recién
+   * después el id nuevo con `duplicarBloque`.** El orden no es intercambiable, y
+   * el segundo paso **no es una precaución sino LA garantía**: medido al
+   * escribirlo, `leerContenido` tiene un camino rápido (`esActual`) que devuelve
+   * el documento tal cual cuando el `v` ya es el actual, y ese chequeo **no mira
+   * los ids repetidos**. O sea que de `leerClip` pueden salir ids que ya existen
+   * en este documento —pegar dos veces el mismo bloque es el caso obvio— y así
+   * React colapsa las dos tarjetas en una y el panel edita la equivocada.
+   * `duplicarBloque` es la misma pieza que ya resuelve eso para ⌘D.
+   *
+   * ⛔ **El encabezado no entra nunca.** Hay uno solo y va primero (lo dice el
+   * renderer, no la lista): un segundo encabezado pegado lo borra
+   * `acomodarEncabezado` en la próxima lectura del Json, o sea que el bloque
+   * aparecería en la lista y se evaporaría al guardar.
+   *
+   * ⚠️ **`html` pide `avanzado`**, igual que en la paleta. El bloque igual está
+   * gateado por `permiteHtmlCrudo` al renderizar, así que esto no es la
+   * seguridad: es que la escotilla de ADMIN no se abra desde otra pestaña.
+   *
+   * Lo que sí cruza de marca y está bien que cruce son los estilos: un color
+   * guardado como `$acento` se repinta con la paleta de la marca de destino y
+   * uno clavado en `#f59e0b` llega clavado, que es la misma distinción que el
+   * panel muestra en cada control.
+   */
+  const pegar = (p: Pegado) => {
+    const sinCabecera = p.bloques.filter((b) => b.tipo !== "encabezado");
+    const entran = avanzado ? sinCabecera : sinCabecera.filter((b) => b.tipo !== "html");
+
+    const motivos: string[] = [];
+    if (sinCabecera.length < p.bloques.length) motivos.push("el encabezado no se duplica");
+    if (entran.length < sinCabecera.length) motivos.push("el bloque HTML pide el permiso avanzado");
+
+    if (!entran.length) {
+      avisar(motivos.length ? `No se pegó nada: ${motivos.join(" y ")}` : "No había bloques para pegar");
+      return;
+    }
+
+    const nuevos = entran.map(duplicarBloque);
+    const i = bloques.findIndex((b) => b.id === seleccionadoId);
+    // Abajo del elegido, igual que ⌘D. Sin nada elegido va al final: el otro
+    // candidato —el principio— es justo donde vive el encabezado.
+    const copia = [...bloques];
+    copia.splice(i >= 0 ? i + 1 : bloques.length, 0, ...nuevos);
+    setBloques(copia, { marcar: true });
+    if (nuevos[0]?.id) setSeleccionadoId(nuevos[0].id);
+
+    // De qué marca vino, y solo cuando NO es esta: pegar adentro de la misma
+    // marca es el caso común y no necesita que se lo expliquen.
+    const de = p.marca && p.marca !== marca.nombreCuenta ? ` de ${p.marca}` : "";
+    const cuantos = nuevos.length === 1 ? "1 bloque pegado" : `${nuevos.length} bloques pegados`;
+    avisar(`${cuantos}${de}${motivos.length ? ` · ${motivos.join(" y ")}` : ""}`);
+  };
+
+  /**
+   * El teclado de bloques: `⌥↑`/`⌥↓` mover · `⌘D` duplicar · `⌘C` copiar ·
+   * `⌫` borrar · `↑`/`↓` elegir. (`⌘V` no está acá: ver `alPegar`.)
    *
    * Cero UI nueva: las cinco funciones ya existían acá arriba y son las mismas
    * que llaman los botones de `ListaBloques`. Lo que resuelve es la puntería:
@@ -301,6 +406,22 @@ export function EditorMail({
     if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "d") {
       ev.preventDefault();
       if (i >= 0) duplicar(i);
+      return;
+    }
+
+    // ⌘C / Ctrl+C — copiar. ⚠️ **Sin `preventDefault` incondicional**, al revés
+    // que ⌘D: acá el default del navegador es la operación que la gente
+    // realmente quiere el 99% de las veces —copiar el texto seleccionado— y
+    // quedárselo sería romper copiar una URL del panel para pegarla en un botón.
+    // Se lo queda solo cuando el navegador no tendría nada que copiar.
+    if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "c") {
+      if (i < 0 || enCampo(ev.target)) return;
+      // Algo seleccionado con el mouse gana siempre: es lo que la persona
+      // está mirando cuando aprieta ⌘C.
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed && sel.toString().trim()) return;
+      ev.preventDefault();
+      copiar(bloques[i]);
       return;
     }
 
@@ -351,16 +472,54 @@ export function EditorMail({
    * mientras se renderiza es justo lo que frena el lint de React (es el mismo
    * cuidado que documenta `useHistorial`).
    */
+  /**
+   * ⌘V, por el **evento nativo `paste`** y no por el `keydown`.
+   *
+   * 🔴 Es toda la tanda: la contracara de `writeText` es `readText()`, y en
+   * Safari **pide confirmación en un diálogo cada vez** que se la llama. Un
+   * pegar que abre un cartel es un pegar que nadie usa dos veces. El evento
+   * `paste` trae el contenido puesto en `clipboardData`, sin permiso ninguno,
+   * porque el gesto ES el permiso.
+   *
+   * ⚠️ El precio de la asimetría es que **pegar no se puede disparar desde un
+   * botón**: no hay evento `paste` sin ⌘V. Por eso no hay botón de pegar en la
+   * lista, y no es un olvido.
+   *
+   * La guarda es la misma que la de `⌫`: adentro de un campo, pegar tiene su
+   * significado de siempre. Alguien que copió un bloque, entró a "Asunto" a
+   * corregir una letra y apretó ⌘V se lleva el Json a la vista — feo, pero es
+   * lo que pidió, y un ⌘Z lo saca. Robarle el pegado a un campo de texto sería
+   * mucho peor.
+   */
+  const alPegar = (ev: ClipboardEvent) => {
+    if (hayModal() || enCampo(ev.target)) return;
+    const txt = ev.clipboardData?.getData("text/plain");
+    if (!txt) return;
+    const p = leerClip(txt);
+    // `null` = esto no es nuestro. El evento se le devuelve al navegador entero:
+    // el editor no tiene por qué opinar sobre el resto de las pegadas.
+    if (!p) return;
+    ev.preventDefault();
+    pegar(p);
+  };
+
   const atajos = useRef(alTeclado);
+  const pegadas = useRef(alPegar);
   useEffect(() => {
     atajos.current = alTeclado;
+    pegadas.current = alPegar;
   });
 
   useEffect(() => {
     if (soloLectura) return;
     const onKey = (ev: KeyboardEvent) => atajos.current(ev);
+    const onPaste = (ev: ClipboardEvent) => pegadas.current(ev);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("paste", onPaste);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("paste", onPaste);
+    };
   }, [soloLectura]);
 
   const setTema = (t: Tema | undefined) => {
@@ -451,6 +610,19 @@ export function EditorMail({
             </>
           )}
         </div>
+        {/* El renglón del portapapeles. Va acá arriba y no adentro de la lista
+            de bloques porque abajo del corte se ve UNA columna por vez: pegar
+            estando en "Vista previa" tiene que decir algo igual.
+
+            ⚠️ Montado siempre, aunque esté vacío. Un `aria-live` que aparece
+            junto con su texto no se anuncia: el lector de pantalla tiene que
+            estar mirando la región desde antes de que cambie. */}
+        <span
+          aria-live="polite"
+          className="min-w-0 flex-1 truncate px-2 text-center text-xs text-muted"
+        >
+          {aviso?.txt ?? ""}
+        </span>
         <AISoonButton label="Redactar con IA" />
       </div>
 

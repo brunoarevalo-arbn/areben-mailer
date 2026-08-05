@@ -63,6 +63,7 @@ node --env-file=.env --import tsx scripts/verificar-productos-tn.ts # ↑ pero c
 node --import tsx scripts/probar-tema.ts       # un tema no deja el mail ilegible
 node --import tsx scripts/probar-marcado.ts    # el `data-b` del preview NO sale en un envío
 node --import tsx scripts/probar-esquema.ts    # el Json de bloques migra sin perder nada
+node --import tsx scripts/probar-portapapeles.ts # lo que se pega es un bloque nuestro, y sale con id nuevo
 node --import tsx scripts/probar-estilos.ts    # la cascada respeta el orden y no inyecta
 node --import tsx scripts/probar-render.ts     # golden: el mail no cambió sin querer
 node --import tsx scripts/probar-html.ts       # VML, media queries, tracking, peso
