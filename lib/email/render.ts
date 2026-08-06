@@ -520,16 +520,20 @@ export function renderProductosHtml(items: ProductoEmail[], tema?: Tema, movil?:
 }
 
 /**
- * La grilla: filas de dos o de tres tarjetas.
+ * La grilla: filas de dos, de tres o de cuatro tarjetas.
  *
  * `porFila` es el layout de escritorio y **ausente son 2**, que es como salieron
  * todos los mails hasta el 1-ago-2026. `movil` decide qué pasa en el teléfono y
  * **ausente es 1**, apilada (ver `PorFilaMovil`). La fila incompleta se rellena
- * con celdas vacías: con la grilla de a dos o de a tres, el hueco a la derecha
- * es exactamente lo que corresponde ver.
+ * con celdas vacías: con la grilla de a dos, de a tres o de a cuatro, el hueco a
+ * la derecha es exactamente lo que corresponde ver.
  *
- * ⚠️ Con `porFila: 3` el `movil` no se puede respetar —una `<tr>` de tres celdas
- * no se parte en dos filas con CSS— y la grilla apila. Ver `PorFila`.
+ * ⚠️ Con `porFila: 3` o `4` el `movil` no se puede respetar —una `<tr>` de tres
+ * celdas no se parte en dos filas con CSS— y la grilla apila. Ver `PorFila`.
+ *
+ * 🔑 Con **cuatro**, el botón por tarjeta no se dibuja: a 118px de celda no
+ * entra y Outlook lo parte en dos renglones. El porqué está en `PorFila`; acá
+ * está el `botonTexto` que no viaja.
  */
 function renderProductos(
   items: ProductoEmail[],
@@ -541,8 +545,13 @@ function renderProductos(
   precioOculto?: boolean,
 ): string {
   if (items.length === 0) return "";
-  const n = porFila === 3 ? 3 : 2;
+  const n = porFila === 3 || porFila === 4 ? porFila : 2;
   const dos = movil === 2 && n === 2;
+  // Con cuatro por fila el botón por tarjeta no se dibuja (ver `PorFila`). Se
+  // filtra ACÁ y no en el editor: el `botonTexto` guardado no se toca, así que
+  // volver a 3 o a 2 lo devuelve solo. Un bloque no puede perder un dato porque
+  // alguien miró otra forma de grilla.
+  const boton = n === 4 ? undefined : botonTexto;
   const pct = Math.round(100 / n);
   // El ancho real de una celda, que es el tope del `<v:roundrect>` de Outlook:
   // sin él un texto largo dibuja un botón más ancho que su `<td>` y descuadra
@@ -553,7 +562,7 @@ function renderProductos(
   for (let i = 0; i < items.length; i += n) {
     const celdas = Array.from({ length: n }, (_, j) =>
       items[i + j]
-        ? renderCard(items[i + j], pal, e, dos, pct, botonTexto, anchoCelda, precioOculto)
+        ? renderCard(items[i + j], pal, e, dos, pct, boton, anchoCelda, precioOculto)
         : `<td width="${pct}%"></td>`,
     );
     filas.push(`<tr>${celdas.join("")}</tr>`);

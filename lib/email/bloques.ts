@@ -163,18 +163,40 @@ export type PorFilaMovil = 1 | 2;
  *
  * Tres es el estándar de la industria —16 de las 21 referencias de la primera
  * tanda lo usan, incluida la galería de Tiendanube— y el motor solo sabía hacer
- * dos. Cuatro no entra: a 600px de ancho son 132px de foto por tarjeta con el
- * nombre y el precio abajo, y en dos de las referencias que lo intentan el
- * botón sale partido en dos renglones ("COMP / RAR").
+ * dos.
  *
- * ⚠️ **Con 3 por fila, en el celular se APILA**, sea cual sea `movil`. No es una
- * decisión estética: la fila es una `<tr>` con tres `<td>`, y una clase no puede
- * convertirla en dos filas de dos. Lo que sí se puede —`display:inline-block` en
- * las celdas— deja de ser una tabla justo en los clientes donde la tabla es lo
- * único confiable. Vale la regla del shell: lo peor que se ve es el layout de
- * escritorio, nunca uno roto.
+ * **Cuatro entró el 6-ago-2026**, pedido por R-004, R-007, R-011 y R-021. Hasta
+ * ese día acá decía que no entraba, con dos argumentos: que la tarjeta queda en
+ * 132px y que "en dos de las referencias que lo intentan el botón sale partido
+ * en dos renglones". El primero es un dato de layout, no un impedimento —una
+ * grilla de cuatro es una fila de fotos, no cuatro fichas—; el segundo era una
+ * observación sobre **las capturas ajenas**, y medido acá resultó cierto sobre
+ * este motor también, con dueño conocido: **es el botón por tarjeta**.
+ *
+ * 🔑 **Por eso con cuatro el botón por tarjeta no se dibuja.** Medido en Chrome
+ * el 6-ago-2026 sobre el render real: la celda mide **134px** (118 de foto) y el
+ * botón del BASE necesita **147px** — "COMPRAR" son 83px de texto a 16px más
+ * 32px de padding de cada lado. Sobran 29px, así que el ancla parte el texto en
+ * dos renglones y el `<v:roundrect>` de Outlook —que lleva el ancho de la celda
+ * como tope— hace lo mismo. Preferir la fila de cuatro **y** el botón es elegir
+ * el defecto que la referencia misma tiene. La tarjeta entera sigue siendo un
+ * ancla, que es lo que hace un lookbook.
+ * ⚠️ El texto **no se borra del bloque**: bajar a 3 o a 2 lo devuelve.
+ * ⛔ No se resuelve achicando el botón: un botón de 11px sobre una foto de 118
+ * es un renglón gris, y el tamaño lo puede haber elegido una persona.
+ *
+ * Lo que sí entra a 118px, medido en el mismo pase: el nombre en el BASE de 14px
+ * (dos renglones para "Perfume Nocturne 100ml") y el precio con el tachado al
+ * lado, en un solo renglón. Por eso no hay achique automático de texto acá.
+ *
+ * ⚠️ **Con 3 o 4 por fila, en el celular se APILA**, sea cual sea `movil`. No es
+ * una decisión estética: la fila es una `<tr>` con tres o cuatro `<td>`, y una
+ * clase no puede convertirla en dos filas de dos. Lo que sí se puede
+ * —`display:inline-block` en las celdas— deja de ser una tabla justo en los
+ * clientes donde la tabla es lo único confiable. Vale la regla del shell: lo
+ * peor que se ve es el layout de escritorio, nunca uno roto.
  */
-export type PorFila = 2 | 3;
+export type PorFila = 2 | 3 | 4;
 
 /**
  * La consulta, hecha texto.

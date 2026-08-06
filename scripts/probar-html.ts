@@ -199,6 +199,19 @@ titulo("Responsive");
   ok(tres.includes(`class="${CLASES.col}"`), "con tres por fila el celular apila");
   ok(!tres.includes(`class="${CLASES.col2}"`), "y `movil: 2` no la deja a medio camino");
 
+  // La grilla de cuatro (6-ago-2026): lo mismo que la de tres, MÁS la única
+  // regla que no se ve en el HTML de arriba —el botón por tarjeta no se dibuja,
+  // porque a 118px de celda necesita 147 y sale partido en dos renglones—.
+  // 🔑 Se prueba con `botonTexto` PUESTO: sin eso, el test pasa por la razón
+  // equivocada (ningún botón porque nadie lo pidió) y no fija nada. Ver `PorFila`.
+  const grilla4 = render({ bloques: [{ tipo: "productos", items: ITEMS, movil: 2, porFila: 4, botonTexto: "COMPRAR" }] });
+  const tresConBoton = render({ bloques: [{ tipo: "productos", items: ITEMS, porFila: 3, botonTexto: "COMPRAR" }] });
+  ok(grilla4.includes(`width="25%"`), "la grilla de cuatro reparte 25% en escritorio");
+  ok(grilla4.includes(`class="${CLASES.col}"`), "con cuatro por fila el celular apila");
+  ok(!grilla4.includes(`class="${CLASES.col2}"`), "y `movil: 2` tampoco la deja a medio camino");
+  ok(!grilla4.includes("COMPRAR"), "con cuatro por fila el botón de la tarjeta NO se dibuja");
+  ok(tresConBoton.includes("COMPRAR"), "y con tres el mismo bloque sí lo dibuja (la guarda es de la forma, no del texto)");
+
   // La imagen a sangre sale del contenedor con padding, y no de otra forma: lo
   // que se está fijando es que NO la envuelva `pad()`.
   const sangre = render({ bloques: [{ tipo: "imagen", url: "https://x/hero.jpg", alt: "Portada", sangre: true }] });

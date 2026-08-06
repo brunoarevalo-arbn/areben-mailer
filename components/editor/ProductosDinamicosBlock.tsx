@@ -5,7 +5,7 @@ import { ETIQUETA_FUENTE, type FuenteProductos, type PorFila, type PorFilaMovil 
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { Rango } from "@/components/editor/Rango";
-import { GrillaControl } from "@/components/editor/GrillaControl";
+import { GrillaControl, hintBotonGrilla } from "@/components/editor/GrillaControl";
 
 /**
  * Los controles del bloque de productos automáticos.
@@ -121,7 +121,7 @@ export function ProductosDinamicosBlock({
         fullWidth
         value={botonTexto ?? ""}
         placeholder="Sin botón"
-        hint="Va debajo de cada producto y lleva a su página. Vacío, no se dibuja."
+        hint={hintBotonGrilla(porFila)}
         onChange={(e) => onChange({ botonTexto: e.target.value })}
       />
 

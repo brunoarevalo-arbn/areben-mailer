@@ -7,7 +7,7 @@ import type { PorFila, PorFilaMovil, ProductoEmail } from "@/lib/email/render";
 import type { ProductoTN } from "@/lib/tn/products";
 import { RotateCcw, X } from "lucide-react";
 import { campoBase } from "@/lib/ui";
-import { GrillaControl } from "@/components/editor/GrillaControl";
+import { GrillaControl, hintBotonGrilla } from "@/components/editor/GrillaControl";
 import { ImagenDrop } from "@/components/editor/ImagenDrop";
 import { Input } from "@/components/ui/Input";
 
@@ -239,7 +239,7 @@ export function ProductosBlock({
         label="Texto del botón"
         value={botonTexto ?? ""}
         placeholder="Sin botón"
-        hint="Va debajo de cada producto y lleva a su página. Vacío, no se dibuja."
+        hint={hintBotonGrilla(porFila)}
         onChange={(e) => onBoton(e.target.value)}
       />
 

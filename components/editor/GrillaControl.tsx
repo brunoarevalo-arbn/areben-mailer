@@ -16,6 +16,19 @@ import type { PorFila, PorFilaMovil } from "@/lib/email/bloques";
  * ⚠️ No va al panel de estilo: no es una propiedad de un rol (título, cuerpo,
  * caja), es la forma del bloque.
  */
+/**
+ * Lo que dice el campo "Texto del botón" de los dos bloques de grilla.
+ *
+ * Vive acá por el mismo motivo que el componente: con cuatro por fila el motor
+ * **no dibuja el botón** (no entra en la tarjeta; ver `PorFila`), y un campo que
+ * sigue aceptando texto sin avisarlo es exactamente la clase de silencio que
+ * hace que alguien mande un mail creyendo que tiene botones.
+ */
+export const hintBotonGrilla = (porFila?: PorFila): string =>
+  porFila === 4
+    ? "Con cuatro por fila el botón no se dibuja: no entra en una tarjeta de ese ancho. El texto se guarda igual y vuelve al bajar a 3 o a 2."
+    : "Va debajo de cada producto y lleva a su página. Vacío, no se dibuja.";
+
 export function GrillaControl({
   movil,
   porFila,
@@ -25,7 +38,10 @@ export function GrillaControl({
   porFila?: PorFila;
   onChange: (cambio: { movil?: PorFilaMovil; porFila?: PorFila }) => void;
 }) {
-  const tres = porFila === 3;
+  // Tres y cuatro comparten todo lo que le importa a este control: la fila no se
+  // parte en el celular. Preguntar por "≠ 2" y no enumerar es lo que hace que un
+  // valor nuevo no se olvide acá.
+  const apila = porFila === 3 || porFila === 4;
   return (
     <>
       <Select
@@ -34,11 +50,15 @@ export function GrillaControl({
         // Ausente = 2, igual que en el render: es como se dibujó la grilla desde
         // el día uno y el control tiene que mostrar lo que el mail hace.
         value={String(porFila ?? 2)}
-        onChange={(e) => onChange({ porFila: Number(e.target.value) === 3 ? 3 : 2 })}
-        hint="Tres por fila es lo que hace la mayoría de las tiendas: entra más producto sin que el mail se haga interminable. De a dos la foto sale más grande."
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          onChange({ porFila: v === 3 || v === 4 ? v : 2 });
+        }}
+        hint="Tres por fila es lo que hace la mayoría de las tiendas: entra más producto sin que el mail se haga interminable. De a dos la foto sale más grande, y de a cuatro es una fila de fotos —sin botón, porque no entra—."
       >
         <option value="2">2 productos por fila</option>
         <option value="3">3 productos por fila</option>
+        <option value="4">4 productos por fila</option>
       </Select>
       <Select
         label="En el celular"
@@ -54,18 +74,18 @@ export function GrillaControl({
         // bloque, y al bajar la computadora a 2 el celular "cambiaba solo" a un
         // valor que en realidad ya estaba puesto.
         value={String(movil ?? 1)}
-        disabled={tres}
+        disabled={apila}
         onChange={(e) => onChange({ movil: Number(e.target.value) === 2 ? 2 : 1 })}
         hint={
-          tres
-            ? "Con tres por fila en la computadora, en el celular se apila: una fila de tres no se puede partir en dos sin romper el mail en Outlook."
+          apila
+            ? `Con ${porFila === 4 ? "cuatro" : "tres"} por fila en la computadora, en el celular se apila: una fila de ${porFila === 4 ? "cuatro" : "tres"} no se puede partir en dos sin romper el mail en Outlook.`
             : "De a dos entra el doble de producto en la misma pantalla y se comparan de un vistazo. De a uno la foto sale más grande."
         }
       >
         <option value="1">1 producto por fila</option>
         <option value="2">2 productos por fila</option>
       </Select>
-      {tres && (
+      {apila && (
         // El control apagado decía el MOTIVO y no el CAMINO. Que haya que
         // deducir "entonces bajá el de arriba a 2" es lo que lo hace parecer
         // roto en vez de decidido: el hint está abajo, en 12px y en gris, y lo
