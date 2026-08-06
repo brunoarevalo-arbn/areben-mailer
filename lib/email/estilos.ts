@@ -192,7 +192,12 @@ export const RANGOS = {
   alto:        [4, 400],  // px
 } as const satisfies Record<string, readonly [number, number]>;
 
-const PESOS = [400, 500, 600, 700] as const;
+// ⚠️ `PESOS` y los tres `sanear*` de abajo se exportan porque el texto rico
+// (`texto-rico.ts`) valida sus trozos con EXACTAMENTE los mismos validadores que
+// la cascada. Escribirlos dos veces sería que un `tamano: 999` se acote a 48 en
+// un lado y pase entero en el otro — y el que pasa entero es el que llega al
+// HTML.
+export const PESOS = [400, 500, 600, 700] as const;
 const ALINEACIONES = ["left", "center", "right"] as const;
 const BORDES = ["solid", "dashed"] as const;
 
@@ -228,7 +233,7 @@ export function sanearColor(v: unknown): ValorColor | undefined {
 }
 
 /** Número dentro de rango, o `undefined`. Redondea salvo la interlínea. */
-function sanearNum(v: unknown, rango: readonly [number, number], decimales = false): number | undefined {
+export function sanearNum(v: unknown, rango: readonly [number, number], decimales = false): number | undefined {
   const n = typeof v === "number" ? v : Number(v);
   if (!Number.isFinite(n)) return undefined;
   const [min, max] = rango;
@@ -236,11 +241,11 @@ function sanearNum(v: unknown, rango: readonly [number, number], decimales = fal
   return decimales ? Math.round(acotado * 100) / 100 : Math.round(acotado);
 }
 
-function sanearEnum<T extends string | number>(v: unknown, valores: readonly T[]): T | undefined {
+export function sanearEnum<T extends string | number>(v: unknown, valores: readonly T[]): T | undefined {
   return (valores as readonly unknown[]).includes(v) ? (v as T) : undefined;
 }
 
-function sanearBool(v: unknown): boolean | undefined {
+export function sanearBool(v: unknown): boolean | undefined {
   // 🔴 **El `false` se guarda, y guardarlo es todo el punto.** Hasta el
   // 4-ago-2026 acá se tiraba, con el argumento de que "un false es lo mismo que
   // no estar". No lo es: en una cascada, *no estar* significa **heredar**, y una
@@ -592,8 +597,14 @@ export interface CtxEstilo {
   propio?: Estilos;
 }
 
-/** `$acento` → el hex de la paleta. Un hex se devuelve tal cual. */
-function resolverColor(v: ValorColor | undefined, pal: Paleta): string | undefined {
+/**
+ * `$acento` → el hex de la paleta. Un hex se devuelve tal cual.
+ *
+ * Exportada para el texto rico: un trozo con color también tiene que poder
+ * nombrar un token de la marca, o pintar una palabra sería clavarle un hex que
+ * deja de repintarse cuando el comerciante cambia el tema.
+ */
+export function resolverColor(v: ValorColor | undefined, pal: Paleta): string | undefined {
   if (!v) return undefined;
   if (v.startsWith("$")) {
     const t = pal[v.slice(1) as TokenColor];

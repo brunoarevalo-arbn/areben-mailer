@@ -8,6 +8,8 @@
 //   node --import tsx scripts/probar-tracking.ts
 import { normalizarDominioEnvio, hostDeEnvio, marcaDe, leerConfigCuenta } from "../lib/marca";
 import { inyectarTracking } from "../lib/email/tracking";
+import { renderEmailHtml, type ContenidoCampania } from "../lib/email/render";
+import { V_ACTUAL } from "../lib/email/esquema";
 
 let fallos = 0;
 function ok(cond: boolean, que: string) {
@@ -86,6 +88,32 @@ const c = leerConfigCuenta({ tema: { acento: "#000000" }, logo: "https://x/y.png
 ok(c.dominioEnvio === "https://links.zattia.com.ar", "se lee normalizado");
 ok(c.logo === "https://x/y.png", "el logo sigue ahí");
 ok(!!c.tema, "el tema sigue ahí");
+
+console.log("\n8) Un link escrito ADENTRO del texto también se mide");
+{
+  // Desde el texto rico, una palabra suelta puede llevar link. Sale como un
+  // `<a>` normal, así que `inyectarTracking` lo agarra solo — y es lo que
+  // queremos: un link en el cuerpo de un párrafo es de los clicks más valiosos
+  // que hay, más que el botón, que ya se medía.
+  const conTrozo = renderEmailHtml(
+    { v: V_ACTUAL, bloques: [{ id: "b", tipo: "texto", texto: [{ t: "mirá acá", url: "https://zattia.com.ar/new-in/" }] }] } as ContenidoCampania,
+    { unsubscribeUrl: `${APP}/baja?e=E1`, nombreCuenta: "Zattia" },
+  );
+  const medido = inyectarTracking(conTrozo, "E1", APP);
+  ok(medido.includes(`${APP}/api/track/click/E1`), "el link de un trozo se reescribe por el tracking");
+  ok(medido.includes(`href="${APP}/baja?e=E1"`), "y el de baja sigue pasando intacto");
+
+  // El caso real de "si no querés recibir más, hacé click acá" escrito a mano
+  // adentro del párrafo: NO se mide, igual que el del pie.
+  const bajaEnTexto = renderEmailHtml(
+    { v: V_ACTUAL, bloques: [{ id: "b", tipo: "texto", texto: [{ t: "darte de baja", url: `${APP}/baja?e=E1` }] }] } as ContenidoCampania,
+    { unsubscribeUrl: `${APP}/baja?e=E1`, nombreCuenta: "Zattia" },
+  );
+  ok(
+    !inyectarTracking(bajaEnTexto, "E1", APP).includes("/api/track/click/"),
+    "un trozo que apunta a /baja tampoco se trackea",
+  );
+}
 
 console.log(fallos === 0 ? "\n✅ Todo verde\n" : `\n❌ ${fallos} fallo(s)\n`);
 process.exit(fallos === 0 ? 0 : 1);

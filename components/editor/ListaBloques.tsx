@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ETIQUETA_BLOQUE, TIPOS_BLOQUE, type Bloque, type TipoBloque } from "@/lib/email/render";
+import { textoPlano } from "@/lib/email/texto-rico";
 import { ETIQUETA_FUENTE } from "@/lib/email/bloques";
 import {
   AlignLeft, ChevronDown, ChevronUp, Code2, Columns2, Copy, GripVertical, ImageIcon,
@@ -77,14 +78,17 @@ function resumen(b: Bloque): string {
   switch (b.tipo) {
     case "encabezado":
       return b.variante === "logo" ? "Logo" : b.texto?.trim() || "El nombre de la marca";
+    // ⚠️ `textoPlano()` y no `.trim()` pelado: estos cuatro campos son
+    // `TextoRico`, así que pueden venir como lista de trozos con formato. El
+    // resumen de la tarjeta quiere el texto, nunca el formato.
     case "titulo":
     case "texto":
-      return b.texto.trim() || "—";
+      return textoPlano(b.texto).trim() || "—";
     case "boton":
       return b.texto.trim() || "—";
     case "hero":
     case "seccion":
-      return b.titulo.trim() || "—";
+      return textoPlano(b.titulo).trim() || "—";
     case "cupon":
       return b.codigo.trim() || "—";
     case "imagen":

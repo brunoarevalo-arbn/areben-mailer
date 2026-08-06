@@ -79,6 +79,7 @@ node --import tsx scripts/probar-remitente.ts  # una marca sin remitente propio 
 node --import tsx scripts/probar-tracking.ts   # los links del mail cuelgan del dominio de la marca, y un valor basura cae al fallback
 node --import tsx scripts/probar-redes.ts      # cada red de la lista tiene su PNG; lo que no tiene icono sale en texto, nunca roto
 node --import tsx scripts/probar-negritas.ts   # `**negrita**` se resuelve DESPUÉS de escapar, y solo en los cuatro campos que se escriben
+node --import tsx scripts/probar-texto-rico.ts # un campo de texto rico rinde el MISMO html que el string de siempre
 node --env-file=.env --import tsx scripts/probar-segmentos.ts # el "no abrió/no clickeó" es RECIBIÓ y no lo hizo, nunca "no me consta"
 node --import tsx scripts/probar-automations.ts # una automation por trigger: dos son dos mails a la misma persona
 node --import tsx scripts/probar-fechas.ts      # el día de las métricas es el del calendario local, no el día UTC
@@ -235,6 +236,75 @@ escribir los cuatro asteriscos alrededor de la selección.
   texto sale en cada envío.
 - Lo fija `probar-negritas.ts`, verificado en rojo invirtiendo el orden de
   `esc()`/`negritas()` y sacando el `sinNegritas()` del texto plano.
+
+### Texto con formato POR SELECCIÓN: `TextoRico` (5-ago-2026)
+
+`lib/email/texto-rico.ts`. **Ocho campos** dejaron de ser `string` y pasaron a
+`TextoRico = string | Trozo[]`: los cuatro de cuerpo (`texto.texto`,
+`hero.subtitulo`, `seccion.texto`, `Columna.texto`) y los cuatro de título
+(`titulo.texto`, `hero.titulo`, `seccion.titulo`, `Columna.titulo`). Un `Trozo`
+es `{ t, fuente?, tamano?, peso?, italica?, subrayado?, color?, fondo?, url? }` —
+**las mismas claves que `EstiloBloque`**, para que el saneo reuse los mismos
+validadores y quien conoce la cascada lea un trozo sin manual.
+
+- 🔑 **Es una UNIÓN, no un reemplazo, y el `string` es la forma NORMAL.** Por eso
+  no hay migración, `V_ACTUAL` **no sube**, los 38 presets no se tocaron y el
+  golden no se movió un byte. Precedente literal: `Columna.botonTexto` e `icono`
+  entraron sin bump con el mismo argumento — `V_ACTUAL` existe para cambios de
+  **forma que requieren conversión**, y acá no hay nada que convertir.
+- 🔑 **`canonizar()` es lo que hace que esto sea barato.** Fusiona los trozos
+  adyacentes iguales y, si queda uno solo sin formato, **devuelve el `string`
+  pelado**. Sin eso, el primer click en negrita convertiría el campo a array para
+  siempre y en seis meses la mitad de los mails guardados serían arrays de un
+  trozo. Con eso, el array es la excepción.
+- 🔴 **La única asimetría: un `string` interpreta `**negrita**` y un `Trozo[]`
+  NO** (adentro de un trozo los asteriscos quedan literales — ahí la negrita se
+  pide con `peso`). Por eso `canonizar` **se niega a colapsar un trozo cuyo texto
+  tenga `**`**: colapsarlo haría aparecer un `<strong>` que nadie pidió.
+- **El renderer**: `cuerpoHtml()` y `tituloHtml()` en `render.ts`. La rama
+  `string` llama a `nl()` y a `esc()` **sin tocarlas**, y ahí está toda la
+  garantía de compatibilidad. Son dos funciones y no una con bandera porque la
+  diferencia es una invariante fijada por test (los títulos no interpretan `**`,
+  y tampoco cortan renglones).
+- 🔴 **`trozoCss()` es lista blanca pura: ni una interpolación de un string del
+  Json adentro del `style`.** La tipografía sale de `FUENTES[clave]` (un literal
+  del código), el tamaño de `px()` sobre un número ya acotado y el color de
+  `sanearColor` + `resolverColor`. Por eso `Trozo.fuente` guarda una **clave** y
+  no un stack CSS. Y `Trozo.color` acepta **token** (`$acento`) además de hex: si
+  fuera solo hex, pintar una palabra la clavaría y dejaría de repintarse al
+  cambiar el tema.
+- 🔴 **La URL del link se valida en el EMISOR, no solo al sanear.** `esActual()`
+  deja pasar los documentos por el camino rápido sin re-sanear, así que un
+  `javascript:` filtrado únicamente en `sanearTrozos` saldría entero en un mail
+  cuyo Json nunca volvió a pasar por el saneo. Misma doctrina que los colores.
+- 🔴 **Tres cosas que no son el call site** y que solo se ven en el celular o en
+  Outlook: (a) **un trozo con `tamano` le saca al contenedor la clase que lo
+  achica** (`m-h1`/`m-h2`/`m-c1`/`m-c2`) — el inline de un hijo le gana a la
+  clase del padre, así que si no, el título mezclaría dos tamaños en el teléfono;
+  (b) **un trozo con link desactiva el ancla de la celda**, igual que
+  `botonTexto`, o sale un `<a>` adentro de otro; (c) el **`alt`** de la foto de
+  una celda va por `textoPlano()`, nunca por el HTML.
+- ⛔ **Un trozo NO puede emitir una `class`** (regla única del shell) ⇒ no existe
+  "un trozo que se achica en el celular". Lo frena `probar-html.ts`.
+- ⛔ Afuera quedan los 5 `botonTexto` —el texto del botón se emite **dos veces**,
+  VML + ancla, y el VML no dibuja spans adentro—, `cupon`, `menu`, `encabezado`
+  (aplica mayúsculas en JS sobre el string) e `imagen.alt`.
+- 🟡 **Modo de falla conocido**: si alguien pone formato **en el medio** de un
+  merge tag, el `<span>` parte el string, el regex de `aplicarMergeTags` no
+  matchea y sale `${contacto.nombre}` literal en la casilla. Está documentado en
+  `probar-texto-rico.ts`; se arregla en la barra, tratando el tag como una unidad
+  que no se puede partir.
+- Lo fija **`scripts/probar-texto-rico.ts`**, cuyo test principal es la
+  **equivalencia**: para todo `s` sin `**`, `render(campo = s)` es **idéntico** a
+  `render(campo = [{t: s}])`. Encontró tres bugs reales al escribirlo (el `\n` de
+  los títulos, el `<span>` vacío que movía el HTML al canonizar, y la URL sin
+  validar en el emisor).
+
+⏳ **El editor todavía no existe: el motor está deployado y apagado.** Los ocho
+campos siguen dibujándose con `<Input>`/`<Textarea>` sobre `textoPlano()` (ver el
+helper `plano` de `FormBloque.tsx`), así que **nadie puede crear un trozo desde
+la app**. Eso es a propósito: con el dato y el renderer probados y en producción,
+lo único que queda por descubrir es el `contenteditable`.
 
 ### El preview del editor se puede tocar (2-ago-2026)
 

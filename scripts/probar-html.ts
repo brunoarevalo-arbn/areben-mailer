@@ -2,7 +2,7 @@
 //
 //   node --import tsx scripts/probar-html.ts
 
-import { renderEmailHtml, renderEmailTexto, nuevoBloque, TIPOS_BLOQUE } from "../lib/email/render";
+import { renderEmailHtml, renderEmailTexto, nuevoBloque, TIPOS_BLOQUE, type Bloque } from "../lib/email/render";
 import { claveProductos } from "../lib/email/bloques";
 import { inyectarTracking } from "../lib/email/tracking";
 import { CLASES } from "../lib/email/shell";
@@ -248,6 +248,43 @@ titulo("Propiedades que los clientes de mail no soportan");
   ok(!TODO.includes("box-shadow"), "cero box-shadow");
   ok(!/\bcalc\(/.test(TODO), "cero calc()");
   ok(!/font-size:\s*\d+(\.\d+)?(rem|em)\b/.test(TODO), "ningún tamaño en rem/em");
+}
+
+// ─── Texto con formato por selección ─────────────────────────────────────────
+titulo("Los `<span>` del texto rico juegan con las mismas reglas");
+{
+  // Un mail con los 18 tipos, pero con los 8 campos ricos llenos de trozos de
+  // todos los formatos que existen. Es el peor caso posible del emisor.
+  const cargado = render({
+    bloques: [
+      { id: "t1", tipo: "titulo", texto: [{ t: "TÍT", fuente: "georgia", tamano: 34 }, { t: "ULO", italica: true, color: "$acento" }] },
+      { id: "t2", tipo: "texto", texto: [{ t: "cuerpo " }, { t: "gordo", peso: 700, fondo: "#ffff00" }, { t: " y ", subrayado: true }, { t: "link", url: "https://ejemplo.com" }] },
+      { id: "t3", tipo: "hero", imagen: "", titulo: [{ t: "H", tamano: 40 }], subtitulo: [{ t: "S", italica: true }], botonTexto: "", botonUrl: "", bg: "" },
+      { id: "t4", tipo: "seccion", bg: "#faf7f0", titulo: [{ t: "S", peso: 700 }], texto: [{ t: "x", color: "#ff0000" }], botonTexto: "", botonUrl: "" },
+      { id: "t5", tipo: "columnas", variante: "textos", celdas: [{ imagen: "", url: "", titulo: [{ t: "A", tamano: 20 }], texto: [{ t: "b", peso: 600 }] }, { imagen: "", url: "" }] },
+    ] as Bloque[],
+  });
+
+  ok(cargado.includes("<span style="), "los trozos con formato salen como span");
+  ok(!cargado.includes("position:absolute"), "cero position");
+  ok(!/[^-]display:flex|display:grid/.test(cargado), "cero flex y grid");
+  ok(!/\bcalc\(/.test(cargado), "cero calc()");
+  ok(!/font-size:\s*\d+(\.\d+)?(rem|em)\b/.test(cargado), "ningún tamaño en rem/em");
+  ok(!cargado.includes("box-shadow"), "cero box-shadow");
+
+  // 🔴 Un trozo NO puede emitir una clase. La regla única del shell dice que el
+  // inline lleva el valor de escritorio y la clase solo puede ser un override;
+  // un `<span class>` sin inline sería lo único de esa propiedad y se perdería
+  // en Outlook. Por eso no existe "un trozo que se achica en el celular".
+  ok(!/<span[^>]*\sclass=/.test(cargado), "🔴 ningún `<span>` de trozo lleva `class`");
+
+  // 🔴 Un `<a>` adentro de otro `<a>`: cada cliente lo repara distinto y el
+  // click termina en cualquier lado. Es el riesgo que trae el link por trozo.
+  ok(!/<a\b[^>]*>(?:(?!<\/a>)[\s\S])*?<a\b/.test(cargado), "🔴 cero anclas anidadas");
+
+  // Y la regla del inline sigue valiendo para todo el documento.
+  const conClase = cargado.match(/<[a-z][^>]*\sclass="[^"]*"[^>]*>/g) ?? [];
+  ok(conClase.every((tag) => tag.includes("style=")), "toda etiqueta con clase sigue trayendo su inline");
 }
 
 // ─── Cosas que no se pueden perder ───────────────────────────────────────────

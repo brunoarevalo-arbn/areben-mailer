@@ -13,6 +13,7 @@ import { cabeza, apertura, cierre, botonVml, botonVmlCrudo, clase, clasesDe, CLA
 import { claveProductos } from "./bloques";
 import { redConIcono, urlIcono } from "./redes";
 import { iconoDe, urlIconoCelda } from "./iconos";
+import { trozoCss, textoPlano, tieneTamano, tieneLink, fusionar, sanearUrl, type TextoRico, type Trozo } from "./texto-rico";
 import type { Bloque, Columna, ContenidoCampania, PorFila, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
 
 // Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
@@ -59,6 +60,74 @@ const sinNegritas = (s: string) => s.replace(/\*\*([^*\n]+?)\*\*/g, "$1");
  * título ya es grande y pesado, y ahí la negrita no se nota.
  */
 const nl = (s: string) => negritas(esc(s)).replace(/\n/g, "<br>");
+
+/**
+ * Los trozos de un campo con formato, hechos HTML.
+ *
+ * 🔴 **`esc()` primero, siempre** — el mismo orden que `negritas()` y por el
+ * mismo motivo: después de escapar no queda un `<` que venga de la base, así que
+ * los únicos tags de la salida son los `<span>` y `<a>` que emite el motor.
+ *
+ * El `style` sale de `trozoCss`, que es **lista blanca pura**: la tipografía es
+ * un literal de `FUENTES`, el tamaño un `px()` sobre un número ya acotado y el
+ * color pasa por `sanearColor` + `resolverColor`. Ningún string del Json se
+ * interpola adentro del atributo.
+ *
+ * ⚠️ Un trozo **sin formato no envuelve nada**: sale el texto pelado. Es lo que
+ * hace que un campo con una sola palabra en negrita agregue un `<span>` y no
+ * cinco, y lo que mantiene el mail lejos del techo de ~102 KB de Gmail.
+ *
+ * ⚠️ **Un trozo nunca puede emitir una `class`.** La regla del shell dice que el
+ * inline lleva el valor de escritorio y la clase solo puede ser un override; un
+ * `<span class>` sin inline sería lo único de esa propiedad y `probar-html.ts`
+ * lo frena. Por eso no hay "trozo que se achica en el celular".
+ */
+function trozosHtml(ts: Trozo[], pal: Paleta, saltos: boolean): string {
+  return fusionar(ts)
+    .map((t) => {
+      const cuerpo = saltos ? esc(t.t).replace(/\n/g, "<br>") : esc(t.t);
+      const css = trozoCss(t, pal);
+      const dentro = css ? `<span style="${css}">${cuerpo}</span>` : cuerpo;
+      // 🔴 **La URL se valida acá y no solo al sanear.** `esActual()` deja pasar
+      // los documentos ya guardados sin re-sanear, así que un `javascript:`
+      // filtrado únicamente en `sanearTrozos` saldría entero en un mail cuyo
+      // Json nunca volvió a pasar por el saneo. Misma doctrina que los colores:
+      // la frontera es el emisor.
+      const url = sanearUrl(t.url);
+      if (!url) return dentro;
+      // Un `<a>` sin color explícito sale azul subrayado en todos los clientes,
+      // que casi nunca es lo que se quiere adentro de un párrafo con marca. Se
+      // le pone el color del link de la paleta salvo que el trozo elija otro.
+      const color = t.color ? "" : `color:${pal.link};`;
+      return `<a href="${esc(url)}" style="${color}text-decoration:underline">${dentro}</a>`;
+    })
+    .join("");
+}
+
+/**
+ * Un campo de CUERPO → HTML. `string` = exactamente lo de siempre.
+ *
+ * 🔑 **La rama `string` llama a `nl()` sin tocarla**, y ahí está toda la
+ * garantía de que el texto rico no movió un byte de ningún mail ya guardado: un
+ * documento de puros strings pasa por un `typeof` y después por el mismo código
+ * de ayer. Lo custodia el golden, que en este trabajo **no se bendice**.
+ */
+const cuerpoHtml = (v: TextoRico, pal: Paleta): string =>
+  typeof v === "string" ? nl(v) : trozosHtml(v, pal, true);
+
+/**
+ * Un campo de TÍTULO → HTML. `string` = `esc()` pelado, como siempre.
+ *
+ * Dos funciones y no una con bandera: la diferencia entre ellas es que **los
+ * títulos no interpretan `**negrita**`** —una invariante que fija
+ * `probar-negritas.ts` §4— y un booleano en el call site la volvería invisible.
+ *
+ * ⚠️ Y tampoco cortan renglones: `esc()` deja el `\n` crudo, así que el trozo
+ * tiene que hacer lo mismo o un título con un salto adentro saldría distinto
+ * según cómo esté guardado. La bandera es de esta función, no del call site.
+ */
+const tituloHtml = (v: TextoRico, pal: Paleta): string =>
+  typeof v === "string" ? esc(v) : trozosHtml(v, pal, false);
 
 /**
  * Un color de la base a `rgba(...)`, para poder pintarlo semitransparente.
@@ -148,9 +217,16 @@ const est = (
  * Solo si **nadie eligió el tamaño**: si alguien puso 40px y la media query lo
  * bajara a 22 igual, el control del panel sería mentira — el mail se vería
  * distinto de lo que muestra el editor.
+ *
+ * 🔴 **Y "nadie eligió" incluye adentro del texto.** Si un trozo declara
+ * `font-size:34px`, ese inline está en un HIJO del `<h1>` y le gana a la clase
+ * del padre siempre: la media query bajaría el resto del renglón a 22px y el
+ * título saldría **mezclando dos tamaños en el celular**. Por eso el campo entra
+ * por parámetro. Es la misma doctrina de arriba, con la elección viniendo de
+ * otro lado.
  */
-const clasesTitulo = (e: EstiloResuelto): string[] => [
-  e.elegidas.has("tamano") ? "" : CLASES.titulo,
+const clasesTitulo = (e: EstiloResuelto, campo?: TextoRico): string[] => [
+  e.elegidas.has("tamano") || tieneTamano(campo) ? "" : CLASES.titulo,
   ...clasesDe(e),
 ].filter(Boolean);
 
@@ -553,11 +629,11 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     }
     case "titulo": {
       const t = e("titulo");
-      return pad(`<h1${clase(...clasesTitulo(t))} style="margin:16px 0;font-size:${px(t.tamano ?? 26)};line-height:${t.interlinea ?? 1.25};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${esc(b.texto)}</h1>`, caja());
+      return pad(`<h1${clase(...clasesTitulo(t, b.texto))} style="margin:16px 0;font-size:${px(t.tamano ?? 26)};line-height:${t.interlinea ?? 1.25};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${tituloHtml(b.texto, ctx.pal)}</h1>`, caja());
     }
     case "texto": {
       const t = e("cuerpo");
-      return pad(`<p style="margin:0 0 16px;font-size:${px(t.tamano ?? 16)};line-height:${t.interlinea ?? 1.6};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${nl(b.texto)}</p>`, caja());
+      return pad(`<p style="margin:0 0 16px;font-size:${px(t.tamano ?? 16)};line-height:${t.interlinea ?? 1.6};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${cuerpoHtml(b.texto, ctx.pal)}</p>`, caja());
     }
     case "boton": {
       const t = e("boton");
@@ -680,9 +756,17 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // ⚠️ Y solo si NADIE eligió el tamaño, igual que `clasesTitulo()`: con un
       // valor puesto a mano, la media query lo estaría desmintiendo y el control
       // del panel sería mentira.
+      //
+      // 🔴 Y son funciones del CAMPO, no dos constantes: un trozo con tamaño
+      // propio emite su `font-size` inline en un hijo del `<div>`, y ese inline
+      // le gana a la clase del padre. Sin mirarlo, la celda saldría mezclando el
+      // tamaño achicado con el del trozo. Es lo mismo que hace `clasesTitulo()`,
+      // pero acá la respuesta cambia celda por celda.
       const achica = enFila && celdas.length >= 3;
-      const claseTitulo = achica && !tTitulo.elegidas.has("tamano") ? CLASES.colTitulo : undefined;
-      const claseTexto = achica && !tCuerpo.elegidas.has("tamano") ? CLASES.colTexto : undefined;
+      const claseTitulo = (campo?: TextoRico) =>
+        achica && !tTitulo.elegidas.has("tamano") && !tieneTamano(campo) ? CLASES.colTitulo : undefined;
+      const claseTexto = (campo?: TextoRico) =>
+        achica && !tCuerpo.elegidas.has("tamano") && !tieneTamano(campo) ? CLASES.colTexto : undefined;
 
       // 🔴 El botón de la celda va **afuera** del ancla que envuelve al resto —
       // por eso lo emite un helper aparte y no forma parte del interior. Un
@@ -723,13 +807,20 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         // salió a la izquierda desde el día uno, contra las seis referencias que
         // la centran (002 · 006 · 007 · 018 · 020 · 021). Ver `alineacion()`.
         const label = c.titulo
-          ? `<div${clase(claseTitulo)} style="margin-top:8px;font-size:${px(tTitulo.tamano ?? 15)};font-weight:${tTitulo.peso ?? 600};color:${tTitulo.color};text-align:${alineacion(tTitulo, "center")}${extra(tTitulo, ["tamano", "peso", "color", "align"])}">${esc(c.titulo)}</div>`
+          ? `<div${clase(claseTitulo(c.titulo))} style="margin-top:8px;font-size:${px(tTitulo.tamano ?? 15)};font-weight:${tTitulo.peso ?? 600};color:${tTitulo.color};text-align:${alineacion(tTitulo, "center")}${extra(tTitulo, ["tamano", "peso", "color", "align"])}">${tituloHtml(c.titulo, ctx.pal)}</div>`
           : "";
-        const foto = `${c.imagen ? `<img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:${px(tImg.radio ?? 8)};display:block" alt="${esc(c.titulo ?? "")}" />` : ""}${label}`;
+        const foto = `${c.imagen ? `<img src="${esc(c.imagen)}" width="100%" style="max-width:100%;border-radius:${px(tImg.radio ?? 8)};display:block" alt="${esc(textoPlano(c.titulo ?? ""))}" />` : ""}${label}`;
         // Sin botón la celda entera es el link —como fue siempre, hasta con la
         // url vacía—; con botón, la foto se queda sin ancla y el click vive en
         // el botón, que es lo que el lector ve.
-        const interior = c.botonTexto ? foto : `<a href="${esc(c.url || "#")}" style="text-decoration:none;color:inherit">${foto}</a>`;
+        //
+        // 🔴 **Un link adentro del texto cuenta igual que un botón.** Si la
+        // etiqueta trae un trozo con `url`, envolver la celda daría un `<a>`
+        // adentro de otro: no está permitido en HTML y cada cliente lo repara
+        // distinto —Gmail cierra el primero, Outlook anida—, así que el click
+        // termina yendo a cualquier lado. Mismo criterio y misma salida que
+        // `botonTexto`.
+        const interior = c.botonTexto || tieneLink(c.titulo) ? foto : `<a href="${esc(c.url || "#")}" style="text-decoration:none;color:inherit">${foto}</a>`;
         return `<td width="${pct}%" valign="top"${clase(claseCelda)} style="padding:6px">${interior}${botonCelda(c, pct, alineacion(tTitulo, "center"))}</td>`;
       };
 
@@ -755,13 +846,13 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
 
       const celdaTexto = (c: Columna, pct: number) => {
         const titulo = c.titulo
-          ? `<div${clase(claseTitulo)} style="margin:0 0 6px;font-size:${px(tTitulo.tamano ?? 18)};font-weight:${tTitulo.peso ?? 700};line-height:${tTitulo.interlinea ?? 1.3};color:${tTitulo.color};text-align:${tTitulo.align ?? "left"}${extra(tTitulo, ["tamano", "peso", "interlinea", "color", "align"])}">${esc(c.titulo)}</div>`
+          ? `<div${clase(claseTitulo(c.titulo))} style="margin:0 0 6px;font-size:${px(tTitulo.tamano ?? 18)};font-weight:${tTitulo.peso ?? 700};line-height:${tTitulo.interlinea ?? 1.3};color:${tTitulo.color};text-align:${tTitulo.align ?? "left"}${extra(tTitulo, ["tamano", "peso", "interlinea", "color", "align"])}">${tituloHtml(c.titulo, ctx.pal)}</div>`
           : "";
         const texto = c.texto
-          ? `<div${clase(claseTexto)} style="font-size:${px(tCuerpo.tamano ?? 14)};line-height:${tCuerpo.interlinea ?? 1.5};color:${tCuerpo.color};text-align:${tCuerpo.align ?? "left"}${extra(tCuerpo, ["tamano", "interlinea", "color", "align"])}">${nl(c.texto)}</div>`
+          ? `<div${clase(claseTexto(c.texto))} style="font-size:${px(tCuerpo.tamano ?? 14)};line-height:${tCuerpo.interlinea ?? 1.5};color:${tCuerpo.color};text-align:${tCuerpo.align ?? "left"}${extra(tCuerpo, ["tamano", "interlinea", "color", "align"])}">${cuerpoHtml(c.texto, ctx.pal)}</div>`
           : "";
         const contenido = `${iconoCelda(c, tTitulo.align ?? "left")}${titulo}${texto}`;
-        const interior = c.url && !c.botonTexto ? `<a href="${esc(c.url)}" style="text-decoration:none;color:inherit">${contenido}</a>` : contenido;
+        const interior = c.url && !c.botonTexto && !tieneLink(c.titulo) && !tieneLink(c.texto) ? `<a href="${esc(c.url)}" style="text-decoration:none;color:inherit">${contenido}</a>` : contenido;
         return `<td width="${pct}%" valign="top"${clase(claseCelda)} style="padding:6px">${interior}${botonCelda(c, pct, tTitulo.align ?? "left")}</td>`;
       };
 
@@ -871,12 +962,12 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // título blanco sobre blanco si se heredara la paleta.
       const c = caja();
       const bg = c.autoFondo ? b.bg || pal.tarjeta : c.fondo!;
-      const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h1${clase(...clasesTitulo(x))} style="margin:0 0 10px;font-size:${px(x.tamano ?? 30)};line-height:${x.interlinea ?? 1.2};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.titulo)}</h1>`; })() : "";
+      const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h1${clase(...clasesTitulo(x, b.titulo))} style="margin:0 0 10px;font-size:${px(x.tamano ?? 30)};line-height:${x.interlinea ?? 1.2};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${tituloHtml(b.titulo, ctx.pal)}</h1>`; })() : "";
       // La bajada va por `nl()` —y no por `esc()`— igual que la de `seccion`:
       // es la otra mitad del mismo par y no había razón para que una admitiera
       // negritas y saltos de línea y la otra no. Verificado que ningún preset
       // publicado tiene un `\n` ni un `**` acá, así que el golden no se mueve.
-      const s = b.subtitulo ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 20px;font-size:${px(x.tamano ?? 17)};line-height:${x.interlinea ?? 1.5};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${nl(b.subtitulo)}</p>`; })() : "";
+      const s = b.subtitulo ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 20px;font-size:${px(x.tamano ?? 17)};line-height:${x.interlinea ?? 1.5};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${cuerpoHtml(b.subtitulo, ctx.pal)}</p>`; })() : "";
       const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
       const interior = `${t}${s}${btn}`;
 
@@ -917,8 +1008,8 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // padding por diseño, nadie la comprime a una barra, y cambiarlo movería
       // todas las que ya se enviaron a cambio de nada.
       const mBtn = b.botonTexto ? 1 : 0;
-      const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h2${clase(...clasesTitulo(x))} style="margin:0 0 ${px(b.texto || mBtn ? 8 : 0)};font-size:${px(x.tamano ?? 22)};line-height:${x.interlinea ?? 1.3};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${esc(b.titulo)}</h2>`; })() : "";
-      const tx = b.texto ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 ${px(mBtn ? 16 : 0)};font-size:${px(x.tamano ?? 16)};line-height:${x.interlinea ?? 1.6};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${nl(b.texto)}</p>`; })() : "";
+      const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h2${clase(...clasesTitulo(x, b.titulo))} style="margin:0 0 ${px(b.texto || mBtn ? 8 : 0)};font-size:${px(x.tamano ?? 22)};line-height:${x.interlinea ?? 1.3};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${tituloHtml(b.titulo, ctx.pal)}</h2>`; })() : "";
+      const tx = b.texto ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 ${px(mBtn ? 16 : 0)};font-size:${px(x.tamano ?? 16)};line-height:${x.interlinea ?? 1.6};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${cuerpoHtml(b.texto, ctx.pal)}</p>`; })() : "";
       const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
       const estiloCaja = `${padCss(c.padY ?? 32, c.padX ?? 32)};text-align:${alineacion(c, "center")}${extra(c, ["fondo", "padX", "padY", "align"])}`;
       // La misma banda del `hero`, en el medio del mail. Con la foto, el color
@@ -1138,6 +1229,22 @@ ${cierre}
 </body></html>`;
 }
 
+/**
+ * Un campo de texto humano → texto plano.
+ *
+ * Un `string` va por `sinNegritas()`, idéntico a siempre: un cuerpo que dice
+ * `**Solo hasta el domingo**` se lee como marcado de spam, no como énfasis.
+ *
+ * Un `Trozo[]` se concatena, y un trozo con link sale como `texto (url)` — entre
+ * paréntesis y **no** `texto: url` como los botones: en el medio de un párrafo
+ * los dos puntos se leen como puntuación rota. Sin tracking, igual que todo el
+ * resto de esta parte del mail.
+ */
+const campoATexto = (v: TextoRico): string =>
+  typeof v === "string"
+    ? sinNegritas(v)
+    : v.map((t) => (t.url ? `${t.t} (${t.url})` : t.t)).join("");
+
 /** Un bloque, en texto. `null` = no aporta nada legible (imágenes sueltas, etc.). */
 function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
   const link = (texto: string, url?: string) => (url ? `${texto}: ${url}` : texto);
@@ -1156,13 +1263,13 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       return b.mayusculas === false ? nombre : nombre.toUpperCase();
     }
     case "titulo":
-      return b.texto;
+      return campoATexto(b.texto);
     // 🔴 Los mismos campos que en el HTML admiten `**negrita**` tienen que
     // salir acá SIN los asteriscos. La parte text/plain va en cada envío y es
     // una de las señales que mira el filtro: un mail cuyo cuerpo dice
     // "**Solo hasta el domingo**" se lee como marcado de spam, no como énfasis.
     case "texto":
-      return sinNegritas(b.texto);
+      return campoATexto(b.texto);
     case "boton":
       return b.url ? link(b.texto, b.url) : b.texto;
     case "imagen":
@@ -1190,7 +1297,7 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       // esta rama, la versión de texto de una fila de tarjetas con CTA propio
       // salía sin un solo link.
       const lado = (c: Columna) =>
-        [c.titulo, c.texto && sinNegritas(c.texto), c.botonTexto ? link(c.botonTexto, c.botonUrl) : c.url]
+        [c.titulo && campoATexto(c.titulo), c.texto && campoATexto(c.texto), c.botonTexto ? link(c.botonTexto, c.botonUrl) : c.url]
           .filter(Boolean)
           .join(" — ");
       return (b.celdas ?? []).map(lado).filter(Boolean).join("\n") || null;
@@ -1213,10 +1320,10 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       // No aporta nada legible: en texto plano el aire ya lo dan los saltos.
       return null;
     case "hero":
-      return [b.titulo, b.subtitulo && sinNegritas(b.subtitulo), b.botonTexto ? link(b.botonTexto, b.botonUrl) : null]
+      return [campoATexto(b.titulo), b.subtitulo && campoATexto(b.subtitulo), b.botonTexto ? link(b.botonTexto, b.botonUrl) : null]
         .filter(Boolean).join("\n") || null;
     case "seccion":
-      return [b.titulo, b.texto && sinNegritas(b.texto), b.botonTexto ? link(b.botonTexto, b.botonUrl) : null]
+      return [campoATexto(b.titulo), b.texto && campoATexto(b.texto), b.botonTexto ? link(b.botonTexto, b.botonUrl) : null]
         .filter(Boolean).join("\n") || null;
     case "cupon":
       return [b.texto, b.codigo, b.botonTexto ? link(b.botonTexto, b.botonUrl) : null].filter(Boolean).join("\n") || null;

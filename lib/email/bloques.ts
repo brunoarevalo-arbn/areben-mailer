@@ -11,6 +11,23 @@
 import type { Estilos } from "./estilos";
 import type { EstiloIconos } from "./redes";
 import type { Tema } from "./tema";
+import type { TextoRico } from "./texto-rico";
+
+/**
+ * 🔑 **Ocho campos de este archivo son `TextoRico` y no `string`**: los cuatro
+ * de cuerpo (`texto.texto`, `hero.subtitulo`, `seccion.texto`, `Columna.texto`)
+ * y los cuatro de título (`titulo.texto`, `hero.titulo`, `seccion.titulo`,
+ * `Columna.titulo`).
+ *
+ * `TextoRico` es `string | Trozo[]`, o sea una **unión**: el `string` de siempre
+ * sigue siendo válido y es la forma normal — no hay migración, `V_ACTUAL` no
+ * sube y ninguna plantilla ya guardada cambia. El porqué completo está arriba de
+ * `texto-rico.ts`.
+ *
+ * ⚠️ El import es `type` puro, así que TS lo borra: `texto-rico.ts` importa
+ * valores de `estilos.ts`, que importa el tipo de acá, y sin el `type` eso sería
+ * un ciclo de módulos de verdad.
+ */
 
 export interface ProductoEmail {
   nombre: string;
@@ -55,8 +72,8 @@ export interface Columna {
    * tanda del 1-ago la etiqueta ES el contenido de la celda. Con dos campos, el
    * día que alguien cambia la variante de la celda el texto se le queda atrás.
    */
-  titulo?: string;
-  texto?: string;
+  titulo?: TextoRico;
+  texto?: TextoRico;
   /**
    * Botón propio de la celda. **Vacío o ausente = no se dibuja**, igual que en
    * `hero`, `seccion` y `cupon`: vaciar el texto es cómo se lo saca.
@@ -240,8 +257,8 @@ export type Bloque = BloqueBase &
          */
         mayusculas?: boolean;
       }
-    | { tipo: "titulo"; texto: string; align?: "left" | "center" }
-    | { tipo: "texto"; texto: string; align?: "left" | "center" }
+    | { tipo: "titulo"; texto: TextoRico; align?: "left" | "center" }
+    | { tipo: "texto"; texto: TextoRico; align?: "left" | "center" }
     | { tipo: "boton"; texto: string; url: string; align?: "left" | "center"; full?: boolean }
     | {
         tipo: "imagen";
@@ -421,8 +438,8 @@ export type Bloque = BloqueBase &
     | {
         tipo: "hero";
         imagen: string;
-        titulo: string;
-        subtitulo: string;
+        titulo: TextoRico;
+        subtitulo: TextoRico;
         botonTexto: string;
         botonUrl: string;
         bg: string;
@@ -452,8 +469,8 @@ export type Bloque = BloqueBase &
     | {
         tipo: "seccion";
         bg: string;
-        titulo: string;
-        texto: string;
+        titulo: TextoRico;
+        texto: TextoRico;
         botonTexto: string;
         botonUrl: string;
         /**

@@ -126,5 +126,23 @@ ok(!h1.includes("<strong>"), "y no aparece ningún <strong> de la nada");
 // El salto de línea sigue siendo un <br>, que es lo que `nl()` hacía antes.
 ok(html([{ tipo: "texto", texto: "a\nb" } as Bloque]).includes("a<br>b"), "el \\n sigue saliendo <br>");
 
+console.log("\n7) 🔴 Adentro de un TROZO, `**` no es marcado: son dos asteriscos");
+// El texto rico y `**negrita**` son dos vocabularios distintos y no se mezclan.
+// Un `string` interpreta los asteriscos; un `Trozo[]` los deja literales, porque
+// ahí la negrita se pide con `peso` y no con sintaxis. Es la única asimetría del
+// diseño, y `canonizar()` la respeta negándose a colapsar un trozo que los
+// tenga: si colapsara, aparecería un <strong> que nadie pidió.
+{
+  const conTrozo = html([{ tipo: "texto", texto: [{ t: "Solo hasta el **domingo**." }] } as Bloque]);
+  ok(!conTrozo.includes("<strong>"), "un trozo con `**` no emite <strong>");
+  ok(conTrozo.includes("**domingo**"), "y los asteriscos salen a la vista");
+
+  const negritaDeVerdad = html([{ tipo: "texto", texto: [{ t: "Solo hasta el " }, { t: "domingo", peso: 700 }] } as Bloque]);
+  ok(negritaDeVerdad.includes('<span style="font-weight:700">domingo</span>'), "la negrita del trozo va por `peso`");
+
+  const plano = texto([{ tipo: "texto", texto: [{ t: "Solo hasta el " }, { t: "domingo", peso: 700 }] } as Bloque]);
+  ok(plano.includes("Solo hasta el domingo") && !plano.includes("<span"), "el texto plano de un trozo es la concatenación");
+}
+
 console.log(fallos === 0 ? "\n✅ Negritas OK" : `\n❌ ${fallos} fallo(s)`);
 process.exit(fallos === 0 ? 0 : 1);

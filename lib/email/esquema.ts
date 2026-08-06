@@ -14,6 +14,7 @@
 import { TIPOS_BLOQUE, nuevoId, type Bloque, type Columna, type ContenidoCampania } from "./bloques";
 import { sanearEstilos } from "./estilos";
 import { temaDe } from "./tema";
+import { sanearTrozos, CAMPOS_RICOS, CAMPOS_RICOS_CELDA } from "./texto-rico";
 
 /**
  * Versión del esquema de bloques.
@@ -171,6 +172,34 @@ function sanearBloque(v: unknown, usados: Set<string>): Bloque | null {
     b.celdas = celdas;
     delete b.izq;
     delete b.der;
+  }
+
+  // Los 8 campos que admiten formato por selección (`texto-rico.ts`). El saneo
+  // filtra cada trozo contra la lista blanca y lo deja en forma canónica — que
+  // en el caso normal significa **devolverlo a `string`**.
+  //
+  // ⚠️ **Esto casi nunca corre, y está bien.** `esActual()` deja pasar los
+  // documentos ya guardados por el camino rápido sin re-sanear: la frontera de
+  // seguridad son los emisores (`trozoCss`, que es lista blanca pura), no este
+  // filtro. Quien canoniza en el caso normal es el EDITOR, al escribir. Esto es
+  // la red para el Json editado a mano, pegado de otra pestaña o traído por un
+  // script.
+  const ricos: readonly string[] = CAMPOS_RICOS[b.tipo as keyof typeof CAMPOS_RICOS] ?? [];
+  for (const campo of ricos) {
+    if (!(campo in b)) continue;
+    const v = sanearTrozos(b[campo]);
+    if (v !== undefined) b[campo] = v;
+  }
+  if (b.tipo === "columnas" && Array.isArray(b.celdas)) {
+    b.celdas = (b.celdas as Bruto[]).map((c) => {
+      const out = { ...c };
+      for (const campo of CAMPOS_RICOS_CELDA) {
+        if (!(campo in out)) continue;
+        const v = sanearTrozos(out[campo]);
+        if (v !== undefined) out[campo] = v;
+      }
+      return out;
+    });
   }
 
   return b as unknown as Bloque;
