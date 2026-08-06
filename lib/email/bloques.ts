@@ -609,7 +609,26 @@ export function nuevoBloque(tipo: TipoBloque): Bloque {
   }
 }
 
-/** Copia de un bloque con identidad propia. Sin id nuevo, React colapsa las dos tarjetas. */
+/**
+ * Copia de un bloque con identidad propia. Sin id nuevo, React colapsa las dos
+ * tarjetas.
+ *
+ * 🔴 **La copia es PROFUNDA, y el `{ ...b }` de antes era un bug esperando.** Un
+ * spread superficial deja el array `celdas` —y cada objeto `Columna` adentro—
+ * **compartido entre el original y la copia**: editar la foto de la celda 2 del
+ * duplicado se la cambiaba también al bloque de arriba. Hoy no muerde porque
+ * todos los caminos de edición son inmutables (`setCelda` hace `map`), pero eso
+ * es una promesa que ningún tipo obliga y que ningún test custodiaba, y basta un
+ * `celdas[i].titulo = …` en un componente nuevo para que reaparezca.
+ *
+ * Vale también para el portapapeles: `leerClip` devuelve los bloques con los ids
+ * de ORIGEN y quien pega tiene que pasar por acá, así que esta línea es lo que
+ * evita que un bloque pegado comparta memoria con el de la otra pestaña.
+ *
+ * `structuredClone` y no `JSON.parse(JSON.stringify(…))`: un bloque es Json puro
+ * —lo custodia `leerContenido`—, así que las dos hacen lo mismo, pero la primera
+ * no pasa por el serializador. Corre en un click, nunca en un loop de envío.
+ */
 export function duplicarBloque(b: Bloque): Bloque {
-  return { ...b, id: nuevoId() } as Bloque;
+  return { ...structuredClone(b), id: nuevoId() } as Bloque;
 }

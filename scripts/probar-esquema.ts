@@ -88,6 +88,23 @@ titulo("Todo bloque sale con id propio y único");
   const copia = duplicarBloque(b);
   ok(!!b.id && !!copia.id && b.id !== copia.id, "duplicar acuña un id nuevo");
 }
+{
+  // 🔴 La copia tiene que ser PROFUNDA. Con el spread superficial de antes, el
+  // array `celdas` y cada `Columna` quedaban COMPARTIDOS entre el original y la
+  // copia: tocar la foto de una celda del duplicado se la cambiaba también al
+  // bloque de arriba. Se pone rojo si alguien vuelve a `{ ...b, id }`.
+  const b = nuevoBloque("columnas");
+  const copia = duplicarBloque(b);
+  if (b.tipo !== "columnas" || copia.tipo !== "columnas") throw new Error("no es columnas");
+
+  ok(copia.celdas !== b.celdas, "el array de celdas es otro objeto");
+  ok(copia.celdas[0] !== b.celdas[0], "cada celda es otro objeto");
+
+  copia.celdas[0].imagen = "https://ejemplo.com/pisada.jpg";
+  copia.celdas.push({ imagen: "", url: "" });
+  ok(b.celdas[0].imagen === "", "mutar una celda de la copia no toca el original");
+  ok(b.celdas.length === 2, "agregarle una celda a la copia no se la agrega al original");
+}
 
 // ─── Idempotencia ────────────────────────────────────────────────────────────
 titulo("Idempotencia: leerlo dos veces da lo mismo");

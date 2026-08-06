@@ -156,6 +156,31 @@ titulo("Un sobre de un deploy VIEJO se migra en vez de romperse");
   );
 }
 
+titulo("🔴 Lo pegado no comparte memoria con lo copiado");
+{
+  // La otra mitad de la garantía de `duplicarBloque`: además de un id nuevo,
+  // tiene que dar un objeto NUEVO hasta el fondo. Un `columnas` pegado que
+  // compartiera el array `celdas` con el original haría que editar el de abajo
+  // le cambiara la foto al de arriba, en la misma pestaña y sin aviso.
+  const original = nuevoBloque("columnas");
+  const p = leerClip(armarClip([original], "BDI Accesorios"));
+  const [pegado] = (p?.bloques ?? []).map(duplicarBloque);
+
+  ok(pegado?.tipo === "columnas", "el bloque pegado sigue siendo `columnas`");
+  if (pegado?.tipo === "columnas" && original.tipo === "columnas") {
+    pegado.celdas[0].imagen = "https://ejemplo.com/pisada.jpg";
+    ok(original.celdas[0].imagen === "", "editar la celda del pegado no toca la del copiado");
+
+    // Y dos pegadas del mismo clip tampoco se pisan entre ellas.
+    const [a] = (leerClip(armarClip([original], "BDI"))?.bloques ?? []).map(duplicarBloque);
+    const [b] = (leerClip(armarClip([original], "BDI"))?.bloques ?? []).map(duplicarBloque);
+    if (a?.tipo === "columnas" && b?.tipo === "columnas") {
+      a.celdas[0].url = "https://ejemplo.com/a";
+      ok(b.celdas[0].url === "", "dos pegadas del mismo clip no comparten celdas");
+    }
+  }
+}
+
 titulo("El texto que se pone en el portapapeles se puede leer");
 {
   // Si alguien lo pega en una nota o en un mail, tiene que verse algo que se
