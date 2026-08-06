@@ -289,22 +289,64 @@ validadores y quien conoce la cascada lea un trozo sin manual.
 - ⛔ Afuera quedan los 5 `botonTexto` —el texto del botón se emite **dos veces**,
   VML + ancla, y el VML no dibuja spans adentro—, `cupon`, `menu`, `encabezado`
   (aplica mayúsculas en JS sobre el string) e `imagen.alt`.
-- 🟡 **Modo de falla conocido**: si alguien pone formato **en el medio** de un
-  merge tag, el `<span>` parte el string, el regex de `aplicarMergeTags` no
-  matchea y sale `${contacto.nombre}` literal en la casilla. Está documentado en
-  `probar-texto-rico.ts`; se arregla en la barra, tratando el tag como una unidad
-  que no se puede partir.
 - Lo fija **`scripts/probar-texto-rico.ts`**, cuyo test principal es la
   **equivalencia**: para todo `s` sin `**`, `render(campo = s)` es **idéntico** a
   `render(campo = [{t: s}])`. Encontró tres bugs reales al escribirlo (el `\n` de
   los títulos, el `<span>` vacío que movía el HTML al canonizar, y la URL sin
   validar en el emisor).
 
-⏳ **El editor todavía no existe: el motor está deployado y apagado.** Los ocho
-campos siguen dibujándose con `<Input>`/`<Textarea>` sobre `textoPlano()` (ver el
-helper `plano` de `FormBloque.tsx`), así que **nadie puede crear un trozo desde
-la app**. Eso es a propósito: con el dato y el renderer probados y en producción,
-lo único que queda por descubrir es el `contenteditable`.
+### El editor: `CampoRico` (5-ago-2026)
+
+`components/editor/CampoRico.tsx`. Un `contenteditable` con una barra fija que
+reemplaza al `<Input>`/`<Textarea>` en los ocho campos. Con esto el motor dejó de
+estar apagado: `ConNegrita`/`BotonNegrita.tsx` **se borró** —nadie escribe más
+asteriscos a mano— y `negritas()` queda sólo para lo ya guardado.
+
+- 🔑 **No es un componente controlado, y no puede serlo.** Mientras el campo
+  tiene el foco **el DOM es la fuente de verdad**: repintar es reemplazar nodos y
+  la selección del navegador apunta a nodos, así que hacerlo en cada tecla le
+  destruye el cursor a quien escribe. Se pinta al montar, cada tecla LEE el DOM y
+  avisa para arriba, y sólo se repinta cuando el valor que baja **no es el último
+  que subió** (`ultimo`, un ref) — que son exactamente dos casos: **⌘Z** y
+  **elegir otro bloque**. Después de un botón de la barra sí se repinta, y por eso
+  ahí la selección se restaura a mano.
+- 🔑 **La selección viaja como dos números.** El componente traduce `Range` →
+  offsets del texto plano (`medir`), llama a las funciones puras de
+  `texto-rico.ts` y vuelve (`punto`). Es lo que deja que partir, fusionar y
+  colapsar los trozos lo pruebe un script de Node; **nada de lo que pasa adentro
+  de un `contenteditable` lo ve un test**.
+- El formato de cada trozo vive en un **`data-f`** del `<span>`, que es lo que
+  hace que tipear adentro de una palabra en negrita **siga en negrita** (el
+  navegador clona el span solo). ⚠️ Se re-sanea al leerlo: `sanearFormato` está
+  exportada por eso.
+- 🔴 **`negritasATrozos` existe para que el primer click no meta asteriscos en un
+  mail.** Un `string` interpreta `**domingo**` y un `Trozo[]` no, así que un campo
+  con `**` que pasa a trozos por cualquier motivo perdía la negrita y ganaba
+  cuatro asteriscos literales en la casilla — hay 9 presets con `**` adentro. La
+  conversión usa **el mismo regex que `negritas()`** y corre **sólo en los cuatro
+  campos de CUERPO** (`cuerpo`): en un título los asteriscos nunca significaron
+  nada. ⚠️ El HTML de ese campo pasa de `<strong>x</strong>` a
+  `<span style="font-weight:700">x</span>` —se ve idéntico— y la dispara **una
+  edición de una persona**, nunca el render: el golden no se mueve.
+- 🔴 **`ajustarSeleccion` cierra el modo de falla del merge tag.** Formatear media
+  palabra de `${contacto.nombre}` partía el string con un `<span>`, el regex de
+  `aplicarMergeTags` dejaba de matchear y el tag salía literal. La barra estira la
+  selección hasta abarcar el tag entero antes de aplicar nada.
+- ⛔ **Al pegar entra TEXTO, nunca HTML.** Lo del portapapeles trae `<span style>`,
+  `<font>` y clases del programa del que salió, y el formato de un trozo es una
+  lista blanca. El Enter también se maneja a mano o el navegador mete `<div>`
+  propios.
+- ⚠️ **El `<br data-fin>` del final de un campo multilínea no sobra**: un `<br>`
+  final no dibuja el renglón que abre —es por lo que "el Enter al final no hace
+  nada" en todo `contenteditable`— y `medir`, `punto` y `leerDom` lo saltean.
+- **La barra es FIJA y no flotante.** Una que sólo aparece con algo seleccionado
+  es una que el comerciante no descubre, y la posición de una selección adentro de
+  un panel scrolleable es de lo primero que se rompe en Safari. Los botones frenan
+  su `onMouseDown` (si no, el click roba el foco y se pierde la selección **antes**
+  del `onClick`); los dos `<select>` no pueden, y por eso la última selección se
+  guarda en estado y **no se limpia al perder el foco**.
+- `enCampo()` de `EditorMail` ya preguntaba por `isContentEditable`, así que ⌫,
+  ↑/↓ y el ⌘V de pegar bloques quedaron guardados solos.
 
 ### El preview del editor se puede tocar (2-ago-2026)
 

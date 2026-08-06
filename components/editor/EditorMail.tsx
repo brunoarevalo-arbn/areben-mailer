@@ -714,7 +714,7 @@ export function EditorMail({
           <div className={`space-y-3 rounded-xl border border-border bg-surface p-4 shadow-sm ${soloSi("panel")}`}>
             <h3 className="text-sm font-semibold text-foreground">{ETIQUETA_BLOQUE[seleccionado.tipo]}</h3>
             <fieldset disabled={soloLectura} className="space-y-4 disabled:opacity-60">
-              <FormBloque bloque={seleccionado} onChange={editar} marca={marca} />
+              <FormBloque bloque={seleccionado} onChange={editar} marca={marca} pal={pal} />
               <div className="border-t border-border pt-4">
                 <PanelEstilo
                   // Remonta al cambiar de bloque: si no, el picker libre que

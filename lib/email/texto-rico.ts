@@ -168,8 +168,17 @@ export function sanearUrl(v: unknown): string | undefined {
   return PROTOCOLOS.some((p) => u.startsWith(p)) ? u : undefined;
 }
 
-/** El formato de un objeto cualquiera, filtrado contra la lista blanca. */
-function sanearFormato(x: Record<string, unknown>): Formato {
+/**
+ * El formato de un objeto cualquiera, filtrado contra la lista blanca.
+ *
+ * ⚠️ Exportada porque **el editor la vuelve a llamar**. `CampoRico` guarda el
+ * formato de cada trozo en un `data-f` del `<span>`, y lo que vuelve del DOM no
+ * es lo mismo que lo que se escribió: el navegador clona, parte y fusiona esos
+ * nodos solo cuando alguien tipea adentro. Es el mismo argumento que `sanearUrl`
+ * —la frontera es quien lee, no quien escribió— con un borde más: el `data-f`
+ * viaja en el HTML y el HTML se puede pegar.
+ */
+export function sanearFormato(x: Record<string, unknown>): Formato {
   const f: Formato = {};
   const poner = <K extends keyof Formato>(k: K, valor: Formato[K] | undefined) => {
     if (valor !== undefined) f[k] = valor;
@@ -309,6 +318,83 @@ export const tieneLink = (v: TextoRico | undefined): boolean =>
 // ─────────────────────────────────────────────────────────────────────────────
 // Editar
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * `**palabra**` → un trozo con `peso: 700`, **sin los asteriscos**.
+ *
+ * 🔴 **Es lo que impide que el primer click en la barra haga aparecer asteriscos
+ * en un mail.** Un `string` interpreta `**negrita**` y un `Trozo[]` no (ver la
+ * asimetría de arriba), así que un campo que dice `Solo hasta el **domingo**`,
+ * apenas se lo formatea por otro lado, pasaría a array y saldría con los cuatro
+ * asteriscos a la vista en la casilla de todo el mundo. Hay 9 presets con `**`
+ * adentro y el editor lo enseñaba en su propio texto de ayuda.
+ *
+ * El patrón es **el mismo de `negritas()`** en `render.ts`, literal, y esa
+ * igualdad es la garantía: lo que ahí se vuelve `<strong>` acá se vuelve
+ * `peso: 700` y **nada más** cambia de forma. `probar-texto-rico.ts` lo fija
+ * comparando las dos salidas palabra por palabra.
+ *
+ * ⚠️ **El HTML de ese campo cambia de `<strong>x</strong>` a
+ * `<span style="font-weight:700">x</span>`.** Se ve idéntico en cualquier
+ * cliente —700 es el peso que `<strong>` pide— pero no es el mismo byte, así
+ * que la conversión la dispara **una edición de una persona**, nunca el render:
+ * el golden no se mueve y un mail que nadie tocó sale exactamente igual que
+ * ayer.
+ *
+ * ⛔ **Solo para los cuatro campos de CUERPO.** En un título los asteriscos
+ * nunca significaron nada (`tituloHtml` va por `esc()` pelado) y convertirlos
+ * sería inventar una negrita que nadie pidió.
+ */
+export function negritasATrozos(s: string): Trozo[] {
+  const out: Trozo[] = [];
+  const re = /\*\*([^*\n]+?)\*\*/g;
+  let ultimo = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s)) !== null) {
+    if (m.index > ultimo) out.push({ t: s.slice(ultimo, m.index) });
+    out.push({ t: m[1], peso: 700 });
+    ultimo = m.index + m[0].length;
+  }
+  if (ultimo < s.length) out.push({ t: s.slice(ultimo) });
+  return out;
+}
+
+/** Un merge tag entero: `${contacto.nombre}`. El mismo que reemplaza el envío. */
+const MERGE_TAG = /\$\{[^}\n]*\}/g;
+
+/**
+ * Estirar una selección para que no parta un merge tag por el medio.
+ *
+ * 🔴 **Sin esto, formatear media palabra de `${contacto.nombre}` le manda
+ * `${contacto.nombre}` literal a 16.800 personas.** El reemplazo corre sobre el
+ * HTML ya armado (`aplicarMergeTags`, al final de `render.ts`) y un `<span>` en
+ * el medio parte el string: el regex deja de matchear y el tag sale crudo en la
+ * casilla. Era el modo de falla que el motor dejó anotado como "se arregla en la
+ * barra"; esto es la barra.
+ *
+ * Un tag es **una unidad que no se puede partir**, así que la selección se
+ * agranda hacia los dos lados hasta abarcarlo entero. Agrandar y no achicar:
+ * quien pintó de rojo la mitad del saludo quiere el saludo rojo, y lo contrario
+ * —no hacer nada— sería un botón que a veces no responde.
+ */
+export function ajustarSeleccion(
+  v: TextoRico,
+  desde: number,
+  hasta: number,
+): [number, number] {
+  const s = textoPlano(v);
+  let ini = Math.max(0, Math.min(desde, hasta));
+  let fin = Math.min(s.length, Math.max(desde, hasta));
+  if (ini >= fin) return [ini, fin];
+
+  for (const m of s.matchAll(MERGE_TAG)) {
+    const a = m.index;
+    const b = a + m[0].length;
+    if (ini > a && ini < b) ini = a;
+    if (fin > a && fin < b) fin = b;
+  }
+  return [ini, fin];
+}
 
 /**
  * Aplicar (o sacar) formato a un rango de caracteres.

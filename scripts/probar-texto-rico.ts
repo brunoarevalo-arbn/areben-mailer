@@ -15,9 +15,11 @@
 // test.
 
 import {
+  ajustarSeleccion,
   aplicarFormato,
   canonizar,
   formatoEn,
+  negritasATrozos,
   largo,
   sanearTrozos,
   textoPlano,
@@ -414,26 +416,100 @@ titulo("Los trozos sobreviven a `leerContenido`");
   ok(ninguno, "🔑 un documento viejo NO se convierte a trozos por leerlo");
 }
 
-// ─── El modo de falla conocido ───────────────────────────────────────────────
-titulo("🟡 El modo de falla documentado: formato en el medio de un merge tag");
+// ─── El modo de falla conocido, ya cerrado ───────────────────────────────────
+titulo("🔴 Un merge tag no se puede partir por el medio");
 {
   // `aplicarMergeTags` corre sobre el HTML ya armado con un regex. Si alguien
   // pone negrita a media palabra adentro de `${contacto.nombre}`, el `<span>`
-  // parte el string y el tag no matchea: sale literal en la casilla.
-  //
-  // No se arregla acá — se arregla en la barra, tratando el merge tag como una
-  // unidad que no se puede partir. Se deja escrito para que el día que se
-  // corrija haya un test que lo diga.
+  // parte el string, el tag no matchea y sale literal en la casilla de 16.800
+  // personas. Lo arregla la barra: `ajustarSeleccion` estira la selección hasta
+  // abarcar el tag entero antes de aplicar nada.
   const partido = html({
     id: "b",
     tipo: "texto",
     texto: [{ t: "${contacto." }, { t: "nombre}", peso: 700 }],
   } as Bloque);
-  ok(partido.includes("</span>") , "el span parte el merge tag");
   ok(
-    !/\$\{contacto\.nombre\}/.test(partido.replace(/<[^>]+>/g, "")) === false ||
-      partido.includes("${contacto."),
-    "⚠️ conocido: partido así, el merge tag ya no matchea y sale literal",
+    !/\$\{contacto\.nombre\}/.test(partido),
+    "el daño existe: partido a mano, el tag ya no matchea",
+  );
+
+  const v = "Hola ${contacto.nombre}, mirá esto";
+  // "Hola ${cont" — la selección termina adentro del tag.
+  // El tag arranca en 5 y termina en 23: `${contacto.nombre}` son 18 caracteres.
+  const [d1, h1] = ajustarSeleccion(v, 0, 11);
+  ok(d1 === 0 && h1 === 23, "la selección que TERMINA adentro del tag se estira hasta cerrarlo", `${d1}-${h1}`);
+  // "ontacto.nombre}, mirá" — arranca adentro.
+  const [d2, h2] = ajustarSeleccion(v, 8, 27);
+  ok(d2 === 5 && h2 === 27, "la que ARRANCA adentro se estira hacia atrás", `${d2}-${h2}`);
+  // "contacto" — entera adentro del tag.
+  const [d3, h3] = ajustarSeleccion(v, 7, 15);
+  ok(d3 === 5 && h3 === 23, "la que está ENTERA adentro se lleva el tag completo", `${d3}-${h3}`);
+  // Una selección que ya lo abarca no se toca.
+  const [d4, h4] = ajustarSeleccion(v, 0, 23);
+  ok(d4 === 0 && h4 === 23, "una selección que ya lo abarca queda igual");
+
+  const roto = aplicarFormato(v, 0, 11, { peso: 700 });
+  const arreglado = aplicarFormato(v, ...ajustarSeleccion(v, 0, 11), { peso: 700 });
+  ok(
+    !/\$\{contacto\.nombre\}/.test(html({ id: "b", tipo: "texto", texto: roto } as Bloque)),
+    "sin ajustar, el mail sale con el tag partido",
+  );
+  ok(
+    /\$\{contacto\.nombre\}/.test(html({ id: "b", tipo: "texto", texto: arreglado } as Bloque)),
+    "🔑 ajustando, el tag llega entero al HTML y el envío lo puede reemplazar",
+  );
+}
+
+// ─── `**negrita**` al entrar al editor ───────────────────────────────────────
+titulo("🔴 `**palabra**` se convierte a trozo, o aparecen asteriscos en un mail");
+{
+  // El daño que motiva la función: un campo con `**` que pasa a trozos por
+  // CUALQUIER motivo pierde la negrita y gana cuatro asteriscos literales.
+  const conAsteriscos = aplicarFormato("Solo hasta el **domingo**", 0, 4, { italica: true });
+  ok(
+    html({ id: "b", tipo: "texto", texto: conAsteriscos } as Bloque).includes("**domingo**"),
+    "el daño existe: formatear por otro lado deja los asteriscos a la vista",
+  );
+
+  const ts = negritasATrozos("Solo hasta el **domingo**");
+  ok(ts.length === 2, "`**x**` da dos trozos", JSON.stringify(ts));
+  ok(ts[1].t === "domingo" && ts[1].peso === 700, "el segundo es la palabra con peso 700, sin asteriscos");
+  ok(textoPlano(ts) === "Solo hasta el domingo", "el texto plano ya no tiene asteriscos");
+
+  const conv = html({ id: "b", tipo: "texto", texto: ts } as Bloque);
+  ok(!conv.includes("**"), "🔑 convertido, en el mail no queda un solo asterisco");
+  ok(conv.includes("font-weight:700"), "y la negrita sigue estando");
+
+  // 🔑 La equivalencia que importa: MISMO texto visible que la rama string.
+  const sinTags = (h: string) => h.replace(/<[^>]+>/g, "");
+  for (const s of [
+    "Solo hasta el **domingo**",
+    "**a** y **b**",
+    "sin nada",
+    "**",
+    "un ** suelto sin cerrar",
+    "**vacío**",
+    "arranca **acá** y sigue",
+  ]) {
+    const comoString = sinTags(html({ id: "b", tipo: "texto", texto: s } as Bloque));
+    const comoTrozos = sinTags(html({ id: "b", tipo: "texto", texto: negritasATrozos(s) } as Bloque));
+    ok(comoString === comoTrozos, `mismo texto visible con y sin convertir: ${JSON.stringify(s)}`,
+      `${JSON.stringify(comoString)}\n      ${JSON.stringify(comoTrozos)}`);
+  }
+
+  // Un `**` que `negritas()` deja literal, la conversión también.
+  ok(negritasATrozos("un ** suelto").length === 1, "un `**` sin cerrar no parte nada");
+  ok(
+    negritasATrozos("no cruza **el\nrenglón**").every((t) => t.peso === undefined),
+    "no cruza renglones, igual que `negritas()`",
+  );
+
+  // ⛔ Los títulos quedan afuera: `tituloHtml` va por `esc()` pelado y ahí un
+  // `**` nunca significó nada. Convertirlo inventaría una negrita.
+  ok(
+    html({ id: "b", tipo: "titulo", texto: "un **titulo**" } as Bloque).includes("**titulo**"),
+    "⛔ en un título los asteriscos son literales y así se quedan",
   );
 }
 

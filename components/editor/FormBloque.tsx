@@ -5,7 +5,7 @@ import { ProductosBlock } from "@/components/ProductosBlock";
 import { ProductosDinamicosBlock } from "@/components/editor/ProductosDinamicosBlock";
 import { ImagenDrop } from "@/components/editor/ImagenDrop";
 import { Rango } from "@/components/editor/Rango";
-import { ConNegrita } from "@/components/editor/BotonNegrita";
+import { CampoRico } from "@/components/editor/CampoRico";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
@@ -14,20 +14,16 @@ import { REDES, redConIcono, type EstiloIconos } from "@/lib/email/redes";
 import { Desplegable } from "@/components/ui/Desplegable";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
+import type { Paleta } from "@/lib/email/tema";
 import { textoPlano, type TextoRico } from "@/lib/email/texto-rico";
 
 /**
  * Un campo con formato, visto como texto pelado.
  *
- * ⏳ **Es provisorio y a propósito.** Ocho campos de este formulario ya son
- * `TextoRico` en el dato, pero los controles siguen siendo el `<Input>` y el
- * `<Textarea>` de siempre, que solo saben mostrar un `string`. Mientras el
- * editor de texto no exista, nadie puede crear un trozo: el motor está
- * deployado y apagado.
- *
- * ⚠️ Cuando exista, esta función **desaparece campo por campo**, reemplazada por
- * `CampoRico`. Escribir en el textarea sobre un campo con trozos borraría el
- * formato — no puede pasar hoy porque no hay forma de ponerlo.
+ * ⚠️ Ya **no** se usa para dibujar ninguno de los ocho campos ricos: esos van
+ * por `CampoRico`. Queda para los resúmenes —el renglón que muestra el
+ * desplegable de una celda sin abrirla— donde lo que hace falta es texto y no
+ * formato.
  */
 const plano = (v: TextoRico | undefined): string => (v === undefined ? "" : textoPlano(v));
 
@@ -130,6 +126,7 @@ export function FormBloque({
   bloque: b,
   onChange,
   marca,
+  pal,
 }: {
   bloque: Bloque;
   /** Parche sobre el bloque. Nunca reemplaza el bloque entero: perdería el `id`. */
@@ -139,6 +136,12 @@ export function FormBloque({
    * el render, no se copian adentro del bloque.
    */
   marca: Marca;
+  /**
+   * La misma paleta que va a usar el mail. La necesitan los campos ricos: un
+   * trozo puede guardar `$acento` y el editor tiene que pintarlo con el color de
+   * ESTA marca, igual que el render.
+   */
+  pal: Paleta;
 }) {
   const set = onChange;
   const nombreCuenta = marca.nombreCuenta ?? "";
@@ -209,26 +212,23 @@ export function FormBloque({
     case "titulo":
     case "texto": {
       const esTitulo = b.tipo === "titulo";
-      const campo = (
-        <Textarea
-          label={esTitulo ? "Título" : "Texto"}
-          fullWidth
-          rows={esTitulo ? 2 : 6}
-          value={plano(b.texto)}
-          onChange={(e) => set({ texto: e.target.value })}
-          hint={
-            esTitulo
-              ? "Podés usar ${contacto.nombre}."
-              : "Podés usar ${contacto.nombre}, y **así** para poner algo en negrita."
-          }
-        />
-      );
       return (
         <div className="space-y-3">
-          {/* ⛔ El título NO lleva negrita, y no es un olvido: ya sale grande y
-              pesado, así que adentro no se notaría. Los dos tipos comparten
-              este `case` desde siempre; lo único que los separa es esto. */}
-          {esTitulo ? campo : <ConNegrita value={plano(b.texto)} onChange={(texto) => set({ texto })}>{campo}</ConNegrita>}
+          {/* 🔑 `cuerpo` es lo único que separa a los dos tipos, y no es
+              cosmético: decide si un `**palabra**` ya guardado se muestra en
+              negrita (el mail lo dibuja así) o literal (en un título los
+              asteriscos nunca significaron nada). Lo mismo vale para el Enter:
+              el cuerpo lo emite como `<br>` y el título lo tira. */}
+          <CampoRico
+            label={esTitulo ? "Título" : "Texto"}
+            value={b.texto}
+            onChange={(texto) => set({ texto })}
+            pal={pal}
+            cuerpo={!esTitulo}
+            multilinea={!esTitulo}
+            filas={esTitulo ? 2 : 6}
+            hint="Podés usar ${contacto.nombre}."
+          />
           <Alineacion value={b.align ?? "left"} onChange={(align) => set({ align })} />
         </div>
       );
@@ -284,10 +284,8 @@ export function FormBloque({
           ) : (
             <ImagenDrop value={b.imagen} onChange={(imagen) => set({ imagen })} placeholder="URL de la imagen (banner)" />
           )}
-          <Input label="Título principal" fullWidth value={plano(b.titulo)} onChange={(e) => set({ titulo: e.target.value })} />
-          <ConNegrita value={plano(b.subtitulo)} onChange={(subtitulo) => set({ subtitulo })}>
-            <Input label="Subtítulo" fullWidth value={plano(b.subtitulo)} onChange={(e) => set({ subtitulo: e.target.value })} />
-          </ConNegrita>
+          <CampoRico label="Título principal" value={b.titulo} onChange={(titulo) => set({ titulo })} pal={pal} cuerpo={false} filas={2} />
+          <CampoRico label="Subtítulo" value={b.subtitulo} onChange={(subtitulo) => set({ subtitulo })} pal={pal} cuerpo filas={2} />
           <Input label="Texto del botón" fullWidth value={b.botonTexto} onChange={(e) => set({ botonTexto: e.target.value })} />
           <Input label="Link del botón" fullWidth value={b.botonUrl} placeholder="https://…" onChange={(e) => set({ botonUrl: e.target.value })} />
           <ColorFijo label="Fondo del texto" value={b.bg} onChange={(bg) => set({ bg })} />
@@ -299,10 +297,8 @@ export function FormBloque({
       const conFoto = !!b.fondoImagen;
       return (
         <div className="space-y-3">
-          <Input label="Título de la sección" fullWidth value={plano(b.titulo)} onChange={(e) => set({ titulo: e.target.value })} />
-          <ConNegrita value={plano(b.texto)} onChange={(texto) => set({ texto })}>
-            <Textarea label="Texto" fullWidth rows={4} value={plano(b.texto)} onChange={(e) => set({ texto: e.target.value })} />
-          </ConNegrita>
+          <CampoRico label="Título de la sección" value={b.titulo} onChange={(titulo) => set({ titulo })} pal={pal} cuerpo={false} filas={2} />
+          <CampoRico label="Texto" value={b.texto} onChange={(texto) => set({ texto })} pal={pal} cuerpo multilinea filas={4} />
           <Input label="Texto del botón" fullWidth value={b.botonTexto} placeholder="Opcional" onChange={(e) => set({ botonTexto: e.target.value })} />
           <Input label="Link del botón" fullWidth value={b.botonUrl} placeholder="https://…" onChange={(e) => set({ botonUrl: e.target.value })} />
           <Select
@@ -536,11 +532,13 @@ export function FormBloque({
                     onChange={(imagen) => setCelda(i, { imagen })}
                     placeholder="URL de la imagen"
                   />
-                  <Input
-                    fullWidth
-                    value={plano(c.titulo ?? "")}
+                  <CampoRico
+                    value={c.titulo}
+                    onChange={(titulo) => setCelda(i, { titulo })}
+                    pal={pal}
+                    cuerpo={false}
+                    filas={1}
                     placeholder="Texto debajo (opcional)"
-                    onChange={(e) => setCelda(i, { titulo: e.target.value })}
                   />
                   <Input
                     fullWidth
@@ -552,21 +550,23 @@ export function FormBloque({
                 </>
               ) : (
                 <>
-                  <Input
-                    fullWidth
-                    value={plano(c.titulo ?? "")}
+                  <CampoRico
+                    value={c.titulo}
+                    onChange={(titulo) => setCelda(i, { titulo })}
+                    pal={pal}
+                    cuerpo={false}
+                    filas={1}
                     placeholder="Título"
-                    onChange={(e) => setCelda(i, { titulo: e.target.value })}
                   />
-                  <ConNegrita value={plano(c.texto ?? "")} onChange={(texto) => setCelda(i, { texto })}>
-                    <Textarea
-                      fullWidth
-                      rows={3}
-                      value={plano(c.texto ?? "")}
-                      placeholder="Texto"
-                      onChange={(e) => setCelda(i, { texto: e.target.value })}
-                    />
-                  </ConNegrita>
+                  <CampoRico
+                    value={c.texto}
+                    onChange={(texto) => setCelda(i, { texto })}
+                    pal={pal}
+                    cuerpo
+                    multilinea
+                    filas={3}
+                    placeholder="Texto"
+                  />
                   <Input
                     fullWidth
                     value={c.url}
