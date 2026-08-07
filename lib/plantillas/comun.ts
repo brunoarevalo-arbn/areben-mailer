@@ -9,7 +9,7 @@
 // y el navegador (las miniaturas de /plantillas).
 
 import type { Bloque } from "@/lib/email/render";
-import type { Estilos } from "@/lib/email/estilos";
+import { ESTILO_CUPON_COMPACTO, type Estilos } from "@/lib/email/estilos";
 import type { Tema } from "@/lib/email/tema";
 import type { Trigger } from "@/lib/automations";
 import { foto, type ClaveFoto } from "./fotos";
@@ -424,4 +424,29 @@ export const barra = (texto: string, bg: "" | `#${string}` = ""): Bloque => ({
   texto,
   ...sinBoton,
   estilo: { caja: { padY: 10 }, subtitulo: { tamano: 14 } },
+});
+
+/**
+ * El cupón que ACOMPAÑA en vez de ser el mail.
+ *
+ * Misma idea que `barra` un renglón más arriba, y por el mismo motivo: hasta que
+ * los tres huecos internos del cupón dejaron de estar cableados, un cupón
+ * ocupaba ~180 px aunque no fuera lo importante de la pieza.
+ *
+ * ⚠️ **Los dos campos van juntos y no sueltos**: `variante` decide los huecos que
+ * no tienen perilla y `ESTILO_CUPON_COMPACTO` el resto. Un preset que pusiera
+ * uno solo saldría a medio achatar, y es exactamente el error que este helper
+ * existe para que nadie pueda cometer.
+ */
+export const cuponCompacto = (
+  texto: string,
+  codigo: string,
+  boton?: { texto: string; url: string },
+): Bloque => ({
+  tipo: "cupon",
+  variante: "compacta",
+  texto,
+  codigo,
+  ...(boton ? cta(boton.texto, boton.url) : sinBoton),
+  estilo: ESTILO_CUPON_COMPACTO,
 });

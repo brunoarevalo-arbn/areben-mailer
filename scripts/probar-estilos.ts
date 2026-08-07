@@ -2,7 +2,7 @@
 //
 //   node --import tsx scripts/probar-estilos.ts
 
-import { resolverEstilo, extra, type Estilos } from "../lib/email/estilos";
+import { resolverEstilo, extra, estiloCupon, ESTILO_CUPON_COMPACTO, TAMANOS_BOTON, type Estilos } from "../lib/email/estilos";
 import { renderEmailHtml } from "../lib/email/render";
 import { resolverPaleta } from "../lib/email/tema";
 
@@ -155,6 +155,95 @@ titulo("padding:32px, no padding:32px 32px");
     { unsubscribeUrl: "#", nombreCuenta: "X" },
   );
   ok(html.includes("padding:32px;"), "los dos lados iguales van en un solo valor");
+}
+
+// ─── Las dos formas del cupón ────────────────────────────────────────────────
+//
+// 🔑 La invariante que importa es el VIAJE DE IDA Y VUELTA. La variante compacta
+// escribe siete claves en el bloque en vez de vivir en una capa propia de la
+// cascada, así que lo único que la hace segura es que volver a "caja" las saque
+// TODAS: si quedara una sola colgada, el cupón de siempre saldría distinto según
+// si alguien probó la otra forma o no, y nadie lo relacionaría jamás.
+titulo("El cupón compacto se escribe y se borra entero");
+{
+  const compacta = estiloCupon(undefined, "compacta");
+  ok(compacta?.caja?.padY === 14, "compacta: achata la caja", JSON.stringify(compacta?.caja));
+  ok(compacta?.caja?.bordeEstilo === "solid", "compacta: el borde deja de ser cortado");
+  ok(compacta?.titulo?.tamano === 20, "compacta: el código se achica");
+  ok(compacta?.boton?.padX === 20, "compacta: el botón acompaña");
+
+  ok(estiloCupon(compacta, "caja") === undefined, "volver a caja no deja NADA colgado", JSON.stringify(estiloCupon(compacta, "caja")));
+
+  // Y lo que la persona eligió aparte sobrevive al viaje: la variante administra
+  // sus siete claves y ninguna más.
+  const propio: Estilos = { caja: { fondo: "#ff0000" }, titulo: { fuente: "georgia" } };
+  const ida = estiloCupon(propio, "compacta");
+  ok(ida?.caja?.fondo === "#ff0000", "el fondo elegido a mano sobrevive la ida");
+  const vuelta = estiloCupon(ida, "caja");
+  ok(JSON.stringify(vuelta) === JSON.stringify(propio), "ida y vuelta devuelve el bloque IGUAL", JSON.stringify(vuelta));
+}
+
+titulo("La variante compacta achata de verdad");
+{
+  const cupon = (extra: Record<string, unknown>) =>
+    renderEmailHtml(
+      { bloques: [{ id: "a", tipo: "cupon", texto: "T", codigo: "ABC", botonTexto: "", botonUrl: "", ...extra }] } as never,
+      { unsubscribeUrl: "#", nombreCuenta: "X" },
+    );
+
+  // Los tres márgenes que ninguna perilla alcanza: son la única razón por la que
+  // la variante existe. Sin esto, `estiloCupon` sería un preset de estilo y ya.
+  const caja = cupon({});
+  ok(caja.includes("margin-bottom:14px"), "caja: el hueco del código sigue en 14");
+  ok(caja.includes("margin:8px 0 16px"), "caja: la caja sigue separando con 16");
+
+  const comp = cupon({ variante: "compacta", estilo: ESTILO_CUPON_COMPACTO });
+  ok(comp.includes("margin-bottom:4px"), "compacta: el hueco del texto baja a 4");
+  ok(comp.includes("margin-bottom:0px"), "compacta: sin botón, el hueco del código COLAPSA");
+  ok(comp.includes("margin:8px 0 10px"), "compacta: la caja separa con 10");
+  ok(comp.includes("border:1px solid"), "compacta: el borde fino llega al HTML");
+}
+
+// ─── Los tres tamaños de botón ───────────────────────────────────────────────
+//
+// Misma doctrina que `probar-panel-estilo.ts`: un atajo que no mueve el mail es
+// una perilla desconectada, la peor clase de bug de UI porque no falla, no pasa
+// nada. Y los tres tienen que dar HTML DISTINTO entre sí, no solo distinto del
+// automático.
+titulo("Chico, Mediano y Grande dan tres botones distintos");
+{
+  const conTamano = (valores?: Record<string, number>) =>
+    renderEmailHtml(
+      { bloques: [{ id: "a", tipo: "boton", texto: "Ir", url: "https://e.com", align: "left", full: false, estilo: valores ? { boton: valores } : undefined }] } as never,
+      { unsubscribeUrl: "#", nombreCuenta: "X" },
+    );
+
+  const salidas = new Map<string, string>();
+  salidas.set("auto", conTamano());
+  for (const t of TAMANOS_BOTON) salidas.set(t.clave, conTamano(t.valores));
+
+  for (const t of TAMANOS_BOTON) {
+    ok(salidas.get(t.clave) !== salidas.get("auto") || t.clave === "mediano", `${t.clave}: mueve el mail`);
+  }
+  ok(new Set(salidas.values()).size === 3, "los tres tamaños son tres botones distintos", `salieron ${new Set(salidas.values()).size} variantes`);
+
+  // 🔴 Y el que documenta por qué "Mediano" y "Automático" son dos opciones y no
+  // una: en un bloque suelto coinciden, pero adentro de una columna el
+  // automático es 14/18/10 y elegir Mediano AGRANDA el botón.
+  const enColumna = (valores?: Record<string, number>) =>
+    renderEmailHtml(
+      {
+        bloques: [
+          {
+            id: "a", tipo: "columnas", celdas: [{ imagen: "", titulo: "T", texto: "", url: "", botonTexto: "Ir", botonUrl: "https://e.com" }],
+            estilo: valores ? { boton: valores } : undefined,
+          },
+        ],
+      } as never,
+      { unsubscribeUrl: "#", nombreCuenta: "X" },
+    );
+  const medianoEnColumna = TAMANOS_BOTON.find((t) => t.clave === "mediano")!.valores;
+  ok(enColumna() !== enColumna(medianoEnColumna), "en columnas, Mediano NO es lo mismo que Automático");
 }
 
 console.log(fallas === 0 ? "\n✅ Estilos OK\n" : `\n❌ ${fallas} fallas\n`);

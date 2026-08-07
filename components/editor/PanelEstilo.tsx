@@ -6,7 +6,7 @@ import {
 } from "@/lib/email/estilos";
 import { FUENTES, FUENTE_LABEL, type Paleta } from "@/lib/email/tema";
 import type { TipoBloque } from "@/lib/email/render";
-import { ControlBool, ControlColor, ControlEnum, ControlNumero } from "@/components/editor/ControlEstilo";
+import { ControlBool, ControlColor, ControlEnum, ControlNumero, ControlTamanoBoton } from "@/components/editor/ControlEstilo";
 import { Desplegable } from "@/components/ui/Desplegable";
 
 /**
@@ -162,11 +162,25 @@ export function PanelEstilo({
    * nadie tocó, y de ese "¿lo eligió una persona?" dependen la legibilidad
    * contextual y el modo oscuro.
    */
-  const set = (rol: RolEstilo, k: Prop, v: unknown) => {
-    const rolAnterior = valor?.[rol];
-    const nuevoRol: EstiloBloque = { ...rolAnterior };
-    if (v === undefined) delete nuevoRol[k];
-    else (nuevoRol as Record<string, unknown>)[k] = v;
+  const set = (rol: RolEstilo, k: Prop, v: unknown) => setMuchas(rol, { [k]: v });
+
+  /**
+   * Varias propiedades de un rol **en una sola escritura**.
+   *
+   * 🔴 No es azúcar sobre `set`: es al revés, y el orden importa. Llamar a `set`
+   * tres veces seguidas para el selector de tamaño de botón **no funciona** —
+   * cada llamada reconstruye desde el mismo `valor` de este render, así que la
+   * segunda y la tercera parten del estado viejo y se pisan entre sí; quedaría
+   * escrita nada más que la última.
+   *
+   * Una clave con valor `undefined` se BORRA, que es como se vuelve a heredar.
+   */
+  const setMuchas = (rol: RolEstilo, campos: Record<string, unknown>) => {
+    const nuevoRol: EstiloBloque = { ...valor?.[rol] };
+    for (const [k, v] of Object.entries(campos)) {
+      if (v === undefined) delete nuevoRol[k as Prop];
+      else (nuevoRol as Record<string, unknown>)[k] = v;
+    }
 
     const out: Estilos = { ...valor };
     if (Object.keys(nuevoRol).length) out[rol] = nuevoRol;
@@ -240,6 +254,14 @@ export function PanelEstilo({
               })
             }
           >
+            {/* Arriba de las perillas, no abajo: es el atajo que la mayoría va
+                a usar, y las tres que resume quedan a mano para afinar. Va
+                dentro del rol `boton` y por eso vale para los cinco bloques que
+                dibujan uno —el botón suelto, el cupón, la portada, la sección y
+                las columnas— sin repetir nada. */}
+            {rol === "boton" && (
+              <ControlTamanoBoton valor={propio} onChange={(v) => setMuchas("boton", v)} />
+            )}
             {visibles.map((k) => {
               const def = CAMPO[k];
               const bruto = propio?.[k];

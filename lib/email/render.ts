@@ -1035,10 +1035,31 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     case "cupon": {
       const c = caja();
       const bg = c.fondo ?? pal.cuponFondo;
-      const t = b.texto ? (() => { const x = e("cuerpo", bg); return `<div style="font-size:${px(x.tamano ?? 16)};color:${x.color}${extra(x, ["tamano", "color", "align"])};margin-bottom:8px">${esc(b.texto)}</div>`; })() : "";
-      const cod = b.codigo ? (() => { const x = e("titulo"); return `<div style="font-size:${px(x.tamano ?? 26)};font-weight:${x.peso ?? 700};letter-spacing:${px(x.espaciado ?? 3)};color:${x.color}${extra(x, ["tamano", "peso", "espaciado", "color", "align", "interlinea"])};margin-bottom:14px">${esc(b.codigo)}</div>`; })() : "";
+      // 🔑 **Los únicos tres números que la variante decide.** Son los huecos
+      // entre las tres partes y el que separa la caja de lo que sigue: ninguno
+      // tiene perilla en el panel, así que sin esto un cupón no se puede achatar
+      // ni bajando `padY` a 0. Es el mismo cableado que tenía `seccion` hasta el
+      // 2-ago-2026 y que impedía la barra fina de aviso.
+      //
+      // ⛔ Todo lo demás de la variante compacta —padding, borde, tamaños— NO se
+      // decide acá: eso ya tiene control, y lo escribe el editor en el bloque
+      // (`ESTILO_CUPON_COMPACTO`). Un default propio en el renderer haría que el
+      // panel mostrara un número y el mail dibujara otro.
+      //
+      // ⚠️ **La variante de siempre queda byte por byte igual**, con margen
+      // muerto y todo: el hueco de 14 px sale aunque no haya botón abajo. Se
+      // podría colapsar como hace `seccion`, pero acá no destraba nada —la
+      // compacta se ocupa sola de sus huecos— y movería el pixel de todos los
+      // cupones ya enviados a cambio de nada.
+      const compacta = b.variante === "compacta";
+      const sigueAlTexto = !!b.codigo || !!b.botonTexto;
+      const huecoTexto = compacta ? (sigueAlTexto ? 4 : 0) : 8;
+      const huecoCodigo = compacta ? (b.botonTexto ? 6 : 0) : 14;
+      const abajo = compacta ? 10 : 16;
+      const t = b.texto ? (() => { const x = e("cuerpo", bg); return `<div style="font-size:${px(x.tamano ?? 16)};color:${x.color}${extra(x, ["tamano", "color", "align"])};margin-bottom:${px(huecoTexto)}">${esc(b.texto)}</div>`; })() : "";
+      const cod = b.codigo ? (() => { const x = e("titulo"); return `<div style="font-size:${px(x.tamano ?? 26)};font-weight:${x.peso ?? 700};letter-spacing:${px(x.espaciado ?? 3)};color:${x.color}${extra(x, ["tamano", "peso", "espaciado", "color", "align", "interlinea"])};margin-bottom:${px(huecoCodigo)}">${esc(b.codigo)}</div>`; })() : "";
       const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
-      return pad(`<div style="border:${px(c.bordeAncho ?? 2)} ${c.bordeEstilo ?? "dashed"} ${c.bordeColor ?? pal.acento};border-radius:${px(c.radio ?? 12)};background:${bg};${padCss(c.padY ?? 24, c.padX ?? 24)};text-align:center;margin:8px 0 16px">${t}${cod}${btn}</div>`, undefined);
+      return pad(`<div style="border:${px(c.bordeAncho ?? 2)} ${c.bordeEstilo ?? "dashed"} ${c.bordeColor ?? pal.acento};border-radius:${px(c.radio ?? 12)};background:${bg};${padCss(c.padY ?? 24, c.padX ?? 24)};text-align:center;margin:8px 0 ${px(abajo)}">${t}${cod}${btn}</div>`, undefined);
     }
     // ⛔ Gateado por la CUENTA, no por quién lo editó — ver el comentario en
     // `Ctx.permiteHtmlCrudo`. Sin el toggle prendido, el bloque no se dibuja

@@ -406,6 +406,104 @@ const BASE_POR_TIPO: Partial<Record<TipoBloque, Estilos>> = {
 };
 
 /**
+ * El paquete que hace que un cupón `variante: "compacta"` se vea compacto.
+ *
+ * 🔑 **No es una capa nueva de la cascada, y es a propósito.** Estos siete
+ * valores ya tienen su control en el panel de estilo, así que la variante los
+ * escribe en `Bloque.estilo` —la capa 4, la de siempre— en vez de inventar un
+ * `BASE_POR_VARIANTE`. Dos motivos:
+ *
+ * - **El panel no puede mentir.** Con un default propio adentro del renderer, el
+ *   control diría "Automático (24)" al lado de un mail que dibuja 14. Lo que se
+ *   ve en la perilla es lo que sale en el correo.
+ * - **Queda retocable.** La variante deja el cupón achatado y de ahí la persona
+ *   sigue: si el paquete fuera un piso invisible, cada retoque pelearía contra
+ *   un valor que no está en ninguna pantalla.
+ *
+ * Es el precedente literal del `hero`, que al elegir la variante de fondo
+ * escribe `velo` en el bloque ("opinión en el editor, dato en el Json").
+ *
+ * ⚠️ Lo consumen **dos** lados —el `<Select>` del editor y el helper
+ * `cuponCompacto` de los presets— y por eso vive acá y no en cualquiera de los
+ * dos: dos definiciones de "compacto" son dos cupones distintos.
+ *
+ * ⛔ Lo que **no** está acá son los tres márgenes internos del cupón (el hueco
+ * texto→código, el código→botón y el de la caja contra lo que sigue): no tienen
+ * perilla, así que los elige el renderer mirando la variante.
+ */
+export const ESTILO_CUPON_COMPACTO: Estilos = {
+  // Borde fino y LISO: el cortado es lo que más grita "cupón de recorte", que es
+  // justo lo que esta variante no quiere ser.
+  caja: { padX: 20, padY: 14, radio: 8, bordeAncho: 1, bordeEstilo: "solid" },
+  // El código. 20 en vez de 26, y menos espacio entre letras: a 3 px un código
+  // largo se come el ancho del celular.
+  titulo: { tamano: 20, espaciado: 2 },
+  cuerpo: { tamano: 14 },
+  boton: { tamano: 14, padX: 20, padY: 9 },
+};
+
+/**
+ * Los tres tamaños de botón que se eligen de un click.
+ *
+ * No son un escalón nuevo de la cascada: son **atajos** que escriben las tres
+ * claves de siempre en la capa que se esté editando. Existen porque el botón de
+ * fábrica (32/14/16) sale grande para media docena de usos y achicarlo eran tres
+ * perillas separadas, una por una, en cada bloque que tenga uno.
+ *
+ * 🔴 **"Mediano" NO es lo mismo que "Automático".** Coincide con `BASE.boton`,
+ * pero en `columnas` el automático es 14/18/10 (un botón de cuerpo entero no
+ * entra en media columna), así que ahí elegir Mediano **agranda**. Por eso son
+ * cuatro opciones y no tres, y por eso cuál está puesto se decide comparando lo
+ * ESCRITO y nunca lo resuelto.
+ *
+ * ⚠️ Los tres entran holgados en `RANGOS`; si alguno se moviera fuera de rango,
+ * `sanearEstiloBloque` lo tiraría en silencio.
+ */
+export const TAMANOS_BOTON = [
+  { clave: "chico", label: "Chico", valores: { tamano: 14, padX: 16, padY: 8 } },
+  { clave: "mediano", label: "Mediano", valores: { tamano: 16, padX: 32, padY: 14 } },
+  { clave: "grande", label: "Grande", valores: { tamano: 18, padX: 40, padY: 18 } },
+] as const satisfies readonly { clave: string; label: string; valores: Pick<EstiloBloque, "tamano" | "padX" | "padY"> }[];
+
+/** Las tres claves que administra el selector de tamaño, y ninguna más. */
+export const CLAVES_TAMANO_BOTON = ["tamano", "padX", "padY"] as const;
+
+/**
+ * El estilo de un cupón después de elegir una variante.
+ *
+ * Puro y acá —y no adentro del `onChange` del `<Select>`— porque es lo único de
+ * esta variante que un script de Node puede probar: que ir y volver entre las
+ * dos deje el bloque **exactamente** como estaba.
+ *
+ * ⚠️ **Volver a "caja" borra las claves del paquete, no la capa entera.** Un
+ * color de fondo o una tipografía que la persona eligió aparte sobreviven al
+ * viaje de ida y vuelta; lo que sí se pierde es un retoque hecho *sobre* una de
+ * las siete claves del paquete, y eso es intencional: son las que la variante
+ * administra. Es la misma economía que el `hero` con su `velo`.
+ *
+ * 🔑 Y respeta la higiene de la cascada: un rol sin propiedades se borra, y una
+ * capa sin roles vuelve a ser `undefined`. Un `{}` colgado hace que
+ * `"titulo" in estilos` diga que sí para un rol que nadie tocó, y de ese "¿lo
+ * eligió una persona?" dependen la legibilidad contextual y el modo oscuro.
+ */
+export function estiloCupon(actual: Estilos | undefined, variante: "caja" | "compacta"): Estilos | undefined {
+  const out: Estilos = { ...actual };
+
+  for (const [rol, paquete] of Object.entries(ESTILO_CUPON_COMPACTO) as [RolEstilo, EstiloBloque][]) {
+    const previo = out[rol];
+    const nuevo: EstiloBloque = { ...previo };
+    for (const k of Object.keys(paquete) as (keyof EstiloBloque)[]) {
+      if (variante === "compacta") (nuevo as Record<string, unknown>)[k] = paquete[k];
+      else delete nuevo[k];
+    }
+    if (Object.keys(nuevo).length) out[rol] = nuevo;
+    else delete out[rol];
+  }
+
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
  * Qué roles dibuja de verdad cada bloque.
  *
  * Es lo que el panel de estilo usa para no ofrecer controles que no hacen nada:

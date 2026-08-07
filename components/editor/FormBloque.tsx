@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import type { Marca } from "@/lib/marca";
 import { REDES, redConIcono, type EstiloIconos } from "@/lib/email/redes";
+import { estiloCupon } from "@/lib/email/estilos";
 import { Desplegable } from "@/components/ui/Desplegable";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
@@ -333,15 +334,39 @@ export function FormBloque({
       );
     }
 
-    case "cupon":
+    case "cupon": {
+      const variante = b.variante ?? "caja";
       return (
         <div className="space-y-3">
+          {/* La variante mueve DOS cosas a la vez, y por eso el `onChange` no es
+              un `set` pelado: los tres huecos internos, que los decide el
+              renderer, y el paquete de padding/borde/tamaños, que se escribe
+              acá en el bloque para que el panel de estilo muestre lo que el mail
+              dibuja. Es lo mismo que hace el `hero` con el `velo` un poco más
+              arriba. */}
+          <Select
+            label="Forma"
+            fullWidth
+            value={variante}
+            hint={{
+              caja: "Un recuadro con borde cortado. El cupón es lo importante del mail.",
+              compacta: "Más baja y sin tanto recuadro, para cuando el cupón acompaña.",
+            }[variante]}
+            onChange={(e) => {
+              const v = e.target.value as "caja" | "compacta";
+              set({ variante: v === "caja" ? undefined : v, estilo: estiloCupon(b.estilo, v) });
+            }}
+          >
+            <option value="caja">Recuadro</option>
+            <option value="compacta">Compacta</option>
+          </Select>
           <Input label="Texto" fullWidth value={b.texto} placeholder="Usá este código en el checkout" onChange={(e) => set({ texto: e.target.value })} />
           <Input label="Código" fullWidth value={b.codigo} placeholder="DESCUENTO10" onChange={(e) => set({ codigo: e.target.value })} />
           <Input label="Texto del botón" fullWidth value={b.botonTexto} placeholder="Opcional" onChange={(e) => set({ botonTexto: e.target.value })} />
           <Input label="Link del botón" fullWidth value={b.botonUrl} placeholder="https://…" onChange={(e) => set({ botonUrl: e.target.value })} />
         </div>
       );
+    }
 
     case "imagen":
       return (

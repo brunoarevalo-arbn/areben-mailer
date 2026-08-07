@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Monitor, Smartphone } from "lucide-react";
 
 /**
@@ -156,6 +156,80 @@ export function VistaPreviaMail({
   }, [frame, html, anchoMarco]);
 
   /**
+   * 🔴 **Cambiar el estilo de un bloque NO puede tirar la vista previa para
+   * arriba.** Y lo hacía, sin que nadie escribiera un `scrollTop`: el arreglo de
+   * `6eb6423` frenó que se moviera la *página*, y lo que quedó fue esto.
+   *
+   * La cadena, medida en Chrome el 7-ago-2026:
+   *
+   * 1. Cambia el `html` ⇒ se reescribe el `srcDoc` ⇒ el navegador reemplaza el
+   *    documento de forma asíncrona.
+   * 2. Dispara `load` ⇒ `enganchar()` mide `body.scrollHeight` con las fotos
+   *    todavía sin bajar y la medida sale **corta** (es el mismo motivo por el
+   *    que existe el `ResizeObserver` de arriba).
+   * 3. Ese `altoMail` corto colapsa la caja que reserva el alto ⇒ el
+   *    `scrollHeight` del scroller se desploma ⇒ **el navegador clampea
+   *    `scrollTop`**, y contra un mail de miles de px eso es ir a parar a 0.
+   * 4. El `ResizeObserver` devuelve el alto real cuando las fotos cargan, pero
+   *    **la posición no vuelve sola**: el clamp ya pasó.
+   *
+   * Medido en un banco con la misma estructura: scrollear a 2000, colapsar la
+   * reserva de 4000 a 300 y devolverla a 4000 deja el `scrollTop` en 0.
+   *
+   * 🔑 **Por eso se re-aplica en CADA cambio de alto y con un `Math.min`, no una
+   * sola vez al final.** Las fotos entran de a una y el alto llega en varios
+   * escalones; con el mínimo contra el tope de cada momento, la posición
+   * **vuelve caminando** (0 → 502 → 1402 → 2000) y no hace falta saber cuándo
+   * terminó de cargar todo — que es justo lo que no se puede saber.
+   *
+   * ⚠️ **`propio` es lo que impide que el arreglo se coma a sí mismo.** Tanto el
+   * clamp como la restauración disparan un evento `scroll`, y si ese evento
+   * grabara la posición, el 0 del clamp pisaría la posición buena antes de poder
+   * usarla. Se apaga en el `requestAnimationFrame` siguiente —los eventos de
+   * scroll se despachan antes de los rAF del mismo cuadro— así que entre dos
+   * medidas del observador un scroll de verdad **sí** se graba.
+   *
+   * ⛔ No se toca el efecto de `[resaltado]` de más abajo: ése ya está bien y
+   * cambiar la tipografía no cambia el bloque elegido.
+   */
+  const pos = useRef(0);
+  const propio = useRef(false);
+  useLayoutEffect(() => {
+    const s = scroller.current;
+    if (!s) return;
+    // 🔴 **`propio` se prende porque el alto se movió, NO porque haya algo que
+    // restaurar**, y esa diferencia era todo el bug en la primera versión de
+    // este arreglo (7-ago-2026).
+    //
+    // Con un `if (scrollTop === destino) return` antes de prenderlo, el paso que
+    // importa se escapaba: en el momento del colapso el navegador **ya** clampeó
+    // a 0, así que `destino` también daba 0, el efecto se iba sin marcar nada y
+    // el evento `scroll` del clamp —que llega después— grababa `pos = 0`. Para
+    // cuando el observador devolvía el alto real ya no quedaba a dónde volver, y
+    // la vista previa seguía yéndose para arriba igual que antes.
+    //
+    // Por eso se marca primero y se pregunta después.
+    propio.current = true;
+    const destino = Math.min(pos.current, Math.max(0, s.scrollHeight - s.clientHeight));
+    if (s.scrollTop !== destino) s.scrollTop = destino;
+    // ⚠️ El `rAF` es el que manda —se despacha justo después de los eventos de
+    // scroll del mismo cuadro, que es lo que hay que dejar pasar—, pero **en una
+    // pestaña de fondo no corre nunca**. Sin el reloj de atrás, `propio` se
+    // quedaría prendido para siempre y el preview dejaría de seguir a la persona
+    // al volver a la pestaña. Ahí no hay nada que dibujar, así que llegar tarde
+    // no cuesta nada.
+    const soltar = () => {
+      propio.current = false;
+    };
+    const cuadro = requestAnimationFrame(soltar);
+    const reloj = setTimeout(soltar, 250);
+    return () => {
+      cancelAnimationFrame(cuadro);
+      clearTimeout(reloj);
+    };
+  }, [altoMail]);
+
+  /**
    * 🔴 **Un click adentro del mail nunca navega, y no por un handler.**
    *
    * Hasta el 4-ago-2026 acá había un listener que hacía `preventDefault()` sobre
@@ -299,6 +373,11 @@ export function VistaPreviaMail({
         <div
           ref={scroller}
           onClick={alClick}
+          // Dónde está parada la persona. Lo que escribe el propio arreglo no
+          // cuenta — ver `propio`, arriba.
+          onScroll={(e) => {
+            if (!propio.current) pos.current = e.currentTarget.scrollTop;
+          }}
           // `overflow-y-auto` y no `hidden`: **este** es el que scrollea el mail
           // desde que el iframe dejó de recibir eventos.
           className="h-full overflow-y-auto rounded-xl border border-border bg-white"

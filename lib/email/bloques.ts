@@ -507,7 +507,29 @@ export type Bloque = BloqueBase &
         /** Cuánto se oscurece la foto, 0-100. **Ausente = 0**, como el `hero`. */
         velo?: number;
       }
-    | { tipo: "cupon"; texto: string; codigo: string; botonTexto: string; botonUrl: string }
+    | {
+        tipo: "cupon";
+        /**
+         * Ausente = `"caja"`, el recuadro de borde cortado de siempre. Misma
+         * convención que `columnas.variante` y `encabezado.variante`.
+         *
+         * `"compacta"` es el mismo cupón apilado pero achatado: existe para
+         * cuando el cupón **acompaña** en vez de ser el protagonista, que con
+         * una sola forma salía ocupando ~180 px igual.
+         *
+         * 🔑 Lo único que la variante decide acá son los tres márgenes que
+         * ninguna perilla alcanza (ver el `case "cupon"` del renderer). Todo lo
+         * demás —padding, borde, tamaños— ya tiene control en el panel, y lo
+         * escribe el editor en `estilo` al elegirla: si el renderer usara
+         * defaults propios, el panel diría "Automático (24)" al lado de un mail
+         * que dibuja 14.
+         */
+        variante?: "caja" | "compacta";
+        texto: string;
+        codigo: string;
+        botonTexto: string;
+        botonUrl: string;
+      }
     /**
      * HTML crudo. Escotilla de administrador, no de comerciante: sale desde un
      * dominio verificado por vos y con tu reputación de envío.

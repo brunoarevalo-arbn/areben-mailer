@@ -18,6 +18,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { claveProductos, type Bloque } from "../lib/email/bloques";
 import { renderEmailHtml, renderEmailTexto, type ContenidoCampania } from "../lib/email/render";
+import { ESTILO_CUPON_COMPACTO } from "../lib/email/estilos";
 import { presetsPara } from "../lib/plantillas/presets";
 
 /** Una cuenta de mentira para instanciar los presets. */
@@ -44,6 +45,24 @@ const SIMPLE = {
     { tipo: "titulo", texto: "Hola", align: "left" },
     { tipo: "texto", texto: "Un párrafo\ncon salto.", align: "left" },
     { tipo: "boton", texto: "Comprar", url: "https://ejemplo.com", align: "left", full: false },
+  ],
+} as unknown as ContenidoCampania;
+
+/**
+ * Las dos formas del cupón, y las tres van ENTERAS por el mismo motivo que
+ * `SIMPLE`: acá lo que se vigila son márgenes de un dígito, y un hash distinto
+ * no dice cuál se movió.
+ *
+ * 🔑 La tercera es la que importa de verdad: una compacta **sin botón**, que es
+ * donde los huecos internos colapsan a 0. La de siempre no colapsa nada —deja el
+ * margen muerto aunque no haya nada abajo— y esa diferencia entre las dos es
+ * justo lo que hay que poder ver moverse.
+ */
+const CUPONES = {
+  bloques: [
+    { tipo: "cupon", texto: "Usá este código en el checkout", codigo: "DESCUENTO10", botonTexto: "Comprar", botonUrl: "https://ejemplo.com" },
+    { tipo: "cupon", variante: "compacta", texto: "Usá este código en el checkout", codigo: "DESCUENTO10", botonTexto: "Comprar", botonUrl: "https://ejemplo.com", estilo: ESTILO_CUPON_COMPACTO },
+    { tipo: "cupon", variante: "compacta", texto: "Usá este código en el checkout", codigo: "DESCUENTO10", botonTexto: "", botonUrl: "", estilo: ESTILO_CUPON_COMPACTO },
   ],
 } as unknown as ContenidoCampania;
 
@@ -78,6 +97,7 @@ function capturarTodo(): Record<string, string> {
   const out: Record<string, string> = {};
   out["simple.html"] = renderEmailHtml(SIMPLE, OPTS);
   out["simple.texto"] = renderEmailTexto(SIMPLE, OPTS);
+  out["cupones.html"] = renderEmailHtml(CUPONES, OPTS);
 
   for (const p of presetsPara(CUENTA)) {
     const c = p.contenido;
@@ -119,12 +139,15 @@ if (!existsSync(GOLDEN)) {
 
 const esperado: Record<string, string> = JSON.parse(readFileSync(GOLDEN, "utf8"));
 
+/** Los que se guardan enteros: cuando se mueven, el diff tiene que decir dónde. */
+const ENTEROS = ["simple.html", "simple.texto", "cupones.html"] as const;
+
 for (const clave of Object.keys(esperado)) {
-  if (clave === "simple.html" || clave === "simple.texto") continue;
+  if ((ENTEROS as readonly string[]).includes(clave)) continue;
   ok(actual[clave] === esperado[clave], clave, `esperaba ${esperado[clave]}, salió ${actual[clave]}`);
 }
 
-for (const clave of ["simple.html", "simple.texto"] as const) {
+for (const clave of ENTEROS) {
   const igual = actual[clave] === esperado[clave];
   ok(igual, clave);
   if (!igual) {

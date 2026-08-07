@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import {
-  TOKENS_COLOR, TOKEN_LABEL, esToken,
-  type ValorColor,
+  TOKENS_COLOR, TOKEN_LABEL, esToken, TAMANOS_BOTON, CLAVES_TAMANO_BOTON,
+  type ValorColor, type EstiloBloque,
 } from "@/lib/email/estilos";
 import type { Paleta } from "@/lib/email/tema";
 import { campoCompacto, tapTarget } from "@/lib/ui";
@@ -296,6 +296,73 @@ export function ControlBool({
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Chico · Mediano · Grande, de un click.
+ *
+ * 🔑 **Es el único control del panel que escribe TRES claves a la vez**, y por
+ * eso no entra por la tabla `CAMPO` como los demás: ahí cada entrada describe
+ * una propiedad. Es un atajo por encima de "Tamaño", "Margen lateral" y "Margen
+ * arriba y abajo", que siguen abajo para quien quiera afinar — y que es
+ * exactamente lo que había que tocar de a una hasta ahora.
+ *
+ * ⚠️ **Cuál está puesto se decide comparando lo ESCRITO, nunca lo resuelto.** En
+ * `columnas` el automático es 14/18/10, así que preguntar por lo resuelto
+ * marcaría "Chico" en un bloque donde nadie eligió nada — y peor, elegir Mediano
+ * ahí **agranda** el botón, que es información que el control tiene que poder
+ * dar. Cuando la persona afinó las perillas de abajo no coincide ninguno y no se
+ * marca ninguno, que es la verdad.
+ *
+ * **Sin `avanzado`**: es justamente la versión simple de tres perillas finas.
+ */
+export function ControlTamanoBoton({
+  valor,
+  onChange,
+}: {
+  /** Lo que dice ESTA capa para el rol `boton`. */
+  valor: EstiloBloque | undefined;
+  /**
+   * Siempre las **tres** claves, y "Automático" las manda en `undefined` para
+   * que se borren. Nunca un objeto a medias: dejar una puesta y las otras dos no
+   * es un botón que no es ninguno de los tres tamaños.
+   */
+  onChange: (v: Record<(typeof CLAVES_TAMANO_BOTON)[number], number | undefined>) => void;
+}) {
+  const auto = CLAVES_TAMANO_BOTON.every((k) => valor?.[k] === undefined);
+  const puesto = auto
+    ? "auto"
+    : TAMANOS_BOTON.find((t) => CLAVES_TAMANO_BOTON.every((k) => valor?.[k] === t.valores[k]))?.clave;
+
+  const vacio = Object.fromEntries(CLAVES_TAMANO_BOTON.map((k) => [k, undefined])) as Record<
+    (typeof CLAVES_TAMANO_BOTON)[number],
+    number | undefined
+  >;
+  const opciones = [{ clave: "auto", label: "Automático", valores: vacio }, ...TAMANOS_BOTON] as const;
+
+  return (
+    <div>
+      <span className="mb-1 block text-xs font-semibold text-muted">Tamaño del botón</span>
+      {/* La misma barra de botones que `ControlBool` y que el toggle
+          Escritorio/Celular del preview. `tapTarget` porque abajo de `lg` esto
+          se toca con el dedo. */}
+      <div className="flex items-center gap-1 rounded-lg border border-border p-0.5">
+        {opciones.map((o) => (
+          <button
+            key={o.clave}
+            type="button"
+            onClick={() => onChange(o.valores)}
+            aria-pressed={puesto === o.clave}
+            className={`${tapTarget} flex-1 rounded-md px-2 py-1 text-xs transition-colors ${
+              puesto === o.clave ? "bg-accent-subtle text-accent-subtle-foreground" : "text-muted hover:text-foreground"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
       </div>
     </div>
   );
