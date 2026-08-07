@@ -194,6 +194,16 @@ export function VistaPreviaMail({
    */
   const pos = useRef(0);
   const propio = useRef(false);
+
+  /** Devolver el mail a donde lo dejó la persona, hasta donde el alto de hoy dé. */
+  const reponer = useCallback(() => {
+    const s = scroller.current;
+    if (!s) return;
+    propio.current = true;
+    const destino = Math.min(pos.current, Math.max(0, s.scrollHeight - s.clientHeight));
+    if (s.scrollTop !== destino) s.scrollTop = destino;
+  }, []);
+
   useLayoutEffect(() => {
     const s = scroller.current;
     if (!s) return;
@@ -209,25 +219,39 @@ export function VistaPreviaMail({
     // la vista previa seguía yéndose para arriba igual que antes.
     //
     // Por eso se marca primero y se pregunta después.
-    propio.current = true;
-    const destino = Math.min(pos.current, Math.max(0, s.scrollHeight - s.clientHeight));
-    if (s.scrollTop !== destino) s.scrollTop = destino;
-    // ⚠️ El `rAF` es el que manda —se despacha justo después de los eventos de
-    // scroll del mismo cuadro, que es lo que hay que dejar pasar—, pero **en una
-    // pestaña de fondo no corre nunca**. Sin el reloj de atrás, `propio` se
-    // quedaría prendido para siempre y el preview dejaría de seguir a la persona
-    // al volver a la pestaña. Ahí no hay nada que dibujar, así que llegar tarde
-    // no cuesta nada.
-    const soltar = () => {
+    // 🔑 **La dependencia es `html` y no sólo `altoMail`, y eso NO es de más.**
+    // La teoría del colapso explica el mecanismo, pero medido contra producción
+    // en Chrome —con las fotos ya cacheadas— el alto pasa de 2350 a 2400 de una,
+    // sin colapso y sin perder la posición: ahí no se reproduce. En Safari sí, y
+    // Safari no se puede manejar desde acá. Así que en vez de apostar a una
+    // causa, se repone después de **cada reescritura del mail**, cambie o no el
+    // alto. Lo que no se puede diagnosticar se cubre.
+    //
+    // Los cuatro relojes son el precio de no saber CUÁNDO se pierde: el
+    // documento se reemplaza de forma asíncrona y las fotos entran de a una, así
+    // que una sola reposición llegaría antes o después del momento que importa.
+    // Con el `Math.min` de `reponer`, cada intento acerca un poco más y la
+    // posición vuelve caminando.
+    //
+    // ⚠️ Y el `rAF` no alcanza solo: **en una pestaña de fondo no corre nunca**,
+    // y `propio` se quedaría prendido para siempre ⇒ el preview dejaría de
+    // seguir a la persona al volver. Ahí no hay nada que dibujar, así que llegar
+    // tarde por reloj no cuesta nada.
+    reponer();
+    const cuadro = requestAnimationFrame(reponer);
+    const relojes = [50, 150, 300].map((ms) => setTimeout(reponer, ms));
+    // Recién acá se vuelve a escuchar a la persona. Son 300 ms en los que un
+    // scroll suyo se ignora; el intercambio es a favor, porque nadie scrollea el
+    // preview en el mismo tercio de segundo en que tocó una perilla.
+    const soltar = setTimeout(() => {
       propio.current = false;
-    };
-    const cuadro = requestAnimationFrame(soltar);
-    const reloj = setTimeout(soltar, 250);
+    }, 320);
     return () => {
       cancelAnimationFrame(cuadro);
-      clearTimeout(reloj);
+      relojes.forEach(clearTimeout);
+      clearTimeout(soltar);
     };
-  }, [altoMail]);
+  }, [altoMail, html, reponer]);
 
   /**
    * 🔴 **Un click adentro del mail nunca navega, y no por un handler.**

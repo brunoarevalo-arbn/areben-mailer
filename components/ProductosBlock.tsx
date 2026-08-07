@@ -5,7 +5,7 @@ import type { PorFila, PorFilaMovil, ProductoEmail } from "@/lib/email/render";
 // Sólo el TIPO: `import type` se borra al compilar, así que el cliente de la API
 // de Tiendanube no entra al bundle del editor.
 import type { ProductoTN } from "@/lib/tn/products";
-import { RotateCcw, X } from "lucide-react";
+import { ChevronDown, ChevronUp, RotateCcw, X } from "lucide-react";
 import { campoBase } from "@/lib/ui";
 import { GrillaControl, hintBotonGrilla } from "@/components/editor/GrillaControl";
 import { ImagenDrop } from "@/components/editor/ImagenDrop";
@@ -93,6 +93,34 @@ export function ProductosBlock({
   const quitar = (i: number) => onChange(items.filter((_, j) => j !== i));
 
   /**
+   * Cambiar el orden en que salen en la grilla.
+   *
+   * 🔴 Hasta el 7-ago-2026 este bloque **sólo sabía agregar al final y sacar**:
+   * el orden del mail era el orden en que alguien fue haciendo click en el
+   * buscador, y cambiarlo era vaciar la lista y volver a elegir los seis
+   * productos en el orden nuevo. Con una grilla de a cuatro por fila, "cuál va
+   * primero" es la decisión de diseño más frecuente que hay acá.
+   *
+   * Flechas y no arrastre, por la misma razón que las de `ListaBloques`: los
+   * eventos `drag*` de HTML5 no se disparan en ningún navegador de celular, así
+   * que un grip acá prometería algo que con el dedo no pasa. Y son también el
+   * camino de teclado.
+   *
+   * ⚠️ Mueve **el item entero**, con su foto propia y su `imagenTienda` adentro:
+   * el orden es de la lista, no de las URLs. Intercambiar sólo el nombre y la
+   * URL dejaría la foto propia pegada a la posición y no al producto.
+   */
+  const mover = (i: number, hacia: number) => {
+    if (hacia < 0 || hacia >= items.length) return;
+    const copia = [...items];
+    [copia[i], copia[hacia]] = [copia[hacia], copia[i]];
+    onChange(copia);
+    // El panel de la foto está abierto POR ÍNDICE, así que si no lo sigue se
+    // queda abierto sobre el producto que vino a ocupar el lugar.
+    setEditandoFoto((abierto) => (abierto === i ? hacia : abierto === hacia ? i : abierto));
+  };
+
+  /**
    * Pisar la foto que trajo la tienda con una propia.
    *
    * ⚠️ `imagenTienda` se escribe **una sola vez**, la primera. Reescribirla en
@@ -134,6 +162,32 @@ export function ProductosBlock({
                     </span>
                   )}
                 </span>
+                {/* El orden de la grilla. Van antes de "cambiar la foto" porque
+                    es lo que se toca mientras se arma la fila, no después. */}
+                {items.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => mover(i, i - 1)}
+                      disabled={i === 0}
+                      title="Subir"
+                      aria-label={`Subir ${p.nombre}`}
+                      className="shrink-0 rounded px-0.5 text-muted transition-colors hover:text-foreground disabled:opacity-25"
+                    >
+                      <ChevronUp className="h-4 w-4" aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => mover(i, i + 1)}
+                      disabled={i === items.length - 1}
+                      title="Bajar"
+                      aria-label={`Bajar ${p.nombre}`}
+                      className="shrink-0 rounded px-0.5 text-muted transition-colors hover:text-foreground disabled:opacity-25"
+                    >
+                      <ChevronDown className="h-4 w-4" aria-hidden />
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   onClick={() => setEditandoFoto(editandoFoto === i ? null : i)}
