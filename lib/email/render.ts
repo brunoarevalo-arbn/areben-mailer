@@ -436,6 +436,29 @@ function renderCard(
 }
 
 /**
+ * El lado de la miniatura del carrito, en píxeles. **Fijo y cuadrado**, y las
+ * dos cosas por el mismo motivo.
+ *
+ * 🔴 Antes era `<td width="25%">` con `<img width="100%">`, y eso fallaba de dos
+ * maneras que sólo se ven con productos de verdad (medido el 8-ago-2026 sobre un
+ * carrito real de BDI de 6 productos):
+ *
+ *   - **El mail medía 1652px.** Un 25% de 600 son 150px de ancho, y con fotos
+ *     verticales de 3:4 eso da ~200px de ALTO por producto. Seis productos son
+ *     1200px sólo de fotos: hay que scrollear tres pantallas para llegar al
+ *     botón, que es lo único que recupera la venta.
+ *   - **En Outlook podía salir a tamaño natural.** Un `<img width="100%">`
+ *     adentro de un `<td>` con ancho porcentual es de los casos que Word no
+ *     resuelve; las fotos de Tiendanube vienen a 1024px, así que el modo de
+ *     falla es una imagen que revienta el ancho del mail.
+ *
+ * `object-fit: cover` recorta en vez de deformar. Los clientes que no lo
+ * soportan igual respetan el `width`/`height` del atributo, así que lo peor que
+ * pasa ahí es una foto un poco estirada — no un mail roto.
+ */
+const MINIATURA_CARRITO = 72;
+
+/**
  * Una línea de carrito: foto | nombre + variante + cantidad | precio.
  *
  * Es la diferencia de fondo con `renderCard`: una grilla de tarjetas dice "mirá
@@ -443,13 +466,13 @@ function renderCard(
  */
 function renderLineaCarrito(p: ProductoEmail, eNombre: EstiloResuelto, ePrecio: EstiloResuelto, eNota: EstiloResuelto, eImg: EstiloResuelto): string {
   const foto = p.imagen
-    ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:${px(eImg.radio ?? 8)};display:block" />`
+    ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="${MINIATURA_CARRITO}" height="${MINIATURA_CARRITO}" style="width:${px(MINIATURA_CARRITO)};height:${px(MINIATURA_CARRITO)};object-fit:cover;border-radius:${px(eImg.radio ?? 8)};display:block" />`
     : "";
   return `<tr>
     <!-- Sin \`m-col\`: apilar la línea la parte en tres renglones por producto y
          un carrito de 6 se vuelve interminable. Foto | nombre | precio aguanta
          los 375px de un celular. -->
-    <td width="25%" valign="top" style="padding:10px 0"><a href="${esc(p.url)}">${foto}</a></td>
+    <td width="${MINIATURA_CARRITO}" valign="top" style="padding:10px 0;width:${px(MINIATURA_CARRITO)}"><a href="${esc(p.url)}">${foto}</a></td>
     <td valign="top" style="padding:10px 14px">
       <a href="${esc(p.url)}" style="text-decoration:none;color:inherit">
         <div style="font-size:${px(eNombre.tamano ?? 15)};line-height:${eNombre.interlinea ?? 1.35};color:${eNombre.color};font-weight:${eNombre.peso ?? 600}${extra(eNombre, ["tamano", "interlinea", "color", "peso", "align"])}">${esc(p.nombre)}</div>

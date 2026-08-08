@@ -32,6 +32,18 @@ import { getRemitenteEnvio } from '../lib/remitentes.ts';
 const TRIGGERS: Trigger[] = ['NUEVO_CLIENTE', 'COMPRA', 'CARRITO_ABANDONADO', 'NUEVO_SUSCRIPTOR'];
 const soloCuenta = process.argv.find((a) => a.startsWith('--cuenta='))?.split('=')[1];
 
+// `--trigger=CARRITO_ABANDONADO` crea UNA sola. Existe por la advertencia de
+// arriba: sin esto, la única forma de darle a Zattia su automation de carrito
+// era correr las cuatro, y eso **le devuelve la Bienvenida de `NUEVO_CLIENTE`
+// que se borró a propósito** ⇒ dos mails al mismo lead de pop-up. Un flag es más
+// barato que acordarse de borrarla después.
+const soloTrigger = process.argv.find((a) => a.startsWith('--trigger='))?.split('=')[1];
+const triggers = soloTrigger ? TRIGGERS.filter((t) => t === soloTrigger) : TRIGGERS;
+if (soloTrigger && triggers.length === 0) {
+  console.error(`❌ Trigger desconocido: "${soloTrigger}". Son: ${TRIGGERS.join(', ')}`);
+  process.exit(1);
+}
+
 async function main() {
   const cuentas = await prisma.cuenta.findMany({
     where: soloCuenta ? { slug: soloCuenta } : { slug: { in: ['bdi', 'zattia', 'stunned'] } },
@@ -43,7 +55,7 @@ async function main() {
     const preset = (t: Trigger) => presetDeTrigger(t, cuenta, rem?.email);
     console.log(`\n▶ ${cuenta.nombre} (${cuenta.slug})${cuenta.tnStoreId ? '' : ' — sin Tiendanube conectada'}`);
 
-    for (const trigger of TRIGGERS) {
+    for (const trigger of triggers) {
       const ya = await prisma.automation.findFirst({ where: { cuentaId: cuenta.id, trigger } });
       if (ya) {
         console.log(`   = ${preset(trigger).nombre.padEnd(24)} ya existe (${ya.estado})`);
