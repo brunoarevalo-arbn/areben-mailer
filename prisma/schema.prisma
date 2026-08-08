@@ -169,8 +169,19 @@ model CarritoVisto {
 
   creadoEnTnAt DateTime?
   completadoAt DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+
+  /// Cuándo le preguntamos a TN, por última vez, si este carrito terminó en
+  /// compra (`app/api/carritos/recuperados`).
+  ///
+  /// 🔴 **No es `updatedAt` y no puede serlo.** Es lo único que distingue "lo
+  /// miramos y todavía no compró" de "nunca lo miramos", que es la diferencia
+  /// entre informar y mentir en la casilla de recuperados del panel. `updatedAt`
+  /// lo mueve cualquier escritura, incluida la del poller al crear la fila.
+  /// Mismo rol —y misma lección— que `syncAt` en los canjes de Resorty.
+  revisadoAt DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   /// La idempotencia del poller: inserta con `ON CONFLICT DO NOTHING` y sólo
   /// encola lo que devolvió fila, así dos crons simultáneos se reparten el
@@ -178,6 +189,10 @@ model CarritoVisto {
   @@unique([cuentaId, tnCheckoutId])
   @@index([cuentaId, tnCheckoutId(sort: Desc)])
   @@index([cuentaId, creadoEnTnAt])
+  /// El índice del barrido es PARCIAL (`WHERE estado = 'ENCOLADO'`) y Prisma no
+  /// sabe expresarlo, así que vive sólo en `scripts/add-carrito-revisado.ts`.
+  /// ⛔ No "completarlo" acá con un `@@index([revisadoAt, creadoEnTnAt])`: sería
+  /// un segundo índice sobre toda la tabla, no el mismo.
 }
 
 enum RolUsuario {

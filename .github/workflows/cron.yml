@@ -38,3 +38,19 @@ jobs:
           curl -sS --max-time 60 \
             "https://areben-mailer.vercel.app/api/carritos/detectar?secret=${{ secrets.CRON_SECRET }}" \
             && echo "" || echo "fallo (se reintenta en el próximo ciclo)"
+
+      # Cuáles de los carritos que encolamos terminaron en compra. Es lo único
+      # que contesta "¿esto sirve?", y por lo tanto lo único que después
+      # justifica (o no) pagar por mensaje en WhatsApp.
+      #
+      # Va ÚLTIMO y es el que menos duele si la corrida se corta: no manda nada
+      # y no encola nada, sólo lee de TN y marca filas. Lo que no alcance a
+      # revisar lo toma la corrida siguiente — cada carrito se consulta como
+      # mucho una vez cada 12 h y hay un tope de 40 por corrida, así que no
+      # puede convertirse en una ráfaga contra el límite de la API de TN (que se
+      # comparte con el monitor y con Resorty).
+      - name: Marcar carritos recuperados
+        run: |
+          curl -sS --max-time 60 \
+            "https://areben-mailer.vercel.app/api/carritos/recuperados?secret=${{ secrets.CRON_SECRET }}" \
+            && echo "" || echo "fallo (se reintenta en el próximo ciclo)"

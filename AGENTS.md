@@ -57,6 +57,7 @@ node --import tsx scripts/probar-gate.ts       # el gate no se abre solo
 node --import tsx scripts/probar-webhooks.ts   # los webhooks de rebotes fallan CERRADO
 node --import tsx scripts/probar-supresion.ts  # una queja no cruza de tienda; un rebote duro sí
 node --import tsx scripts/probar-carrito.ts    # el carrito de muestra no sale en un envío real
+node --import tsx scripts/probar-recuperados.ts # un fallo de TN no se lee como "no compró", y el barrido siempre avanza
 node --import tsx scripts/probar-bienvenida.ts # el cupón del pop-up entra, el placeholder nunca sale, y NUEVO_SUSCRIPTOR no lo alcanza ningún evento de TN
 node --import tsx scripts/probar-productos-dinamicos.ts # la consulta se guarda, los productos no
 node --import tsx scripts/probar-links-productos.ts # un producto sin publicar no sale, y nada más frena
