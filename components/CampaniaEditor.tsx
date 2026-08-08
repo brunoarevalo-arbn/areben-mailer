@@ -7,6 +7,7 @@ import {
   guardarCampania,
   enviarPrueba,
   enviarCampania,
+  continuarCampania,
   programarCampania,
   cancelarProgramacion,
   guardarComoPlantilla,
@@ -63,6 +64,8 @@ interface Props {
   /** ISO del instante programado, si la campaña está PROGRAMADA. */
   programadaAt?: string | null;
   abInfo?: AbInfo;
+  /** Elegibles que todavía NO recibieron esta campaña. Solo se calcula si ya salió. */
+  restantes?: number;
 }
 
 const PCT_OPCIONES = [10, 20, 30, 50];
@@ -77,7 +80,7 @@ const HORA_SUGERIDA = "19:00";
 const tasa = (ap: number, env: number) => (env ? Math.round((ap / env) * 100) : 0);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPrueba, estado, programadaAt, abInfo }: Props) {
+export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPrueba, estado, programadaAt, abInfo, restantes = 0 }: Props) {
   const router = useRouter();
   const [nombre, setNombre] = useState(initial.nombre);
   const [asunto, setAsunto] = useState(initial.asunto);
@@ -134,6 +137,12 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
   // curso — todavía se puede editar, cancelar o mandar antes de hora.
   const [enviado, setEnviado] = useState(estado === "ENVIADA" || estado === "ENVIANDO");
   const [progreso, setProgreso] = useState<string | null>(null);
+  /**
+   * Cuántos como máximo en esta tanda. Vacío = todos, que es como se comportó
+   * siempre: escribir un número es una decisión, no el default.
+   */
+  const [tope, setTope] = useState("");
+  const [continuando, setContinuando] = useState(false);
   const [promoviendo, setPromoviendo] = useState(false);
 
   /**
@@ -173,18 +182,40 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
   const enviarTodo = async () => {
     if (!destino) { setMsg("Elegí un destino primero"); return; }
     if (abActivo && !asuntoB.trim()) { setMsg("Completá el asunto B"); return; }
+    const n = Number(tope);
+    const conTope = !abActivo && Number.isFinite(n) && n > 0;
     const q = abActivo
       ? `¿Enviar el test A/B (asunto A y B) al ${abPct}% de la lista?`
-      : "¿Enviar esta campaña a toda la lista (contactos que aceptan marketing)?";
+      : conTope
+        ? `¿Enviar esta campaña a ${n.toLocaleString("es-AR")} contactos como máximo?`
+        : "¿Enviar esta campaña a toda la lista (contactos que aceptan marketing)?";
     if (!confirm(q)) return;
     setEnviado(true);
     await guardarCampania(campData());
-    const r = await enviarCampania(id);
+    const r = await enviarCampania(id, conTope ? n : undefined);
     if (!r.ok) { setProgreso(`Error: ${r.error}`); setEnviado(false); return; }
     // En ensayo el destino real fue mucho más chico que la lista: decirlo, o el
     // "Enviados 4/4" se lee como si la campaña hubiera salido entera.
     if (r.modo === "ensayo") setMsg(`Modo ensayo: salió a ${r.total} casilla${r.total === 1 ? "" : "s"} habilitada${r.total === 1 ? "" : "s"}; se omitieron ${r.omitidos}.`);
     await seguirProgreso(r.total ?? 0, abActivo ? "Test enviado" : "Enviados");
+    // 🔑 Un envío con tope termina `ENVIADA` con gente afuera. Si la pantalla no
+    // lo dice, "Enviada" se lee como "salió a todos" y nadie vuelve a abrirla.
+    if (r.ok && r.restantes) setMsg(`Quedaron ${r.restantes.toLocaleString("es-AR")} sin recibir: podés seguir con la tanda que viene.`);
+    router.refresh();
+  };
+
+  /** Manda a los que quedaron afuera del tope de la vez pasada. */
+  const continuar = async () => {
+    const n = Number(tope);
+    const conTope = Number.isFinite(n) && n > 0;
+    const cuantos = conTope ? Math.min(n, restantes) : restantes;
+    if (!confirm(`¿Enviar a ${cuantos.toLocaleString("es-AR")} contacto${cuantos === 1 ? "" : "s"} más? Los que ya la recibieron no la reciben de nuevo.`)) return;
+    setContinuando(true);
+    const r = await continuarCampania(id, conTope ? n : undefined);
+    setContinuando(false);
+    if (!r.ok) { setProgreso(`Error: ${r.error}`); return; }
+    await seguirProgreso(r.total ?? 0, "Enviados");
+    if (r.restantes) setMsg(`Todavía quedan ${r.restantes.toLocaleString("es-AR")} sin recibir.`);
     router.refresh();
   };
 
@@ -488,6 +519,32 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
                   ? `Se manda el asunto A y B al ${abPct}% de la lista. Después elegís el ganador y se manda al resto.`
                   : "Se envía solo a los contactos de la lista que aceptan marketing y están activos."}
             </p>
+            {/* El tope: mandar de a poco sin fabricar una lista por escalón.
+                No se ofrece con A/B —ese ya reparte una muestra y dos criterios
+                de recorte no tienen respuesta correcta— ni cuando la campaña ya
+                salió, que es el caso de "continuar" de más abajo. */}
+            {/* Sigue visible con la campaña ENVIADA cuando queda gente: el bloque
+                de "continuar" lo usa, y un control que se menciona pero no se ve
+                es peor que no ofrecerlo. */}
+            {puedeEnviar && !abActivo && (!enviado || restantes > 0) && (
+              <label className="block text-xs text-muted">
+                Enviar solo a (opcional)
+                <input
+                  type="number"
+                  min={1}
+                  inputMode="numeric"
+                  placeholder="todos"
+                  className={`${campoBase} mt-1 block w-40`}
+                  value={tope}
+                  onChange={(e) => setTope(e.target.value)}
+                />
+                <span className="mt-1 block">
+                  Vacío manda a toda la audiencia. Con un número, el resto queda para
+                  después y no se pierde.
+                </span>
+              </label>
+            )}
+
             <Button
               variant="accent"
               onClick={enviarTodo}
@@ -502,6 +559,23 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
                     ? "Enviar test A/B"
                     : "Enviar a la lista"}
             </Button>
+
+            {/* 🔑 La campaña dice ENVIADA y todavía tiene gente esperando. Sin
+                este bloque nadie se enteraría: es la contracara del tope. */}
+            {puedeEnviar && estado === "ENVIADA" && !abActivo && restantes > 0 && (
+              <div className="flex flex-wrap items-end gap-2 rounded-lg border border-border bg-surface p-3">
+                <div className="text-sm text-foreground">
+                  Quedan <strong>{restantes.toLocaleString("es-AR")}</strong> sin recibir
+                </div>
+                <Button variant="secondary" size="sm" onClick={continuar} disabled={continuando}>
+                  {continuando ? "…" : "Enviar la tanda que sigue"}
+                </Button>
+                <span className="w-full text-xs text-muted">
+                  Usa el mismo tope de arriba si le ponés un número. Los que ya la
+                  recibieron no la reciben de nuevo.
+                </span>
+              </div>
+            )}
 
             {/* Programar. Solo para quien puede enviar: programar ES enviar, más
                 tarde. Y no se ofrece cuando la campaña ya salió. */}

@@ -82,6 +82,31 @@ export default async function CampaniaEditorPage({
     };
   }
 
+  /**
+   * Cuántos elegibles quedan sin recibir ESTA campaña. Es lo que hace visible
+   * que un envío con tope no terminó: si no, la pantalla dice `ENVIADA` y nadie
+   * se entera de que faltan 1.338 personas.
+   *
+   * ⚠️ Se calcula **solo cuando la campaña ya salió**: es la única situación en
+   * la que sirve, y traer la audiencia entera —16.000 filas en BDI— en cada
+   * carga de un borrador sería pagarlo siempre para no usarlo nunca.
+   *
+   * 🔑 Y se cuenta contra los ids, no restando `total - enviados`: alguien que
+   * recibió y después rebotó ya no es elegible, así que la resta daría de menos
+   * y el botón de continuar no aparecería teniendo gente a la que escribirle.
+   */
+  let restantes = 0;
+  if (campania.estado === "ENVIADA" && campania.abTestPct == null) {
+    const elegibles = await contactosElegibles(cuenta.id, campania);
+    if (elegibles?.length) {
+      const yaTienen = new Set(
+        (await prisma.envio.findMany({ where: { campaniaId: id }, select: { contactoId: true } }))
+          .map((e) => e.contactoId),
+      );
+      restantes = elegibles.filter((c) => !yaTienen.has(c.id)).length;
+    }
+  }
+
   const pct = (n: number) => (enviados ? `${Math.round((n / enviados) * 100)}%` : "0%");
   const stats = enviados > 0
     ? [
@@ -127,6 +152,7 @@ export default async function CampaniaEditorPage({
         estado={campania.estado}
         programadaAt={campania.programadaAt?.toISOString() ?? null}
         abInfo={abInfo}
+        restantes={restantes}
       />
     </div>
   );
