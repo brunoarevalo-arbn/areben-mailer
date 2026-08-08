@@ -111,14 +111,30 @@ export async function toggleAutomation(id: string) {
   // sea *incapaz* de dispararse desde el webhook: tampoco tiene que darlo de
   // alta.
   const event = TRIGGER_EVENT[a.trigger];
+  let avisoWebhook: string | undefined;
   if (nuevoEstado === "ACTIVO" && event && cuenta.tnStoreId && cuenta.tnToken) {
-    await ensureEventoWebhook(cuenta.tnStoreId, cuenta.tnToken, process.env.APP_URL ?? "", event).catch(() => {});
+    const r = await ensureEventoWebhook(
+      cuenta.tnStoreId,
+      cuenta.tnToken,
+      process.env.APP_URL ?? "",
+      event,
+    );
+    // 🔴 Antes esto era un `.catch(() => {})`. Ese silencio dejó a la automation
+    // de carrito abandonado de BDI **activa y sorda durante semanas**, con 0
+    // runs, porque el evento que pedía no existe en la API de TN. Ahora el
+    // motivo sube a la pantalla.
+    //
+    // Se avisa pero **no se frena el toggle**: hay triggers que además se
+    // disparan por otros caminos (un lead de pop-up encola runs sin pasar por
+    // Tiendanube), así que dejar la automation apagada por un webhook que falló
+    // rompería el camino que sí funciona.
+    if (!r.ok) avisoWebhook = r.motivo;
   }
 
   await prisma.automation.update({ where: { id }, data: { estado: nuevoEstado } });
   revalidatePath("/automations");
   revalidatePath(`/automations/${id}`);
-  return { ok: true, estado: nuevoEstado };
+  return { ok: true, estado: nuevoEstado, aviso: avisoWebhook };
 }
 
 /**

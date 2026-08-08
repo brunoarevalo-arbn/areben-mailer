@@ -22,3 +22,19 @@ jobs:
           curl -sS --max-time 60 \
             "https://areben-mailer.vercel.app/api/campanias/procesar-cola?secret=${{ secrets.CRON_SECRET }}" \
             && echo "" || echo "fallo (se reintenta en el próximo ciclo)"
+
+      # Carritos abandonados. Es un POLLER y no un webhook porque Tiendanube no
+      # publica ningún evento de checkout (ver lib/tn/eventos.ts).
+      #
+      # Va DESPUÉS del procesador a propósito: los runs que encole van a tener
+      # `proximoAt` a una hora o más, así que no hay nada que ganar corriéndolo
+      # antes, y si tarda no le roba tiempo a los mails que ya están listos.
+      #
+      # La primera corrida de cada tienda **siembra**: marca todo lo que ve y no
+      # encola nada. Es lo que impide que estrenar esto le escriba a 163 personas
+      # con carritos de hace tres semanas.
+      - name: Detectar carritos abandonados
+        run: |
+          curl -sS --max-time 60 \
+            "https://areben-mailer.vercel.app/api/carritos/detectar?secret=${{ secrets.CRON_SECRET }}" \
+            && echo "" || echo "fallo (se reintenta en el próximo ciclo)"

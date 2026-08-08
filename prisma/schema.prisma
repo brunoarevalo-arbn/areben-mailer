@@ -39,6 +39,7 @@ model Cuenta {
   formularios  Formulario[]
   envios       Envio[]
   imagenes     ImagenMail[]
+  carritos     CarritoVisto[]
 }
 
 model Plantilla {
@@ -122,6 +123,61 @@ model AutomationRun {
   @@index([estado, proximoAt])
   @@index([estado, procesandoHasta])
   @@index([automationId, contactoId, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Carritos abandonados (ingesta del poller)
+//
+// La tabla se crea por SQL crudo (scripts/add-carritos.ts):
+// ⛔ NO usar `prisma db push` en esta base (la comparte areben-popups).
+// ─────────────────────────────────────────────────────────────
+
+enum EstadoCarrito {
+  /// Lo vio la PRIMERA corrida de esta cuenta. No se le escribió y no se le va
+  /// a escribir: es historia, y mandarle a 163 personas de golpe un "te
+  /// olvidaste algo" de hace tres semanas es la peor forma de estrenar esto.
+  SEMBRADO
+  /// Tiene runs creados. El resto lo decide el procesador de automations.
+  ENCOLADO
+  /// Sin mail ni teléfono. Raro: medido el 8-ago-2026, el 100% de los checkouts
+  /// de BDI, Zattia y Stunned traían los dos.
+  SIN_CONTACTO
+  /// Terminó comprando. La única métrica que dice si esto sirve.
+  RECUPERADO
+  /// Fuera de la ventana, o la cuenta no tiene automation activa.
+  DESCARTADO
+}
+
+model CarritoVisto {
+  id       String @id @default(cuid())
+  cuentaId String
+  cuenta   Cuenta @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+
+  /// El `id` del checkout en Tiendanube. **BIGINT y no String**: es el cursor
+  /// del poller (`MAX(tnCheckoutId)` → `since_id`), y sobre texto ese MAX sería
+  /// lexicográfico ("999…" > "1000…").
+  tnCheckoutId BigInt
+
+  contactoId String?
+  contacto   Contacto?     @relation(fields: [contactoId], references: [id], onDelete: SetNull)
+  estado     EstadoCarrito @default(SEMBRADO)
+
+  email        String?
+  telefono     String? // crudo, como lo devuelve TN
+  total        Decimal? @db.Decimal(12, 2)
+  abandonedUrl String   @default("")
+
+  creadoEnTnAt DateTime?
+  completadoAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  /// La idempotencia del poller: inserta con `ON CONFLICT DO NOTHING` y sólo
+  /// encola lo que devolvió fila, así dos crons simultáneos se reparten el
+  /// trabajo sin necesitar un lease.
+  @@unique([cuentaId, tnCheckoutId])
+  @@index([cuentaId, tnCheckoutId(sort: Desc)])
+  @@index([cuentaId, creadoEnTnAt])
 }
 
 enum RolUsuario {
@@ -231,6 +287,7 @@ model Contacto {
   intereses ContactoInteres[]
   envios    Envio[]
   runs      AutomationRun[]
+  carritos  CarritoVisto[]
 
   @@unique([cuentaId, email])
   @@index([cuentaId, estado])

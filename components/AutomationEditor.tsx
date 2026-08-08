@@ -53,7 +53,19 @@ export function AutomationEditor({
 
   const guardar = () => startSave(async () => { await guardarAutomation(payload()); setMsg("Guardado ✓"); setTimeout(() => setMsg(null), 2000); });
   const prueba = () => startSend(async () => { await guardarAutomation(payload()); const r = await enviarPruebaAutomation(id, pruebaEmail); setMsg(r.ok ? `Prueba enviada ✓` : `Error: ${r.error}`); setTimeout(() => setMsg(null), 4000); });
-  const toggle = () => startToggle(async () => { await guardarAutomation(payload()); const r = await toggleAutomation(id); if (r.ok && r.estado) setEstado(r.estado); });
+  // 🔴 El resultado del toggle SE MIRA. Antes se descartaba entero, así que
+  // "no podés encender: la marca no tiene remitente" no llegaba a la pantalla y
+  // el botón parecía no hacer nada. El `aviso` es la otra mitad: la automation
+  // quedó activa pero Tiendanube rechazó su webhook, o sea que no se va a
+  // disparar sola. Ninguno de los dos se auto-oculta — un mensaje que se borra
+  // solo a los 4 segundos no sirve para algo que hay que ir a resolver.
+  const toggle = () => startToggle(async () => {
+    await guardarAutomation(payload());
+    const r = await toggleAutomation(id);
+    if (!r.ok) { setMsg(`Error: ${r.error ?? "no se pudo cambiar el estado"}`); return; }
+    if (r.estado) setEstado(r.estado);
+    setMsg(r.aviso ? `⚠️ ${r.aviso}` : null);
+  });
 
   return (
     // `data-editor` levanta el cap de 1152px del layout (ver el `has-[]` de
