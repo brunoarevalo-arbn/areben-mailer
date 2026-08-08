@@ -28,10 +28,22 @@ export const maxDuration = 60;
 /**
  * Hasta cuándo tiene sentido preguntar por un carrito.
  *
- * 🔴 No es un límite técnico —TN los sirve 30 días— sino de SIGNIFICADO: una
- * compra tres semanas después del abandono no la recuperó el mail, y contarla
- * infla justo el número del que cuelga la decisión de pagarle a Meta por
- * mensaje. Siete días es holgado contra una espera de 3 h.
+ * 🔴 **Primero, es de SIGNIFICADO**: una compra tres semanas después del abandono
+ * no la recuperó el mail, y contarla infla justo el número del que cuelga la
+ * decisión de pagarle a Meta por mensaje. Siete días es holgado contra una
+ * espera de 3 h.
+ *
+ * 🔴 **Y además es lo que hace SEGURO leer el 404 como "compró".** Un checkout
+ * que se convierte en orden desaparece de TN, así que `estadoDeCheckout` mapea
+ * 404 → completado — pero un checkout **purgado** devuelve exactamente lo mismo,
+ * y TN los conserva **30 días accesibles y los borra a los 90**. Con la ventana
+ * en 7 días la purga no puede alcanzar a ninguno de los que consultamos; con la
+ * ventana en 30 o más, la caducidad se contaría como recuperación y el número
+ * mejoraría solo con el tiempo, sin que nadie compre nada.
+ *
+ * ⚠️ **Subir esta constante sin más rompe eso.** Si algún día hay que ampliar la
+ * ventana, primero hay que distinguir el 404-por-compra del 404-por-purga (hoy
+ * son indistinguibles desde la API).
  */
 const VENTANA_DIAS = 7;
 
