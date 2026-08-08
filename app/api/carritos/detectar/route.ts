@@ -130,7 +130,16 @@ async function procesarCuenta(
   // ahorro de API que justificaba filtrar arriba, pero aplicado donde no rompe
   // la siembra. Si todavía no está sembrada, se sigue: sembrar es lo que evita
   // que prender la automation mañana dispare 30 días de historia.
-  if (activas.length === 0 && !sembrando) {
+  //
+  // 🔴 **`dry` es la excepción, y sin ella la simulación de abajo era código
+  // muerto.** Este corte no miraba `dry`, así que una cuenta sembrada con la
+  // automation pausada —el único estado en el que alguien quiere simular—
+  // devolvía `leidos: 0` y el motivo, que se lee igual que "no hay carritos".
+  // Justo el número que hace falta para decidir si conviene prenderla era el
+  // que no se podía medir. Se sigue sólo si hay una automation en condiciones
+  // de mandar: sin eso, la simulación no responde ninguna pregunta y la
+  // llamada a TN se gasta al pedo.
+  if (activas.length === 0 && !sembrando && !(dry && listas.length > 0)) {
     r.motivo = listas.length
       ? "automation pausada (ya sembrada)"
       : "esta marca no tiene automation de carrito abandonado";
