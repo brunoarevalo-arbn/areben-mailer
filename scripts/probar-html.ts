@@ -335,6 +335,43 @@ titulo("Lo que no puede faltar nunca");
   ok(sinTexto.length === 0, "todo tipo con contenido aporta algo a la parte de texto", sinTexto.join(", "));
 }
 
+// ─── Bloques apagados en las dos vistas ──────────────────────────────────────
+titulo("Un bloque oculto en las DOS vistas no existe para nadie (8-ago-2026)");
+{
+  // El caso real: el T01 de BDI tenía el `encabezado` y el `menu` apagados en
+  // escritorio Y en celular. No se dibujaban... y sin embargo aparecían en la
+  // notificación del teléfono, atrás del preheader.
+  const oculto = { ...nuevoBloque("texto"), texto: "NO-DEBERIA-SALIR" } as Bloque;
+  oculto.estilo = { caja: { ocultarMovil: true, ocultarEscritorio: true } };
+  const visible = { ...nuevoBloque("texto"), texto: "SI-SALE" } as Bloque;
+  const doc = { v: V_ACTUAL, bloques: [oculto, visible] } as unknown as ContenidoCampania;
+
+  const txt = renderEmailTexto(doc, OPTS);
+  ok(!txt.includes("NO-DEBERIA-SALIR"),
+     "el text/plain NO lo incluye (de ahí sale el texto de preview del buzón)");
+  ok(txt.includes("SI-SALE"), "y el bloque de al lado sigue saliendo");
+
+  // La misma pregunta pero apagando SOLO una vista: ahí el bloque sí se ve en
+  // la otra, así que su texto tiene que seguir estando.
+  for (const clave of ["ocultarMovil", "ocultarEscritorio"] as const) {
+    const b = { ...nuevoBloque("texto"), texto: "UNA-SOLA-VISTA" } as Bloque;
+    b.estilo = { caja: { [clave]: true } };
+    const t = renderEmailTexto({ v: V_ACTUAL, bloques: [b] } as unknown as ContenidoCampania, OPTS);
+    ok(t.includes("UNA-SOLA-VISTA"), `con solo ${clave} el texto SÍ sale (se ve en la otra vista)`);
+  }
+
+  // 🔴 Y el orden de las dos reglas del media query, que es lo que decide qué
+  // pasa en el celular cuando están las dos clases. Invertirlo hace que
+  // "mostrar" le gane a "ocultar", que es el bug que esto cierra.
+  const mq = TODO.slice(TODO.indexOf("@media only screen"));
+  const iMovil = mq.indexOf(`.${CLASES.ocultarMovil}{`);
+  const iEscritorio = mq.indexOf(`.${CLASES.ocultarEscritorio}{`);
+  ok(iMovil > 0 && iEscritorio > 0, "las dos reglas están en el media query");
+  ok(iMovil > iEscritorio,
+     "ocultarMovil va DESPUÉS de ocultarEscritorio: con las dos clases gana ocultar",
+     `movil en ${iMovil}, escritorio en ${iEscritorio}`);
+}
+
 // ─── Peso ────────────────────────────────────────────────────────────────────
 titulo("Peso: Gmail recorta a ~102 KB y al recortar TIRA el <style>");
 {

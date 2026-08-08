@@ -64,6 +64,25 @@ export const CLASES = {
    */
   colTitulo: "m-c1",
   colTexto: "m-c2",
+  /**
+   * 🔴 **El orden de estas dos reglas adentro del media query ES la regla**, y
+   * por eso `m-hide` se emite ÚLTIMA (ver `cabeza`).
+   *
+   * Un bloque apagado en las dos vistas lleva las dos clases, y adentro del
+   * media query las dos son `!important` con la misma especificidad: gana la
+   * que se escribió después. Hasta el 8-ago-2026 estaban al revés, así que
+   * `d-hide{display:block!important}` —"en celular sí se ve"— le ganaba a
+   * `m-hide{display:none!important}`, y **el bloque que alguien apagó en las
+   * dos vistas se dibujaba igual en el teléfono**.
+   *
+   * Lo encontró el primer envío de BDI: el `encabezado` y el `menu` estaban
+   * apagados en las dos y salían arriba de la foto en los celulares. Entre dos
+   * órdenes que se contradicen, gana **ocultar**: es la que alguien pidió dos
+   * veces.
+   *
+   * ⚠️ Con UNA sola clase no cambia nada, y ése es todo el alcance del arreglo.
+   * Lo fija `probar-html.ts`, verificado en rojo.
+   */
   ocultarMovil: "m-hide",
   ocultarEscritorio: "d-hide",
   /** La tabla del cuerpo, para que no se pase del ancho de la pantalla. */
@@ -120,8 +139,9 @@ export function cabeza(pal: Paleta): string {
     .${CLASES.subtitulo}{font-size:19px!important}
     .${CLASES.colTitulo}{font-size:13px!important}
     .${CLASES.colTexto}{font-size:12px!important}
-    .${CLASES.ocultarMovil}{display:none!important;max-height:0!important;overflow:hidden!important;mso-hide:all}
     .${CLASES.ocultarEscritorio}{display:block!important;mso-hide:none}
+    /* El orden importa: con ambas clases gana la última, o sea ocultar. */
+    .${CLASES.ocultarMovil}{display:none!important;max-height:0!important;overflow:hidden!important;mso-hide:all}
   }
 </style>
 </head>`;

@@ -702,6 +702,27 @@ export interface CtxEstilo {
  * nombrar un token de la marca, o pintar una palabra sería clavarle un hex que
  * deja de repintarse cuando el comerciante cambia el tema.
  */
+/**
+ * ¿Este bloque está oculto en las DOS vistas? Entonces no lo ve nadie.
+ *
+ * 🔴 Existe por lo que pasó el 8-ago-2026 con el T01 de BDI: el `encabezado` y
+ * el `menu` estaban ocultos en escritorio y en celular, así que no se dibujaban
+ * — pero **`renderEmailTexto` no miraba estas dos claves**, los metía igual en
+ * el `text/plain`, y el buzón arma de ahí el texto de preview. Resultado: la
+ * notificación del teléfono mostraba «BDI ACCESORIOS Novedades Más vendidos
+ * Ofertas» pegado atrás del preheader, que es lo primero que lee la persona.
+ *
+ * 🔑 **Mira solo las dos capas que pueden escribir estas claves** —el documento
+ * y el bloque—, así que no necesita paleta ni contexto y la puede llamar el
+ * renderer de texto, que no arma ninguno de los dos. `BASE` y `BASE_POR_TIPO`
+ * no las tocan (son banderas de una persona, nunca un default), y por eso
+ * saltearlas acá no cambia nada: lo fija `probar-tema.ts`.
+ */
+export function ocultoEnTodas(propio: Estilos | undefined, doc: Estilos | undefined): boolean {
+  const caja = { ...(doc?.caja ?? {}), ...(propio?.caja ?? {}) };
+  return caja.ocultarMovil === true && caja.ocultarEscritorio === true;
+}
+
 export function resolverColor(v: ValorColor | undefined, pal: Paleta): string | undefined {
   if (!v) return undefined;
   if (v.startsWith("$")) {

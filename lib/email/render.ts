@@ -6,7 +6,7 @@
 import { resolverPaleta, combinarTema, type Paleta, type Tema } from "./tema";
 import { leerContenido } from "./esquema";
 import {
-  resolverEstilo, extra, px, padCss, alineacion, tenueSobre,
+  resolverEstilo, extra, px, padCss, alineacion, tenueSobre, ocultoEnTodas,
   type CtxEstilo, type EstiloResuelto, type Estilos, type RolEstilo,
 } from "./estilos";
 import { cabeza, apertura, cierre, botonVml, botonVmlCrudo, clase, clasesDe, CLASES } from "./shell";
@@ -1386,6 +1386,11 @@ export function renderEmailTexto(entrada: ContenidoCampania, opts: RenderOpts): 
     ...bloques.filter((b) => b.tipo === "encabezado").slice(0, 1),
     ...bloques.filter((b) => b.tipo !== "encabezado"),
   ]
+    // 🔴 Un bloque oculto en las dos vistas no se dibuja en ningún lado, pero
+    // hasta el 8-ago-2026 salía igual en el `text/plain` — y de ahí saca el
+    // buzón el texto de preview, así que ensuciaba el preheader. Ver
+    // `ocultoEnTodas`.
+    .filter((b) => !ocultoEnTodas(b.estilo, contenido.estilos))
     .map((b) => bloqueATexto(b, opts))
     .filter((t): t is string => !!t && t.trim() !== "")
     .join("\n\n");
