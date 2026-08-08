@@ -86,12 +86,38 @@ export async function guardarCampania(input: GuardarInput) {
  * (una campaña programada) y ahí no hay sesión. Acá queda lo único que el cron
  * no puede hacer: preguntar quién está pidiendo.
  */
-export async function enviarCampania(id: string): Promise<ResultadoEncolar> {
+export async function enviarCampania(id: string, tope?: number): Promise<ResultadoEncolar> {
   // El envío a la lista completa es la acción más cara de la app: no se deshace
   // y una lista mal armada quema la reputación del dominio. Solo ADMIN.
   const auth = await chequear("enviar");
   if (!auth.ok) return { ok: false, error: auth.error };
-  return encolarCampania(auth.ctx.cuenta, id);
+  return encolarCampania(auth.ctx.cuenta, id, { tope: saneaTope(tope) });
+}
+
+/**
+ * Mandar a los que quedaron afuera del tope de la vez pasada.
+ *
+ * 🔑 **Es una action aparte y no un parámetro de `enviarCampania` a propósito.**
+ * La guarda de "esta campaña ya fue enviada" es lo único que hoy impide que dos
+ * clicks manden dos veces; relajarla con una bandera la convertiría en una
+ * guarda que se apaga sola. Acá, reanudar es algo que alguien pidió por su
+ * nombre. Mismo permiso, porque sigue siendo mandar.
+ */
+export async function continuarCampania(id: string, tope?: number): Promise<ResultadoEncolar> {
+  const auth = await chequear("enviar");
+  if (!auth.ok) return { ok: false, error: auth.error };
+  return encolarCampania(auth.ctx.cuenta, id, { tope: saneaTope(tope), continuar: true });
+}
+
+/**
+ * ⚠️ El tope llega del navegador: un `0` o un negativo dejaría una campaña
+ * `ENVIANDO` sin un solo envío, y un decimal rompe el `slice`. Ausente y basura
+ * significan lo mismo —sin tope—, que es como se comportó siempre.
+ */
+function saneaTope(n: number | undefined): number | undefined {
+  if (n == null) return undefined;
+  const v = Math.floor(Number(n));
+  return Number.isFinite(v) && v > 0 ? v : undefined;
 }
 
 /**

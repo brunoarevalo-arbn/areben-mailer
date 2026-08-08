@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
+import { MANDABLE } from "@/lib/campanias";
 import { crearLista, eliminarLista } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,27 @@ export default async function ListasPage() {
     orderBy: { createdAt: "asc" },
     include: { _count: { select: { contactos: true } } },
   });
+
+  /**
+   * Cuántos de cada lista **van a recibir de verdad**.
+   *
+   * 🔑 El total de `ContactoLista` miente: un rebotado o una baja sigue adentro
+   * de la lista —no se lo borra, ver `decidirAlcance`— pero `contactosElegibles`
+   * lo filtra por `MANDABLE`. Al 8-ago-2026 eso eran 642 personas en BDI: una
+   * lista que decía 500 mandaba 497 y nada lo explicaba.
+   *
+   * ⚠️ Va **una sola consulta agrupada**, no un `count` por lista: son 13 listas
+   * en BDI y esto se dibuja en cada carga de la página.
+   *
+   * Usa la MISMA constante que el envío, igual que `contarSegmento`. Dos
+   * criterios serían una pantalla que promete 500 y un envío de 430.
+   */
+  const porLista = await prisma.contactoLista.groupBy({
+    by: ["listaId"],
+    where: { contacto: { cuentaId: cuenta.id, ...MANDABLE } },
+    _count: { contactoId: true },
+  });
+  const mandables = new Map(porLista.map((g) => [g.listaId, g._count.contactoId]));
 
   return (
     <div className="space-y-6">
@@ -57,6 +79,13 @@ export default async function ListasPage() {
                 <div className="text-2xl font-semibold tabular-nums text-foreground">
                   {l._count.contactos.toLocaleString("es-AR")}
                   <span className="ml-1 text-sm font-normal text-subtle">contactos</span>
+                  {/* El renglón sale SOLO cuando los dos números no coinciden:
+                      en una lista sana repetiría el de arriba y sería ruido. */}
+                  {(mandables.get(l.id) ?? 0) !== l._count.contactos && (
+                    <div className="text-sm font-normal text-muted">
+                      {(mandables.get(l.id) ?? 0).toLocaleString("es-AR")} mandables
+                    </div>
+                  )}
                 </div>
                 {l.tipo === "MANUAL" && (
                   <form action={eliminarLista.bind(null, l.id)}>

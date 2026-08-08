@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { contactosElegibles, crearEnvios } from "@/lib/campanias";
+import { proximaTanda } from "@/lib/contactos/tramos";
 import { arrancarCola } from "@/lib/email/cola";
 import { estadoEnvioMarca, motivoEnTexto } from "@/lib/remitentes";
 import {
@@ -38,8 +39,34 @@ export interface CuentaEnvio {
 }
 
 export type ResultadoEncolar =
-  | { ok: true; total: number; esTest?: boolean; modo: ModoEnvio; omitidos: number }
+  | { ok: true; total: number; esTest?: boolean; modo: ModoEnvio; omitidos: number; restantes?: number }
   | { ok: false; error: string };
+
+/**
+ * Mandar de a poco sobre un destino grande, sin fabricar una lista por escalón.
+ *
+ * 🔑 **Es lo que reemplaza a las listas de tramo.** Hasta hoy, "mandale a 1.000
+ * de estos 5.280" no existía: el motor manda a una lista o segmento COMPLETO,
+ * así que cada escalón de un ramp tenía que fabricar una lista a mano. Eso dejó
+ * 24 listas entre BDI y Zattia, la mayoría sin uso, y —peor— **nada impedía que
+ * dos se solaparan**: el índice único de `Envio` es por campaña, así que evita
+ * el doble envío de LA MISMA campaña, no el de dos campañas distintas.
+ *
+ * Con un tope, el destino es un segmento que se recalcula solo y el "ya le
+ * mandé" sale de `Envio`, que es donde siempre estuvo.
+ */
+export interface OpcionesEncolar {
+  /** Cuántos como máximo. Ausente = todos, que es como se comportó siempre. */
+  tope?: number;
+  /**
+   * Reanudar una campaña ya enviada: manda a los que quedaron afuera del tope.
+   *
+   * 🔑 Es una puerta aparte y no un relajamiento de la guarda de `ENVIADA`:
+   * volver a mandar una campaña terminada tiene que ser algo que alguien pidió
+   * explícitamente, no algo que pasa por apretar dos veces el botón de siempre.
+   */
+  continuar?: boolean;
+}
 
 /**
  * Todo lo que tiene que ser cierto para que una campaña pueda salir, en un solo
@@ -88,14 +115,34 @@ function shuffle<T>(arr: T[]): T[] {
  * Crea los `Envio` de una campaña y la pone `ENVIANDO`. A partir de ahí manda la
  * cola del servidor (`lib/email/cola.ts`), que se auto-encadena sola.
  */
-export async function encolarCampania(cuenta: CuentaEnvio, id: string): Promise<ResultadoEncolar> {
+export async function encolarCampania(
+  cuenta: CuentaEnvio,
+  id: string,
+  opts: OpcionesEncolar = {},
+): Promise<ResultadoEncolar> {
   const campania = await prisma.campania.findFirst({ where: { id, cuentaId: cuenta.id } });
   if (!campania) return { ok: false, error: "Campaña no encontrada" };
-  if (campania.estado === "ENVIANDO" || campania.estado === "ENVIADA")
+
+  // ⚠️ `ENVIANDO` frena las dos puertas: hay una cola con lease corriendo sobre
+  // esta campaña y meterle envíos nuevos en el medio es pedirle a dos workers
+  // que se pisen. Reanudar se hace con la campaña quieta.
+  if (campania.estado === "ENVIANDO")
+    return { ok: false, error: "La campaña se está enviando ahora mismo" };
+  if (opts.continuar) {
+    if (campania.estado !== "ENVIADA")
+      return { ok: false, error: "Solo se puede continuar una campaña que ya salió" };
+  } else if (campania.estado === "ENVIADA") {
     return { ok: false, error: "La campaña ya fue enviada" };
+  }
 
   const motivo = await validarEnvio(cuenta, campania);
   if (motivo) return { ok: false, error: motivo };
+
+  // ⛔ El tope y el A/B se pelean por el mismo recorte: el A/B ya reparte una
+  // muestra entre las dos variantes y decide el resto con el ganador. Dos
+  // criterios de corte encima del otro no tienen una respuesta correcta.
+  if ((opts.tope != null || opts.continuar) && campania.abTestPct != null)
+    return { ok: false, error: "Una campaña con test A/B se manda entera: no admite tope ni continuar" };
 
   const modo = modoEnvio();
   const todos = await contactosElegibles(cuenta.id, campania);
@@ -112,6 +159,27 @@ export async function encolarCampania(cuenta: CuentaEnvio, id: string): Promise<
       error: `Modo ensayo: ninguno de los ${todos.length} contactos elegibles está en ENVIO_ENSAYO.`,
     };
 
+  /**
+   * Los que YA tienen `Envio` de esta campaña salen antes de recortar.
+   *
+   * 🔴 El índice único `[campaniaId, contactoId]` + `skipDuplicates` ya hacen
+   * imposible mandar dos veces, así que esto **no es la protección**: es lo que
+   * hace que el tope signifique algo. Sin este filtro, "los próximos 1.000"
+   * agarra a los primeros 1.000 de siempre, `skipDuplicates` los descarta a
+   * todos y **no sale nadie nuevo** — un botón que dice que mandó y no mandó.
+   */
+  const yaEncolados = new Set(
+    opts.continuar || opts.tope != null
+      ? (await prisma.envio.findMany({ where: { campaniaId: id }, select: { contactoId: true } }))
+          .map((e) => e.contactoId)
+      : [],
+  );
+  // El recorte vive en `proximaTanda` (puro): es la parte que se puede romper
+  // —solaparse, saltear gente— y probarla acá adentro sería mandar mails.
+  const { tanda: aMandar, restantes } = proximaTanda(contactos, yaEncolados, opts.tope);
+  if (aMandar.length === 0)
+    return { ok: false, error: "Ya salió a todos los contactos elegibles de esta campaña" };
+
   const esAB = campania.abTestPct != null;
   if (esAB) {
     // Test A/B: mandar A y B a una muestra; el resto espera al ganador.
@@ -123,14 +191,19 @@ export async function encolarCampania(cuenta: CuentaEnvio, id: string): Promise<
     await crearEnvios(cuenta.id, id, muestra.slice(0, mitad), "A");
     await crearEnvios(cuenta.id, id, muestra.slice(mitad), "B");
   } else {
-    await crearEnvios(cuenta.id, id, contactos, null);
+    await crearEnvios(cuenta.id, id, aMandar, null);
   }
 
   // ⚠️ `programadaAt` se limpia al disparar. Si no, una campaña que alguien
   // mandó a mano antes de su hora queda con una fecha que ya no significa nada,
   // y el panel la seguiría anunciando para las 19:00.
   await prisma.campania.update({ where: { id }, data: { estado: "ENVIANDO", programadaAt: null } });
+  // `total` es cuántos envíos EXISTEN, no cuántos se crearon recién: al
+  // continuar, es acumulado. Es el número que la pantalla necesita para decir
+  // "1.000 de 2.338", y para un envío sin tope los dos coinciden.
   const total = await prisma.envio.count({ where: { campaniaId: id } });
   after(() => arrancarCola());
-  return esAB ? { ok: true, total, esTest: true, modo, omitidos } : { ok: true, total, modo, omitidos };
+  return esAB
+    ? { ok: true, total, esTest: true, modo, omitidos }
+    : { ok: true, total, modo, omitidos, restantes };
 }

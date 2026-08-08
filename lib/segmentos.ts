@@ -7,6 +7,7 @@ export type CondCampo =
   | "tnAcceptsMkt"
   | "esComprador"
   | "estado"
+  | "recibio"
   | "abrio"
   | "clickeo";
 
@@ -52,6 +53,34 @@ function condToWhere(c: Condicion): Prisma.ContactoWhereInput | null {
         : { OR: [{ tnTotalGastado: null }, { tnTotalGastado: { lte: 0 } }] };
     case "estado":
       return { estado: c.valor as Prisma.ContactoWhereInput["estado"] };
+    /**
+     * ENTREGA, no enganche: "¿le mandamos algo?". Sale de `Envio` igual que
+     * `abrio` y `clickeo`, pero **no comparte su `case` a propósito**, porque el
+     * "no" significa lo contrario. Existe para poder decir *"compradores de
+     * gmail que no recibieron nada en 30 días"* sin fabricar una lista.
+     */
+    case "recibio": {
+      const dias = Number(c.valor);
+      if (Number.isNaN(dias)) return null;
+      const umbral = diasAtras(dias);
+      if (c.op === "si") return { envios: { some: { enviadoAt: { gte: umbral } } } };
+      /**
+       * 🔴 **Acá el `none` PELADO es lo correcto, y es justo lo que en `abrio` /
+       * `clickeo` es un bug. No "arreglar" esto para que se parezca a aquello.**
+       *
+       * En `abrio`, "no lo hizo" tiene que significar **recibió y no lo hizo**:
+       * con un `none` a secas entra quien nunca recibió nada y el mail de
+       * reactivación le pega a gente que jamás supo de la marca.
+       *
+       * En `recibio`, "no recibió" tiene que incluir **exactamente a esa
+       * gente**: son el público al que le queremos escribir. Pedirle además
+       * haber recibido algo sería pedir "recibió y no recibió".
+       *
+       * Es la misma forma con el sentido opuesto. Lo fija `probar-segmentos.ts`.
+       */
+      if (c.op === "no") return { envios: { none: { enviadoAt: { gte: umbral } } } };
+      return null;
+    }
     // Enganche. Sale de `Envio` (`abiertoAt` / `clickAt`), que cuelga del
     // contacto: es la única condición que no mira una columna de `Contacto`.
     case "abrio":
@@ -106,6 +135,14 @@ export const CAMPOS: { campo: CondCampo; label: string; ops: { op: string; label
   { campo: "esComprador", label: "Es comprador", tipo: "bool", ops: [{ op: "eq", label: "es" }] },
   { campo: "tnAcceptsMkt", label: "Acepta marketing", tipo: "bool", ops: [{ op: "eq", label: "es" }] },
   { campo: "estado", label: "Estado", tipo: "estado", ops: [{ op: "eq", label: "es" }] },
+  // "Recibió" va antes que las dos de enganche porque es la pregunta anterior:
+  // no es cómo reaccionó alguien, es si le escribimos. Es la que reemplaza a las
+  // listas de tramo — "no recibió nada en 30 días" es una audiencia que se
+  // recalcula sola, contra una lista fabricada, que es una foto que envejece.
+  { campo: "recibio", label: "Recibió un mail", tipo: "dias", ops: [
+    { op: "si", label: "sí, en los últimos (días)" },
+    { op: "no", label: "no, en los últimos (días)" },
+  ] },
   // ⚠️ El click va ANTES que la apertura en la lista a propósito: es la señal
   // que no se falsifica. El pixel de apertura lo dispara el escaneo de
   // seguridad de Outlook sin que nadie mire el mail —es lo que infló las 880

@@ -46,6 +46,31 @@ for (const campo of ["clickeo", "abrio"] as const) {
   ok(Array.isArray(cond) && cond.length === 2, `${campo} no → son DOS condiciones (recibió + no lo hizo)`);
 }
 
+console.log("\n2 bis) 🔴 'recibio' es la MISMA forma con el sentido OPUESTO");
+// El riesgo de este campo no es que no ande: es que alguien lo lea al lado de
+// `abrio` y lo "empareje" agregándole el `some enviadoAt`. Eso lo rompe en
+// silencio — el segmento pasaría a excluir justo a la gente a la que se le
+// quiere escribir, y como sigue devolviendo contactos, nadie lo notaría hasta
+// mirar por qué el ramp no avanza.
+{
+  const si = json(una("recibio", "si", 30));
+  ok(si.includes('"some"') && si.includes("enviadoAt"), "recibio sí → envios.some.enviadoAt");
+  ok(si.includes('"gte"'), "recibio sí → acotado por fecha", si);
+
+  const no = reglasToWhere(una("recibio", "no", 30));
+  const cond = ((no as { AND?: unknown[] }).AND ?? [])[0] as Record<string, unknown>;
+  ok(JSON.stringify(cond).includes('"none"'), "recibio no → usa none");
+  // La afirmación que importa: UNA sola condición, no dos.
+  ok(
+    !!cond?.envios && Object.keys(cond).length === 1 && !("AND" in cond),
+    "recibio no → es UNA sola condición: NO exige haber recibido algo",
+    JSON.stringify(cond),
+  );
+  // Y la contracara, para que quede claro que la asimetría es a propósito:
+  const abrioNo = ((reglasToWhere(una("abrio", "no", 30)) as { AND?: unknown[] }).AND ?? [])[0] as { AND?: unknown[] };
+  ok(Array.isArray(abrioNo?.AND) && abrioNo.AND.length === 2, "y 'abrio no' SIGUE siendo dos condiciones");
+}
+
 console.log("\n3) Lo que no se entiende no filtra (nunca 'todos')");
 // Un where vacío como destino de campaña es la lista entera. Ante la duda, la
 // condición se descarta — pero entonces el segmento tiene que quedar en nada,
@@ -84,6 +109,15 @@ async function main() {
   console.log(`     contactos sin ningún envío: ${sinEnvios} de ${enLaBase}`);
   ok(sinEnvios > 0, "hay gente que nunca recibió nada (si no, esta prueba no prueba nada)");
   ok(clickNo <= recibieron, "y ninguno de ellos entra en el 'no clickeó'");
+
+  // 🔴 La contracara medida: en `recibio` esa misma gente SÍ tiene que entrar.
+  // Es el caso de uso entero — "mandale a los que todavía no recibieron nada".
+  const recSi = await cuantos(una("recibio", "si", 90));
+  const recNo = await cuantos(una("recibio", "no", 90));
+  console.log(`     recibio sí: ${recSi} · recibio no: ${recNo} · en la base: ${enLaBase}`);
+  ok(recSi + recNo === enLaBase, "recibio sí + no = TODA la base (nadie queda afuera)", `${recSi}+${recNo} ≠ ${enLaBase}`);
+  ok(recNo >= sinEnvios, "los que nunca recibieron nada entran en el 'no recibió'", `${recNo} < ${sinEnvios}`);
+  ok(recSi === recibieron, "y el 'sí recibió' coincide con la cuenta directa", `${recSi} ≠ ${recibieron}`);
 
   console.log(fallos === 0 ? "\n✅ Segmentos OK" : `\n❌ ${fallos} fallo(s)`);
 }

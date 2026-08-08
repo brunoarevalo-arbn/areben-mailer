@@ -125,6 +125,46 @@ export function planTramos<T extends { email: string }>(contactos: T[], opts: Pl
  * orden alfabético del panel sea el orden de envío, y sin el tamaño adentro: el
  * nombre es la identidad de la lista y no puede cambiar si se corrige la escalera.
  */
+/**
+ * La tanda que sigue, **sin fabricar ninguna lista**.
+ *
+ * 🔑 Es lo que reemplaza a todo lo de arriba. Los tramos existen porque el motor
+ * manda a un destino COMPLETO; con un tope, el destino puede ser un segmento que
+ * se recalcula solo y el "a éste ya le mandé" sale de `Envio`, que es donde
+ * siempre estuvo. Lo de arriba se queda para el ramp que ya está en curso.
+ *
+ * Puro a propósito: es la parte que se puede romper —solaparse, saltear gente—
+ * y probarla creando envíos de verdad significaría mandar mails de verdad.
+ *
+ * @param elegibles   la audiencia completa de hoy (un segmento se mueve entre tandas)
+ * @param yaEncolados ids que ya tienen `Envio` de ESTA campaña
+ * @param tope        cuántos como máximo. Ausente = todos.
+ */
+export function proximaTanda<T extends { id: string }>(
+  elegibles: readonly T[],
+  yaEncolados: ReadonlySet<string>,
+  tope?: number,
+): { tanda: T[]; restantes: number } {
+  // 🔑 **Esta línea es la que impide el solape**, no el orden: quien ya tiene
+  // `Envio` de esta campaña no vuelve a entrar. Y como cada tanda saca de lo que
+  // queda, tampoco se saltea a nadie — el ramp termina cubriendo a todos.
+  const pendientes = elegibles.filter((c) => !yaEncolados.has(c.id));
+  /**
+   * ⚠️ **El orden NO agrega cobertura: agrega reproducibilidad.** La consulta
+   * que trae a los elegibles no lleva `ORDER BY`, así que dos llamadas seguidas
+   * pueden devolver el mismo conjunto en distinto orden. Sin este sort, la
+   * misma pregunta contestada dos veces da dos tandas distintas — y eso es
+   * mentira apenas una pantalla muestre "les va a llegar a éstos" antes de
+   * mandar, o apenas alguien quiera repetir un envío para entender qué pasó.
+   *
+   * Por `id` porque es estable, único y ya viene en el select. Cuál sea importa
+   * mucho menos que que **sea siempre el mismo**.
+   */
+  const ordenados = [...pendientes].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const tanda = tope != null && tope > 0 ? ordenados.slice(0, tope) : ordenados;
+  return { tanda, restantes: ordenados.length - tanda.length };
+}
+
 export function nombreTramo(prefijo: string, n: number, buzon: Buzon): string {
   return `${prefijo} — T${String(n).padStart(2, "0")} ${buzon}`;
 }

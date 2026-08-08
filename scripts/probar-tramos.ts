@@ -7,6 +7,7 @@
 //
 // Correr:  node --import tsx scripts/probar-tramos.ts
 import {
+  proximaTanda,
   BUZONES,
   agruparPorBuzon,
   buzonDe,
@@ -145,6 +146,62 @@ const ok = (cond: boolean, msg: string) => {
     agruparPorBuzon(contactos).get('gmail')!.map((c) => c.email).join() === 'a@gmail.com,b@gmail.com',
     'el orden de entrada se preserva (dos corridas dan el mismo reparto)',
   );
+}
+
+{
+  // ── `proximaTanda`: mandar de a poco SIN fabricar listas ──────────────────
+  //
+  // 🔴 Las dos fallas que esto ataja son mudas: si dos tandas se solapan, una
+  // persona recibe dos veces y nadie lo ve hasta que se queja; si saltean, hay
+  // gente que no recibe nunca y tampoco lo ve nadie. No hay error, no hay log.
+  const todos = Array.from({ length: 250 }, (_, i) => ({ id: `c${String(i).padStart(3, '0')}` }));
+
+  // Simula el ramp entero: se manda de a 100 hasta que no queda nadie, igual que
+  // apretar "continuar" en la pantalla.
+  const encolados = new Set<string>();
+  const tandas: string[][] = [];
+  for (let i = 0; i < 10 && encolados.size < todos.length; i++) {
+    // ⚠️ Cada vuelta baraja la entrada: la consulta real no lleva ORDER BY, así
+    // que el orden PUEDE cambiar entre tandas. Si `proximaTanda` se apoyara en
+    // el orden recibido, esto lo destapa.
+    const desordenado = [...todos].sort(() => Math.random() - 0.5);
+    const { tanda, restantes } = proximaTanda(desordenado, encolados, 100);
+    tandas.push(tanda.map((c) => c.id));
+    tanda.forEach((c) => encolados.add(c.id));
+    if (i === 0) ok(restantes === 150, 'la primera tanda informa cuántos quedan');
+  }
+
+  ok(tandas.length === 3, `250 de a 100 son 3 tandas (fueron ${tandas.length})`);
+  ok(
+    tandas.map((t) => t.length).join() === '100,100,50',
+    `la última tanda es el resto, no otra completa (${tandas.map((t) => t.length).join()})`,
+  );
+  const todosLosMandados = tandas.flat();
+  ok(new Set(todosLosMandados).size === todosLosMandados.length, '🔴 NADIE recibe dos veces');
+  ok(new Set(todosLosMandados).size === todos.length, '🔴 y NADIE queda sin recibir');
+
+  // 🔑 **Lo que el `sort` sí garantiza: la misma pregunta da la misma tanda.**
+  // La cobertura la asegura el filtro de encolados (arriba); el orden asegura
+  // que lo que una pantalla anuncie sea lo que después sale. Sin el sort, estas
+  // dos llamadas devuelven dos conjuntos distintos y esta línea se pone roja.
+  const barajado1 = [...todos].sort(() => Math.random() - 0.5);
+  const barajado2 = [...todos].sort(() => Math.random() - 0.5);
+  ok(
+    proximaTanda(barajado1, new Set(), 100).tanda.map((c) => c.id).join() ===
+      proximaTanda(barajado2, new Set(), 100).tanda.map((c) => c.id).join(),
+    'la misma audiencia en otro orden da EXACTAMENTE la misma tanda',
+  );
+
+  // Sin tope se comporta como siempre: todos de una.
+  const sinTope = proximaTanda(todos, new Set(), undefined);
+  ok(sinTope.tanda.length === 250 && sinTope.restantes === 0, 'sin tope va la audiencia entera');
+
+  // Y con todos ya encolados no queda nadie: es lo que corta el "continuar".
+  ok(proximaTanda(todos, new Set(todos.map((c) => c.id)), 100).tanda.length === 0,
+     'con todos ya encolados, la tanda es vacía');
+
+  // El tope más grande que la audiencia no inventa gente.
+  ok(proximaTanda(todos, new Set(), 9999).tanda.length === 250, 'un tope enorme no pasa de la audiencia');
 }
 
 console.log();
