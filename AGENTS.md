@@ -69,6 +69,8 @@ node --import tsx scripts/probar-portapapeles.ts # lo que se pega es un bloque n
 node --import tsx scripts/probar-estilos.ts    # la cascada respeta el orden y no inyecta
 node --import tsx scripts/probar-render.ts     # golden: el mail no cambió sin querer
 node --import tsx scripts/probar-html.ts       # VML, media queries, tracking, peso
+node --import tsx scripts/probar-banda-link.ts # una foto puede ser un link, y NUNCA un <a> dentro de otro
+node --import tsx scripts/probar-precio-oculto.ts # lo que el HTML oculta, el text/plain tampoco lo manda
 node --import tsx scripts/probar-encabezado.ts # el link de baja no se puede borrar
 node --import tsx scripts/probar-imagenes.ts   # permisos, multi-tenant y SVG de /api/imagenes
 node --import tsx scripts/probar-marca.ts      # la marca de TN no se guarda adentro del Json
@@ -414,6 +416,14 @@ uno roto. Lo verifica `probar-html.ts` recorriendo las etiquetas con `class`.
   no se esconde, Outlook dibuja los dos botones.
 - ⚠️ **`inyectarTracking` matchea `<a>` Y `<v:roundrect>`.** Con solo `<a>`, todo
   click desde Outlook quedaba sin medir.
+- 🔑 **Una banda con foto (`hero`/`seccion`) puede ser ella misma el link:
+  `botonUrl` sin `botonTexto`.** Antes de eso el motor no tenía **ninguna** forma
+  de hacer clickeable una foto —el bloque `imagen` tampoco: su `url` es el `src`—
+  y un mail de portada fotográfica salía con su superficie más grande muerta. Se
+  midió en el T01 de BDI: 350 px de foto, 141 aperturas, CTOR 2,1%.
+  ⛔ **Excluyente con el botón**: un `<a>` adentro de otro. Outlook va por el
+  `href` del `<v:rect>`, y ⚠️ **ese click no lo mide el tracking** (el regex mira
+  `<a>` y `<v:roundrect>`). Lo fija `probar-banda-link.ts`.
 - El corte responsive es **el ancho del mail**, no 600px fijos.
 - ⛔ Prohibido: `position` (Gmail lo elimina), `flex`/`grid`/`float`, `box-shadow`,
   `calc()`, `rem`/`em`, base64.
