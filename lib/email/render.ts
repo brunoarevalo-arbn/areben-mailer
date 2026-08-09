@@ -306,6 +306,23 @@ function bandaConFoto(o: {
   interior: string;
   /** El botón, ya partido en sus dos mitades desnudas. Ver `botonPartes`. */
   boton?: { vml: string; ancla: string };
+  /**
+   * La banda ENTERA es un link.
+   *
+   * 🔴 Existe porque hasta el 9-ago-2026 el motor no tenía **ninguna** forma de
+   * hacer clickeable una foto: el `hero` sólo emitía un `<a>` por su botón y el
+   * bloque `imagen` no emite ninguno (su `url` es el `src`, no un destino). Un
+   * mail de portada fotográfica —lo normal en indumentaria y accesorios— salía
+   * con su superficie más grande muerta. Se midió en el T01 de BDI: 350 px de
+   * foto arriba de todo, 141 aperturas, y tocarla no hacía nada.
+   *
+   * ⛔ **Mutuamente excluyente con `boton`**: un `<a>` adentro de otro no es
+   * HTML válido y los clientes lo resuelven cada uno a su manera. Quien llama
+   * ya los hace excluyentes (la banda es link *porque* no hay botón), y el
+   * `if` de abajo lo vuelve a exigir para que un call site nuevo no lo rompa
+   * en silencio.
+   */
+  href?: string;
 }): string {
   const alto = Math.min(600, Math.max(120, Math.round(o.alto)));
   // El velo: una capa del color `bg` encima de la foto, para que el texto se
@@ -325,10 +342,23 @@ function bandaConFoto(o: {
   // `background-color` de respaldo: si la imagen no carga —Outlook con las
   // imágenes bloqueadas, un 404— el texto queda sobre el color y no sobre el
   // blanco de la tarjeta, que es donde se volvía invisible.
-  // Cada rama con su mitad del botón: el VML pelado adentro del condicional de
-  // Outlook, el ancla pelada adentro del de todos los demás. Ver `botonPartes`.
+  // Toda la banda como link. Nunca junto con el botón: ver `href` arriba.
+  //
+  // Outlook lo lleva en el `href` del `<v:rect>` —una forma VML acepta un
+  // destino igual que el `<v:roundrect>` del botón— y los demás en una `<a>`
+  // que reemplaza al `<div>`. Es `display:block` porque una `<a>` inline no
+  // toma el `min-height` y quedaría un link del alto de una línea sobre una
+  // foto de 350 px, que es peor que no tenerlo: parece clickeable toda y
+  // responde una franja.
+  //
+  // ⚠️ `text-decoration:none` va acá y no en los hijos: el título y la bajada
+  // ya traen su propio `color`, pero el subrayado del ancla lo heredarían.
+  const href = o.boton ? undefined : sanearUrl(o.href);
+  const aMso = href ? ` href="${esc(href)}"` : "";
+  const et = href ? "a" : "div";
+  const aExt = href ? `${aMso} style="text-decoration:none;display:block;` : ` style="`;
   return `<!--[if mso]>
-<v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:${o.pal.ancho}px;height:${alto}px">
+<v:rect xmlns:v="urn:schemas-microsoft-com:vml"${aMso} fill="true" stroke="false" style="width:${o.pal.ancho}px;height:${alto}px">
 <v:fill type="frame" src="${esc(o.foto)}" color="${fondo}"${velo > 0 ? ` opacity="${(1 - velo / 100).toFixed(2)}"` : ""} />
 <v:textbox inset="0,0,0,0">
 <div style="${o.estiloCaja}">
@@ -338,9 +368,9 @@ ${o.interior}${o.boton?.vml ?? ""}
 </v:rect>
 <![endif]-->
 <!--[if !mso]><!-->
-<div style="background-color:${fondo};background-image:${capaVelo}url(${esc(o.foto)});background-size:cover;background-position:center;min-height:${px(alto)};${o.estiloCaja}">
+<${et}${aExt}background-color:${fondo};background-image:${capaVelo}url(${esc(o.foto)});background-size:cover;background-position:center;min-height:${px(alto)};${o.estiloCaja}">
 ${o.interior}${o.boton?.ancla ?? ""}
-</div>
+</${et}>
 <!--<![endif]-->`;
 }
 
@@ -1019,6 +1049,16 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
           // Sin el botón: adentro del condicional de Outlook va partido en dos.
           interior: `${t}${s}`,
           boton: b.botonTexto ? botonPartes(b.botonTexto, b.botonUrl, e("boton"), pal) : undefined,
+          // 🔑 **`botonUrl` sin `botonTexto` = la foto entera es el link.**
+          // No hace falta un campo nuevo ni subir `V_ACTUAL`: esa combinación
+          // no significaba nada (los bloques ricos dibujan el botón cuando hay
+          // `botonTexto`, así que vaciar el texto era la forma de no dibujarlo),
+          // y se verificó contra prod el 9-ago-2026 que **no existe en ningún
+          // documento guardado** — 0 casos en las 23 campañas, plantillas y
+          // automations de la base. El helper `cta()` de los presets tampoco la
+          // produce: emite los dos campos o ninguno. ⇒ Darle significado no
+          // mueve un solo mail ya guardado.
+          href: b.botonUrl,
         });
       }
 
@@ -1051,6 +1091,8 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
           foto: b.fondoImagen, alto: b.alto ?? 220, velo: b.velo, bg, pal, estiloCaja,
           interior: `${t}${tx}`,
           boton: b.botonTexto ? botonPartes(b.botonTexto, b.botonUrl, e("boton"), pal) : undefined,
+          // La misma banda del `hero`, así que la misma regla. Ver allá el por qué.
+          href: b.botonUrl,
         });
       }
       return `<div style="background:${colorCss(bg, pal.tarjeta)};${estiloCaja}">${t}${tx}${btn}</div>`;
@@ -1301,11 +1343,20 @@ const campoATexto = (v: TextoRico): string =>
 /** Un bloque, en texto. `null` = no aporta nada legible (imágenes sueltas, etc.). */
 function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
   const link = (texto: string, url?: string) => (url ? `${texto}: ${url}` : texto);
-  /** "PRINT CASE (iPhone 11 · Marrón, 2 u.) — 7490". Mismo dato que la línea HTML. */
-  const lineaTexto = (p: ProductoEmail) => {
+  /**
+   * "PRINT CASE (iPhone 11 · Marrón, 2 u.) — 7490". Mismo dato que la línea HTML.
+   *
+   * 🔴 **`precioOculto` también manda acá.** Hasta el 9-ago-2026 esta función no
+   * lo miraba: una grilla con los precios apagados los mandaba igual en la parte
+   * `text/plain`, que viaja en **cada** envío. No es cosmético — se cazó en el
+   * T02 de BDI, cuya grilla tiene los precios cargados con un factor de 10 de
+   * diferencia ($14.990 contra $1.490 por dos fundas del mismo tipo) y estaba
+   * oculta justo por eso. El mail mostraba una cosa y su mitad de texto otra.
+   */
+  const lineaTexto = (p: ProductoEmail, sinPrecio = false) => {
     const detalle = [p.variante, (p.cantidad ?? 1) > 1 ? `${p.cantidad} u.` : null].filter(Boolean);
     // Mismo formato que el HTML: TN devuelve "10990.00" y en el mail va "$10.990".
-    const precio = p.precioPromo || p.precio;
+    const precio = sinPrecio ? "" : p.precioPromo || p.precio;
     return `${p.nombre}${detalle.length ? ` (${detalle.join(", ")})` : ""}${precio ? ` — ${fmtPrecio(precio)}` : ""}`;
   };
   switch (b.tipo) {
@@ -1328,12 +1379,12 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
     case "imagen":
       return b.alt ? `[${b.alt}]` : null;
     case "productos":
-      return (b.items ?? []).map((p) => link(`· ${lineaTexto(p)}`, p.url)).join("\n") || null;
+      return (b.items ?? []).map((p) => link(`· ${lineaTexto(p, b.precioOculto)}`, p.url)).join("\n") || null;
     // Los productos salen de `opts`, igual que en el HTML: la parte de texto no
     // puede quedarse corta o el mail se vuelve vacío para quien lo lea así.
     case "productos-dinamicos":
       return (opts.productosDinamicos?.[claveProductos(b)] ?? [])
-        .map((p) => link(`· ${lineaTexto(p)}`, p.url))
+        .map((p) => link(`· ${lineaTexto(p, b.precioOculto)}`, p.url))
         .join("\n") || null;
     case "carrito": {
       const lineas = (b.items ?? []).map((p) => link(`· ${lineaTexto(p)}`, p.url));
@@ -1372,11 +1423,15 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
     case "espaciador":
       // No aporta nada legible: en texto plano el aire ya lo dan los saltos.
       return null;
+    // El botón, o —cuando la banda entera es el link— la URL pelada. Sin la
+    // segunda rama, un mail cuya portada fotográfica es su único destino sale
+    // sin un solo link en la versión de texto. Es el mismo `botonTexto ? … : url`
+    // que ya usa `columnas` unas líneas más arriba, por la misma razón.
     case "hero":
-      return [campoATexto(b.titulo), b.subtitulo && campoATexto(b.subtitulo), b.botonTexto ? link(b.botonTexto, b.botonUrl) : null]
+      return [campoATexto(b.titulo), b.subtitulo && campoATexto(b.subtitulo), b.botonTexto ? link(b.botonTexto, b.botonUrl) : b.botonUrl]
         .filter(Boolean).join("\n") || null;
     case "seccion":
-      return [campoATexto(b.titulo), b.texto && campoATexto(b.texto), b.botonTexto ? link(b.botonTexto, b.botonUrl) : null]
+      return [campoATexto(b.titulo), b.texto && campoATexto(b.texto), b.botonTexto ? link(b.botonTexto, b.botonUrl) : b.botonUrl]
         .filter(Boolean).join("\n") || null;
     case "cupon":
       return [b.texto, b.codigo, b.botonTexto ? link(b.botonTexto, b.botonUrl) : null].filter(Boolean).join("\n") || null;

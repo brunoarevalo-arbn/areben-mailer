@@ -29,6 +29,27 @@ import { textoPlano, type TextoRico } from "@/lib/email/texto-rico";
 const plano = (v: TextoRico | undefined): string => (v === undefined ? "" : textoPlano(v));
 
 /**
+ * El cartelito del "Link del botón" de una banda con foto (`hero` / `seccion`).
+ *
+ * 🔑 **La combinación existe pero no se adivina**: con foto y sin texto de
+ * botón, el link se lo come la banda entera y la foto pasa a ser clickeable.
+ * Sin este renglón la feature está en el motor y no en la cabeza de nadie — es
+ * el mismo criterio que el hint de una celda de `columnas`, que avisa que con
+ * botón el link de la celda no se usa.
+ *
+ * Los tres estados son los tres que se pueden mirar en pantalla, y por eso
+ * también avisa el caso inútil: una URL sin texto y **sin foto** no dibuja nada,
+ * que era el estado en el que el T01 de BDI dejó 350 px de portada muerta.
+ */
+function linkDeBanda(conFoto: boolean, botonTexto: string | undefined, botonUrl: string | undefined): string | undefined {
+  if (botonTexto) return undefined; // Hay botón: el link es del botón, y punto.
+  if (!botonUrl) return conFoto ? "Sin texto de botón, este link hace clickeable toda la foto." : undefined;
+  return conFoto
+    ? "✓ Sin texto de botón: la foto entera es el link."
+    : "⚠️ Sin texto de botón y sin foto de fondo no se dibuja ningún link. Poné el texto, o una foto.";
+}
+
+/**
  * El formulario de UN bloque: lo que antes vivía adentro de cada fila de la
  * lista y ahora se dibuja en el panel de la derecha.
  *
@@ -287,8 +308,15 @@ export function FormBloque({
           )}
           <CampoRico label="Título principal" value={b.titulo} onChange={(titulo) => set({ titulo })} pal={pal} cuerpo={false} filas={2} />
           <CampoRico label="Subtítulo" value={b.subtitulo} onChange={(subtitulo) => set({ subtitulo })} pal={pal} cuerpo filas={2} />
-          <Input label="Texto del botón" fullWidth value={b.botonTexto} onChange={(e) => set({ botonTexto: e.target.value })} />
-          <Input label="Link del botón" fullWidth value={b.botonUrl} placeholder="https://…" onChange={(e) => set({ botonUrl: e.target.value })} />
+          <Input label="Texto del botón" fullWidth value={b.botonTexto} placeholder="Opcional" onChange={(e) => set({ botonTexto: e.target.value })} />
+          <Input
+            label="Link del botón"
+            fullWidth
+            value={b.botonUrl}
+            placeholder="https://…"
+            onChange={(e) => set({ botonUrl: e.target.value })}
+            hint={linkDeBanda(!!b.fondoImagen, b.botonTexto, b.botonUrl)}
+          />
           <ColorFijo label="Fondo del texto" value={b.bg} onChange={(bg) => set({ bg })} />
         </div>
       );
@@ -301,7 +329,14 @@ export function FormBloque({
           <CampoRico label="Título de la sección" value={b.titulo} onChange={(titulo) => set({ titulo })} pal={pal} cuerpo={false} filas={2} />
           <CampoRico label="Texto" value={b.texto} onChange={(texto) => set({ texto })} pal={pal} cuerpo multilinea filas={4} />
           <Input label="Texto del botón" fullWidth value={b.botonTexto} placeholder="Opcional" onChange={(e) => set({ botonTexto: e.target.value })} />
-          <Input label="Link del botón" fullWidth value={b.botonUrl} placeholder="https://…" onChange={(e) => set({ botonUrl: e.target.value })} />
+          <Input
+            label="Link del botón"
+            fullWidth
+            value={b.botonUrl}
+            placeholder="https://…"
+            onChange={(e) => set({ botonUrl: e.target.value })}
+            hint={linkDeBanda(conFoto, b.botonTexto, b.botonUrl)}
+          />
           <Select
             label="Fondo"
             fullWidth
