@@ -6,6 +6,7 @@ import {
   type ValorColor, type EstiloBloque,
 } from "@/lib/email/estilos";
 import type { Paleta } from "@/lib/email/tema";
+import { ratioEnTexto, type AvisoContraste } from "@/lib/email/contraste";
 import { campoCompacto, tapTarget } from "@/lib/ui";
 import { Stepper } from "@/components/ui/Stepper";
 import { Pipette, RotateCcw } from "lucide-react";
@@ -36,6 +37,7 @@ export function ControlColor({
   valor,
   resuelto,
   pal,
+  aviso,
   onChange,
 }: {
   label: string;
@@ -43,6 +45,12 @@ export function ControlColor({
   /** El color que se ve hoy, ya resuelto a hex. Es lo que muestra el chip "auto". */
   resuelto: string | undefined;
   pal: Paleta;
+  /**
+   * El veredicto de legibilidad de este color contra el fondo que tiene atrás,
+   * ya calculado por quien conoce el bloque. El control no lo deduce: acá no se
+   * sabe sobre qué se apoya el texto.
+   */
+  aviso?: AvisoContraste | null;
   onChange: (v: ValorColor | undefined) => void;
 }) {
   const libre = valor !== undefined && !esToken(valor);
@@ -128,6 +136,20 @@ export function ControlColor({
             Un color a mano queda clavado: no se repinta cuando cambia el color de la marca.
           </span>
         </div>
+      )}
+
+      {/* El número va SIEMPRE que haya aviso, aunque el cartel de arriba diga lo
+          mismo: éste es el que está al lado del control que lo arregla. */}
+      {aviso && (
+        <p
+          className={`text-xs leading-relaxed ${
+            aviso.nivel === "invisible" ? "text-danger-foreground" : "text-warning-foreground"
+          }`}
+        >
+          {aviso.nivel === "invisible"
+            ? `No se ve sobre el fondo que tiene atrás (${ratioEnTexto(aviso.ratio)}).`
+            : `Se lee con dificultad sobre su fondo (${ratioEnTexto(aviso.ratio)}).`}
+        </p>
       )}
     </div>
   );

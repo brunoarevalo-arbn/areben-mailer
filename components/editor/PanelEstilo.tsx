@@ -4,6 +4,7 @@ import {
   RANGOS, ROLES_POR_TIPO, propsDeRol,
   type EstiloBloque, type EstiloResuelto, type Estilos, type RolEstilo, type ValorColor,
 } from "@/lib/email/estilos";
+import { avisarContraste, superficieDe, type AvisoContraste } from "@/lib/email/contraste";
 import { FUENTES, FUENTE_LABEL, type Paleta } from "@/lib/email/tema";
 import type { TipoBloque } from "@/lib/email/render";
 import { ControlBool, ControlColor, ControlEnum, ControlNumero, ControlTamanoBoton } from "@/components/editor/ControlEstilo";
@@ -114,6 +115,7 @@ export function PanelEstilo({
   onChange,
   resolver,
   pal,
+  bg,
   roles,
   avanzado,
   abiertos,
@@ -126,6 +128,12 @@ export function PanelEstilo({
   onChange: (e: Estilos | undefined) => void;
   resolver: (rol: RolEstilo) => EstiloResuelto;
   pal: Paleta;
+  /**
+   * El fondo propio del bloque (`hero.bg` / `seccion.bg`), para ubicar sobre qué
+   * se apoya su texto. Sin esto el aviso de contraste mediría contra la tarjeta
+   * y no contra la portada.
+   */
+  bg?: string;
   /** Qué roles mostrar. Por defecto, los que el bloque dibuja de verdad. */
   roles?: readonly RolEstilo[];
   /** ¿Se ven las perillas finas? Cuelga del rol, no de una preferencia del navegador. */
@@ -223,6 +231,34 @@ export function PanelEstilo({
         ? [secciones[0].rol]
         : [];
 
+  /**
+   * ¿El texto de este rol se lee sobre lo que tiene atrás?
+   *
+   * 🔴 **Nació del T01 de BDI**: seis nombres de producto salieron a 501 casillas
+   * con el color del fondo puesto a mano, contraste 1.00:1. El motor obedeció
+   * —tiene que obedecer, es el mail de quien lo arma— y no había ningún lugar
+   * donde eso se viera antes de apretar Enviar.
+   *
+   * El botón se mide contra **su propio fondo** y no contra la superficie del
+   * bloque: es la única parte del mail que trae la suya puesta.
+   *
+   * ⚠️ En la capa de DOCUMENTO —"en este mail, todos los títulos…"— la superficie
+   * es siempre la tarjeta, porque esa capa no es de ningún bloque: un color
+   * elegido ahí cae sobre todos, y la tarjeta es donde se apoya la mayoría. La
+   * lectura fina de cada bloque sale en el panel de ESE bloque.
+   */
+  const superficie = superficieDe(tipo, resolver("caja"), pal, bg);
+  const avisoDe = (rol: RolEstilo): AvisoContraste | null => {
+    const e = resolver(rol);
+    if (rol === "imagen" || rol === "caja") return null;
+    const fondo = rol === "boton" ? e.fondo ?? superficie : superficie;
+    return avisarContraste(e.color, fondo, e.elegidas.has("color") || e.elegidas.has("fondo"));
+  };
+  const avisos = secciones
+    .map(({ rol }) => ({ rol, aviso: avisoDe(rol) }))
+    .filter((a): a is { rol: RolEstilo; aviso: AvisoContraste } => a.aviso !== null);
+  const invisibles = avisos.filter((a) => a.aviso.nivel === "invisible");
+
   return (
     // Un desplegable por rol, y NO abajo de un breakpoint: cinco roles por seis
     // a dieciocho propiedades en una sola columna continua también son malos a
@@ -233,6 +269,33 @@ export function PanelEstilo({
     // juntos. Es lo que obliga a que `abiertos` sea una lista y no un solo rol,
     // y a que el valor siga al DOM en vez de gobernarlo.
     <div className="space-y-4">
+      {/* 🔑 **Arriba de todo y fuera de los desplegables, a propósito.** El aviso
+          que vive adentro del rol sólo lo ve quien ya abrió ese rol, y el color
+          ilegible del T01 estaba en un bloque que nadie había vuelto a abrir. Si
+          el cartel no se ve con el panel plegado, no frena nada. */}
+      {avisos.length > 0 && (
+        <p
+          role="status"
+          className={`rounded-lg border px-3 py-2 text-xs leading-relaxed ${
+            invisibles.length
+              ? "border-danger-border bg-danger text-danger-foreground"
+              : "border-warning-border bg-warning text-warning-foreground"
+          }`}
+        >
+          {invisibles.length > 0 ? (
+            <>
+              <strong>No se ve:</strong>{" "}
+              {invisibles.map((a) => ROL_LABEL[a.rol].toLowerCase()).join(", ")} — el color
+              elegido es casi el mismo que el del fondo.
+            </>
+          ) : (
+            <>
+              <strong>Se lee con dificultad:</strong>{" "}
+              {avisos.map((a) => ROL_LABEL[a.rol].toLowerCase()).join(", ")}.
+            </>
+          )}
+        </p>
+      )}
       {secciones.map(({ rol, visibles }) => {
         const propio = valor?.[rol];
         const res = resolver(rol);
@@ -274,6 +337,11 @@ export function PanelEstilo({
                       valor={bruto as ValorColor | undefined}
                       resuelto={res[k as "color" | "fondo" | "bordeColor"] as string | undefined}
                       pal={pal}
+                      // El par que se mide es texto↔fondo, así que el mismo
+                      // aviso cuelga de los dos controles del botón —tocar
+                      // cualquiera de los dos lo arregla— y de ninguno del
+                      // borde, que no tiene letras encima.
+                      aviso={k === "color" || (rol === "boton" && k === "fondo") ? avisoDe(rol) : null}
                       onChange={(v) => set(rol, k, v)}
                     />
                   );

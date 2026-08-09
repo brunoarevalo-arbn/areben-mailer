@@ -9,6 +9,7 @@ import {
   resolverEstilo, extra, px, padCss, alineacion, tenueSobre, ocultoEnTodas,
   type CtxEstilo, type EstiloResuelto, type Estilos, type RolEstilo,
 } from "./estilos";
+import { superficieDe } from "./contraste";
 import { cabeza, apertura, cierre, botonVml, botonVmlCrudo, clase, clasesDe, CLASES } from "./shell";
 import { claveProductos } from "./bloques";
 import { redConIcono, urlIcono } from "./redes";
@@ -639,7 +640,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // en un mail oscuro con tarjeta clara (o al revés) el nombre de la marca
       // saldría del color equivocado.
       const c = caja();
-      const t = e("titulo", pal.fondo);
+      const t = e("titulo", superficieDe("encabezado", c, pal));
       const al = c.align ?? t.align ?? "center";
       // `margin:auto` centra un bloque aunque el `text-align` no lo alcance
       // (la barrita y el logo son elementos de bloque, no texto).
@@ -989,7 +990,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const banda = !c.autoFondo;
       // Legibilidad contextual: sobre una banda oscura los links se recalculan
       // solos si nadie eligió el color, igual que el título de una portada.
-      const t = e("cuerpo", banda ? c.fondo : undefined);
+      const t = e("cuerpo", banda ? superficieDe("menu", c, pal) : undefined);
       // 🔴 `alineacion()` y no `t.align ?? "center"`: ese `??` es letra muerta
       // —`BASE.cuerpo` ya escribe `align:"left"`, así que `t.align` nunca es
       // `undefined`— y por eso la barra de navegación salió **pegada a la
@@ -1023,7 +1024,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // fondo y no por el tema: un hero blanco dentro de un mail oscuro tendría
       // título blanco sobre blanco si se heredara la paleta.
       const c = caja();
-      const bg = c.autoFondo ? b.bg || pal.tarjeta : c.fondo!;
+      const bg = superficieDe("hero", c, pal, b.bg);
       const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h1${clase(...clasesTitulo(x, b.titulo))} style="margin:0 0 10px;font-size:${px(x.tamano ?? 30)};line-height:${x.interlinea ?? 1.2};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${tituloHtml(b.titulo, ctx.pal)}</h1>`; })() : "";
       // La bajada va por `nl()` —y no por `esc()`— igual que la de `seccion`:
       // es la otra mitad del mismo par y no había razón para que una admitiera
@@ -1068,7 +1069,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     }
     case "seccion": {
       const c = caja();
-      const bg = c.autoFondo ? b.bg || pal.seccion : c.fondo!;
+      const bg = superficieDe("seccion", c, pal, b.bg);
       // 🔴 El margen de abajo separa de lo que VIENE, no del borde de la caja —
       // del borde se ocupa `padY`. Estaba cableado, así que una sección de una
       // sola línea salía 16 px más alta de lo que pedía su padding y no había
@@ -1099,7 +1100,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     }
     case "cupon": {
       const c = caja();
-      const bg = c.fondo ?? pal.cuponFondo;
+      const bg = superficieDe("cupon", c, pal);
       // 🔑 **Los únicos tres números que la variante decide.** Son los huecos
       // entre las tres partes y el que separa la caja de lo que sigue: ninguno
       // tiene perilla en el panel, así que sin esto un cupón no se puede achatar

@@ -63,6 +63,7 @@ node --import tsx scripts/probar-productos-dinamicos.ts # la consulta se guarda,
 node --import tsx scripts/probar-links-productos.ts # un producto sin publicar no sale, y nada más frena
 node --env-file=.env --import tsx scripts/verificar-productos-tn.ts # ↑ pero contra la API real de TN
 node --import tsx scripts/probar-tema.ts       # un tema no deja el mail ilegible
+node --import tsx scripts/probar-contraste.ts  # el panel avisa el texto invisible, y mide contra el fondo que el mail PINTA
 node --import tsx scripts/probar-marcado.ts    # el `data-b` del preview NO sale en un envío
 node --import tsx scripts/probar-esquema.ts    # el Json de bloques migra sin perder nada
 node --import tsx scripts/probar-portapapeles.ts # lo que se pega es un bloque nuestro, y sale con id nuevo
@@ -199,6 +200,32 @@ propia banda— y hubo que clavar el color a mano. **En una banda de saturación
 media el color se escribe**, no se hereda. (El otro motivo para clavarlo es que
 el color *sea* el rasgo: el lima de `dos-colores` sobre negro es legible como
 blanco, pero blanco no es esa referencia.)
+
+🔴 **Un color ELEGIDO se respeta aunque quede ilegible, y por eso el panel avisa**
+(`lib/email/contraste.ts`, 9-ago-2026). El T01 de BDI salió a 501 personas con
+los seis nombres de producto invisibles: el bloque `productos` tenía
+`estilo.cuerpo.color: "$fondo"` guardado a mano y el motor lo dibujó — contraste
+**1.00:1**. El motor no cambia (obedecer es correcto: es el mail de quien lo
+arma); lo que cambia es que ahora se ve antes de mandarlo.
+
+- **`superficieDe(tipo, caja, pal, bg)` es el fondo real de un bloque**, y es la
+  ÚNICA definición: los cinco `case` del renderer que armaban un `bg` a mano
+  (encabezado, menu, hero, seccion, cupon) ahora la llaman. Dos definiciones
+  serían un aviso que dice una cosa y un mail que dibuja otra.
+- **`sobreDeRol` es qué le pasa el renderer a `resolverEstilo` como `sobre`**, rol
+  por rol — y el panel resuelve con eso, que antes no hacía: la pastilla "auto"
+  de una portada mostraba el color de la paleta mientras el mail dibujaba el
+  recalculado.
+- ⚠️ **El ratio NO se calcula con `luminancia()` de `tema.ts`.** Esa pesa los
+  canales crudos (sirve para "¿es oscuro?") y como ratio miente: la primera
+  lectura del T01 dio "3,09:1" con esa fórmula. Un ratio linealiza cada canal
+  antes de pesarlo.
+- 🔑 **Sólo se avisa sobre un color que ELIGIÓ una persona**, y alcanza con que
+  hayan elegido el **fondo** (un botón con fondo nuevo y texto en automático se
+  queda con el `$sobreAcento` del acento viejo). Los defaults no se avisan: el
+  gris tenue mide 2,3:1 y está en las 38 plantillas propias — un cartel que
+  aparece siempre no lo lee nadie. Umbrales **1,5** (no se ve) y **3** (flojo),
+  no los 4,5 de WCAG AA.
 
 **El panel de estilo no ofrece lo que el mail no hace.** Los controles salen de
 `propsDeRol(tipo, rol)` en `estilos.ts`, y `probar-panel-estilo.ts` renderiza el

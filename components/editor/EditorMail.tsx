@@ -7,6 +7,7 @@ import {
 } from "@/lib/email/render";
 import { resolverPaleta, type Tema } from "@/lib/email/tema";
 import { resolverEstilo, ROLES_POR_TIPO, type Estilos, type RolEstilo } from "@/lib/email/estilos";
+import { sobreDeRol } from "@/lib/email/contraste";
 import { armarClip, leerClip, type Pegado } from "@/lib/email/portapapeles";
 import { ListaBloques } from "@/components/editor/ListaBloques";
 import { FormBloque } from "@/components/editor/FormBloque";
@@ -67,6 +68,16 @@ function cajaAlFinal(roles: readonly RolEstilo[]): readonly RolEstilo[] {
  * misma perilla desconectada que `probar-panel-estilo.ts` está pensado para
  * cazar, nada más que a nivel de instancia y no de tipo.
  */
+/**
+ * El fondo propio de una portada o una sección, cuando el bloque lo trae.
+ *
+ * Es la mitad del cálculo de la superficie que `superficieDe` no puede adivinar:
+ * `bg` es un campo del bloque, no de su estilo.
+ */
+function bgDe(b: Bloque): string | undefined {
+  return b.tipo === "hero" || b.tipo === "seccion" ? b.bg : undefined;
+}
+
 function rolesDe(b: Bloque): readonly RolEstilo[] {
   if (b.tipo !== "columnas") return cajaAlFinal(ROLES_POR_TIPO[b.tipo]);
   const variante = b.variante ?? "imagenes";
@@ -725,14 +736,21 @@ export function EditorMail({
                   tipo={seleccionado.tipo}
                   valor={seleccionado.estilo}
                   onChange={(e) => editar({ estilo: e })}
-                  resolver={(rol) =>
-                    resolverEstilo(seleccionado.tipo, rol, {
-                      pal,
-                      doc: contenido.estilos,
-                      propio: seleccionado.estilo,
-                    })
-                  }
+                  // 🔴 El `sobre` no estaba, y por eso el panel podía mostrar un
+                  // color que el mail no dibujaba: en una portada con fondo
+                  // propio, el título en automático se recalcula contra ESE
+                  // fondo (`tonosSobre`) y acá salía el de la paleta. `sobreDeRol`
+                  // es la misma tabla que usa el renderer, así que ahora las dos
+                  // pantallas contestan lo mismo — que es la condición para que
+                  // el aviso de contraste no mienta.
+                  resolver={(rol) => {
+                    const ctx = { pal, doc: contenido.estilos, propio: seleccionado.estilo };
+                    const caja = resolverEstilo(seleccionado.tipo, "caja", ctx);
+                    const sobre = sobreDeRol(seleccionado.tipo, rol, caja, pal, bgDe(seleccionado));
+                    return resolverEstilo(seleccionado.tipo, rol, ctx, sobre);
+                  }}
                   pal={pal}
+                  bg={bgDe(seleccionado)}
                   roles={rolesDe(seleccionado)}
                   avanzado={avanzado}
                   abiertos={rolesAbiertos}
