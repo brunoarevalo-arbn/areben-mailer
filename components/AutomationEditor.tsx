@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import type { ContenidoCampania } from "@/lib/email/render";
 import { EditorMail } from "@/components/editor/EditorMail";
 import { useHistorial } from "@/components/editor/useHistorial";
+import { AvisoContraste } from "@/components/AvisoContraste";
+import { preguntaAntesDeMandar, revisarContraste } from "@/lib/email/revisar";
 import type { Marca } from "@/lib/marca";
 import { guardarAutomation, enviarPruebaAutomation, toggleAutomation } from "@/app/(app)/automations/actions";
 import { Button } from "@/components/ui/Button";
@@ -59,7 +61,20 @@ export function AutomationEditor({
   // quedó activa pero Tiendanube rechazó su webhook, o sea que no se va a
   // disparar sola. Ninguno de los dos se auto-oculta — un mensaje que se borra
   // solo a los 4 segundos no sirve para algo que hay que ir a resolver.
+  /**
+   * Lo que no se lee en este mail. Igual que en una campaña, pero el momento es
+   * otro: acá no hay botón "Enviar" — **el envío empieza al ACTIVAR**, y a
+   * partir de ahí sale solo, sin que nadie vuelva a mirar la pantalla.
+   */
+  const hallazgos = useMemo(() => revisarContraste(contenido, marca), [contenido, marca]);
+
   const toggle = () => startToggle(async () => {
+    // ⚠️ **Sólo al encender.** Pausar es la acción segura y no se frena por
+    // nada: ante un problema hay que poder apagar sin contestar preguntas.
+    if (estado !== "ACTIVO") {
+      const aviso = preguntaAntesDeMandar(hallazgos);
+      if (aviso && !confirm(`${aviso}\n\n¿Activar igual? A partir de acá el mail sale solo.`)) return;
+    }
     await guardarAutomation(payload());
     const r = await toggleAutomation(id);
     if (!r.ok) { setMsg(`Error: ${r.error ?? "no se pudo cambiar el estado"}`); return; }
@@ -96,6 +111,13 @@ export function AutomationEditor({
             ? <><Pause className="mr-1.5 h-4 w-4" aria-hidden /> Pausar</>
             : <><Play className="mr-1.5 h-4 w-4" aria-hidden /> Activar</>}
         </Button>
+        {/* En su propio renglón de la barra, al lado del botón que la enciende:
+            una automation activa manda sola y nadie vuelve a esta pantalla. */}
+        {hallazgos.length > 0 && (
+          <div className="w-full">
+            <AvisoContraste hallazgos={hallazgos} />
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

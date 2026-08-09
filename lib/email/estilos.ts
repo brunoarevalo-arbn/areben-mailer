@@ -104,6 +104,25 @@ export type RolEstilo =
   /** Precio tachado, variante, cantidad, "y 3 productos más". */
   | "nota";
 
+/**
+ * Cómo se llama cada rol en la pantalla.
+ *
+ * 🔑 Vive acá y no en el panel porque **lo nombran dos pantallas**: los
+ * desplegables del panel de estilo y el aviso de contraste de la pantalla de
+ * envío. Con una copia en cada lado, un rol se llamaría "Texto" en un lugar y
+ * "Cuerpo" en el otro, sobre el mismo color.
+ */
+export const ROL_LABEL: Record<RolEstilo, string> = {
+  caja: "Caja del bloque",
+  titulo: "Título",
+  subtitulo: "Subtítulo",
+  cuerpo: "Texto",
+  boton: "Botón",
+  imagen: "Imagen",
+  precio: "Precio",
+  nota: "Detalles",
+};
+
 export const ROLES: readonly RolEstilo[] = [
   "caja", "titulo", "subtitulo", "cuerpo", "boton", "imagen", "precio", "nota",
 ];

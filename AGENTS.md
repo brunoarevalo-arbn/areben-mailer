@@ -63,7 +63,7 @@ node --import tsx scripts/probar-productos-dinamicos.ts # la consulta se guarda,
 node --import tsx scripts/probar-links-productos.ts # un producto sin publicar no sale, y nada más frena
 node --env-file=.env --import tsx scripts/verificar-productos-tn.ts # ↑ pero contra la API real de TN
 node --import tsx scripts/probar-tema.ts       # un tema no deja el mail ilegible
-node --import tsx scripts/probar-contraste.ts  # el panel avisa el texto invisible, y mide contra el fondo que el mail PINTA
+node --import tsx scripts/probar-contraste.ts  # el panel avisa el texto invisible, la pantalla de envío lo pregunta, y los dos miden contra el fondo que el mail PINTA
 node --import tsx scripts/probar-marcado.ts    # el `data-b` del preview NO sale en un envío
 node --import tsx scripts/probar-esquema.ts    # el Json de bloques migra sin perder nada
 node --import tsx scripts/probar-portapapeles.ts # lo que se pega es un bloque nuestro, y sale con id nuevo
@@ -226,6 +226,35 @@ arma); lo que cambia es que ahora se ve antes de mandarlo.
   gris tenue mide 2,3:1 y está en las 38 plantillas propias — un cartel que
   aparece siempre no lo lee nadie. Umbrales **1,5** (no se ve) y **3** (flojo),
   no los 4,5 de WCAG AA.
+
+### El freno al mandar (`lib/email/revisar.ts`, 9-ago-2026)
+
+🔴 **El cartel del panel sólo lo ve quien abrió ese bloque**, y el `$fondo` del
+T01 estaba en uno que nadie había vuelto a abrir. `revisarContraste(contenido,
+marca)` recorre el documento entero y devuelve los hallazgos; el cartel vive
+**pegado al botón que manda** y `preguntaAntesDeMandar()` arma la pregunta.
+
+- **Cinco puertas, un solo texto**: enviar, continuar la tanda, programar y
+  promover el ganador del A/B (`CampaniaEditor`) + **activar** una automation
+  (`AutomationEditor`, donde el envío empieza al encender y después sale solo).
+  ⚠️ **Pausar nunca pregunta**: la acción segura no se frena por nada.
+- 🔑 **Sólo lo INVISIBLE interrumpe.** El "flojo" se muestra y no corta: cinco de
+  las 42 plantillas propias tienen alguno y una pregunta que aparece siempre se
+  contesta sin leerla. ⚠️ **«Oscura con acento» tiene un invisible a propósito**
+  (botón blanco sobre su amarillo, 1,49:1, clonado de R-019) y está anotada en
+  el ensayo: si nace otra, se pone rojo.
+- 🔑 **`rolesDibujados(bloque)` no es `ROLES_POR_TIPO`.** Esa contesta "qué
+  controles ofrece el panel para este TIPO"; acá la pregunta es de INSTANCIA —
+  una portada sin bajada no dibuja ningún subtítulo, y un color elegido en la
+  capa de documento haría cantar el aviso en todas. Es un espejo de las
+  condiciones del renderer, y `probar-contraste.ts` lo cruza **pintando cada rol
+  de magenta y mirando si sale texto de ese color en el HTML**.
+- ⛔ **Sobre una foto no se mide nada**: en un `hero`/`seccion` con `fondoImagen`
+  el color de atrás lo pone la imagen, así que el bloque se saltea. Un bloque
+  oculto en las dos vistas, también.
+- ⚠️ **No hay freno del lado del servidor y es a propósito**: bloquear
+  contradiría que un color elegido se respeta, y obligaría a persistir la
+  confirmación para que el cron no frenara una campaña programada.
 
 **El panel de estilo no ofrece lo que el mail no hace.** Los controles salen de
 `propsDeRol(tipo, rol)` en `estilos.ts`, y `probar-panel-estilo.ts` renderiza el

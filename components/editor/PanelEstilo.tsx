@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  RANGOS, ROLES_POR_TIPO, propsDeRol,
+  RANGOS, ROLES_POR_TIPO, ROL_LABEL, propsDeRol,
   type EstiloBloque, type EstiloResuelto, type Estilos, type RolEstilo, type ValorColor,
 } from "@/lib/email/estilos";
 import { avisarContraste, superficieDe, type AvisoContraste } from "@/lib/email/contraste";
@@ -96,17 +96,6 @@ const CAMPO: Record<Prop, Def> = {
   italica: { tipo: "bool", label: "Itálica", avanzado: true },
   ocultarMovil: { tipo: "bool", label: "Ocultar en el celular", avanzado: true },
   ocultarEscritorio: { tipo: "bool", label: "Ocultar en escritorio", avanzado: true },
-};
-
-export const ROL_LABEL: Record<RolEstilo, string> = {
-  caja: "Caja del bloque",
-  titulo: "Título",
-  subtitulo: "Subtítulo",
-  cuerpo: "Texto",
-  boton: "Botón",
-  imagen: "Imagen",
-  precio: "Precio",
-  nota: "Detalles",
 };
 
 export function PanelEstilo({

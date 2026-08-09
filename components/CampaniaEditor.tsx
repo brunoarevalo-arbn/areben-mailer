@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { type ContenidoCampania } from "@/lib/email/render";
 import {
@@ -15,6 +15,8 @@ import {
 } from "@/app/(app)/campanias/actions";
 import { EditorMail } from "@/components/editor/EditorMail";
 import { useHistorial } from "@/components/editor/useHistorial";
+import { AvisoContraste } from "@/components/AvisoContraste";
+import { preguntaAntesDeMandar, revisarContraste } from "@/lib/email/revisar";
 import type { Marca } from "@/lib/marca";
 import { Button } from "@/components/ui/Button";
 import { BarraAcciones } from "@/components/ui/BarraAcciones";
@@ -179,6 +181,32 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
     }
   };
 
+  /**
+   * Lo que no se lee en ESTE documento, recorrido entero.
+   *
+   * 🔴 Nació del T01 de BDI: 501 personas recibieron seis nombres de producto
+   * invisibles porque el color estaba a mano en un bloque que nadie había vuelto
+   * a abrir, y el aviso del panel sólo se ve con ese bloque abierto. Acá la
+   * pregunta se hace una vez, sobre todo el mail.
+   *
+   * Se memoriza contra `contenido` porque se recalcula en cada tecleo del asunto
+   * y del nombre: recorrer treinta bloques resolviendo la cascada es barato, pero
+   * no gratis, y este componente se re-renderiza mucho.
+   */
+  const hallazgos = useMemo(() => revisarContraste(contenido, marca), [contenido, marca]);
+
+  /**
+   * La pregunta extra, delante de la de siempre.
+   *
+   * 🔑 **Se antepone, no reemplaza**: la de siempre dice a cuánta gente le va a
+   * llegar, que es el otro dato que hay que mirar antes de apretar. Y si no hay
+   * nada invisible no agrega nada — la pantalla se porta como se portó siempre.
+   */
+  const confirmar = (pregunta: string) => {
+    const aviso = preguntaAntesDeMandar(hallazgos);
+    return confirm(aviso ? `${aviso}\n\n${pregunta}` : pregunta);
+  };
+
   const enviarTodo = async () => {
     if (!destino) { setMsg("Elegí un destino primero"); return; }
     if (abActivo && !asuntoB.trim()) { setMsg("Completá el asunto B"); return; }
@@ -189,7 +217,7 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
       : conTope
         ? `¿Enviar esta campaña a ${n.toLocaleString("es-AR")} contactos como máximo?`
         : "¿Enviar esta campaña a toda la lista (contactos que aceptan marketing)?";
-    if (!confirm(q)) return;
+    if (!confirmar(q)) return;
     setEnviado(true);
     await guardarCampania(campData());
     const r = await enviarCampania(id, conTope ? n : undefined);
@@ -209,7 +237,7 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
     const n = Number(tope);
     const conTope = Number.isFinite(n) && n > 0;
     const cuantos = conTope ? Math.min(n, restantes) : restantes;
-    if (!confirm(`¿Enviar a ${cuantos.toLocaleString("es-AR")} contacto${cuantos === 1 ? "" : "s"} más? Los que ya la recibieron no la reciben de nuevo.`)) return;
+    if (!confirmar(`¿Enviar a ${cuantos.toLocaleString("es-AR")} contacto${cuantos === 1 ? "" : "s"} más? Los que ya la recibieron no la reciben de nuevo.`)) return;
     setContinuando(true);
     const r = await continuarCampania(id, conTope ? n : undefined);
     setContinuando(false);
@@ -229,6 +257,11 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
   const programar = async () => {
     if (!destino) { setMsg("Elegí un destino primero"); return; }
     if (abActivo && !asuntoB.trim()) { setMsg("Completá el asunto B"); return; }
+    // 🔑 Programar ES enviar, más tarde: la misma pregunta. Y acá **importa
+    // más**, porque a las 19:00 no va a haber nadie mirando la pantalla.
+    // ⚠️ Sin nada invisible no pregunta nada — programar nunca pidió confirmar.
+    const aviso = preguntaAntesDeMandar(hallazgos);
+    if (aviso && !confirm(`${aviso}\n\n¿Dejarla programada igual?`)) return;
     setProgramando(true);
     await guardarCampania(campData());
     const r = await programarCampania(id, dia, hora);
@@ -249,7 +282,7 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
   };
 
   const mandarGanador = async (letra: "A" | "B") => {
-    if (!confirm(`¿Mandar el asunto ${letra} al resto de la lista (~${abInfo?.holdout ?? 0} contactos)?`)) return;
+    if (!confirmar(`¿Mandar el asunto ${letra} al resto de la lista (~${abInfo?.holdout ?? 0} contactos)?`)) return;
     setPromoviendo(true);
     const r = await promoverGanador(id, letra);
     if (!r.ok) { setProgreso(`Error: ${r.error}`); setPromoviendo(false); return; }
@@ -455,6 +488,9 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
               Elegí el asunto que mejor rindió y mandalo al resto de la lista (~{abInfo!.holdout.toLocaleString("es-AR")} contactos).
               Las aperturas se van cargando con el tiempo — recargá para ver el dato actualizado.
             </p>
+            {/* El holdout es la parte más grande de la lista: acá también se
+                manda, así que acá también se avisa. */}
+            <AvisoContraste hallazgos={hallazgos} />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {(["A", "B"] as const).map((v) => {
                 const d = v === "A" ? abInfo!.a : abInfo!.b;
@@ -544,6 +580,11 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
                 </span>
               </label>
             )}
+
+            {/* 🔴 Arriba del botón y fuera de todo desplegable, por lo mismo que
+                el del panel: el color del T01 estaba en un bloque que nadie
+                había vuelto a abrir. Acá pasa todo el mundo. */}
+            <AvisoContraste hallazgos={hallazgos} />
 
             <Button
               variant="accent"
