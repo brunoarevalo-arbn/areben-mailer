@@ -17,6 +17,7 @@ import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Paleta } from "@/lib/email/tema";
 import { textoPlano, type TextoRico } from "@/lib/email/texto-rico";
+import { tapTarget } from "@/lib/ui";
 
 /**
  * Un campo con formato, visto como texto pelado.
@@ -89,6 +90,68 @@ function Check({
     </label>
   );
 }
+
+/**
+ * Una barra de opciones excluyentes, para elegir entre pocas y con el nombre a
+ * la vista. Es la misma barra de `ControlTamanoBoton` y del toggle
+ * Escritorio/Celular del preview; vive acá porque aquélla es del panel de
+ * estilo y ésta es de contenido.
+ *
+ * ⚠️ El valor se compara contra **lo escrito en el bloque**, nunca contra lo
+ * resuelto: si no, "Completa" —que es la ausencia del campo— se vería marcada y
+ * sin marcar según de dónde venga el default.
+ */
+function Chips<T extends string>({
+  label,
+  value,
+  opciones,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  opciones: readonly { clave: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div>
+      <span className="mb-1 block text-xs font-semibold text-muted">{label}</span>
+      <div className="flex items-center gap-1 rounded-lg border border-border p-0.5">
+        {opciones.map((o) => (
+          <button
+            key={o.clave}
+            type="button"
+            onClick={() => onChange(o.clave)}
+            aria-pressed={value === o.clave}
+            className={`${tapTarget} flex-1 rounded-md px-2 py-1 text-xs transition-colors ${
+              value === o.clave ? "bg-accent-subtle text-accent-subtle-foreground" : "text-muted hover:text-foreground"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Los cuatro tamaños de una imagen, en % del ancho útil.
+ *
+ * ⚠️ **`undefined` y no `100`**: la ausencia del campo es "como salió siempre", y
+ * es lo que hace que el HTML de un mail ya guardado no se mueva ni un byte.
+ */
+const TAMANOS_IMAGEN = [
+  { clave: "completa", label: "Completa", ancho: undefined },
+  { clave: "grande", label: "Grande", ancho: 75 },
+  { clave: "mediana", label: "Mediana", ancho: 50 },
+  { clave: "chica", label: "Chica", ancho: 33 },
+] as const;
+
+const ALINEACIONES_IMAGEN = [
+  { clave: "left", label: "Izquierda" },
+  { clave: "center", label: "Centro" },
+  { clave: "right", label: "Derecha" },
+] as const;
 
 function Alineacion({
   value,
@@ -403,10 +466,44 @@ export function FormBloque({
       );
     }
 
-    case "imagen":
+    case "imagen": {
+      // El tamaño que está puesto sale de comparar contra lo escrito. Un ancho
+      // que no cae en ninguno de los cuatro (el del control fino de abajo) deja
+      // los chips sin marcar, que es la verdad.
+      const tamano = TAMANOS_IMAGEN.find((t) => t.ancho === b.ancho)?.clave;
       return (
         <div className="space-y-3">
           <ImagenDrop value={b.url} onChange={(url) => set({ url })} />
+          {/* 🔴 Con la foto a borde-a-borde no hay margen que repartir: el bloque
+              saltea el `pad()` y un ancho ahí no significaría nada. En vez de
+              dejar una perilla muerta, los controles desaparecen. */}
+          {b.sangre !== true && (
+            <>
+              <Chips
+                label="Tamaño"
+                value={tamano ?? ""}
+                opciones={TAMANOS_IMAGEN.map((t) => ({ clave: t.clave as string, label: t.label }))}
+                // Una sola escritura: el ancho **y** el apagado de "borde a borde".
+                // En dos llamadas la segunda parte del mismo bloque que la primera
+                // y le pisa el cambio.
+                onChange={(clave) =>
+                  set({ ancho: TAMANOS_IMAGEN.find((t) => t.clave === clave)?.ancho, sangre: undefined })
+                }
+              />
+              <Chips
+                label="Alineación"
+                value={b.align ?? "left"}
+                opciones={ALINEACIONES_IMAGEN}
+                onChange={(align) => set({ align: align === "left" ? undefined : align })}
+              />
+              {b.ancho === undefined && (
+                <p className="text-xs leading-relaxed text-muted">
+                  Con la foto completa la alineación sólo se nota si la imagen es más angosta que
+                  el mail: una foto grande ocupa todo el ancho y no queda lugar que repartir.
+                </p>
+              )}
+            </>
+          )}
           <Input
             label="Texto alternativo"
             fullWidth
@@ -415,10 +512,21 @@ export function FormBloque({
             hint="Lo que se lee cuando el cliente de mail bloquea las imágenes — que es el caso por defecto en Outlook."
           />
           <MasOpciones>
+            {b.sangre !== true && (
+              <Rango
+                label="Ancho exacto"
+                value={b.ancho ?? 100}
+                onChange={(ancho) => set({ ancho: ancho >= 100 ? undefined : ancho, sangre: undefined })}
+                min={25}
+                max={100}
+                step={5}
+                sufijo="%"
+              />
+            )}
             <Check
               label="De borde a borde"
               checked={b.sangre === true}
-              onChange={(sangre) => set({ sangre: sangre || undefined })}
+              onChange={(sangre) => set({ sangre: sangre || undefined, ancho: sangre ? undefined : b.ancho })}
             />
             <p className="text-xs leading-relaxed text-muted">
               Sin margen a los costados ni esquinas redondeadas. Es la portada fotográfica que usan
@@ -428,6 +536,7 @@ export function FormBloque({
           </MasOpciones>
         </div>
       );
+    }
 
     case "productos":
       return (

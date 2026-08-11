@@ -297,6 +297,30 @@ export type Bloque = BloqueBase &
          * redondeada deja cuatro puntitos del color de la tarjeta.
          */
         sangre?: boolean;
+        /**
+         * Cuánto del ancho útil ocupa la foto, en % (10-100).
+         * **Ausente = 100**, que es como se dibujó siempre.
+         *
+         * Va acá y no en el rol `imagen` de la cascada —donde `EstiloBloque.ancho`
+         * existe desde siempre— por dos motivos. El estilo **cascadea**: un ancho
+         * en la capa de documento alcanzaría también a la grilla de `productos`,
+         * a las celdas de `columnas` y al `video`, que no lo emiten, y eso es
+         * justo la perilla desconectada que caza `probar-panel-estilo`. Y las
+         * perillas numéricas del panel están detrás del permiso `avanzado`,
+         * mientras que "qué tan grande sale esta foto" es la decisión más básica
+         * de quien arma el mail. El precedente es `logoAncho` del encabezado.
+         *
+         * 🔴 **Excluyente con `sangre`**: una foto a borde-a-borde saltea el
+         * `pad()`, así que ahí un ancho no significa nada. El editor apaga una al
+         * elegir la otra, y el renderer le da prioridad a `sangre`.
+         */
+        ancho?: number;
+        /**
+         * Dónde queda la foto cuando no ocupa todo el ancho. **Ausente = izquierda**,
+         * que es donde caía una imagen de menos de 100% antes de que esto existiera.
+         * Sin `ancho` no hace nada — no hay lugar libre que repartir.
+         */
+        align?: "left" | "center" | "right";
       }
     | {
         tipo: "productos";

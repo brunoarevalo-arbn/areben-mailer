@@ -728,7 +728,44 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       if (b.sangre) {
         return `<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" width="100%" style="width:100%;max-width:100%;height:auto;display:block;border:0" />`;
       }
-      return pad(`<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" style="max-width:100%;height:auto;border-radius:${px(t.radio ?? 8)};margin:8px 0 16px;display:block${extra(t, ["radio", "align", "tamano", "color"])}" />`, caja());
+      const c = caja();
+      const resto = extra(t, ["radio", "align", "tamano", "color"]);
+      // Sin tamaño ni alineación sale byte por byte como salió siempre: la foto
+      // ocupa el ancho útil y no hay ningún `<div>` de más. Todo lo de abajo es
+      // la rama nueva.
+      if (b.ancho === undefined && b.align === undefined) {
+        return pad(`<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" style="max-width:100%;height:auto;border-radius:${px(t.radio ?? 8)};margin:8px 0 16px;display:block${resto}" />`, c);
+      }
+      // 🔑 **El ancho va en PÍXELES y también como atributo.** Outlook de
+      // escritorio ignora `max-width` y no escala una imagen por CSS: con un
+      // `width:50%` dibujaría la foto a su tamaño original. Es lo mismo que ya
+      // hace el logo del encabezado, y por eso el porcentaje se resuelve acá
+      // contra el ancho útil REAL —el del mail menos el padding lateral que pone
+      // `pad()`, o sea 536 px en el mail de 600 de fábrica—, nunca contra un 600
+      // cableado que mentiría en cuanto alguien mueva el margen.
+      //
+      // ⚠️ El clamp vive acá y no en `esquema.ts`: `sanearBloque` deja pasar las
+      // claves que no conoce, y para un documento que ya está en la versión
+      // actual `esActual()` ni lo corre. El renderer es el último lugar por el
+      // que pasa todo, igual que el de `logoAncho`.
+      const util = pal.ancho - 2 * (c.padX ?? 32);
+      const w =
+        b.ancho === undefined
+          ? undefined
+          : Math.round((util * Math.min(100, Math.max(25, Math.round(b.ancho)))) / 100);
+      // Sin `ancho` la foto sale a su tamaño natural (acotada por `max-width`) y
+      // sólo se la alinea: es lo único que se podía hacer con una foto más
+      // angosta que la tarjeta, y hasta hoy no había forma de decirlo.
+      const medida = w === undefined ? "" : ` width="${w}"`;
+      const estiloMedida = w === undefined ? "max-width:100%" : `width:${px(w)};max-width:100%`;
+      const img = `<img src="${esc(b.url)}"${medida} alt="${esc(b.alt ?? "")}" style="${estiloMedida};height:auto;border-radius:${px(t.radio ?? 8)};display:inline-block${resto}" />`;
+      // La alineación va como `text-align` del contenedor y la foto pasa a ser
+      // `inline-block`: `margin:0 auto` no centra nada en Outlook —es el mismo
+      // motivo por el que el shell centra con una tabla y no con un `div`— y Word
+      // sí respeta el `text-align` del párrafo que contiene a la imagen. El
+      // margen se muda al contenedor por lo mismo. Es literalmente la forma del
+      // ícono de celda, que ya anda en los tres clientes.
+      return pad(`<div style="margin:8px 0 16px;text-align:${b.align ?? "left"}">${img}</div>`, c);
     }
     case "productos":
       return pad(
