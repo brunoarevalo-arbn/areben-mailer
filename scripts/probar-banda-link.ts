@@ -1,4 +1,5 @@
-// Una banda con foto (`hero` / `seccion`) puede ser ella misma el link.
+// Una foto puede ser un link: la banda de un `hero`/`seccion` (secciones 1-6) y
+// el bloque `imagen` (7-11).
 //
 //   node --import tsx scripts/probar-banda-link.ts
 //
@@ -130,6 +131,91 @@ for (const { que, con } of BANDAS) {
   // como límite conocido, no como falla: el destino igual funciona.
   ok(h.includes(`<v:rect xmlns:v="urn:schemas-microsoft-com:vml" href="${DESTINO}"`),
     `${que}: ⚠️ el <v:rect> lleva la URL cruda — el click desde Outlook de escritorio no se mide`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// El bloque `imagen` con destino (11-ago-2026).
+//
+// 🔴 Por qué se agregó: la banda de arriba resolvió la portada FOTOGRÁFICA, pero
+// no la foto suelta. El T03 de BDI pasó su portada a un bloque `imagen` para
+// poder recortarla a 16:9 y **perdió el link en el camino** — o sea que elegir el
+// recorte costaba el CTA más grande del mail. Se midió en el T02: la portada
+// clickeable trajo 2 de los 9 clickers.
+//
+// `imagen` tiene TRES ramas de dibujo (a sangre · completa · con ancho/align) y
+// cada una emite un `<img>` distinto: por eso los casos se corren sobre las tres
+// y no sobre una.
+const FOTO2 = "https://ejemplo.test/foto.jpg";
+const RAMAS: { que: string; extra: Record<string, unknown>; display: string }[] = [
+  { que: "a sangre", extra: { sangre: true }, display: "block" },
+  { que: "completa", extra: {}, display: "block" },
+  { que: "con ancho", extra: { ancho: 50, align: "center" }, display: "inline-block" },
+];
+const img = (x: Record<string, unknown>) => ({ tipo: "imagen", url: FOTO2, ...x }) as Bloque;
+// ⚠️ **No se puede contar `<a>` sobre el mail entero**: el pie emite SIEMPRE el
+// ancla del link de baja (`probar-encabezado.ts` fija justamente eso), así que
+// un `!h.includes("<a ")` da rojo con la feature apagada. La pregunta correcta
+// es si la FOTO quedó adentro de un ancla.
+const fotoLinkeada = (h: string) => /<a\b[^>]*>\s*<img\b[^>]*src="[^"]*foto\.jpg"/.test(h);
+/** El interior del ancla de la foto, para exigir que no haya otra adentro. */
+const dentroDelAncla = (h: string) => {
+  const i = h.indexOf(`<a href="${DESTINO}"`);
+  return i < 0 ? "" : h.slice(i + 1, h.indexOf("</a>", i));
+};
+
+console.log("\n7) `imagen` con `enlace` ⇒ la foto entera es el link");
+for (const { que, extra, display } of RAMAS) {
+  const h = html([img({ ...extra, enlace: DESTINO })]);
+  ok(h.includes(`<a href="${DESTINO}"`), `${que}: hay un <a> con el destino`);
+  ok(new RegExp(`<a href="${DESTINO.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*display:${display}`).test(h),
+    `${que}: el ancla es display:${display}`, h.slice(h.indexOf("<a href"), h.indexOf("<a href") + 160));
+  // Sin esto Outlook le dibuja a la foto el borde azul de link.
+  ok(/<img[^>]*\sborder="0"/.test(h), `${que}: el <img> lleva border="0"`);
+  ok(/<a[^>]*text-decoration:none/.test(h), `${que}: el ancla no subraya`);
+  // Un `<a>` adentro de otro: el bloque `imagen` no emite ningún otro ancla, así
+  // que alcanza con contar.
+  ok(fotoLinkeada(h), `${que}: la foto quedó adentro del ancla`);
+  ok(!dentroDelAncla(h).includes("<a "), `${que}: nunca un <a> adentro de otro`);
+}
+
+console.log("\n8) `imagen` sin `enlace` sale BYTE POR BYTE como salía");
+// La garantía de que esto no mueve ningún mail ya guardado, que es lo mismo que
+// custodia el golden pero dicho acá, donde se lee al tocar la feature.
+for (const { que, extra } of RAMAS) {
+  const h = html([img(extra)]);
+  ok(!fotoLinkeada(h), `${que}: sin enlace la foto NO queda adentro de un ancla`);
+  ok(!/<img[^>]*\sborder="0"/.test(h), `${que}: sin enlace tampoco aparece el border="0"`);
+}
+
+console.log("\n9) El esquema de la URL se filtra en el EMISOR");
+for (const v of VENENOS) {
+  for (const { que, extra } of RAMAS) {
+    const h = html([img({ ...extra, enlace: v })]);
+    ok(!fotoLinkeada(h), `${que}: \`${v.slice(0, 22)}…\` no produce link`);
+    ok(!h.includes(v), `${que}: \`${v.slice(0, 22)}…\` no aparece en el HTML`);
+  }
+  ok(!texto([img({ enlace: v })]).includes(v), `text/plain: \`${v.slice(0, 22)}…\` tampoco sale en texto`);
+}
+
+console.log("\n10) La foto clickeable deja su destino en el text/plain");
+// 🔴 Hasta hoy el `case "imagen"` devolvía `[alt]` o nada: quien lee el mail en
+// texto se quedaba sin el CTA más grande.
+const tAlt = texto([img({ enlace: DESTINO, alt: "Girlhood Collection" })]);
+ok(tAlt.includes(`Girlhood Collection: ${DESTINO}`), "con alt: sale 'alt: url'");
+ok(!tAlt.includes("[Girlhood"), "con alt: ya no sale entre corchetes");
+// Sin alt igual sale el link: perder el destino por no haber escrito un texto
+// alternativo sería el mismo agujero con otra puerta.
+const tSin = texto([img({ enlace: DESTINO })]);
+ok(tSin.includes(DESTINO), "sin alt: el destino sale igual");
+ok(tSin.startsWith("BDI:"), "sin alt: la línea abre con el nombre de la marca, no con una URL pelada", JSON.stringify(tSin.split("\n")[0]));
+// Sin enlace, el comportamiento viejo intacto.
+ok(texto([img({ alt: "Foto" })]).includes("[Foto]"), "sin enlace: sigue saliendo [alt]");
+
+console.log("\n11) El link de la foto pasa por el tracking de clicks");
+for (const { que, extra } of RAMAS) {
+  const h = inyectarTracking(html([img({ ...extra, enlace: DESTINO })]), "envio1", "https://app.test");
+  ok(h.includes(`https://app.test/api/track/click/envio1?u=${encodeURIComponent(DESTINO)}`),
+    `${que}: el ancla queda reescrita al redirect`);
 }
 
 console.log(fallos === 0 ? "\n✅ todo en verde\n" : `\n❌ ${fallos} fallas\n`);

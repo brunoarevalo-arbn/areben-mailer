@@ -715,6 +715,35 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // vez de mandar un hueco. `imagen` era el único que faltaba.
       if (!b.url) return "";
       const t = e("imagen");
+      // A dónde lleva tocar la foto. Se sanea acá —el emisor es la frontera, no
+      // el saneo— igual que el `href` de `bandaConFoto`.
+      //
+      // ⚠️ Los dos atributos del `<img>` no son cosmética: **Outlook y varios
+      // webmails le dibujan un borde azul de link a una imagen adentro de un
+      // `<a>`**, y `border:0` es la única forma de sacarlo (el `border` de CSS
+      // no alcanza en Word). El `text-decoration:none` del ancla es por el
+      // subrayado que asoma abajo de la foto en Gmail.
+      //
+      // El ancla va `display:block` por lo mismo que en la banda: una `<a>`
+      // inline deja una franja de la altura de una línea de texto por debajo de
+      // la foto —el hueco del descender— que es una zona clickeable fantasma.
+      // El `display` del ancla copia el de la foto que envuelve: `block` en las
+      // dos ramas que la dibujan de lado a lado, `inline-block` en la que la
+      // alinea —ahí el `text-align` del contenedor es lo que la posiciona, y un
+      // ancla `block` ocuparía el ancho entero y no dejaría lugar que repartir—.
+      // El `line-height:0` de esa rama mata el hueco del descender: un ancla
+      // inline apoya en la línea de base y deja abajo una franja clickeable que
+      // no es la foto.
+      const enlace = sanearUrl(b.enlace);
+      const conEnlace = (img: string, display: "block" | "inline-block") =>
+        enlace
+          ? `<a href="${esc(enlace)}" style="text-decoration:none;display:${display};border:0${display === "inline-block" ? ";line-height:0" : ""}">${img}</a>`
+          : img;
+      // Outlook y varios webmails le dibujan un borde azul de link a una imagen
+      // adentro de un `<a>`. `border:0` como atributo del `<img>` es lo único
+      // que lo saca en Word; el `border` de CSS no alcanza. Sólo se emite cuando
+      // hay enlace, para que una foto sin link salga byte por byte como salía.
+      const borde = enlace ? ` border="0"` : "";
       // A sangre: la foto ocupa la tarjeta de lado a lado, sin el margen lateral
       // ni las esquinas redondeadas. Es el hero fotográfico de 6 de las 21
       // referencias de la primera tanda (ver PLANTILLAS.md), y hasta el
@@ -726,7 +755,10 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // dibujaría la foto a su tamaño original — 2000px de ancho adentro de una
       // tarjeta de 600.
       if (b.sangre) {
-        return `<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" width="100%" style="width:100%;max-width:100%;height:auto;display:block;border:0" />`;
+        return conEnlace(
+          `<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" width="100%"${borde} style="width:100%;max-width:100%;height:auto;display:block;border:0" />`,
+          "block",
+        );
       }
       const c = caja();
       const resto = extra(t, ["radio", "align", "tamano", "color"]);
@@ -734,7 +766,13 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // ocupa el ancho útil y no hay ningún `<div>` de más. Todo lo de abajo es
       // la rama nueva.
       if (b.ancho === undefined && b.align === undefined) {
-        return pad(`<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}" style="max-width:100%;height:auto;border-radius:${px(t.radio ?? 8)};margin:8px 0 16px;display:block${resto}" />`, c);
+        return pad(
+          conEnlace(
+            `<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}"${borde} style="max-width:100%;height:auto;border-radius:${px(t.radio ?? 8)};margin:8px 0 16px;display:block${resto}" />`,
+            "block",
+          ),
+          c,
+        );
       }
       // 🔑 **El ancho va en PÍXELES y también como atributo.** Outlook de
       // escritorio ignora `max-width` y no escala una imagen por CSS: con un
@@ -758,7 +796,10 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // angosta que la tarjeta, y hasta hoy no había forma de decirlo.
       const medida = w === undefined ? "" : ` width="${w}"`;
       const estiloMedida = w === undefined ? "max-width:100%" : `width:${px(w)};max-width:100%`;
-      const img = `<img src="${esc(b.url)}"${medida} alt="${esc(b.alt ?? "")}" style="${estiloMedida};height:auto;border-radius:${px(t.radio ?? 8)};display:inline-block${resto}" />`;
+      const img = conEnlace(
+        `<img src="${esc(b.url)}"${medida} alt="${esc(b.alt ?? "")}"${borde} style="${estiloMedida};height:auto;border-radius:${px(t.radio ?? 8)};display:inline-block${resto}" />`,
+        "inline-block",
+      );
       // La alineación va como `text-align` del contenedor y la foto pasa a ser
       // `inline-block`: `margin:0 auto` no centra nada en Outlook —es el mismo
       // motivo por el que el shell centra con una tabla y no con un `div`— y Word
@@ -1414,8 +1455,20 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       return campoATexto(b.texto);
     case "boton":
       return b.url ? link(b.texto, b.url) : b.texto;
-    case "imagen":
+    // 🔴 Una foto clickeable tiene que dejar su destino en el texto plano, o
+    // quien lee el mail así se queda sin el CTA más grande que tiene. Sin `alt`
+    // igual sale el link solo: perder el destino por no haber escrito un texto
+    // alternativo sería el mismo agujero con otra puerta.
+    //
+    // ⚠️ Va con `alt` adelante y no la URL sola: la primera línea del
+    // `text/plain` es lo que más se parece a lo que mira un filtro, y una URL
+    // pelada ahí es señal de spam — pasó en el T02 de BDI, donde el `hero`
+    // clickeable dejó el mail abriendo con un link a secas.
+    case "imagen": {
+      const destino = sanearUrl(b.enlace);
+      if (destino) return link(b.alt?.trim() || opts.nombreCuenta, destino);
       return b.alt ? `[${b.alt}]` : null;
+    }
     case "productos":
       return (b.items ?? []).map((p) => link(`· ${lineaTexto(p, b.precioOculto)}`, p.url)).join("\n") || null;
     // Los productos salen de `opts`, igual que en el HTML: la parte de texto no

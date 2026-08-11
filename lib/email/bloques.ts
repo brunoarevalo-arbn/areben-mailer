@@ -290,6 +290,29 @@ export type Bloque = BloqueBase &
         url: string;
         alt?: string;
         /**
+         * A dónde lleva tocar la foto. **Ausente = a ningún lado**, que es como
+         * se dibujó siempre.
+         *
+         * 🔴 Existe porque `url` es el `src` y no un destino, así que hasta el
+         * 11-ago-2026 una foto puesta con este bloque **no se podía clickear**.
+         * La única forma que tenía el motor era `botonUrl` sin `botonTexto` en
+         * un `hero`/`seccion` (ver `bandaConFoto`), que dibuja una banda con su
+         * alto propio y el texto encima: no sirve para una foto suelta.
+         *
+         * Se pagó medido dos veces sobre el mismo mail de BDI. El T01 salió con
+         * 350 px de portada muerta y dio CTOR 2,1%; el T02, con la portada ya
+         * clickeable, dio 3,8% y **2 de sus 9 clickers entraron por ahí**. El
+         * T03 volvió a quedarse sin link al pasar esa portada a este bloque para
+         * poder recortarla a 16:9 — o sea que hoy elegir el recorte costaba el
+         * link, que es exactamente la elección que este campo borra.
+         *
+         * ⚠️ **Se valida en el EMISOR con `sanearUrl`**, no acá: `sanearBloque`
+         * deja pasar las claves que no conoce y `esActual()` saltea el saneo,
+         * así que un `javascript:` filtrado sólo al guardar saldría entero.
+         * Misma doctrina que los colores y que los trozos de texto rico.
+         */
+        enlace?: string;
+        /**
          * De borde a borde de la tarjeta, sin margen ni esquinas redondeadas.
          * **Ausente = no**, que es como se dibujó siempre.
          *

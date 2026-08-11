@@ -473,6 +473,18 @@ export function FormBloque({
               )}
             </>
           )}
+          {/* 🔴 Va acá arriba, junto a la foto y no adentro de "Más opciones":
+              la portada suele ser el CTA más grande del mail y una foto que no
+              lleva a ningún lado es su superficie más grande muerta. Escondido,
+              nadie lo encuentra — que es lo que pasó con el T03 de BDI. */}
+          <Input
+            label="Link"
+            fullWidth
+            value={b.enlace ?? ""}
+            placeholder="https://…"
+            onChange={(e) => set({ enlace: e.target.value.trim() || undefined })}
+            hint="A dónde lleva tocar la foto. Vacío, la imagen no se puede clickear."
+          />
           <Input
             label="Texto alternativo"
             fullWidth
