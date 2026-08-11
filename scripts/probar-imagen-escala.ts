@@ -30,7 +30,7 @@
 //      que no conoce y para un documento ya en la versión actual `esActual()` ni
 //      lo corre, así que un `ancho: 9999` llega entero hasta acá.
 import { renderEmailHtml } from "../lib/email/render";
-import { V_ACTUAL } from "../lib/email/esquema";
+import { V_ACTUAL, leerContenido } from "../lib/email/esquema";
 import type { Bloque, ContenidoCampania } from "../lib/email/bloques";
 
 let fallos = 0;
@@ -113,6 +113,28 @@ console.log("\n6. El ancho útil NO está cableado en 600");
   // útil es el del mail entero: si el cálculo estuviera clavado, esto daría 268.
   const h = html({ ancho: 50 }, { caja: { padX: 0 } });
   ok(h.includes('width="300"'), "con padX 0, el 50% son 300 y no 268", laFoto(h));
+}
+
+console.log("\n7. El formato del recorte NO llega al HTML, y sobrevive el round-trip");
+{
+  // `formato` y `urlOriginal` son del EDITOR: la primera marca qué chip está
+  // puesto, la segunda deja volver a la foto entera. El renderer no las mira, y
+  // que la URL original se filtrara al mail sería mandar la foto sin recortar.
+  const h = html({ formato: "1:1", urlOriginal: "https://ejemplo.com/ORIGINAL.jpg", ancho: 50 });
+  ok(!h.includes("ORIGINAL"), "la url original no sale en el mail");
+  ok(!h.includes("1:1"), "ni el nombre del formato");
+  ok(h.includes('width="268"'), "y el ancho sigue funcionando igual");
+
+  const leido = leerContenido({
+    v: V_ACTUAL,
+    bloques: [{ tipo: "imagen", url: URL_FOTO, formato: "4:5", urlOriginal: "https://ejemplo.com/o.jpg", ancho: 33, align: "center" }],
+  });
+  const b = leido.bloques[0] as Record<string, unknown>;
+  ok(
+    b.formato === "4:5" && b.urlOriginal === "https://ejemplo.com/o.jpg" && b.ancho === 33 && b.align === "center",
+    "las cuatro claves sobreviven a leerContenido",
+    JSON.stringify(b),
+  );
 }
 
 console.log(fallos === 0 ? "\n✅ La foto escala y se alinea\n" : `\n❌ ${fallos} fallo(s)\n`);

@@ -72,6 +72,7 @@ node --import tsx scripts/probar-render.ts     # golden: el mail no cambió sin 
 node --import tsx scripts/probar-html.ts       # VML, media queries, tracking, peso
 node --import tsx scripts/probar-banda-link.ts # una foto puede ser un link, y NUNCA un <a> dentro de otro
 node --import tsx scripts/probar-imagen-escala.ts # una foto puede salir más chica y alineada, y Outlook obedece
+node --import tsx scripts/probar-recorte.ts     # el recorte no deforma ni agranda, y el ancla mueve un solo eje
 node --import tsx scripts/probar-precio-oculto.ts # lo que el HTML oculta, el text/plain tampoco lo manda
 node --import tsx scripts/probar-encabezado.ts # el link de baja no se puede borrar
 node --import tsx scripts/probar-imagenes.ts   # permisos, multi-tenant y SVG de /api/imagenes
@@ -678,6 +679,23 @@ hay que pasarle `token` a `put()`.
 - ⛔ **SVG rechazado** aunque sea una imagen: ningún cliente de mail lo rasteriza
   y es un archivo con `<script>` adentro servido desde un dominio propio. Va
   PNG/JPG/GIF/WEBP hasta 5 MB.
+- 🔑 **El navegador ACHICA antes de subir** (11-ago-2026, `lib/imagenes.ts`):
+  tope de 1200 px de ancho y JPEG q 0,72, con `<canvas>` y sin ninguna
+  dependencia nueva. Medido: una foto de 4000×3000 pasa de 7,4 MB a 392 KB. No
+  es cosmético — **el egress de una imagen se paga por destinatario**. Por eso
+  los 5 MB ahora se miden sobre lo que SE SUBE y no sobre lo elegido (una foto
+  de celular de 7 MB entra), con un techo de 40 MB antes de decodificar porque
+  abrir eso en un canvas cuelga la pestaña.
+- El mismo camino recorta a **16:9 · 1:1 · 4:5** desde el bloque `imagen`
+  (`lib/imagenes-encuadre.ts` es la geometría PURA, que es lo único que un
+  script de Node puede probar). ⛔ **Un GIF no se toca nunca** (el canvas se come
+  la animación), **un PNG sigue siendo PNG** (a JPEG, lo transparente sale
+  negro) y **la extensión sale del `type` real del blob** (Safari devuelve PNG
+  cuando no puede dar el pedido). El recorte **siempre parte del original**
+  (`bloque.urlOriginal`, que se escribe una sola vez): recortar un recorte
+  compone la pérdida y no hay vuelta atrás.
+- ⚠️ **Cada recorte es un objeto nuevo en Blob y el anterior no se borra**, por
+  lo mismo que no se borra ninguna: la URL puede estar en un mail ya entregado.
 - **El `cuentaId` va en el WHERE**, nunca en un chequeo después del `findUnique`.
 - **El contador de bytes por cuenta existe desde el día uno.** La cuota puede
   venir después; medir no se retrofitea: Blob se paga y el egress de una imagen

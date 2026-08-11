@@ -92,7 +92,39 @@ titulo("El tope de tamaño");
   ok(/MAX_BYTES = 5 \* 1024 \* 1024/.test(lista), "el servidor corta en 5 MB");
   ok(/archivo\.size > MAX_BYTES/.test(lista), "y lo aplica");
   ok(/MAX_BYTES = 5 \* 1024 \* 1024/.test(cliente), "el navegador corta en el mismo número");
-  ok(/file\.size > MAX_BYTES/.test(cliente), "y no manda 30 MB para que el servidor los rechace");
+  // 🔑 **Desde el 11-ago-2026 el tope del cliente se mide sobre lo que SE SUBE,
+  // no sobre lo elegido**: el navegador achica primero (una foto de celular de 7
+  // MB queda en cientos de KB), así que rechazarla de entrada era una pared
+  // puesta por el paso que la resolvía. Lo que no cambió es la invariante que
+  // este renglón cuida: **al servidor no se le manda algo que va a rechazar**.
+  ok(/subir\.size > MAX_BYTES/.test(cliente), "y no manda al servidor algo que va a rechazar");
+  ok(
+    /TOPE_DECODIFICA/.test(cliente) && /file\.size > TOPE_DECODIFICA/.test(cliente),
+    "hay un techo ANTES de decodificar: abrir 40 MB en un canvas cuelga la pestaña",
+  );
+}
+
+titulo("El re-encode no arruina la foto");
+{
+  // Las tres trampas del canvas, cada una de las cuales rompe la imagen en la
+  // casilla de otra persona y sin forma de volver atrás.
+  ok(/esGif|image\/gif/.test(cliente), "un GIF se detecta");
+  ok(
+    /if \(esGif\(mime\)\) return null/.test(cliente),
+    "y no se re-encodea nunca: el canvas se come la animación",
+  );
+  ok(
+    /mime === 'image\/png' \? 'image\/png'/.test(cliente),
+    "un PNG sigue siendo PNG: a JPEG, lo transparente sale NEGRO",
+  );
+  ok(
+    /blob\.type === 'image\/png'/.test(cliente),
+    "la extensión sale del type REAL del blob (Safari devuelve PNG cuando no puede dar el pedido)",
+  );
+  ok(
+    /crossOrigin = 'anonymous'/.test(cliente),
+    "y el crossOrigin se pone antes del src, o el canvas queda contaminado",
+  );
 }
 
 // ─── El contador de consumo ──────────────────────────────────────────────────

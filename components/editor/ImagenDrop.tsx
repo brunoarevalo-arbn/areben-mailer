@@ -11,22 +11,67 @@
 import { useRef, useState } from "react";
 import { ImageIcon, Library } from "lucide-react";
 import { inputClass } from "@/lib/ui";
-import { subirImagen } from "@/lib/imagenes";
+import { subirImagen, recortarImagen } from "@/lib/imagenes";
+import { FORMATOS, type Formato, type Ancla } from "@/lib/imagenes-encuadre";
 import { ImagenPicker } from "@/components/editor/ImagenPicker";
+import { BarraOpciones } from "@/components/ui/BarraOpciones";
 
 export function ImagenDrop({
   value,
   onChange,
   placeholder = "URL de la imagen (https://…)",
+  formatos = false,
+  formato,
+  urlOriginal,
+  onRecorte,
 }: {
   value: string;
   onChange: (url: string) => void;
   placeholder?: string;
+  /**
+   * Ofrecer los formatos de recorte. **Opt-in a propósito**: este mismo campo
+   * dibuja el logo del encabezado, la miniatura de un video y la foto de una
+   * celda, y en ninguno de esos tres la relación de aspecto es del autor —la
+   * decide el bloque. Sin la bandera, este control no existe.
+   */
+  formatos?: boolean;
+  formato?: Formato;
+  urlOriginal?: string;
+  /** Escribe las tres claves de una: no van en tres `set()` seguidos. */
+  onRecorte?: (v: { url: string; formato?: Formato; urlOriginal?: string }) => void;
 }) {
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [abierta, setAbierta] = useState(false);
+  const [ancla, setAncla] = useState<Ancla>("centro");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Recortar SIEMPRE parte del original, nunca de la última recortada: un
+   * recorte sobre un recorte compone la pérdida del re-encode y, peor, no hay
+   * forma de volver a la foto entera. Por eso `urlOriginal` se escribe una sola
+   * vez y es la que se lee acá.
+   */
+  // ⚠️ El ancla entra por parámetro y no se lee del estado: el botón que la
+  // cambia dispara el recorte en la misma vuelta, y ahí `ancla` todavía tiene el
+  // valor viejo. Es el mismo motivo por el que un `set()` no se llama tres veces
+  // seguidas en el panel de estilo.
+  const recortar = async (f: Formato | "original", conAncla: Ancla = ancla) => {
+    const origen = urlOriginal || value;
+    if (!origen) return;
+    setError(null);
+    if (f === "original") {
+      onRecorte?.({ url: origen, formato: undefined, urlOriginal: undefined });
+      return;
+    }
+    setSubiendo(true);
+    const nombre = origen.split("/").pop() || "imagen";
+    const mime = /\.png($|\?)/i.test(origen) ? "image/png" : /\.gif($|\?)/i.test(origen) ? "image/gif" : "image/jpeg";
+    const r = await recortarImagen(origen, nombre, mime, FORMATOS[f].ratio, conAncla);
+    setSubiendo(false);
+    if (r.ok) onRecorte?.({ url: r.imagen.url, formato: f, urlOriginal: origen });
+    else setError(r.error);
+  };
 
   const subir = async (file: File) => {
     setError(null);
@@ -81,6 +126,45 @@ export function ImagenDrop({
           </div>
         </div>
       </div>
+
+      {formatos && value && (
+        <div className="space-y-1.5 pt-1">
+          <BarraOpciones
+            label="Formato"
+            value={(formato ?? "original") as string}
+            opciones={[
+              { clave: "original" as string, label: "Original" },
+              ...(Object.keys(FORMATOS) as Formato[]).map((k) => ({ clave: k as string, label: FORMATOS[k].label })),
+            ]}
+            disabled={subiendo}
+            onChange={(v) => void recortar(v as Formato | "original")}
+          />
+          {/* El ancla sólo tiene sentido mientras se elige un recorte: cuando lo
+              que sobra es alto, es lo que decide si se corta la cabeza o los
+              pies. Se ve antes de recortar y también después, para poder
+              corregir sin deshacer. */}
+          {formato && (
+            <BarraOpciones
+              label="Qué parte se conserva"
+              value={ancla}
+              opciones={[
+                { clave: "arriba" as Ancla, label: "Arriba" },
+                { clave: "centro" as Ancla, label: "Centro" },
+                { clave: "abajo" as Ancla, label: "Abajo" },
+              ]}
+              disabled={subiendo}
+              onChange={(v) => {
+                setAncla(v);
+                void recortar(formato, v);
+              }}
+            />
+          )}
+          <p className="text-xs leading-relaxed text-muted">
+            El recorte genera una foto nueva y deja la original en tu biblioteca: volver a
+            «Original» no pierde nada.
+          </p>
+        </div>
+      )}
 
       {error && <div className="text-xs text-danger-foreground">{error}</div>}
 

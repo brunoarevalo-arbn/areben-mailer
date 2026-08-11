@@ -17,7 +17,7 @@ import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Paleta } from "@/lib/email/tema";
 import { textoPlano, type TextoRico } from "@/lib/email/texto-rico";
-import { tapTarget } from "@/lib/ui";
+import { BarraOpciones } from "@/components/ui/BarraOpciones";
 
 /**
  * Un campo con formato, visto como texto pelado.
@@ -88,49 +88,6 @@ function Check({
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="accent-accent" />
       {label}
     </label>
-  );
-}
-
-/**
- * Una barra de opciones excluyentes, para elegir entre pocas y con el nombre a
- * la vista. Es la misma barra de `ControlTamanoBoton` y del toggle
- * Escritorio/Celular del preview; vive acá porque aquélla es del panel de
- * estilo y ésta es de contenido.
- *
- * ⚠️ El valor se compara contra **lo escrito en el bloque**, nunca contra lo
- * resuelto: si no, "Completa" —que es la ausencia del campo— se vería marcada y
- * sin marcar según de dónde venga el default.
- */
-function Chips<T extends string>({
-  label,
-  value,
-  opciones,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  opciones: readonly { clave: T; label: string }[];
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div>
-      <span className="mb-1 block text-xs font-semibold text-muted">{label}</span>
-      <div className="flex items-center gap-1 rounded-lg border border-border p-0.5">
-        {opciones.map((o) => (
-          <button
-            key={o.clave}
-            type="button"
-            onClick={() => onChange(o.clave)}
-            aria-pressed={value === o.clave}
-            className={`${tapTarget} flex-1 rounded-md px-2 py-1 text-xs transition-colors ${
-              value === o.clave ? "bg-accent-subtle text-accent-subtle-foreground" : "text-muted hover:text-foreground"
-            }`}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -473,13 +430,24 @@ export function FormBloque({
       const tamano = TAMANOS_IMAGEN.find((t) => t.ancho === b.ancho)?.clave;
       return (
         <div className="space-y-3">
-          <ImagenDrop value={b.url} onChange={(url) => set({ url })} />
+          <ImagenDrop
+            value={b.url}
+            // 🔴 Elegir otra foto tira el formato y el original: si no, los chips
+            // seguirían marcando "Cuadrada" sobre una foto que nadie recortó, y
+            // "volver al original" llevaría a la foto ANTERIOR — la de otro
+            // bloque, en la casilla de otra persona.
+            onChange={(url) => set({ url, formato: undefined, urlOriginal: undefined })}
+            formatos
+            formato={b.formato}
+            urlOriginal={b.urlOriginal}
+            onRecorte={(v) => set(v)}
+          />
           {/* 🔴 Con la foto a borde-a-borde no hay margen que repartir: el bloque
               saltea el `pad()` y un ancho ahí no significaría nada. En vez de
               dejar una perilla muerta, los controles desaparecen. */}
           {b.sangre !== true && (
             <>
-              <Chips
+              <BarraOpciones
                 label="Tamaño"
                 value={tamano ?? ""}
                 opciones={TAMANOS_IMAGEN.map((t) => ({ clave: t.clave as string, label: t.label }))}
@@ -490,7 +458,7 @@ export function FormBloque({
                   set({ ancho: TAMANOS_IMAGEN.find((t) => t.clave === clave)?.ancho, sangre: undefined })
                 }
               />
-              <Chips
+              <BarraOpciones
                 label="Alineación"
                 value={b.align ?? "left"}
                 opciones={ALINEACIONES_IMAGEN}

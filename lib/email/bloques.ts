@@ -8,6 +8,9 @@
 //
 // Para no romper los imports que ya existen, render.ts re-exporta todo esto.
 
+// Sólo el tipo, y de un archivo que también es puro: se borra al compilar, así
+// que esto no le mete el módulo de imágenes al bundle de nadie.
+import type { Formato as FormatoImagen } from "../imagenes-encuadre";
 import type { Estilos } from "./estilos";
 import type { EstiloIconos } from "./redes";
 import type { Tema } from "./tema";
@@ -321,6 +324,21 @@ export type Bloque = BloqueBase &
          * Sin `ancho` no hace nada — no hay lugar libre que repartir.
          */
         align?: "left" | "center" | "right";
+        /**
+         * A qué formato se recortó la foto, y desde dónde.
+         *
+         * 🔑 **El renderer NO las mira nunca.** Existen sólo para el editor: la
+         * primera para poder marcar cuál de los chips está puesto, la segunda
+         * para poder volver al original. Es el mismo criterio —y el mismo
+         * comentario— que `imagenTienda` de `ProductoEmail`.
+         *
+         * 🔴 **`urlOriginal` se escribe UNA sola vez y no se pisa más.** Si cada
+         * recorte la reescribiera, el segundo recorte pasaría a ser "el
+         * original" y re-encodear encima de un re-encode degrada la foto sin
+         * techo, sin forma de volver.
+         */
+        formato?: FormatoImagen;
+        urlOriginal?: string;
       }
     | {
         tipo: "productos";

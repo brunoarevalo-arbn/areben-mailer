@@ -1,6 +1,8 @@
 // Cliente de la biblioteca de imágenes. Lo importa el navegador: sin prisma,
 // sin next/headers.
 
+import { encuadre, ANCHO_MAX, type Ancla } from '@/lib/imagenes-encuadre';
+
 /** Lo que devuelve /api/imagenes. Es el modelo de Prisma con las fechas en string. */
 export interface ImagenMailDto {
   id: string;
@@ -19,6 +21,16 @@ export interface TotalImagenes {
 }
 
 export const MAX_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Lo más grande que se intenta decodificar en el navegador antes de achicar.
+ *
+ * No es el tope de lo que se guarda —ése sigue siendo `MAX_BYTES`, y lo hace
+ * cumplir el servidor—: es el punto en el que abrir el archivo en un `<canvas>`
+ * puede colgar la pestaña. Una foto de celular anda por 3-8 MB; 40 es holgado
+ * para eso y sigue frenando el video que alguien arrastró por error.
+ */
+export const TOPE_DECODIFICA = 40 * 1024 * 1024;
 
 /** "1,4 MB". Con un decimal desde 1 MB: "1 MB" para 1,49 MB miente demasiado. */
 export function formatoBytes(n: number): string {
@@ -50,18 +62,177 @@ function medir(file: File): Promise<{ ancho: number; alto: number } | null> {
   });
 }
 
-/** Sube un archivo. Devuelve la imagen creada o el motivo por el que no se pudo. */
+// ─────────────────────────────────────────────────────────────────────────────
+// Recortar y achicar, en el navegador
+//
+// Con `<canvas>` y nada más: meter `sharp` sería una dependencia nativa en el
+// runtime que manda TODOS los mails, para un trabajo que el navegador de quien
+// sube la foto ya puede hacer —y que ya está haciendo, porque `medir()` la
+// decodifica igual.
+//
+// 🔴 **Tres trampas del re-encode, y las tres están acá porque las tres
+// arruinan la foto en la casilla de otra persona:**
+//   1. **Un GIF no se toca nunca.** El canvas dibuja un cuadro y devuelve una
+//      imagen quieta: un GIF animado sale muerto y no hay forma de volver atrás.
+//   2. **Un PNG sigue siendo PNG.** Canvas → JPEG pinta de NEGRO lo que era
+//      transparente, que es justo lo que tiene un logo o un packshot recortado.
+//   3. **La extensión sale del `type` REAL del blob**, no del que se pidió:
+//      Safari devuelve PNG cuando no puede dar el formato pedido, y un archivo
+//      PNG servido como JPEG es una imagen rota en varios clientes de mail.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Un GIF puede estar animado y el canvas lo aplasta. Nunca se re-encodea. */
+const esGif = (mime: string) => mime === 'image/gif';
+
+/**
+ * La foto, decodificada y lista para dibujar.
+ *
+ * 🔴 **`crossOrigin` va ANTES del `src` o no sirve de nada**: el navegador ya
+ * arrancó la descarga y el canvas queda contaminado igual (`toBlob` tira
+ * `SecurityError`). Medido el 11-ago-2026: el store de Blob y el CDN de
+ * Tiendanube mandan los dos `access-control-allow-origin: *`, así que se puede
+ * recortar tanto una foto de la biblioteca como una de un producto pegada a
+ * mano. Una URL de un servidor sin ese header falla, y se avisa.
+ */
+function cargarImagen(fuente: File | string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = typeof fuente === 'string' ? fuente : URL.createObjectURL(fuente);
+    const img = new Image();
+    if (typeof fuente === 'string') img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (typeof fuente !== 'string') URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      if (typeof fuente !== 'string') URL.revokeObjectURL(url);
+      reject(new Error('No se pudo leer la imagen.'));
+    };
+    img.src = url;
+  });
+}
+
+/** El `File` que sale del canvas, con el nombre y el tipo que de verdad tiene. */
+function archivoDe(blob: Blob, base: string): File {
+  const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+  const limpio = base.replace(/\.[^.]+$/, '') || 'imagen';
+  return new File([blob], `${limpio}.${ext}`, { type: blob.type });
+}
+
+/**
+ * Dibuja el recorte y devuelve el archivo nuevo.
+ *
+ * `ratio` ausente = no recorta, sólo achica (el modo de toda subida).
+ * Devuelve `null` cuando no hay nada que hacer: un GIF, o una foto que ya entra
+ * y no se está recortando. Ahí sube el original y no se pierde calidad por nada.
+ */
+export async function procesarImagen(
+  fuente: File | string,
+  nombre: string,
+  mime: string,
+  opts: { ratio?: number; ancla?: Ancla } = {},
+): Promise<File | null> {
+  if (esGif(mime)) return null;
+
+  const img = await cargarImagen(fuente);
+  const r = encuadre(img.naturalWidth, img.naturalHeight, opts.ratio, ANCHO_MAX, opts.ancla);
+  if (!r.dw || !r.dh) throw new Error('No se pudo leer el tamaño de la imagen.');
+  // Sin recorte y ya entrando en el tope, tocarla sólo la degradaría.
+  if (opts.ratio === undefined && r.dw === img.naturalWidth) return null;
+
+  const lienzo = document.createElement('canvas');
+  lienzo.width = r.dw;
+  lienzo.height = r.dh;
+  const ctx = lienzo.getContext('2d');
+  if (!ctx) throw new Error('El navegador no pudo dibujar la imagen.');
+  ctx.drawImage(img, r.sx, r.sy, r.sw, r.sh, 0, 0, r.dw, r.dh);
+
+  // El PNG conserva su transparencia; todo lo demás sale JPEG, que es lo que
+  // dibuja cualquier cliente de mail (Outlook 2016 no muestra WEBP).
+  const destino = mime === 'image/png' ? 'image/png' : 'image/jpeg';
+  const blob = await new Promise<Blob | null>((res) => lienzo.toBlob(res, destino, 0.72));
+  if (!blob) throw new Error('El navegador no pudo generar la imagen recortada.');
+  return archivoDe(blob, nombre);
+}
+
+/**
+ * Sube un archivo. Devuelve la imagen creada o el motivo por el que no se pudo.
+ *
+ * ⚠️ **Achica antes de subir.** Hasta el 11-ago-2026 se guardaba el original
+ * crudo: una foto de celular de 4.000 px viajaba entera **a cada casilla**, y el
+ * egress de Blob se paga por destinatario. Un GIF y una foto que ya entra en el
+ * tope se suben tal cual.
+ */
 export async function subirImagen(
   file: File,
 ): Promise<{ ok: true; imagen: ImagenMailDto } | { ok: false; error: string }> {
-  // El chequeo del tamaño va también acá, además del servidor: subir 30 MB para
-  // que el servidor los rechace es tráfico y espera de quien está mirando.
-  if (file.size > MAX_BYTES) {
-    return { ok: false, error: `"${file.name}" pesa ${formatoBytes(file.size)}. El tope son 5 MB.` };
+  // 🔑 **El tope de 5 MB se mide sobre lo que SE SUBE, no sobre lo que se
+  // eligió.** Desde que el navegador achica, rechazar de entrada una foto de
+  // celular de 7 MB era una pared puesta por el paso que justamente la
+  // resolvía: esa misma foto queda en unos cientos de KB.
+  //
+  // ⚠️ Igual hay un techo, y va ANTES de decodificar: abrir 40 MB en un canvas
+  // cuelga la pestaña, y ahí no hay mensaje de error que valga.
+  if (file.size > TOPE_DECODIFICA) {
+    return { ok: false, error: `"${file.name}" pesa ${formatoBytes(file.size)}. Es demasiado grande para procesarla.` };
   }
 
+  // Si el navegador no puede achicarla, se sube como está: que la foto entre
+  // siempre gana sobre que pese poco.
+  let subir = file;
+  try {
+    subir = (await procesarImagen(file, file.name, file.type)) ?? file;
+  } catch {
+    subir = file;
+  }
+
+  if (subir.size > MAX_BYTES) {
+    return { ok: false, error: `"${file.name}" pesa ${formatoBytes(subir.size)}. El tope son 5 MB.` };
+  }
+  return subirArchivo(subir);
+}
+
+/**
+ * Recorta una foto que YA está elegida —de la biblioteca, subida o pegada a
+ * mano— y sube el resultado como una imagen nueva.
+ *
+ * 🔑 **Siempre una clave nueva, jamás se pisa la anterior.** La URL vieja puede
+ * estar adentro de un mail que ya está entregado en la casilla de otra persona:
+ * es la misma regla que las fotos de stock. El original queda intacto en la
+ * biblioteca, que es lo que hace que se pueda volver atrás.
+ */
+export async function recortarImagen(
+  fuente: File | string,
+  nombre: string,
+  mime: string,
+  ratio: number,
+  ancla: Ancla = 'centro',
+): Promise<{ ok: true; imagen: ImagenMailDto } | { ok: false; error: string }> {
+  if (esGif(mime)) {
+    return { ok: false, error: 'Un GIF no se puede recortar: perdería la animación.' };
+  }
+  let archivo: File | null;
+  try {
+    archivo = await procesarImagen(fuente, nombre, mime, { ratio, ancla });
+  } catch {
+    // El modo de falla que se ve en la práctica: la foto vive en un servidor que
+    // no manda CORS, así que el navegador la dibuja pero no deja leerla.
+    return {
+      ok: false,
+      error: 'Esta foto vive en otro servidor y no se puede recortar desde acá. Subila a tu biblioteca.',
+    };
+  }
+  if (!archivo) return { ok: false, error: 'No se pudo recortar la imagen.' };
+  return subirArchivo(archivo);
+}
+
+/** El POST de siempre, compartido por la subida y por el recorte. */
+async function subirArchivo(
+  file: File,
+): Promise<{ ok: true; imagen: ImagenMailDto } | { ok: false; error: string }> {
   const fd = new FormData();
   fd.append('archivo', file);
+  // ⚠️ Las medidas que se guardan son las del archivo que se SUBE, no las del
+  // original: describen lo que quedó en la biblioteca.
   const medidas = await medir(file);
   if (medidas) {
     fd.append('ancho', String(medidas.ancho));
