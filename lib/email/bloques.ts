@@ -339,6 +339,12 @@ export type Bloque = BloqueBase &
          */
         formato?: FormatoImagen;
         urlOriginal?: string;
+        /**
+         * Qué parte de la foto conservó el recorte, de 0 a 100 (**ausente = 50**,
+         * centrado). Se guarda para que reabrir el bloque muestre el encuadre que
+         * quedó y no haya que volver a buscarlo con el deslizador.
+         */
+        encuadre?: number;
       }
     | {
         tipo: "productos";

@@ -1,25 +1,58 @@
 // La geometría de recortar una foto a un formato. **Puro: sin DOM, sin canvas.**
 //
 // Vive separado del `<canvas>` a propósito: es lo único de todo el recorte que un
-// script de Node puede probar. Lo de al lado (`canvas.ts`) es API de navegador y
-// no se puede ejercitar sin un navegador, así que todo lo que se pueda decidir
+// script de Node puede probar. El dibujo (`lib/imagenes.ts`) es API de navegador
+// y no se puede ejercitar sin un navegador, así que todo lo que se pueda decidir
 // con números se decide acá.
 //
+// 🔑 De acá sale también el PREVIEW del editor, sin dibujar nada: un `object-fit:
+// cover` con `object-position: 50% <pos>%` hace exactamente esta misma cuenta, y
+// por eso lo que se ve mientras se arrastra es lo que va a quedar. Verificado
+// poniendo los dos al lado en Chrome, en cuatro posiciones.
+//
 // ⚠️ Es un **cover**, nunca un stretch: la foto no se deforma jamás. Lo que
-// sobra se corta, y qué se corta lo decide el ancla.
+// sobra se corta, y qué se corta lo decide el deslizador de encuadre.
 
 /** Los formatos que ofrece el editor. La clave es la relación, para que se lea. */
 export type Formato = "16:9" | "1:1" | "4:5";
 
 /**
- * Qué parte se conserva cuando lo que sobra es ALTO.
+ * Qué parte de la foto se conserva, de 0 a 100. **50 = centrado**, que es el
+ * default y lo que hacía el recorte antes de que esto existiera.
  *
- * Existe porque el centrado automático corta cabezas: en un retrato vertical
- * llevado a 16:9, el centro geométrico de la foto suele ser el torso. Mueve
- * únicamente el eje vertical — el horizontal va siempre centrado, que es donde
- * el centro casi nunca se equivoca.
+ * Existe porque el centrado automático corta cabezas: en un retrato llevado a
+ * 16:9, el centro geométrico de la foto suele ser el torso.
+ *
+ * 🔑 **Es UN número y se aplica al eje que sobra**, no dos controles. En un
+ * recorte cover sólo puede sobrar un eje: si la foto es más alta de lo que el
+ * formato pide, sobra alto y el número sube y baja el recorte; si es más ancha,
+ * sobra ancho y lo corre a los costados. Nunca sobran los dos, así que un
+ * segundo control sería siempre una perilla muerta.
+ *
+ * ⚠️ Empezó siendo tres opciones (arriba · centro · abajo) y duró unas horas:
+ * con tres, encuadrar una cara es elegir el menos malo de tres. Es continuo por
+ * pedido de Bruno el mismo día.
  */
-export type Ancla = "arriba" | "centro" | "abajo";
+export const POS_CENTRO = 50;
+
+/** Cuál de los dos ejes es el que se puede mover en este recorte. */
+export type EjeSobrante = "vertical" | "horizontal" | "ninguno";
+
+/**
+ * Qué eje sobra al llevar esta foto a este formato — o sea, qué mueve el
+ * deslizador y cómo hay que rotularlo.
+ *
+ * Vive acá, con la geometría, porque la respuesta sale de la misma cuenta que el
+ * recorte: si la decidiera la pantalla por su lado, habría dos definiciones de
+ * "qué se puede mover" y un día dirían cosas distintas.
+ */
+export function ejeSobrante(natAncho: number, natAlto: number, ratio: number): EjeSobrante {
+  if (!(natAncho > 0) || !(natAlto > 0)) return "ninguno";
+  const rNat = natAncho / natAlto;
+  // Un píxel de diferencia no es un encuadre que alguien quiera elegir.
+  if (Math.abs(rNat - ratio) < 0.005) return "ninguno";
+  return rNat > ratio ? "horizontal" : "vertical";
+}
 
 export const FORMATOS: Record<Formato, { label: string; ratio: number }> = {
   // 16:9 y no 3:2: el `hero` de este motor dibuja la banda con foto a 280 px de
@@ -71,7 +104,7 @@ export function encuadre(
   natAlto: number,
   ratio: number | undefined,
   anchoMax = ANCHO_MAX,
-  ancla: Ancla = "centro",
+  pos: number = POS_CENTRO,
 ): Recorte {
   // Una foto que todavía no cargó mide 0×0 y dividir por eso da NaN, que
   // terminaría en un `<canvas width="NaN">` y una imagen en blanco en el mail de
@@ -91,20 +124,22 @@ export function encuadre(
   }
 
   const rNat = natAncho / natAlto;
+  // El deslizador puede llegar con cualquier cosa (queda guardado en el Json del
+  // bloque): se acota acá, que es el único lugar por el que pasa todo.
+  const p = Math.min(100, Math.max(0, Number.isFinite(pos) ? pos : POS_CENTRO));
   let sx = 0;
   let sy = 0;
   let sw = natAncho;
   let sh = natAlto;
 
   if (rNat > ratio) {
-    // Sobra ANCHO: se corta a los costados, siempre desde el centro.
+    // Sobra ANCHO: se corre a los costados. 0 = pegado a la izquierda.
     sw = Math.round(natAlto * ratio);
-    sx = Math.round((natAncho - sw) / 2);
+    sx = Math.round(((natAncho - sw) * p) / 100);
   } else if (rNat < ratio) {
-    // Sobra ALTO: acá sí manda el ancla.
+    // Sobra ALTO: sube y baja. 0 = pegado arriba.
     sh = Math.round(natAncho / ratio);
-    const sobra = natAlto - sh;
-    sy = ancla === "arriba" ? 0 : ancla === "abajo" ? sobra : Math.round(sobra / 2);
+    sy = Math.round(((natAlto - sh) * p) / 100);
   }
 
   const dw = Math.min(sw, anchoMax);

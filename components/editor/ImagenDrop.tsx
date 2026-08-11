@@ -12,7 +12,7 @@ import { useRef, useState } from "react";
 import { ImageIcon, Library } from "lucide-react";
 import { inputClass } from "@/lib/ui";
 import { subirImagen, recortarImagen } from "@/lib/imagenes";
-import { FORMATOS, type Formato, type Ancla } from "@/lib/imagenes-encuadre";
+import { FORMATOS, POS_CENTRO, ejeSobrante, type Formato } from "@/lib/imagenes-encuadre";
 import { ImagenPicker } from "@/components/editor/ImagenPicker";
 import { BarraOpciones } from "@/components/ui/BarraOpciones";
 
@@ -23,6 +23,7 @@ export function ImagenDrop({
   formatos = false,
   formato,
   urlOriginal,
+  encuadre,
   onRecorte,
 }: {
   value: string;
@@ -37,40 +38,82 @@ export function ImagenDrop({
   formatos?: boolean;
   formato?: Formato;
   urlOriginal?: string;
-  /** Escribe las tres claves de una: no van en tres `set()` seguidos. */
-  onRecorte?: (v: { url: string; formato?: Formato; urlOriginal?: string }) => void;
+  encuadre?: number;
+  /** Escribe las cuatro claves de una: no van en cuatro `set()` seguidos. */
+  onRecorte?: (v: { url: string; formato?: Formato; urlOriginal?: string; encuadre?: number }) => void;
 }) {
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [abierta, setAbierta] = useState(false);
-  const [ancla, setAncla] = useState<Ancla>("centro");
+  /**
+   * Dónde está el deslizador AHORA, que no es lo mismo que el encuadre que ya se
+   * subió: mientras se arrastra, esto se mueve y la foto del mail todavía no.
+   * `guardado` es lo aplicado, y sale del bloque —no de un ref— porque después
+   * de un recorte el valor vuelve por props: dos fuentes para el mismo dato es
+   * cómo se termina con el deslizador diciendo una cosa y la foto siendo otra.
+   */
+  const guardado = encuadre ?? POS_CENTRO;
+  const [pos, setPos] = useState(guardado);
+  const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
+
+  // Volver a sincronizar cuando cambia el bloque, la foto o el formato (elegir
+  // otro bloque, ⌘Z). Va **en el render y no en un efecto**: un `setState` dentro
+  // de un efecto dibuja una vez con el valor viejo y vuelve a dibujar, que acá se
+  // vería como el deslizador saltando solo.
+  const firma = `${value}|${formato ?? ""}|${guardado}`;
+  const [ultimaFirma, setUltimaFirma] = useState(firma);
+  if (ultimaFirma !== firma) {
+    setUltimaFirma(firma);
+    setPos(guardado);
+  }
+
   const inputRef = useRef<HTMLInputElement>(null);
+  const origen = urlOriginal || value;
+  const eje = formato && nat ? ejeSobrante(nat.w, nat.h, FORMATOS[formato].ratio) : "ninguno";
 
   /**
    * Recortar SIEMPRE parte del original, nunca de la última recortada: un
    * recorte sobre un recorte compone la pérdida del re-encode y, peor, no hay
    * forma de volver a la foto entera. Por eso `urlOriginal` se escribe una sola
    * vez y es la que se lee acá.
+   *
+   * ⚠️ La posición entra por parámetro y no se lee del estado: el deslizador
+   * dispara el recorte en la misma vuelta en la que la cambia, y ahí el estado
+   * todavía tiene el valor viejo.
    */
-  // ⚠️ El ancla entra por parámetro y no se lee del estado: el botón que la
-  // cambia dispara el recorte en la misma vuelta, y ahí `ancla` todavía tiene el
-  // valor viejo. Es el mismo motivo por el que un `set()` no se llama tres veces
-  // seguidas en el panel de estilo.
-  const recortar = async (f: Formato | "original", conAncla: Ancla = ancla) => {
-    const origen = urlOriginal || value;
+  const recortar = async (f: Formato | "original", conPos: number = pos) => {
     if (!origen) return;
     setError(null);
     if (f === "original") {
-      onRecorte?.({ url: origen, formato: undefined, urlOriginal: undefined });
+      onRecorte?.({ url: origen, formato: undefined, urlOriginal: undefined, encuadre: undefined });
       return;
     }
     setSubiendo(true);
     const nombre = origen.split("/").pop() || "imagen";
     const mime = /\.png($|\?)/i.test(origen) ? "image/png" : /\.gif($|\?)/i.test(origen) ? "image/gif" : "image/jpeg";
-    const r = await recortarImagen(origen, nombre, mime, FORMATOS[f].ratio, conAncla);
+    const r = await recortarImagen(origen, nombre, mime, FORMATOS[f].ratio, conPos);
     setSubiendo(false);
-    if (r.ok) onRecorte?.({ url: r.imagen.url, formato: f, urlOriginal: origen });
-    else setError(r.error);
+    if (r.ok) {
+      onRecorte?.({
+        url: r.imagen.url,
+        formato: f,
+        urlOriginal: origen,
+        encuadre: conPos === POS_CENTRO ? undefined : conPos,
+      });
+    } else setError(r.error);
+  };
+
+  /**
+   * 🔴 **El recorte se sube al SOLTAR, no en cada píxel del arrastre.** Cada
+   * recorte es un archivo nuevo en el store que ya no se puede borrar (su URL
+   * puede estar en un mail entregado), así que subir uno por cada paso del
+   * deslizador dejaría cincuenta huérfanos por encuadre. Mientras se arrastra, lo
+   * que se mueve es el preview de acá al lado, que usa `object-fit: cover` — o
+   * sea exactamente la misma cuenta que hace el canvas.
+   */
+  const soltar = () => {
+    if (!formato || pos === guardado) return;
+    void recortar(formato, pos);
   };
 
   const subir = async (file: File) => {
@@ -139,25 +182,63 @@ export function ImagenDrop({
             disabled={subiendo}
             onChange={(v) => void recortar(v as Formato | "original")}
           />
-          {/* El ancla sólo tiene sentido mientras se elige un recorte: cuando lo
-              que sobra es alto, es lo que decide si se corta la cabeza o los
-              pies. Se ve antes de recortar y también después, para poder
-              corregir sin deshacer. */}
-          {formato && (
-            <BarraOpciones
-              label="Qué parte se conserva"
-              value={ancla}
-              opciones={[
-                { clave: "arriba" as Ancla, label: "Arriba" },
-                { clave: "centro" as Ancla, label: "Centro" },
-                { clave: "abajo" as Ancla, label: "Abajo" },
-              ]}
-              disabled={subiendo}
-              onChange={(v) => {
-                setAncla(v);
-                void recortar(formato, v);
-              }}
+          {/* La foto original, medida al vuelo: de acá sale qué eje se puede
+              mover. No se dibuja — es la misma imagen que ya está cacheada. */}
+          {formato && origen && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={origen}
+              alt=""
+              className="hidden"
+              onLoad={(e) => setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
             />
+          )}
+
+          {formato && eje !== "ninguno" && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-muted">Qué parte se conserva</span>
+                <span className="text-xs text-subtle">
+                  {eje === "vertical" ? "arrastrá para subir o bajar" : "arrastrá para correr a los costados"}
+                </span>
+              </div>
+              {/* 🔑 El preview usa `object-fit: cover` con la MISMA posición que
+                  le va a pasar al canvas, así que lo que se ve acá es literalmente
+                  lo que va a quedar. Sin esto, encuadrar sería mover un número y
+                  esperar a que suba para ver si acertaste. */}
+              <div
+                className="overflow-hidden rounded-lg border border-border bg-surface-muted"
+                style={{ aspectRatio: String(FORMATOS[formato].ratio) }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={origen}
+                  alt=""
+                  className="h-full w-full"
+                  style={{
+                    objectFit: "cover",
+                    objectPosition: eje === "vertical" ? `50% ${pos}%` : `${pos}% 50%`,
+                  }}
+                />
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={pos}
+                disabled={subiendo}
+                aria-label="Qué parte de la foto se conserva"
+                className="w-full accent-accent"
+                onChange={(e) => setPos(Number(e.target.value))}
+                // El commit va en los tres finales que existen: soltar el mouse,
+                // soltar el dedo y soltar la tecla. El `onChange` de un `range`
+                // en React es continuo, así que no sirve para esto.
+                onPointerUp={soltar}
+                onKeyUp={soltar}
+                onBlur={soltar}
+              />
+            </div>
           )}
           <p className="text-xs leading-relaxed text-muted">
             El recorte genera una foto nueva y deja la original en tu biblioteca: volver a

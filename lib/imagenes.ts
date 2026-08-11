@@ -1,7 +1,7 @@
 // Cliente de la biblioteca de imágenes. Lo importa el navegador: sin prisma,
 // sin next/headers.
 
-import { encuadre, ANCHO_MAX, type Ancla } from '@/lib/imagenes-encuadre';
+import { encuadre, ANCHO_MAX, POS_CENTRO } from '@/lib/imagenes-encuadre';
 
 /** Lo que devuelve /api/imagenes. Es el modelo de Prisma con las fechas en string. */
 export interface ImagenMailDto {
@@ -129,12 +129,12 @@ export async function procesarImagen(
   fuente: File | string,
   nombre: string,
   mime: string,
-  opts: { ratio?: number; ancla?: Ancla } = {},
+  opts: { ratio?: number; pos?: number } = {},
 ): Promise<File | null> {
   if (esGif(mime)) return null;
 
   const img = await cargarImagen(fuente);
-  const r = encuadre(img.naturalWidth, img.naturalHeight, opts.ratio, ANCHO_MAX, opts.ancla);
+  const r = encuadre(img.naturalWidth, img.naturalHeight, opts.ratio, ANCHO_MAX, opts.pos);
   if (!r.dw || !r.dh) throw new Error('No se pudo leer el tamaño de la imagen.');
   // Sin recorte y ya entrando en el tope, tocarla sólo la degradaría.
   if (opts.ratio === undefined && r.dw === img.naturalWidth) return null;
@@ -205,14 +205,14 @@ export async function recortarImagen(
   nombre: string,
   mime: string,
   ratio: number,
-  ancla: Ancla = 'centro',
+  pos: number = POS_CENTRO,
 ): Promise<{ ok: true; imagen: ImagenMailDto } | { ok: false; error: string }> {
   if (esGif(mime)) {
     return { ok: false, error: 'Un GIF no se puede recortar: perdería la animación.' };
   }
   let archivo: File | null;
   try {
-    archivo = await procesarImagen(fuente, nombre, mime, { ratio, ancla });
+    archivo = await procesarImagen(fuente, nombre, mime, { ratio, pos });
   } catch {
     // El modo de falla que se ve en la práctica: la foto vive en un servidor que
     // no manda CORS, así que el navegador la dibuja pero no deja leerla.

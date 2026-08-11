@@ -436,10 +436,11 @@ export function FormBloque({
             // seguirían marcando "Cuadrada" sobre una foto que nadie recortó, y
             // "volver al original" llevaría a la foto ANTERIOR — la de otro
             // bloque, en la casilla de otra persona.
-            onChange={(url) => set({ url, formato: undefined, urlOriginal: undefined })}
+            onChange={(url) => set({ url, formato: undefined, urlOriginal: undefined, encuadre: undefined })}
             formatos
             formato={b.formato}
             urlOriginal={b.urlOriginal}
+            encuadre={b.encuadre}
             onRecorte={(v) => set(v)}
           />
           {/* 🔴 Con la foto a borde-a-borde no hay margen que repartir: el bloque
