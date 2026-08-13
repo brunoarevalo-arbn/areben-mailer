@@ -26,7 +26,9 @@ export async function POST(req: Request) {
   // Mientras quede trabajo, la invocación se pasa la posta a la siguiente. Va por
   // `after` a propósito: extiende la vida de la función más allá de la respuesta,
   // que es lo único que hace que la request salga de verdad en serverless.
-  if (r.continuar) after(() => arrancarCola());
+  // Con el id: así el dispatch puede confirmar que el sucesor tomó el lease, en
+  // vez de dar por buena una request que quizá murió en un cold start.
+  if (r.continuar) after(() => arrancarCola(r.campaniaId ?? undefined));
 
   console.log(JSON.stringify({ ev: "cola", ...r }));
   return Response.json(r);

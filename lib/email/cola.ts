@@ -153,10 +153,38 @@ export async function procesarCola(): Promise<ResultadoCola> {
 }
 
 /** Cuánto esperamos a que el worker siguiente ACUSE la request (no que termine). */
-const DISPATCH_MS = 3_000;
+const DISPATCH_MS = 2_500;
+/** Cuánto le damos al sucesor para tomar el lease antes de dar la posta por perdida. */
+const CONFIRMAR_MS = 1_500;
+/** Intentos de pasar la posta. */
+const INTENTOS = 3;
+/** Techo duro de todo el dispatch: corre en `after()`, después de los 45s del lote. */
+const DISPATCH_TOTAL_MS = 11_000;
+
+const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * Dispara una invocación del worker.
+ * ¿Alguien tomó la posta? Se pregunta por el EFECTO —el lease de la campaña—, no
+ * por el transporte.
+ *
+ * 🔴 Ésa es la corrección del 13-ago-2026. Antes se daba por entregada cualquier
+ * request que no tirara error, y el `AbortSignal.timeout` hace que un cold start
+ * del sucesor sea indistinguible de un despacho exitoso: en los dos casos lo que
+ * ves es un abort. El T06 salió con un hueco de 476 s en el medio (1.180 envíos,
+ * la cadena muerta, y los 822 restantes esperando al cron) sin que quedara UNA
+ * línea de log, porque el `catch` de acá era mudo.
+ */
+export async function tomaronLaPosta(campaniaId: string): Promise<boolean> {
+  const c = await prisma.campania.findUnique({
+    where: { id: campaniaId },
+    select: { estado: true, procesandoHasta: true },
+  });
+  if (!c || c.estado !== "ENVIANDO") return true; // terminó: no hay posta que pasar
+  return !!c.procesandoHasta && c.procesandoHasta > new Date();
+}
+
+/**
+ * Dispara una invocación del worker, y se asegura de que haya arrancado.
  *
  * ⚠️ Hay que esperar esta promesa (o pasarla por `after()` de next/server). El
  * `void fetch(...)` que había acá no funcionaba: en serverless la función muere
@@ -166,21 +194,58 @@ const DISPATCH_MS = 3_000;
  *
  * Tampoco esperamos a que el worker TERMINE: sería anidar invocaciones —cada
  * eslabón vivo hasta que termine el siguiente— y toda la cadena moriría junta al
- * llegar al `maxDuration`. Cortamos a los 3s, con la request ya despachada y
- * corriendo del otro lado; el abort es del lado del cliente y no la cancela.
+ * llegar al `maxDuration`. Despachamos, cortamos, y confirmamos por el lease.
+ *
+ * ⚠️ Reintentar es seguro: el `updateMany` condicional de `tomarCampania` hace
+ * que dos workers no puedan quedarse con la misma campaña — el de más devuelve
+ * `sin-trabajo`. Mandar una invocación al pedo es infinitamente más barato que
+ * dejar media campaña parada hasta que pase el cron.
+ *
+ * @param campaniaId la campaña cuya posta se está pasando. Sin él se despacha a
+ *   ciegas (no hay lease que mirar), que es lo que hacen los dos call sites que
+ *   arrancan la cola desde cero — ahí todavía no hay nada tomado.
  */
-export async function arrancarCola(): Promise<void> {
+export async function arrancarCola(campaniaId?: string): Promise<void> {
   const appUrl = process.env.APP_URL;
   const secret = process.env.CRON_SECRET;
-  if (!appUrl || !secret) return; // sin config, el cron es el único motor
+  if (!appUrl || !secret) {
+    console.log(JSON.stringify({ ev: "cadena-cortada", motivo: "sin-APP_URL-o-CRON_SECRET", campaniaId }));
+    return; // sin config, el cron es el único motor
+  }
 
-  try {
-    await fetch(`${appUrl}/api/campanias/procesar-cola?secret=${encodeURIComponent(secret)}`, {
-      method: "POST",
-      headers: { "x-encadenado": "1" },
-      signal: AbortSignal.timeout(DISPATCH_MS),
-    });
-  } catch {
-    /* abort esperado, o cadena cortada: en los dos casos la retoma el cron */
+  const t0 = Date.now();
+  for (let intento = 1; intento <= INTENTOS; intento++) {
+    let error: string | null = null;
+    try {
+      await fetch(`${appUrl}/api/campanias/procesar-cola?secret=${encodeURIComponent(secret)}`, {
+        method: "POST",
+        headers: { "x-encadenado": "1" },
+        signal: AbortSignal.timeout(DISPATCH_MS),
+      });
+    } catch (e) {
+      // Un abort acá es lo NORMAL —el sucesor tarda 45s en contestar— así que no
+      // dice nada por sí solo. Se guarda para el log del final y se confirma abajo.
+      error = e instanceof Error ? e.name : String(e);
+    }
+
+    if (!campaniaId) return; // a ciegas: no hay lease contra el cual confirmar
+
+    await dormir(CONFIRMAR_MS);
+    if (await tomaronLaPosta(campaniaId)) {
+      if (intento > 1) {
+        console.log(JSON.stringify({ ev: "cadena-recuperada", campaniaId, intento, ms: Date.now() - t0 }));
+      }
+      return;
+    }
+
+    if (Date.now() - t0 > DISPATCH_TOTAL_MS || intento === INTENTOS) {
+      // Se agotó: los envíos quedan ENCOLADO y los retoma el cron. Lo que cambia
+      // es que ahora se SABE, en vez de descubrirlo mirando por qué una campaña
+      // tardó ocho minutos de más.
+      console.log(
+        JSON.stringify({ ev: "cadena-cortada", campaniaId, intentos: intento, ultimoError: error, ms: Date.now() - t0 }),
+      );
+      return;
+    }
   }
 }
