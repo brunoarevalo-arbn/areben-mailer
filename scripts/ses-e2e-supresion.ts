@@ -123,6 +123,11 @@ async function enviar(campaniaId: string) {
     const r = await procesarLote(campaniaId);
     if (!r) throw new Error('La campaña desapareció');
     console.log(`   lote ${++vueltas}: ${r.enviados} enviados, ${r.fallidos} fallidos, ${r.restantes} restantes${r.throttled ? ' (throttled)' : ''}`);
+    // 🔴 Un lote BLOQUEADO devuelve `restantes` sin tocar, así que la condición de
+    // abajo no se cumple NUNCA: el 13-ago-2026 esto giró 192 vueltas contra
+    // `SIN_REMITENTE` (la cuenta de QA no tiene remitente y nunca lo tuvo) hasta
+    // que lo mataron a mano. Un motivo bloqueante no se resuelve reintentando.
+    if (r.bloqueado) throw new Error(`El lote quedó bloqueado y no se reintenta: ${r.bloqueado}`);
     if (r.restantes === 0) break;
     await sleep(1100); // rate del sandbox: 1 mail por segundo
   }
