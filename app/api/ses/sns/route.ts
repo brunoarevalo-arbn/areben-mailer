@@ -1,4 +1,4 @@
-import { aplicarSupresion } from "@/lib/email/supresion";
+import { aplicarSupresion, registrarRebote } from "@/lib/email/supresion";
 import { verificarFirmaSns } from "@/lib/email/sns-firma";
 
 // Recibe notificaciones SNS de SES (rebotes y quejas) y limpia la lista.
@@ -83,6 +83,22 @@ export async function POST(req: Request) {
     if (tipo === "Bounce") {
       const bounce = ev.bounce as { bounceType?: string; bounceSubType?: string; bouncedRecipients?: { emailAddress: string }[] };
       subtipo = bounce?.bounceSubType;
+
+      // El rebote queda ESCRITO antes de decidir si quema a alguien, y para los
+      // dos tipos: sin esto, "duro" y "blando" son indistinguibles después
+      // (`Envio.estado='REBOTE'` no guarda cuál fue). Es un sensor, no la
+      // reputación: si falla, la supresión sigue igual.
+      try {
+        const eventos = await registrarRebote({
+          messageId,
+          bounceType: bounce?.bounceType,
+          bounceSubType: bounce?.bounceSubType,
+        });
+        if (!eventos) log({ rebote: "sin-envio-casado", bounceType: bounce?.bounceType, subtipo, messageId });
+      } catch (e) {
+        log({ error: "registrar-rebote", messageId, detalle: String(e) });
+      }
+
       // Solo rebotes permanentes queman el contacto.
       if (bounce?.bounceType === "Permanent") {
         supresion = {
@@ -90,7 +106,7 @@ export async function POST(req: Request) {
           emails: (bounce.bouncedRecipients ?? []).map((r) => r.emailAddress),
         };
       } else {
-        log({ ignorado: "rebote-transitorio", tipo, subtipo: bounce?.bounceType, messageId });
+        log({ ignorado: "rebote-transitorio", tipo, bounceType: bounce?.bounceType, subtipo, messageId });
       }
     } else if (tipo === "Complaint") {
       const complaint = ev.complaint as { complaintFeedbackType?: string; complainedRecipients?: { emailAddress: string }[] };

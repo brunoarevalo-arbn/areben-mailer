@@ -12,6 +12,67 @@ export interface EventoSupresion {
   messageId?: string;
 }
 
+export interface RebotePara {
+  /** Message-ID del proveedor: sin esto no hay a qué envío colgar el evento. */
+  messageId?: string;
+  /** `Permanent` | `Transient` | `Undetermined`, tal cual lo manda SES. */
+  bounceType?: string;
+  /** `General`, `NoEmail`, `Suppressed`, `MailboxFull`… */
+  bounceSubType?: string;
+}
+
+/**
+ * Deja el rebote ESCRITO, no sólo suprimido.
+ *
+ * 🔴 Hasta el 13-ago-2026 un rebote existía únicamente como `Envio.estado =
+ * 'REBOTE'`, así que `bounceType` y `bounceSubType` —lo único que distingue una
+ * casilla que NO EXISTE de una llena o de un bloqueo temporal— se perdían en el
+ * log de Vercel. Con público caliente (rebote 0,36-0,76%) daba igual. Deja de
+ * dar igual el día que se le manda a gente que nunca validó una compra: ahí el
+ * rebote DURO es el número que decide si se sigue o se frena.
+ *
+ * Se escribe para los **dos** tipos, permanente y transitorio: el transitorio no
+ * quema a nadie, pero un pico de `Transient/General` es cómo se ve un bloqueo de
+ * Gmail por reputación, y ése es el sensor que faltaba.
+ *
+ * ⚠️ Sin `messageId` casado no hay `Envio` al cual colgar el `Evento` (la
+ * columna es obligatoria) ⇒ ese rebote sigue viviendo sólo en el log, igual que
+ * la queja `sinAtribuir`. Devuelve cuántos escribió para que el webhook lo loguee.
+ */
+export async function registrarRebote(ev: RebotePara): Promise<number> {
+  if (!ev.messageId) return 0;
+
+  const envios = await prisma.envio.findMany({
+    where: { sesMessageId: ev.messageId },
+    select: { id: true },
+  });
+  if (!envios.length) return 0;
+
+  // SNS reintenta ante un 5xx —y el handler devuelve 500 a propósito para no
+  // perder el evento—, así que el mismo rebote puede llegar dos veces. La llave
+  // es el envío + el TIPO de rebote: un transitorio seguido de un permanente son
+  // dos hechos distintos y los dos interesan; el mismo repetido, no.
+  const yaEstan = await prisma.evento.findMany({
+    where: { envioId: { in: envios.map((e) => e.id) }, tipo: 'BOUNCE' },
+    select: { envioId: true, meta: true },
+  });
+  const visto = new Set(
+    yaEstan.map((e) => `${e.envioId}·${(e.meta as { bounceType?: string })?.bounceType ?? ''}`),
+  );
+
+  const nuevos = envios
+    .filter((e) => !visto.has(`${e.id}·${ev.bounceType ?? ''}`))
+    .map((e) => ({
+      envioId: e.id,
+      tipo: 'BOUNCE' as const,
+      meta: { bounceType: ev.bounceType ?? null, bounceSubType: ev.bounceSubType ?? null },
+    }));
+  if (!nuevos.length) return 0;
+
+  const res = await prisma.evento.createMany({ data: nuevos });
+  return res.count;
+}
+
 export interface ResultadoSupresion {
   /** Contactos marcados REBOTADO/SPAM. */
   contactos: number;

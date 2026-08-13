@@ -191,6 +191,29 @@ async function estado(runId: string): Promise<Fila[]> {
       ok: envio?.estado === esperadoEnvio,
     });
   }
+
+  // El `bounceType` guardado (13-ago-2026). `Envio.estado='REBOTE'` no dice si la
+  // casilla NO EXISTE o si estaba llena, y ésa es la diferencia que decide si un
+  // envío a público frío se sigue o se frena. El simulador de SES rebota
+  // `Permanent/General`.
+  const contactoRebote = await prisma.contacto.findFirst({
+    where: { email: emailBounce(runId) },
+    select: { envios: { select: { id: true } } },
+  });
+  const evento = contactoRebote?.envios.length
+    ? await prisma.evento.findFirst({
+        where: { envioId: { in: contactoRebote.envios.map((e) => e.id) }, tipo: 'BOUNCE' },
+        select: { meta: true },
+      })
+    : null;
+  const meta = evento?.meta as { bounceType?: string; bounceSubType?: string } | undefined;
+  filas.push({
+    que: 'evento  bounce (bounceType guardado)',
+    esperado: 'Permanent',
+    actual: meta ? `${meta.bounceType}/${meta.bounceSubType}` : '(no existe)',
+    ok: meta?.bounceType === 'Permanent',
+  });
+
   return filas;
 }
 
