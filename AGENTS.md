@@ -57,7 +57,7 @@ node --import tsx scripts/probar-gate.ts       # el gate no se abre solo
 node --import tsx scripts/probar-webhooks.ts   # los webhooks de rebotes fallan CERRADO
 node --import tsx scripts/probar-supresion.ts  # una queja no cruza de tienda; un rebote duro sí
 node --env-file=.env --import tsx scripts/probar-rebote-tipo.ts # el rebote deja escrito SI FUE DURO (y el reintento de SNS no lo duplica)
-node --env-file=.env --import tsx scripts/probar-cadena-cola.ts # la posta de la cola se confirma por el LEASE, no por la request
+node --env-file=.env --import tsx scripts/probar-cadena-cola.ts # la posta se confirma por el LEASE, y la invocación ENTERA entra en los 60 s
 node --import tsx scripts/probar-carrito.ts    # el carrito de muestra no sale en un envío real
 node --import tsx scripts/probar-recuperados.ts # un fallo de TN no se lee como "no compró", y el barrido siempre avanza
 node --import tsx scripts/probar-bienvenida.ts # el cupón del pop-up entra, el placeholder nunca sale, y NUEVO_SUSCRIPTOR no lo alcanza ningún evento de TN
@@ -173,9 +173,41 @@ spam por SES y entró en inbox por Resend. Cambiar de proveedor es esa env var
 práctico: el escalonado se decide por reputación, no porque el proveedor frene.
 
 **Cola:** el servidor manda, no el navegador. Lease en `Campania.procesandoHasta`
-+ auto-encadenamiento entre invocaciones, con el cron de 15 min como perro
-guardián. Un `updateMany` condicional evita que dos workers agarren la misma
-campaña.
++ auto-encadenamiento entre invocaciones, con el cron como perro guardián. Un
+`updateMany` condicional evita que dos workers agarren la misma campaña.
+
+🔴 **El presupuesto del lote NO se escribe a mano: se resta del techo**
+(`PRESUPUESTO_MS = MAX_DURACION_MS - RESERVA_RELEVO_MS`, `lib/email/cola.ts`). El
+14-ago-2026 el T07 se cortó en 1.560 envíos porque los dos números vivían
+sueltos: `encolarProgramadas` + lote (45 s **más el sobrepaso de un lote**, porque
+el corte se evalúa DESPUÉS de mandarlo) + la escalera de relevo (12 s) daban
+**64 s contra un techo de 60**. ⇒ **Los 3 reintentos sólo tenían lugar cuando no
+hacían falta.** `costeMaximoInvocacion()` hace la cuenta y
+`probar-cadena-cola.ts` la pone en rojo — verificado mutando la reserva a la
+forma vieja: `aire -4000 ms`.
+
+⚠️ **`maxDuration = 60` es el techo del plan `hobby`, no una perilla.** Y por lo
+mismo **no hay Vercel Cron por minuto** (es Pro; en Hobby es 1 por día).
+
+🔴 **El respaldo NO es "cada 15 min".** Medido el 14-ago-2026 sobre las últimas 12
+corridas de `cron.yml`: mediana **75 min**, peor caso **2 h 12**. Si una cadena se
+corta y nadie mira, media campaña espera eso.
+
+**La bitácora de la cola vive en la base** (`EventoCola`,
+`scripts/add-evento-cola.ts`), y se lee con:
+
+```bash
+node --env-file=.env --import tsx scripts/mirar-cola.ts [--horas=72] [--campania=<id>]
+```
+
+🔑 Existe porque **un `console.log` no es evidencia acá**: los runtime logs de
+Vercel no se pueden leer en Hobby (`vercel logs` sólo transmite lo nuevo; los
+endpoints de la API dan 404), y las dos veces que la cadena se cortó el
+diagnóstico chocó con eso. 🔑 **La fila que importa es la de ANTES**: si a la
+invocación la mata el `maxDuration` en pleno relevo, el `cadena-cortada` tampoco
+se escribe — lo que distingue ese caso de "la escalera corrió entera y el sucesor
+no vino" es un **`relevo-inicio` sin fila de cierre**, y por eso el relevo sano
+también deja `relevo-ok`.
 
 **Tracking:** todo mail —de campaña o de automation— termina en la tabla `Envio`
 (`campaniaId` o `automationRunId`, nunca los dos). Por eso las métricas del home

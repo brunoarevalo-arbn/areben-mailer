@@ -16,8 +16,57 @@ import { procesarLote } from "@/lib/email/procesar";
 // El lease `Campania.procesandoHasta` es lo que hace que esos dos caminos no se
 // pisen: el que lo toma es el único que manda esa campaña.
 
-/** Presupuesto de una invocación. Deja aire para cerrar antes del corte duro. */
-const PRESUPUESTO_MS = 45_000;
+/**
+ * Techo duro de la invocación: el `maxDuration` de
+ * `app/api/campanias/procesar-cola/route.ts`. 🔴 **60 s es el máximo del plan
+ * Hobby**, así que no es una perilla que se pueda subir para hacer lugar.
+ */
+export const MAX_DURACION_MS = 60_000;
+
+/**
+ * Lo que hay que dejarle al RELEVO, y por eso el presupuesto del lote se resta
+ * de acá en vez de ser un número suelto.
+ *
+ * 🔑 **El 14-ago-2026 el T07 se cortó en 1.560 envíos con esto mal calculado.**
+ * Estaban los dos números escritos a mano —45 s de lote contra un techo de 60— y
+ * la cuenta no cerraba: `encolarProgramadas` (~1 s) + el lote (45 + el sobrepaso
+ * de un lote, porque el presupuesto se chequea DESPUÉS de mandarlo) + la escalera
+ * de relevo (~12,5 s) da **~61 s**. ⇒ **La escalera de 3 reintentos sólo tenía
+ * lugar cuando no hacía falta**: si el primer despacho anda (lo normal, el sucesor
+ * arranca en 2 s) sobra tiempo; si falla —que es cuando los reintentos servirían—
+ * la función necesita los 12,5 s enteros y es justo cuando la matan a los 60.
+ * Medido: cada invocación mandaba ~46 s y el relevo moría, ~1 de cada 10.
+ *
+ * Restarla en vez de escribir el presupuesto a mano es lo que impide que los dos
+ * números se separen en silencio: lo fija `probar-cadena-cola.ts`.
+ *
+ * ⚠️ **El precio se paga en relevos, no en tiempo**: con menos presupuesto cada
+ * invocación manda menos y hacen falta más eslabones (para el T07, ~13 en vez de
+ * 9). Se elige igual el número más grande que cumple la invariante, justamente
+ * para no sumar eslabones de más mientras no sepamos si la caída viene del techo
+ * o del sucesor — eso lo va a decir la bitácora.
+ */
+const RESERVA_RELEVO_MS = 32_000;
+
+/**
+ * Presupuesto de una invocación para mandar. Se chequea DESPUÉS de cada lote, así
+ * que el gasto real es esto **más un lote**; la reserva lo contempla.
+ */
+const PRESUPUESTO_MS = MAX_DURACION_MS - RESERVA_RELEVO_MS;
+
+/**
+ * Lo que corre ANTES del lote y no está bajo su presupuesto: hoy
+ * `encolarProgramadas()` en la ruta. Medido: ~1 s.
+ */
+const ANTES_DEL_LOTE_MS = 2_000;
+
+/**
+ * Cuánto se pasa el lote de su presupuesto. El corte se evalúa **después** de
+ * mandar un lote entero, así que siempre sobra uno. Medido el 14-ago-2026 sobre
+ * el T07: 20 envíos por lote a 8,9 mail/s ⇒ ~2,3 s. Va al doble, porque el ritmo
+ * lo pone SES y un lote lento es exactamente el que hace que la cuenta no cierre.
+ */
+const SOBREPASO_LOTE_MS = 5_000;
 /** Cuánto dura el arriendo. Más que el presupuesto, para que no venza en pleno lote. */
 const LEASE_MS = 120_000;
 /** Corte de seguridad por si algo devuelve siempre restantes > 0. */
@@ -34,6 +83,31 @@ export interface ResultadoCola {
   /** true si quedó trabajo pendiente y hay que volver a invocar. */
   continuar: boolean;
   motivo: "sin-trabajo" | "terminada" | "sin-tiempo" | "throttled" | "lease-ajeno" | "bloqueado";
+  /** Cuánto tardó el lote. Es lo que dice si el presupuesto se está pasando. */
+  ms: number;
+}
+
+/**
+ * Deja escrito en la base lo que le pasa a la cola.
+ *
+ * 🔴 **Un `console.log` no es evidencia acá**: los runtime logs de Vercel no se
+ * pueden leer en el plan Hobby, y las dos veces que la cadena se cortó (T06 y
+ * T07 de BDI) el diagnóstico chocó con eso. Se sigue logueando a consola además,
+ * porque cuando el dashboard SÍ se puede mirar es lo más rápido.
+ *
+ * ⚠️ Nunca tira: una bitácora que rompe el envío es peor que no tener bitácora.
+ */
+export async function registrarCola(
+  ev: string,
+  campaniaId: string | null,
+  meta: Record<string, unknown> = {},
+): Promise<void> {
+  console.log(JSON.stringify({ ev, campaniaId, ...meta }));
+  try {
+    await prisma.eventoCola.create({ data: { ev, campaniaId, meta: meta as never } });
+  } catch {
+    /* la bitácora no frena la cola */
+  }
 }
 
 /**
@@ -95,12 +169,12 @@ async function soltarLease(campaniaId: string) {
 export async function procesarCola(): Promise<ResultadoCola> {
   const vacio = { enviados: 0, fallidos: 0, restantes: 0, lotes: 0 };
 
+  const t0 = Date.now();
   const campaniaId = await tomarCampania();
   if (!campaniaId) {
-    return { campaniaId: null, ...vacio, continuar: false, motivo: "sin-trabajo" };
+    return { campaniaId: null, ...vacio, continuar: false, motivo: "sin-trabajo", ms: Date.now() - t0 };
   }
 
-  const t0 = Date.now();
   let enviados = 0;
   let fallidos = 0;
   let restantes = 0;
@@ -149,7 +223,7 @@ export async function procesarCola(): Promise<ResultadoCola> {
     });
   }
 
-  return { campaniaId, enviados, fallidos, restantes, lotes, continuar: restantes > 0, motivo };
+  return { campaniaId, enviados, fallidos, restantes, lotes, continuar: restantes > 0, motivo, ms: Date.now() - t0 };
 }
 
 /** Cuánto esperamos a que el worker siguiente ACUSE la request (no que termine). */
@@ -162,6 +236,34 @@ const INTENTOS = 3;
 const DISPATCH_TOTAL_MS = 11_000;
 
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Lo que puede llegar a costar el relevo, en el peor caso: cada intento gasta el
+ * timeout del despacho más la espera de confirmación, y el corte por
+ * `DISPATCH_TOTAL_MS` se evalúa **al final** de un intento, así que uno más
+ * siempre entra entero.
+ *
+ * 🔑 Es una función y no un número escrito a mano para que sumar un reintento o
+ * estirar un timeout mueva la cuenta **solo**. `probar-cadena-cola.ts` exige que
+ * esto más el presupuesto del lote (más el sobrepaso de un lote) entre en
+ * `MAX_DURACION_MS`; el 14-ago-2026 no entraba y por eso el T07 se cortó.
+ */
+export function costeMaximoDelRelevo(): number {
+  return INTENTOS * (DISPATCH_MS + CONFIRMAR_MS);
+}
+
+/**
+ * Lo que puede llegar a durar una invocación ENTERA, de punta a punta.
+ *
+ * 🔑 Ésta es la cuenta que no cerraba el 14-ago-2026, y la razón de que exista
+ * como función: los cuatro sumandos vivían como constantes sueltas en dos
+ * archivos, así que **nadie podía ver que sumaban 61 contra un techo de 60**.
+ * `probar-cadena-cola.ts` exige que entre en `MAX_DURACION_MS` con aire, y se
+ * pone en rojo si alguien sube el presupuesto del lote o agrega un reintento.
+ */
+export function costeMaximoInvocacion(): number {
+  return ANTES_DEL_LOTE_MS + PRESUPUESTO_MS + SOBREPASO_LOTE_MS + costeMaximoDelRelevo();
+}
 
 /**
  * ¿Alguien tomó la posta? Se pregunta por el EFECTO —el lease de la campaña—, no
@@ -209,9 +311,15 @@ export async function arrancarCola(campaniaId?: string): Promise<void> {
   const appUrl = process.env.APP_URL;
   const secret = process.env.CRON_SECRET;
   if (!appUrl || !secret) {
-    console.log(JSON.stringify({ ev: "cadena-cortada", motivo: "sin-APP_URL-o-CRON_SECRET", campaniaId }));
+    await registrarCola("cadena-cortada", campaniaId ?? null, { motivo: "sin-APP_URL-o-CRON_SECRET" });
     return; // sin config, el cron es el único motor
   }
+
+  // 🔑 Se anota ANTES de la escalera, no sólo cuando falla. Si a la invocación la
+  // mata el `maxDuration` en pleno relevo, el `cadena-cortada` tampoco llega a
+  // escribirse — y lo que distingue ESE caso de "la escalera corrió entera y el
+  // sucesor no vino" es justamente un `relevo-inicio` sin fila de cierre.
+  await registrarCola("relevo-inicio", campaniaId ?? null, { coste: costeMaximoDelRelevo() });
 
   const t0 = Date.now();
   for (let intento = 1; intento <= INTENTOS; intento++) {
@@ -232,9 +340,13 @@ export async function arrancarCola(campaniaId?: string): Promise<void> {
 
     await dormir(CONFIRMAR_MS);
     if (await tomaronLaPosta(campaniaId)) {
-      if (intento > 1) {
-        console.log(JSON.stringify({ ev: "cadena-recuperada", campaniaId, intento, ms: Date.now() - t0 }));
-      }
+      // ⚠️ El caso NORMAL también deja fila, y no es ruido: sin el cierre, cada
+      // relevo sano se leería igual que uno que murió a mitad de la escalera.
+      // Un `relevo-inicio` vale por lo que le falta al lado.
+      await registrarCola(intento > 1 ? "cadena-recuperada" : "relevo-ok", campaniaId, {
+        intento,
+        ms: Date.now() - t0,
+      });
       return;
     }
 
@@ -242,9 +354,13 @@ export async function arrancarCola(campaniaId?: string): Promise<void> {
       // Se agotó: los envíos quedan ENCOLADO y los retoma el cron. Lo que cambia
       // es que ahora se SABE, en vez de descubrirlo mirando por qué una campaña
       // tardó ocho minutos de más.
-      console.log(
-        JSON.stringify({ ev: "cadena-cortada", campaniaId, intentos: intento, ultimoError: error, ms: Date.now() - t0 }),
-      );
+      // ⚠️ Y el cron NO es "cada 15 min": medido el 14-ago-2026 sobre sus últimas
+      // 12 corridas, la mediana entre corridas es **75 min** y el peor caso 2 h 12.
+      await registrarCola("cadena-cortada", campaniaId, {
+        intentos: intento,
+        ultimoError: error,
+        ms: Date.now() - t0,
+      });
       return;
     }
   }

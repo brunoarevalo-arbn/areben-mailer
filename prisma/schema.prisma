@@ -440,6 +440,26 @@ model Campania {
   @@index([estado, procesandoHasta])
 }
 
+/// Bitácora de la cola de envío. Tabla creada por scripts/add-evento-cola.ts.
+///
+/// Existe porque el `console.log` no es evidencia: los runtime logs de Vercel no
+/// se pueden leer en el plan Hobby, y las dos veces que la cadena se cortó
+/// (T06 y T07 de BDI) el diagnóstico chocó con eso. Acá queda lo que pasó.
+///
+/// ⚠️ Sin relación a `Campania`: la bitácora tiene que sobrevivir al borrado de
+/// la campaña, que es justo uno de los casos que hay que poder mirar después.
+model EventoCola {
+  id         String   @id @default(cuid())
+  campaniaId String?
+  /// "cola" (resultado de una invocación) · "relevo-inicio" · "cadena-recuperada" · "cadena-cortada"
+  ev         String
+  meta       Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  @@index([campaniaId, createdAt])
+  @@index([ev, createdAt])
+}
+
 enum EstadoEnvio {
   ENCOLADO
   ENVIADO

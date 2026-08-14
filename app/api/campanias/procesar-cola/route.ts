@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { procesarCola, arrancarCola } from "@/lib/email/cola";
+import { procesarCola, arrancarCola, registrarCola } from "@/lib/email/cola";
 import { encolarProgramadas } from "@/lib/email/programadas";
 
 export const maxDuration = 60;
@@ -30,7 +30,20 @@ export async function POST(req: Request) {
   // vez de dar por buena una request que quizá murió en un cold start.
   if (r.continuar) after(() => arrancarCola(r.campaniaId ?? undefined));
 
-  console.log(JSON.stringify({ ev: "cola", ...r }));
+  // La fila de la invocación va ANTES de responder, no en el `after`: es la que
+  // dice cuánto tardó el lote de verdad, y es contra ese número que se calibra el
+  // presupuesto. Una corrida sin trabajo no deja nada — el cron pasa seguido y
+  // llenaría la bitácora de silencio.
+  if (r.motivo !== "sin-trabajo") {
+    await registrarCola("cola", r.campaniaId, {
+      enviados: r.enviados,
+      fallidos: r.fallidos,
+      restantes: r.restantes,
+      lotes: r.lotes,
+      motivo: r.motivo,
+      ms: r.ms,
+    });
+  }
   return Response.json(r);
 }
 

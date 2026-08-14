@@ -11,7 +11,7 @@
 //
 //   node --env-file=.env --import tsx scripts/probar-cadena-cola.ts
 import { prisma } from '../lib/prisma.ts';
-import { tomaronLaPosta } from '../lib/email/cola.ts';
+import { tomaronLaPosta, costeMaximoDelRelevo, costeMaximoInvocacion, MAX_DURACION_MS } from '../lib/email/cola.ts';
 
 const SLUG = 'qa-cadena';
 const errores: string[] = [];
@@ -25,7 +25,31 @@ const limpiar = async () => {
   if (c) await prisma.cuenta.delete({ where: { slug: SLUG } });
 };
 
+/**
+ * La cuenta de tiempo de una invocación. Es lo que falló el 14-ago-2026: el T07
+ * se cortó en 1.560 envíos porque el lote se comía el techo y la escalera de
+ * relevo se quedaba sin lugar — o sea que los 3 reintentos sólo podían correr
+ * cuando no hacían falta.
+ */
+function presupuesto() {
+  const coste = costeMaximoInvocacion();
+  const aire = MAX_DURACION_MS - coste;
+  console.log(`   invocación en el peor caso: ${coste} ms de ${MAX_DURACION_MS} · aire ${aire} ms`);
+
+  ok(coste <= MAX_DURACION_MS, `la invocación entera entra en el techo (${coste} ≤ ${MAX_DURACION_MS} ms)`);
+
+  // Que "entre" no alcanza: entrar por 500 ms es lo mismo que no entrar, porque
+  // el sobrepaso de un lote lo decide SES y no nosotros. Se pide un margen del
+  // ancho de la escalera completa: si el relevo puede repetirse entero adentro
+  // del aire que sobra, un lote lento no se lleva puesta la cadena.
+  ok(
+    aire >= costeMaximoDelRelevo(),
+    `🔴 queda aire para una escalera de relevo entera (${aire} ≥ ${costeMaximoDelRelevo()} ms)`,
+  );
+}
+
 async function main() {
+  presupuesto();
   await limpiar();
   const cuenta = await prisma.cuenta.create({ data: { slug: SLUG, nombre: 'QA · cadena (borrar)' } });
   const campania = await prisma.campania.create({
