@@ -69,6 +69,18 @@ function muestra(tipo: TipoBloque): Bloque {
   if (tipo === "imagen" || tipo === "video") b.imagen = b.url = "https://ejemplo.com/f.jpg";
   if (tipo === "hero") b.imagen = "https://ejemplo.com/f.jpg";
   if (tipo === "boton") b.url = "https://ejemplo.com";
+  // La foto es lo que hace que el bloque exista (sin ella no dibuja nada), y los
+  // tres elementos son los tres roles que el panel ofrece: nace con un título
+  // solo, así que sin el texto y el botón dos de los tres se leerían como
+  // perillas desconectadas.
+  if (tipo === "foto-encima") {
+    b.foto = "https://ejemplo.com/f.jpg";
+    b.elementos = [
+      { id: "e1", clase: "titulo", texto: "Título", x: 5, y: 10, ancho: 60 },
+      { id: "e2", clase: "texto", texto: "Un texto", x: 5, y: 40, ancho: 60 },
+      { id: "e3", clase: "boton", texto: "Comprar", url: "https://ejemplo.com", x: 5, y: 70, ancho: 40 },
+    ];
+  }
   if (tipo === "seccion" || tipo === "cupon") { b.botonTexto = "Comprar"; b.botonUrl = "https://ejemplo.com"; }
   if (tipo === "columnas") {
     // "imagen-texto" ejercita los dos tipos de celda en el mismo fixture: la

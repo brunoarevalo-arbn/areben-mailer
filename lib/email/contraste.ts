@@ -56,6 +56,13 @@ export function superficieDe(tipo: TipoBloque, caja: Caja, pal: Paleta, bg?: str
       return caja.autoFondo ? bg || pal.tarjeta : caja.fondo!;
     case "seccion":
       return caja.autoFondo ? bg || pal.seccion : caja.fondo!;
+    // La misma cuenta que el `hero`: `bg` es el respaldo de la banda Y el color
+    // del velo, así que es lo que hay atrás del texto cuando la foto no carga.
+    // ⚠️ Con la foto cargada atrás hay una FOTO, y ahí no se mide: `sobreFoto`
+    // en `revisar.ts` calla el aviso. Esto sigue haciendo falta igual, porque es
+    // lo que decide el color automático del título.
+    case "foto-encima":
+      return caja.autoFondo ? bg || pal.tarjeta : caja.fondo!;
     case "cupon":
       return caja.fondo ?? pal.cuponFondo;
     // Sin banda, el menú se apoya en la tarjeta como cualquier otro bloque.
@@ -83,6 +90,10 @@ const ROLES_SOBRE: Partial<Record<TipoBloque, readonly RolEstilo[]>> = {
   menu: ["cuerpo"],
   hero: ["titulo", "subtitulo"],
   seccion: ["titulo", "subtitulo"],
+  // El título y el texto que van ENCIMA de la foto: los dos se recalculan contra
+  // el color de la banda. El botón no, igual que en la portada: trae su propio
+  // fondo.
+  "foto-encima": ["titulo", "cuerpo"],
   cupon: ["cuerpo"],
 };
 

@@ -559,6 +559,13 @@ export const ROLES_POR_TIPO: Record<TipoBloque, readonly RolEstilo[]> = {
   // Ídem: la foto de la portada va a sangre, sin radio.
   hero: ["caja", "titulo", "subtitulo", "boton"],
   seccion: ["caja", "titulo", "subtitulo", "boton"],
+  // Un rol por cada tipo de elemento que se puede poner encima de la foto
+  // (`ClaseEncima`): título, texto y botón. Sin `imagen`: la foto es el FONDO de
+  // la banda, no un `<img>` al que se le pueda dar radio o ancho — ídem `hero`.
+  // 🔑 El estilo es del BLOQUE y no de cada ficha: dos títulos sobre la misma
+  // foto con tamaños distintos es un diseño, no un default que el panel deba
+  // ofrecer.
+  "foto-encima": ["caja", "titulo", "cuerpo", "boton"],
   cupon: ["caja", "titulo", "cuerpo", "boton"],
   html: ["caja"],
 };
@@ -621,6 +628,12 @@ function propsCaja(tipo: TipoBloque): readonly (keyof EstiloBloque)[] {
     case "hero":
     case "seccion":
       return ["fondo", "padX", "padY", "align"];
+    // La misma banda, sin `align`: el lugar de cada elemento es su `x`, y una
+    // alineación de caja sería una segunda perilla para lo mismo — el bug que
+    // documenta `SIN_EFECTO`. `ocultarMovil`/`ocultarEscritorio` tampoco entran:
+    // la banda no pasa por `clasesDe` y no hay dónde colgar la clase (ver arriba).
+    case "foto-encima":
+      return ["fondo", "padX", "padY"];
     // 🔑 El menú es el quinto que puede dibujar su propio contenedor, y solo
     // cuando alguien elige el fondo: sin `fondo` sigue pasando por `pad()`. Entró
     // por la regla 5 de `PLANTILLAS.md` (6 referencias con el menú adentro de una

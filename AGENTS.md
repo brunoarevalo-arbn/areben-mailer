@@ -74,6 +74,7 @@ node --import tsx scripts/probar-espaciado.ts  # el margen se puede llevar a CER
 node --import tsx scripts/probar-render.ts     # golden: el mail no cambió sin querer
 node --import tsx scripts/probar-html.ts       # VML, media queries, tracking, peso
 node --import tsx scripts/probar-banda-link.ts # una foto puede ser un link, y NUNCA un <a> dentro de otro
+node --import tsx scripts/probar-foto-encima.ts # una foto lleva VARIOS botones encima, y el condicional de Outlook no se cierra antes de tiempo
 node --import tsx scripts/probar-imagen-escala.ts # una foto puede salir más chica y alineada, y Outlook obedece
 node --import tsx scripts/probar-recorte.ts     # el recorte no deforma ni agranda, y el deslizador mueve un solo eje
 node --import tsx scripts/probar-precio-oculto.ts # lo que el HTML oculta, el text/plain tampoco lo manda

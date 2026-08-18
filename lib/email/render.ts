@@ -15,12 +15,13 @@ import { claveProductos } from "./bloques";
 import { redConIcono, urlIcono } from "./redes";
 import { iconoDe, urlIconoCelda } from "./iconos";
 import { trozoCss, textoPlano, tieneTamano, tieneLink, fusionar, sanearUrl, type TextoRico, type Trozo } from "./texto-rico";
-import type { Bloque, Columna, ContenidoCampania, PorFila, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
+import type { Bloque, Columna, ContenidoCampania, ElementoEncima, PorFila, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
+import { armarPlano, type CeldaEncima } from "./encima";
 
 // Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
 // sin ciclo) pero se re-exportan desde acá: media app importa `Bloque` y
 // `nuevoBloque` de "@/lib/email/render" y no hay razón para hacerla cambiar.
-export type { Bloque, BloqueBase, TipoBloque, ContenidoCampania, ProductoEmail, Columna, PorFilaMovil, PorFila } from "./bloques";
+export type { Bloque, BloqueBase, TipoBloque, ContenidoCampania, ProductoEmail, Columna, PorFilaMovil, PorFila, ElementoEncima, ClaseEncima } from "./bloques";
 export { nuevoBloque, duplicarBloque, nuevoId, TIPOS_BLOQUE, ETIQUETA_BLOQUE } from "./bloques";
 
 const esc = (s: string) =>
@@ -336,13 +337,23 @@ function bandaConFoto(o: {
   /** Padding y alineación ya resueltos por la caja del bloque. */
   estiloCaja: string;
   /**
-   * Título y texto: lo que va igual en las dos ramas.
+   * Lo que va adentro de la banda.
    *
-   * ⚠️ **Acá no puede venir un botón**, ni nada que traiga un comentario
-   * condicional adentro: esta cadena se inserta dentro del `<!--[if mso]>` de
-   * abajo, y el primer `-->` que aparezca lo cierra. El botón va por `boton`.
+   * Un `string` es **la misma cadena en las dos ramas**, y es el caso del `hero`
+   * y de `seccion`: un título y una bajada no traen comentarios condicionales
+   * adentro.
+   *
+   * ⚠️ **Un botón NO puede ir en esa cadena**: se inserta dentro del
+   * `<!--[if mso]>` de abajo y el primer `-->` que aparezca lo cierra, dejando el
+   * resto del condicional a la vista. Para UNO alcanza `boton`, que viaja partido
+   * en dos mitades desnudas (ver `botonPartes`) y se pega al final de cada rama.
+   *
+   * 🔴 Con VARIOS botones eso no alcanza, y es lo que obligó a la segunda forma
+   * (`foto-encima`, 18-ago-2026): cada botón aporta su mitad **en el lugar donde
+   * cae**, no al final, así que el interior mismo tiene que venir armado dos
+   * veces —uno por rama— en vez de compartir una sola cadena.
    */
-  interior: string;
+  interior: string | { mso: string; resto: string };
   /** El botón, ya partido en sus dos mitades desnudas. Ver `botonPartes`. */
   boton?: { vml: string; ancla: string };
   /**
@@ -392,6 +403,9 @@ function bandaConFoto(o: {
   //
   // ⚠️ `text-decoration:none` va acá y no en los hijos: el título y la bajada
   // ya traen su propio `color`, pero el subrayado del ancla lo heredarían.
+  // Las dos ramas piden lo mismo salvo cuando adentro hay botones: normalizar acá
+  // deja los dos call sites viejos escribiendo byte por byte lo que escribían.
+  const int = typeof o.interior === "string" ? { mso: o.interior, resto: o.interior } : o.interior;
   const href = o.boton ? undefined : sanearUrl(o.href);
   const aMso = href ? ` href="${esc(href)}"` : "";
   const et = href ? "a" : "div";
@@ -401,14 +415,14 @@ function bandaConFoto(o: {
 <v:fill type="frame" src="${esc(o.foto)}" color="${fondo}"${velo > 0 ? ` opacity="${(1 - velo / 100).toFixed(2)}"` : ""} />
 <v:textbox inset="0,0,0,0">
 <div style="${o.estiloCaja}">
-${o.interior}${o.boton?.vml ?? ""}
+${int.mso}${o.boton?.vml ?? ""}
 </div>
 </v:textbox>
 </v:rect>
 <![endif]-->
 <!--[if !mso]><!-->
 <${et}${aExt}background-color:${fondo};background-image:${capaVelo}url(${esc(o.foto)});background-size:cover;background-position:center;min-height:${px(alto)};${o.estiloCaja}">
-${o.interior}${o.boton?.ancla ?? ""}
+${int.resto}${o.boton?.ancla ?? ""}
 </${et}>
 <!--<![endif]-->`;
 }
@@ -1228,6 +1242,85 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       }
       return `<div style="background:${colorCss(bg, pal.tarjeta)};${estiloCaja}">${t}${tx}${btn}</div>`;
     }
+    /**
+     * Una foto con títulos, textos y botones ENCIMA, cada uno donde lo pusieron.
+     *
+     * 🔑 La banda es la misma del `hero` (`bandaConFoto`, con su `<v:rect>` para
+     * Outlook); lo nuevo es que adentro va una **tabla**, y que el interior se
+     * arma DOS veces —una por rama del condicional— porque cada botón aporta su
+     * mitad en el lugar donde cae. Ver `interior` en `bandaConFoto`.
+     *
+     * 🔴 Los altos van en px y en el atributo `height`, no en %: Outlook mide
+     * filas y **no mide texto**, así que sin el número la banda se le desarma.
+     * El reparto lo hace `armarPlano`, que garantiza que `arriba` más los altos
+     * de las filas sumen el alto de la banda.
+     */
+    case "foto-encima": {
+      // Sin foto no hay banda. El bloque nace con la foto vacía —se elige
+      // después—, y hasta entonces no dibuja nada: mismo criterio que `imagen`
+      // sin `url` y que `video` sin miniatura.
+      if (!b.foto) return "";
+      const c = caja();
+      const bg = superficieDe("foto-encima", c, pal, b.bg);
+      // El mismo rango que acota `bandaConFoto`; se calcula acá también porque el
+      // reparto de las filas necesita el número REAL, no el pedido.
+      const alto = Math.min(600, Math.max(120, Math.round(b.alto ?? 280)));
+      const plano = armarPlano(b.elementos ?? [], alto);
+      // Los tres roles se resuelven UNA vez y no por elemento: son estilo del
+      // bloque, no de cada ficha — dos títulos encima de la misma foto con
+      // tamaños distintos es un diseño, no un default. El `sobre` es el color de
+      // la banda, igual que en la portada: el texto se recalcula contra el velo y
+      // no contra la tarjeta.
+      const eTit = e("titulo", bg);
+      const eTx = e("cuerpo", bg);
+      const eBtn = e("boton");
+      /** Un elemento, en la rama que toque. El único que sale distinto es el botón. */
+      const pieza = (el: ElementoEncima, rama: "mso" | "resto"): string => {
+        if (el.clase === "boton") {
+          // ⚠️ `sanearUrl` acá y no en el saneo del esquema: `esActual()` saltea
+          // el saneo de los documentos ya guardados, así que la frontera es el
+          // emisor. Misma doctrina que el `enlace` del bloque `imagen`.
+          const { vml, ancla } = botonPartes(el.texto, sanearUrl(el.url) ?? "", eBtn, pal);
+          return rama === "mso" ? vml : ancla;
+        }
+        // `margin:0` siempre: la posición la da la tabla, y un margen propio la
+        // correría sin que nadie lo haya pedido.
+        if (el.clase === "titulo") {
+          return `<div${clase(...clasesTitulo(eTit, el.texto))} style="margin:0;font-size:${px(eTit.tamano ?? 30)};line-height:${eTit.interlinea ?? 1.2};font-weight:${eTit.peso ?? 700};color:${eTit.color}${extra(eTit, ["tamano", "interlinea", "peso", "color"])}">${tituloHtml(el.texto, pal)}</div>`;
+        }
+        return `<div style="margin:0;font-size:${px(eTx.tamano ?? 16)};line-height:${eTx.interlinea ?? 1.5};color:${eTx.color}${extra(eTx, ["tamano", "interlinea", "color"])}">${cuerpoHtml(el.texto, pal)}</div>`;
+      };
+      // 🔴 El aire va como CELDA vacía con `font-size:0;line-height:0`, no como
+      // padding: sin eso Outlook le mete la altura de línea por defecto y la
+      // columna vacía empuja la de al lado hacia abajo. Es el mismo truco del
+      // bloque `espaciador`.
+      const celdaHtml = (cel: CeldaEncima, rama: "mso" | "resto", altoFila: number): string => {
+        const dim = ` width="${cel.pct}%" height="${altoFila}"`;
+        return cel.el
+          ? `<td${dim} valign="top" style="width:${cel.pct}%;height:${px(altoFila)}">${pieza(cel.el, rama)}</td>`
+          : `<td${dim} style="width:${cel.pct}%;height:${px(altoFila)};font-size:0;line-height:0">&nbsp;</td>`;
+      };
+      const tabla = (rama: "mso" | "resto") =>
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%">${
+          plano.arriba > 0
+            ? `<tr><td height="${plano.arriba}" style="height:${px(plano.arriba)};font-size:0;line-height:0">&nbsp;</td></tr>`
+            : ""
+        }${plano.filas.map((f) => `<tr>${f.celdas.map((cel) => celdaHtml(cel, rama, f.alto)).join("")}</tr>`).join("")}</table>`;
+      return bandaConFoto({
+        foto: b.foto,
+        alto,
+        velo: b.velo,
+        bg,
+        pal,
+        // Padding 0 de fábrica, al revés que la portada: acá el lugar de cada cosa
+        // lo dice su `x`/`y`, y un padding de 32 haría que "pegado al borde
+        // izquierdo" quedara a 32px del borde. Quien lo quiera lo pone.
+        estiloCaja: `${padCss(c.padY ?? 0, c.padX ?? 0)}${extra(c, ["fondo", "padX", "padY"])}`,
+        // Sin nada encima, la banda es la foto sola: una tabla vacía sumaría un
+        // `<tr>` que Outlook dibuja con alto propio.
+        interior: plano.filas.length ? { mso: tabla("mso"), resto: tabla("resto") } : "",
+      });
+    }
     case "cupon": {
       const c = caja();
       const bg = superficieDe("cupon", c, pal);
@@ -1586,6 +1679,26 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
     case "seccion":
       return [campoATexto(b.titulo), b.texto && campoATexto(b.texto), b.botonTexto ? link(b.botonTexto, b.botonUrl) : b.botonUrl]
         .filter(Boolean).join("\n") || null;
+    // Lo que hay encima de la foto, de arriba para abajo: en texto plano no hay
+    // foto ni posiciones, así que del lugar de cada cosa sobrevive sólo el orden.
+    //
+    // 🔴 Y es lo único que sobrevive del bloque entero. Sin esto, un mail cuyo
+    // protagonista es una foto con su CTA encima sale **sin una línea y sin un
+    // link** en la versión de texto —que es de donde el buzón saca el preview— y
+    // un mail solo-HTML es señal de spam. Es la misma deuda que ya se pagó con la
+    // portada cuya banda entera es el link.
+    case "foto-encima":
+      return (b.elementos ?? [])
+        .filter((el) => el.texto?.trim())
+        .slice()
+        .sort((x, y) => (x.y ?? 0) - (y.y ?? 0) || (x.x ?? 0) - (y.x ?? 0))
+        // `sinNegritas` sólo en el texto: el título **no** interpreta `**` (va por
+        // `tituloHtml`, que escapa pelado), así que borrarle los asteriscos acá
+        // haría decir dos cosas distintas al mail y a su versión de texto.
+        .map((el) =>
+          el.clase === "boton" ? link(el.texto, el.url) : el.clase === "texto" ? sinNegritas(el.texto) : el.texto,
+        )
+        .join("\n") || null;
     case "cupon":
       return [b.texto, b.codigo, b.botonTexto ? link(b.botonTexto, b.botonUrl) : null].filter(Boolean).join("\n") || null;
     // Sin conversión razonable a texto plano: es la escotilla de HTML libre.

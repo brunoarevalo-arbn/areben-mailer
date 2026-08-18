@@ -11,7 +11,8 @@
 // y, como `resolverPaleta`, **nunca lanza**: un contenido roto no puede impedir
 // que salga la campaña.
 
-import { TIPOS_BLOQUE, nuevoId, type Bloque, type Columna, type ContenidoCampania } from "./bloques";
+import { TIPOS_BLOQUE, nuevoId, type Bloque, type ClaseEncima, type Columna, type ContenidoCampania } from "./bloques";
+import { MAX_ELEMENTOS } from "./encima";
 import { sanearEstilos } from "./estilos";
 import { temaDe } from "./tema";
 import { sanearTrozos, CAMPOS_RICOS, CAMPOS_RICOS_CELDA } from "./texto-rico";
@@ -33,6 +34,15 @@ export const V_ACTUAL = 4;
 
 /** El tope de celdas de un `columnas`. Ver `CantidadCeldas` en `bloques.ts`. */
 const MAX_CELDAS = 4;
+
+/** Las tres clases de elemento que puede tener un `foto-encima`. */
+const CLASES_ENCIMA = new Set<string>(["titulo", "texto", "boton"] satisfies ClaseEncima[]);
+
+/** Un `x`/`y` de la base a un porcentaje. Lo que no es número cae a 0. */
+const enRango = (v: unknown): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : 0;
+};
 
 /**
  * `{izq, der}` → `{celdas:[izq, der]}`, para un bloque cualquiera.
@@ -172,6 +182,42 @@ function sanearBloque(v: unknown, usados: Set<string>): Bloque | null {
     b.celdas = celdas;
     delete b.izq;
     delete b.der;
+  }
+
+  // Lo que va encima de una foto: clase conocida, texto string, coordenadas en
+  // rango y un id propio por elemento.
+  //
+  // ⚠️ **No es la red del renderer**: `armarPlano` acota todo otra vez, y tiene
+  // que hacerlo porque `esActual()` deja pasar los documentos ya guardados sin
+  // re-sanear. Esto es lo que hace que un Json amontonado a mano quede GUARDADO
+  // sano la próxima vez que alguien toque la campaña, en vez de arreglarse en cada
+  // lectura para siempre. Un elemento sin `clase` reconocible cae a `texto`: es la
+  // clase que no promete nada (ni link ni tamaño de título) y así el contenido
+  // escrito no se pierde.
+  if (b.tipo === "foto-encima") {
+    const lista = Array.isArray(b.elementos) ? (b.elementos as unknown[]) : [];
+    b.elementos = lista
+      .filter((el): el is Bruto => !!el && typeof el === "object" && !Array.isArray(el))
+      .slice(0, MAX_ELEMENTOS)
+      .map((el) => {
+        const out: Bruto = {
+          ...el,
+          id: typeof el.id === "string" && el.id.trim() ? el.id.trim() : nuevoId(),
+          clase: CLASES_ENCIMA.has(el.clase as string) ? el.clase : "texto",
+          texto: typeof el.texto === "string" ? el.texto : "",
+          x: enRango(el.x),
+          y: enRango(el.y),
+        };
+        // El ancho ausente significa "hasta donde arranca el que sigue", así que
+        // un valor ilegible se BORRA en vez de caer a un número: caer a 100 le
+        // clavaría el ancho entero y taparía a los de al lado.
+        if (out.ancho !== undefined) {
+          const n = Number(out.ancho);
+          if (Number.isFinite(n)) out.ancho = Math.min(100, Math.max(5, Math.round(n)));
+          else delete out.ancho;
+        }
+        return out;
+      });
   }
 
   // Los 8 campos que admiten formato por selección (`texto-rico.ts`). El saneo

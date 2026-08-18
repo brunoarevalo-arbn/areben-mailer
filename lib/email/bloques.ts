@@ -221,6 +221,53 @@ export const ETIQUETA_FUENTE = {
 } as const satisfies Record<FuenteProductos, string>;
 
 /**
+ * Una cosa que va ENCIMA de una foto: un título, un texto o un botón, con su
+ * lugar dentro de la banda.
+ *
+ * 🔴 **`x`/`y` no son `position:absolute`.** Un mail no puede superponer nada
+ * —Gmail borra `position` y Outlook lo ignora—, así que el renderer los traduce
+ * a filas y celdas de una tabla (`lib/email/encima.ts`). De ahí sale la única
+ * regla que el modelo no puede prometer y el editor sí: **dos elementos no se
+ * pueden pisar**. Una tabla no tiene forma de dibujar eso, así que lo que se
+ * monta sobre otro no sale "mal puesto": sale **corrido**, y sin que nada avise.
+ *
+ * 🔑 `texto` es `string` y no `TextoRico` a propósito, y se puede subir después
+ * **sin migrar nada**: `TextoRico` es `string | Trozo[]`, o sea que el string de
+ * hoy seguiría siendo válido. Arrancar en el mínimo evita el saneo anidado que
+ * `columnas` necesitó (`CAMPOS_RICOS_CELDA` en `esquema.ts`) para algo que
+ * todavía nadie pidió.
+ */
+export interface ElementoEncima {
+  /**
+   * Identidad estable dentro del bloque. La usa el editor para saber cuál está
+   * agarrado: por índice, mover uno le cambia el elegido a otro — el mismo bug
+   * que documenta `BloqueBase.id`.
+   */
+  id?: string;
+  clase: ClaseEncima;
+  /** El texto; en un botón, la etiqueta. **Vacío = no se dibuja**. */
+  texto: string;
+  /** Sólo en `boton`: a dónde lleva. Se sanea al emitir, como todo link. */
+  url?: string;
+  /**
+   * Dónde arranca, en % del ancho de la banda (0-100). Con 0 queda pegado al
+   * borde de la caja — que puede tener su propio padding lateral.
+   */
+  x: number;
+  /** Dónde arranca, en % del alto de la banda (0-100). */
+  y: number;
+  /**
+   * Cuánto ocupa de ancho, en % (5-100). **Ausente = hasta donde empieza el que
+   * sigue**, o hasta el borde si es el último: es lo que deja que un título solo
+   * use el ancho entero sin que nadie configure nada.
+   */
+  ancho?: number;
+}
+
+/** Las tres cosas que se pueden poner encima de una foto. */
+export type ClaseEncima = "titulo" | "texto" | "boton";
+
+/**
  * Lo que todo bloque tiene, sea del tipo que sea.
  *
  * Se intersecta con la unión de abajo en vez de repetirse en cada variante. El
@@ -578,6 +625,38 @@ export type Bloque = BloqueBase &
         /** Cuánto se oscurece la foto, 0-100. **Ausente = 0**, como el `hero`. */
         velo?: number;
       }
+    /**
+     * Una foto con cosas ENCIMA: títulos, textos y botones ubicados a mano.
+     *
+     * 🔑 Es un bloque nuevo y **no una perilla más del `hero`**, a propósito: la
+     * portada tiene 38 presets con golden y un único camino de texto (título,
+     * bajada y botón, uno abajo del otro). Meterle posiciones habría movido todo
+     * eso para agregar algo que ninguno de los 38 usa.
+     *
+     * Lo que lo hace expresable es que **el fondo no es una capa**: la foto va
+     * como `background-image` de la banda —el mismo `bandaConFoto` del `hero`,
+     * con su rama `<v:rect>` para Outlook— y lo de encima es una tabla adentro.
+     * Ver `ElementoEncima` para por qué eso obliga a que nada se pise.
+     */
+    | {
+        tipo: "foto-encima";
+        /** La foto de fondo. **Sin ella el bloque no dibuja nada.** */
+        foto: string;
+        /**
+         * Alto de la banda en px (el renderer lo acota a 120-600).
+         *
+         * No es cosmético y no se puede sacar: **Outlook mide filas, no mide
+         * texto**, así que la banda necesita el número. Lo pone el editor a
+         * partir del tamaño real de la foto, para que entre entera.
+         */
+        alto?: number;
+        /** Cuánto se tapa la foto con el color `bg`, 0-100. Ausente = 0. */
+        velo?: number;
+        /** Color de respaldo y del velo. Vacío = la tarjeta del tema. */
+        bg: string;
+        /** Lo que va encima. El orden de la lista no importa: el lugar es `x`/`y`. */
+        elementos: ElementoEncima[];
+      }
     | {
         tipo: "cupon";
         /**
@@ -618,7 +697,7 @@ export type TipoBloque = Bloque["tipo"];
 /** Todos los tipos que existen. El editor arma su paleta con esto. */
 export const TIPOS_BLOQUE = [
   "encabezado",
-  "hero", "seccion", "cupon", "titulo", "texto", "boton", "imagen",
+  "hero", "seccion", "foto-encima", "cupon", "titulo", "texto", "boton", "imagen",
   "productos", "productos-dinamicos", "carrito", "columnas", "video", "redes", "menu",
   "divisor", "espaciador", "html",
 ] as const satisfies readonly TipoBloque[];
@@ -635,6 +714,7 @@ export const ETIQUETA_BLOQUE = {
   encabezado: "Encabezado",
   hero: "Portada",
   seccion: "Sección con fondo",
+  "foto-encima": "Foto con textos encima",
   cupon: "Cupón",
   titulo: "Título",
   texto: "Texto",
@@ -736,6 +816,19 @@ export function nuevoBloque(tipo: TipoBloque): Bloque {
     // nuevo tiene que verse bien en el tema que tenga la marca, no en el claro.
     case "hero": return { id, tipo, imagen: "", titulo: "Título principal", subtitulo: "Un subtítulo que acompaña", botonTexto: "Ver más", botonUrl: "", bg: "" };
     case "seccion": return { id, tipo, bg: "#faf7f0", titulo: "Título de sección", texto: "Texto de la sección.", botonTexto: "", botonUrl: "" };
+    // Nace con la foto vacía pero **con un título encima**: sin ningún elemento
+    // el bloque es una foto de fondo y nada más, y lo que hay que ver funcionando
+    // es justamente que el texto va ARRIBA de la foto.
+    //
+    // 🔑 El `bg` oscuro y el velo 45 son OPINIÓN, y acá sí puede vivir en el
+    // documento: es un tipo nuevo, no hay un solo mail guardado al que cambiarle
+    // el aspecto. Es la diferencia con el `velo` del `hero`, cuyo default tiene
+    // que seguir siendo 0 para siempre y por eso la opinión vive en el editor.
+    case "foto-encima":
+      return {
+        id, tipo, foto: "", alto: 320, bg: "#111111", velo: 45,
+        elementos: [{ id: nuevoId(), clase: "titulo", texto: "Título encima", x: 8, y: 58, ancho: 84 }],
+      };
     case "cupon": return { id, tipo, texto: "Usá este código en el checkout", codigo: "DESCUENTO10", botonTexto: "Comprar", botonUrl: "" };
     case "html": return { id, tipo, contenido: "" };
   }

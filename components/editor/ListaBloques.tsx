@@ -7,7 +7,7 @@ import { ETIQUETA_FUENTE } from "@/lib/email/bloques";
 import {
   AlignLeft, ChevronDown, ChevronUp, Code2, Columns2, Copy, GripVertical, ImageIcon,
   LayoutTemplate, Menu as MenuIcon, Minus, MousePointerClick, MoveVertical, PanelTop, Play, Plus,
-  Share2, ShoppingBag, ShoppingCart, Sparkles, Ticket, Trash2, Type,
+  Share2, ShoppingBag, ShoppingCart, Sparkles, Ticket, Trash2, Type, TypeOutline,
 } from "lucide-react";
 
 /**
@@ -45,6 +45,7 @@ const ICONO: Record<TipoBloque, typeof Type> = {
   encabezado: PanelTop,
   hero: LayoutTemplate,
   seccion: AlignLeft,
+  "foto-encima": TypeOutline,
   cupon: Ticket,
   titulo: Type,
   texto: AlignLeft,
@@ -89,6 +90,13 @@ function resumen(b: Bloque): string {
     case "hero":
     case "seccion":
       return textoPlano(b.titulo).trim() || "—";
+    // El primer texto de arriba para abajo, que es el que se lee primero en el
+    // mail. Sin foto lo que hay que decir es eso: el bloque no se dibuja.
+    case "foto-encima": {
+      if (!b.foto) return "Sin foto";
+      const arriba = [...(b.elementos ?? [])].filter((el) => el.texto?.trim()).sort((x, y) => x.y - y.y)[0];
+      return arriba?.texto.trim() || "Sin textos encima";
+    }
     case "cupon":
       return b.codigo.trim() || "—";
     case "imagen":

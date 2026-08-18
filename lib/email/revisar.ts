@@ -137,6 +137,19 @@ export function rolesDibujados(b: Bloque, opts: OpcionesRevision = {}): readonly
     // un color que ese texto no usa.
     case "seccion":
       return bandaRoles(hay(b.titulo), hay(b.texto), hay(b.botonTexto));
+    // Los roles salen de los elementos que HAY, no de los tres que el bloque
+    // podría tener: una foto con un solo botón encima no dibuja ningún título, y
+    // un color de título elegido en la capa de documento haría cantar el aviso
+    // por un texto que no existe. Es la misma pregunta de instancia de arriba.
+    // ⚠️ El aviso igual se calla siempre en este bloque: ver `sobreFoto`.
+    case "foto-encima": {
+      const vivos = (b.elementos ?? []).filter((el) => hay(el.texto));
+      const roles: RolEstilo[] = [];
+      if (vivos.some((el) => el.clase === "titulo")) roles.push("titulo");
+      if (vivos.some((el) => el.clase === "texto")) roles.push("cuerpo");
+      if (vivos.some((el) => el.clase === "boton")) roles.push("boton");
+      return roles;
+    }
     // El código del cupón va en `titulo` (y no se recalcula: es color de marca).
     case "cupon": {
       const roles: RolEstilo[] = [];
@@ -209,7 +222,7 @@ function bandaRoles(titulo: boolean, bajada: boolean, boton: boolean): RolEstilo
  * `superficieDe` no puede adivinar, porque `bg` es un campo del bloque.
  */
 function bgDe(b: Bloque): string | undefined {
-  return b.tipo === "hero" || b.tipo === "seccion" ? b.bg : undefined;
+  return b.tipo === "hero" || b.tipo === "seccion" || b.tipo === "foto-encima" ? b.bg : undefined;
 }
 
 /**
@@ -222,6 +235,7 @@ function bgDe(b: Bloque): string | undefined {
  * cuando le pasan algo que no es un color: `null` antes que inventar.
  */
 function sobreFoto(b: Bloque): boolean {
+  if (b.tipo === "foto-encima") return !!b.foto;
   return (b.tipo === "hero" || b.tipo === "seccion") && !!b.fondoImagen;
 }
 

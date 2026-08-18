@@ -51,6 +51,8 @@ for (const b of todos) {
   if (b.tipo === 'menu') b.links = [{ texto: 'Novedades', url: 'https://x.com/new-in' }];
   if (b.tipo === 'redes') b.links = [{ red: 'Instagram', url: 'https://instagram.com/bdi' }];
   if (b.tipo === 'columnas') b.celdas = [{ imagen: 'a.jpg', url: '#' }, { imagen: 'b.jpg', url: '#' }];
+  // Nace con un título encima pero SIN foto, y sin foto no hay banda que marcar.
+  if (b.tipo === 'foto-encima') b.foto = 'https://ejemplo.com/fondo.jpg';
 }
 
 /**
