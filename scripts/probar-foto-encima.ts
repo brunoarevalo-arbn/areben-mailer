@@ -182,6 +182,28 @@ console.log("\n6) La banda: la foto va de fondo y el alto se acota");
   ok(alto(bloque([{ texto: "x", y: 50 }], { alto: 10 })) === "120", "y uno de 10 sube a 120");
 }
 
+console.log("\n6b) 🔴 La banda va A SANGRE: `x: 0` es el borde, no 32px adentro");
+{
+  // 🔴 **Esto nació roto y estuvo un día así.** El `case` decía "padding 0 de
+  // fábrica" y dibujaba 32: el default de `BASE.caja.padX` es 32 y este tipo no
+  // estaba en `BASE_POR_TIPO`, así que el `?? 0` del renderer no se usaba nunca.
+  // El efecto no era cosmético: la superficie del editor ubica las fichas sobre el
+  // ancho ENTERO de la banda, así que **mentía 32px por lado** — que es justo lo
+  // que este bloque existe para no hacer.
+  //
+  // El oráculo es el `padding` que emite la caja de la banda, y NO que el elemento
+  // "esté": con 32px de padding el HTML de las celdas sale idéntico (los anchos van
+  // en %), y lo único que cambia es contra qué se calcula ese %.
+  const h = html([bloque([{ clase: "titulo", texto: "Girlhood", x: 0, y: 60 }])]);
+  const cajas = [...h.matchAll(/padding:0px[^;"]*/g)].map((m) => m[0]);
+  ok(cajas.length > 0, "la caja de la banda emite su padding");
+  ok(cajas.every((c) => c === "padding:0px"), "y no lleva NINGÚN margen lateral de fábrica", cajas.join(" | "));
+  // Y la perilla sigue existiendo: quien quiera margen lo pone y el mail obedece.
+  const conMargen = bloque([{ clase: "titulo", texto: "Girlhood", x: 0, y: 60 }]);
+  (conMargen as unknown as { estilo: unknown }).estilo = { caja: { padX: 24 } };
+  ok(html([conMargen]).includes("padding:0px 24px"), "…pero elegir 24 en el panel sí lo dibuja");
+}
+
 console.log("\n7) Sin foto no se dibuja nada (un hueco es peor que nada)");
 {
   const h = html([bloque([{ clase: "titulo", texto: "Girlhood", x: 8, y: 60 }], { foto: "" })]);

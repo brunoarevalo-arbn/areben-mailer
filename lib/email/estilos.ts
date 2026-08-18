@@ -419,6 +419,15 @@ const BASE_POR_TIPO: Partial<Record<TipoBloque, Estilos>> = {
     cuerpo: { tamano: 14, interlinea: 1.5 },
     boton: { tamano: 14, padX: 18, padY: 10 },
   },
+  // 🔴 **A sangre, y esto es un ARREGLO, no una preferencia** (18-ago-2026). El
+  // `case` de `foto-encima` dice "padding 0 de fábrica" desde el día que se
+  // escribió y dibujaba **32**: el default de `BASE.caja` es 32 y este tipo no
+  // estaba acá, así que el `?? 0` del renderer nunca se usaba. O sea que un
+  // elemento con `x: 0` salía a 32px del borde mientras la superficie del editor
+  // —que ubica las fichas sobre el ancho ENTERO de la banda— lo dibujaba pegado.
+  // La superficie mentía 32px por lado, que es justo lo que ese bloque existe
+  // para no hacer.
+  "foto-encima": { caja: { padX: 0 } },
   // Ídem, y por una razón más fuerte: una foto en pedazos **ES la pieza**, viene
   // diseñada entera de afuera y va de punta a punta. Con los 32 de `BASE` el
   // pedazo de la izquierda arrancaría a 32px del borde y la foto no se vería
