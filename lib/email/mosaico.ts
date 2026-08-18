@@ -176,6 +176,22 @@ export const sinAlt = (filas: readonly FilaMosaico[]): number =>
 export interface CeldaPlano {
   /** Ancho en px. Los de una fila suman EXACTAMENTE el ancho útil. */
   ancho: number;
+  /**
+   * El mismo ancho en PORCENTAJE de la tabla, y los de una fila suman
+   * exactamente 100.
+   *
+   * 🔴 **No es una duplicación: son dos lectores distintos.** Word/Outlook usa el
+   * `width` en píxeles del atributo —ahí el reparto exacto es lo único que impide
+   * que la fila desborde la tabla— y cualquier navegador usa el porcentaje del
+   * CSS, que es lo que hace que el mosaico se pueda achicar. Con píxeles también
+   * en el `style`, en un teléfono de 375px la tabla salía de 634 y se llevaba el
+   * mail entero al scroll horizontal.
+   *
+   * Sale de `repartir` sobre una escala de 10.000 (centésimas de punto) por el
+   * mismo motivo que los píxeles: tres tercios redondeados por separado dan
+   * 100,01% y eso vuelve a desbordar.
+   */
+  pct: number;
   celda: CeldaMosaico;
 }
 
@@ -183,10 +199,18 @@ export interface FilaPlano {
   /**
    * Alto en px, **el mismo para todas las celdas de la fila**.
    *
-   * 🔴 Va declarado y no se deja en `auto`: si cada pedazo calcula su alto de su
-   * propia relación de aspecto, los redondeos difieren en un píxel entre celdas
-   * vecinas y aparece el escalón —una rayita blanca horizontal— justo en el
-   * lugar donde la foto tenía que verse continua.
+   * 🔴 Va declarado **en el atributo `height` del `<img>`** y no se deja en
+   * `auto` ahí: si cada pedazo calcula su alto de su propia relación de aspecto,
+   * los redondeos difieren en un píxel entre celdas vecinas y aparece el escalón
+   * —una rayita blanca horizontal— justo en el lugar donde la foto tenía que
+   * verse continua. Ese escalón es de **Word**, que redondea a píxeles enteros y
+   * lee el atributo.
+   *
+   * ⚠️ En el CSS, en cambio, el alto va `auto` (18-ago-2026): clavarlo también
+   * ahí dejaba la foto estirada en cuanto la tabla se achicaba en un teléfono. Y
+   * no reabre el escalón, porque los pedazos de una banda se cortaron todos al
+   * mismo alto: `alto_natural / ancho_natural` escala igual para todos, así que
+   * el alto calculado sale el mismo — y un navegador, además, hace subpíxeles.
    *
    * `0` = no se sabe (la foto todavía no se midió) y entonces no se declara nada.
    */
@@ -220,7 +244,22 @@ export function armarMosaico(
     ancho: anchoUtil,
     filas: g.map((f, i) => ({
       alto: altos[i],
-      celdas: repartir(f.celdas.map((c) => c.ancho), anchoUtil).map((ancho, j) => ({ ancho, celda: f.celdas[j] })),
+      celdas: (() => {
+        const partes = f.celdas.map((c) => c.ancho);
+        const px = repartir(partes, anchoUtil);
+        // 🔑 **El porcentaje sale de los PÍXELES ya repartidos, no del reparto
+        // otra vez.** Son los dos lados de la misma celda —el atributo que lee
+        // Word y el CSS que lee un navegador— y tienen que describir el mismo
+        // corte: recalcularlos por separado los deja diferentes por redondeo, y
+        // esa diferencia se convierte en una diferencia de ALTO entre pedazos
+        // vecinos, que es la costura que este bloque existe para no tener. Como
+        // los píxeles suman el ancho exacto, los porcentajes suman 100 exacto.
+        return px.map((ancho, j) => ({
+          ancho,
+          pct: Math.round((ancho / anchoUtil) * 1_000_000) / 10_000,
+          celda: f.celdas[j],
+        }));
+      })(),
     })),
   };
 }

@@ -1383,8 +1383,26 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         // celda es la única, así que la foto sale a ancho completo.
         const src = cel.celda.url || b.foto;
         const alto = altoFila > 0 ? ` height="${altoFila}"` : "";
-        const altoCss = altoFila > 0 ? `height:${px(altoFila)};` : "height:auto;";
-        const img = `<img src="${esc(src)}" alt="${esc(cel.celda.alt ?? "")}" width="${cel.ancho}"${alto} border="0" style="width:${px(cel.ancho)};${altoCss}display:block;border:0" />`;
+        // Siempre `auto`: el alto de verdad lo declara el atributo `height` de
+        // arriba, que es el que mira Word. Clavarlo también acá dejaba la foto
+        // estirada en cuanto la tabla se achicaba en un teléfono.
+        const altoCss = "height:auto;";
+        // 🔴 **Los píxeles van en los ATRIBUTOS y los porcentajes en el CSS.**
+        // Outlook de escritorio lee los atributos —ahí sigue el reparto exacto de
+        // `repartir`, que es lo que impide que la fila desborde la tabla— y
+        // cualquier navegador lee el CSS, que es fluido. Con el ancho en píxeles
+        // también en el `style`, la tabla no podía achicarse: en un teléfono de
+        // 375px el mosaico salía **634px de ancho**, tapado a la derecha y
+        // arrastrando el mail entero al scroll horizontal (medido el 18-ago-2026
+        // en el navegador; el HTML estaba bien y por eso ningún script lo vio).
+        //
+        // 🔑 **`height:auto` NO rompe el alto compartido de la fila**, que es la
+        // invariante de este bloque: los pedazos de una banda se cortaron todos
+        // al mismo alto, así que `alto_natural / ancho_natural` escala igual para
+        // todos y el alto calculado sale el mismo. El escalón de un píxel que el
+        // `height` declarado existe para evitar es de Word, y Word usa el
+        // atributo, no esto.
+        const img = `<img src="${esc(src)}" alt="${esc(cel.celda.alt ?? "")}" width="${cel.ancho}"${alto} border="0" style="width:100%;max-width:${px(cel.ancho)};${altoCss}display:block;border:0" />`;
         // Se sanea acá y no en el esquema: `esActual()` saltea el saneo de lo ya
         // guardado, así que el emisor es la frontera. Misma doctrina que el
         // `enlace` del bloque `imagen` y el `url` de un elemento encima.
@@ -1396,23 +1414,44 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
           ? `<a href="${esc(destino)}" style="text-decoration:none;display:block;border:0">${img}</a>`
           : img;
       };
+      /**
+       * 🔴 **Una tabla POR BANDA, no una tabla con varias filas.**
+       *
+       * En una tabla, las columnas son de la TABLA y no de la fila: una banda de
+       * tres pedazos arriba de una de dos comparte los mismos bordes de columna,
+       * y el navegador resuelve el conflicto sumando los dos repartos. Medido el
+       * 18-ago-2026 en el navegador con una grilla 3+2 dentro de un mail de 600:
+       * la tabla salía de **838 px** —desbordada en escritorio, no sólo en el
+       * teléfono— y al hacerla fluida el tercer pedazo colapsaba a **cero**.
+       *
+       * Con una tabla por banda cada fila reparte su ancho sola, que es lo que
+       * este bloque siempre quiso decir. Las bandas se apilan porque son tablas
+       * de bloque, y Outlook las apila igual.
+       */
       const filasHtml = plano.filas
         .map(
           (f) =>
-            `<tr>${f.celdas
+            `<table role="presentation" width="${plano.ancho}" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${px(plano.ancho)};border-collapse:collapse"><tr>${f.celdas
               .map(
                 (cel) =>
-                  `<td width="${cel.ancho}" valign="top" style="width:${px(cel.ancho)};font-size:0;line-height:0;padding:0">${pedazo(cel, f.alto)}</td>`,
+                  `<td width="${cel.ancho}" valign="top" style="width:${cel.pct}%;font-size:0;line-height:0;padding:0">${pedazo(cel, f.alto)}</td>`,
               )
-              .join("")}</tr>`,
+              .join("")}</tr></table>`,
         )
         .join("");
       // `border-collapse:collapse` y `cellspacing="0"` los dos: el atributo es el
       // que obedece Word, y sin él quedan dos píxeles de tarjeta entre pedazo y
       // pedazo. El `width` en atributo además del inline, por lo mismo que en
       // toda imagen de este motor: Outlook ignora `max-width`.
-      const tabla = `<table role="presentation" width="${plano.ancho}" cellpadding="0" cellspacing="0" border="0" style="width:${px(plano.ancho)};border-collapse:collapse;max-width:100%">${filasHtml}</table>`;
-      return `<div${clase(...clasesDe(c))} style="${padCss(c.padY ?? 0, padX)}${extra(c, ["padX", "padY"])}">${tabla}</div>`;
+      // 🔴 **`width:100%` con tope, no un ancho en píxeles con `max-width`** (en
+      // cada banda, arriba). Una tabla no baja de su ancho MÍNIMO, y con
+      // `width:600px` en el CSS ese mínimo son 600: el `max-width:100%` no la
+      // achicaba un píxel y en un teléfono de 375 el mosaico salía de 634
+      // —medido en el navegador el 18-ago-2026—, arrastrando el mail entero al
+      // scroll horizontal. Con el ancho en porcentaje el mínimo lo marcan las
+      // celdas, que ahora también van en porcentaje. En escritorio no cambia
+      // nada: 100% del contenedor de 600 son 600.
+      return `<div${clase(...clasesDe(c))} style="${padCss(c.padY ?? 0, padX)}${extra(c, ["padX", "padY"])}">${filasHtml}</div>`;
     }
     /**
      * La cuenta regresiva: un PNG que se dibuja en cada apertura, y **abajo la

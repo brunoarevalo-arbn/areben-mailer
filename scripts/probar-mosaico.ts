@@ -72,8 +72,13 @@ const cortada = (filas: FilaMosaico[]): FilaMosaico[] =>
   }));
 
 /** La tabla del mosaico, que es la única del mail con `border-collapse` inline. */
-const tablaDe = (h: string) => h.match(/<table[^>]*border-collapse:collapse[\s\S]*?<\/table>/)?.[0] ?? "";
-/** Los `<tr>` de esa tabla, cada uno con sus `<td>`. */
+// ⚠️ **Son VARIAS tablas: una por banda** (18-ago-2026). En una sola tabla las
+// columnas son de la tabla y no de la fila, así que una banda de tres arriba de
+// una de dos compartía bordes y el navegador sumaba los dos repartos: 838 px de
+// tabla adentro de un mail de 600. Por eso esto junta todas y no la primera.
+const tablasDe = (h: string) => h.match(/<table[^>]*border-collapse:collapse[\s\S]*?<\/table>/g) ?? [];
+const tablaDe = (h: string) => tablasDe(h).join("");
+/** Los `<tr>` de esas tablas, cada uno con sus `<td>`. Uno por banda. */
 const filasDe = (h: string) => (tablaDe(h).match(/<tr>[\s\S]*?<\/tr>/g) ?? []);
 /** Los `width="N"` de los `<td>` de una fila: es lo que Outlook mide. */
 const anchosDe = (tr: string) => [...tr.matchAll(/<td width="(\d+)"/g)].map((m) => Number(m[1]));
@@ -437,6 +442,84 @@ console.log("\n12) El plano, contra lo que dibuja el mail");
     "y los altos también",
   );
   ok(plano.ancho === ANCHO, "el plano sabe cuánto mide la tabla");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\n13) 🔴 El mosaico se ACHICA, y una banda no le impone columnas a otra");
+// Las dos cosas se midieron en el navegador el 18-ago-2026 y ningún script las
+// veía: el HTML estaba bien y lo que fallaba era el layout.
+//
+//   · Con el ancho en píxeles también en el `style`, una tabla no baja de su
+//     ancho MÍNIMO: en un marco de 375 el mosaico salía de 634 y se llevaba el
+//     mail entero al scroll horizontal.
+//   · Y con UNA tabla para todas las bandas, las columnas son de la tabla y no
+//     de la fila: una banda de tres arriba de una de dos sumaba los dos repartos
+//     y daba 838 px de tabla adentro de un mail de 600.
+{
+  const g: FilaMosaico[] = [
+    { alto: 50, celdas: [{ ancho: 33, url: "a.jpg" }, { ancho: 33, url: "b.jpg" }, { ancho: 34, url: "c.jpg" }] },
+    { alto: 50, celdas: [{ ancho: 50, url: "d.jpg" }, { ancho: 50, url: "e.jpg" }] },
+  ];
+  const h = html([bloque(g)]);
+  const tablas = tablasDe(h);
+  const plano = armarMosaico(g, ANCHO, 1.25);
+  ok(tablas.length === 2, "cada banda sale en su PROPIA tabla", `salieron ${tablas.length}`);
+  ok(tablas.every((t) => (t.match(/<tr>/g) ?? []).length === 1), "…y cada tabla tiene una sola fila");
+
+  // El ancho fluido: porcentaje en el CSS, píxeles en el atributo. Los dos, o se
+  // rompe uno de los dos lectores.
+  //
+  // ⚠️ Se mira la ETIQUETA `<table…>` sola y no la tabla entera: adentro está el
+  // `<img>`, que también lleva `width:100%;max-width:…px`, y un regex sobre todo
+  // el bloque pasaba en verde con la tabla clavada en píxeles — daba por
+  // confirmado el ancho de la tabla leyendo el de la foto.
+  const etiquetas = tablas.map((t) => t.slice(0, t.indexOf(">") + 1));
+  ok(etiquetas.every((t) => /style="width:100%;max-width:\d+px/.test(t)), "la tabla de la banda va a 100% con tope en px", etiquetas[0]);
+  // El `\bstyle="width:` pegado: `max-width:600px` es justamente lo que SÍ tiene
+  // que estar, y un regex suelto lo confundía con el ancho clavado.
+  ok(etiquetas.every((t) => !/style="width:\d+px/.test(t)), "…y NO clava su ancho en píxeles en el CSS: una tabla no baja de su ancho mínimo");
+  ok(etiquetas.every((t) => /<table[^>]*\bwidth="\d+"/.test(t)), "…y sigue declarando su ancho en px como ATRIBUTO (lo que mide Word)");
+  // Outlook y varios webmails le dibujan un borde azul de link a una imagen
+  // adentro de un `<a>`, y el atributo es lo único que lo saca en Word.
+  ok((h.match(/<img[^>]*border="0"/g) ?? []).length === 5, "cada pedazo lleva `border=\"0\"`");
+  // 🔴 El `width` en ATRIBUTO es lo único que dimensiona la foto en Word: sin él
+  // Outlook la dibuja a su tamaño natural, que es el DOBLE del que se muestra
+  // (los pedazos se suben a 2× por las pantallas finas) y desborda la banda.
+  // El CSS no lo cubre: Word no lee `width:100%` de un `<img>`.
+  const anchosImg = [...h.matchAll(/<img[^>]*\bwidth="(\d+)"/g)].map((m) => Number(m[1]));
+  ok(anchosImg.length === 5, "cada pedazo declara su ancho en px como ATRIBUTO", `salieron ${anchosImg.length} de 5`);
+  ok(
+    anchosImg.join("/") === plano.filas.flatMap((f) => f.celdas.map((c) => c.ancho)).join("/"),
+    "…y es exactamente el del reparto, pedazo por pedazo",
+    anchosImg.join("/"),
+  );
+  ok(!/<td width="\d+"[^>]*style="width:\d+px/.test(h), "ninguna celda clava su ancho en píxeles en el CSS");
+  ok(/<img[^>]*style="width:100%;max-width:\d+px/.test(h), "el pedazo va a 100% de su celda, con tope");
+  ok(!/<img[^>]*style="[^"]*height:\d+px/.test(h), "y su alto en el CSS va AUTO, o se estira al achicarse");
+  ok(/<img[^>]*\bheight="\d+"/.test(h), "…pero el alto declarado en el ATRIBUTO sigue estando (es el que evita el escalón en Word)");
+
+  // 🔑 Los dos lados de la misma celda tienen que describir el MISMO corte: si el
+  // porcentaje y el píxel se calculan por separado, el navegador dibuja pedazos
+  // de anchos apenas distintos y eso se convierte en una diferencia de alto.
+  // 🔴 El fixture reparte 1/1/1 sobre 536 A PROPÓSITO: los píxeles salen
+  // 179/179/178 —no se puede dividir 536 en tres— así que el porcentaje que sale
+  // de ellos (33,3955 / 33,3955 / 33,209) NO es el tercio exacto. Con un fixture
+  // de 33/33/34 sobre 600 las dos cuentas dan lo mismo y esto pasaría en verde
+  // con el porcentaje calculado por su cuenta.
+  const desparejo = armarMosaico([{ alto: 100, celdas: [{ ancho: 1 }, { ancho: 1 }, { ancho: 1 }] }], 536, 1);
+  ok(
+    desparejo.filas[0].celdas.every((c) => Math.abs(c.pct - (c.ancho / 536) * 100) < 0.0001),
+    "el porcentaje sale de los PÍXELES ya repartidos, no de un reparto aparte",
+    desparejo.filas[0].celdas.map((c) => `${c.ancho}px=${c.pct}%`).join(" "),
+  );
+  for (const [i, f] of plano.filas.entries()) {
+    const suma = f.celdas.reduce((a, c) => a + c.pct, 0);
+    ok(Math.abs(suma - 100) < 0.0001, `los porcentajes de la banda ${i + 1} suman 100 exacto`, String(suma));
+    ok(
+      f.celdas.every((c) => Math.abs(c.pct - (c.ancho / plano.ancho) * 100) < 0.0001),
+      `y describen el mismo reparto que los píxeles (banda ${i + 1})`,
+    );
+  }
 }
 
 console.log(fallos ? `\n❌ ${fallos} fallo(s)` : "\n✅ La foto en pedazos sale como se pidió");

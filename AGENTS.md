@@ -794,6 +794,26 @@ lleva a un lado distinto.
 - El bloque va **a sangre de fábrica** (`BASE_POR_TIPO.mosaico.caja.padX = 0`, como
   `html`). El default vive en la cascada y no en un `?? 0` del renderer: si no, el
   panel diría "Automático (32)" al lado de un mail que dibuja 0.
+- 🔴 🔑 **Una tabla POR BANDA, y los anchos en % en el CSS** (arreglado el
+  18-ago-2026, **medido en el navegador**). Eran dos defectos que sólo se ven en el
+  layout, con el HTML impecable — o sea que ningún script de Node los veía:
+  - Con **una sola tabla** para todas las bandas, las columnas son de la TABLA y
+    no de la fila: una banda de tres arriba de una de dos sumaba los dos repartos
+    y la tabla salía de **838 px adentro de un mail de 600** — desbordada también
+    en escritorio, no sólo en el teléfono.
+  - Con el ancho **en píxeles en el `style`**, una tabla no baja de su ancho
+    MÍNIMO: en un marco de 375 el mosaico medía **634** y se llevaba el mail
+    entero al scroll horizontal. Es lo que Bruno vio como "la vista previa de
+    celular está rota".
+  ⇒ Hoy cada banda es su propia tabla, el ancho va `width:100%;max-width:Npx` y
+  las celdas en **porcentaje**, mientras los **atributos** siguen en píxeles
+  exactos: el CSS lo lee un navegador, los atributos los lee Word.
+  🔑 **El porcentaje sale de los píxeles ya repartidos**, no de un reparto aparte:
+  son los dos lados de la misma celda y si se calculan por separado el redondeo
+  los deja distintos, lo que se convierte en una diferencia de ALTO entre pedazos
+  vecinos. Y el alto en el CSS va **`auto`** (el declarado sigue en el atributo,
+  que es el que evita el escalón en Word). Queda una diferencia **sub-píxel**
+  (<1 px) entre pedazos de una banda en el navegador, medida.
 - Tope: **12 pedazos**. No es la grilla: cada pedazo es una imagen que se descarga
   **una vez por destinatario** — doce en un envío a 16.800 contactos son 200.000
   pedidos.
