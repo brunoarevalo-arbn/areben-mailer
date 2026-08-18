@@ -35,7 +35,59 @@ export const MAX_ELEMENTOS = 8;
 const TOLERANCIA_Y = 4;
 
 /** Menos que esto no es una celda: es una raya. */
-const ANCHO_MIN = 5;
+export const ANCHO_MIN = 5;
+
+/**
+ * De cuánto en cuánto se mueve una ficha al arrastrarla.
+ *
+ * 🔑 **`PASO_Y` es MAYOR que `TOLERANCIA_Y`, y eso no es casualidad: es lo que
+ * hace que la superficie del editor no pueda mentir.** Con un paso más chico que
+ * la tolerancia, dos fichas que en la pantalla se ven a alturas distintas caerían
+ * en la misma fila del mail —o al revés— y no habría forma de saber cuál de las
+ * dos cosas va a salir. Con el paso arriba de la tolerancia, dos elementos
+ * comparten fila **si y sólo si** tienen el mismo `y`.
+ *
+ * El de la horizontal puede ser fino: ahí no hay filas que agrupar, cada
+ * elemento se lleva su celda.
+ */
+export const PASO_X = 1;
+export const PASO_Y = 5;
+
+/** Al múltiplo de `paso` más cercano, dentro de 0-100. */
+export const snap = (v: number, paso: number): number =>
+  Math.min(100, Math.max(0, Math.round(v / paso) * paso));
+
+/**
+ * Lo que ocupa una ficha en la superficie: todo en % (el ancho, del ancho de la
+ * banda; el alto, de su alto).
+ *
+ * ⚠️ El `alto` **se mide en la pantalla**, no se calcula: cuánto ocupa un título
+ * depende de la letra, de cuántos renglones entren y del ancho de su celda. Es la
+ * misma razón por la que el mail necesita un alto de banda escrito — nadie puede
+ * predecir el alto de un texto, ni acá ni en Outlook.
+ */
+export interface CajaEncima {
+  x: number;
+  y: number;
+  ancho: number;
+  alto: number;
+}
+
+/**
+ * ¿Estas dos cajas se montan una sobre la otra?
+ *
+ * 🔴 Es la única pregunta que el editor tiene que contestar antes de soltar, y la
+ * contesta acá —en el archivo puro— y no en el componente: **un mail no puede
+ * superponer dos cosas**. Si se sueltan montadas, el renderer corre a la segunda
+ * (`armarPlano`) y lo que sale no es lo que se vio en la pantalla. O sea que sin
+ * este freno la superficie sería una mentira prolija.
+ *
+ * Se tocan por el borde ⇒ NO se pisan: dos fichas pegadas una al lado de la otra
+ * es un diseño normal (un botón junto a otro), y prohibirlo dejaría un hueco
+ * obligatorio que nadie pidió.
+ */
+export const sePisan = (a: CajaEncima, b: CajaEncima): boolean =>
+  a.x < b.x + b.ancho && b.x < a.x + a.ancho && a.y < b.y + b.alto && b.y < a.y + a.alto;
 
 /** Una celda de la fila. Sin `el`, es aire: existe para empujar a la de al lado. */
 export interface CeldaEncima {

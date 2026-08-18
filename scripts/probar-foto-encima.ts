@@ -27,7 +27,7 @@
 //      foto con su CTA encima, sin `text/plain`, es la señal de spam clásica — y
 //      es de ahí que el buzón saca el preview.
 import { renderEmailHtml, renderEmailTexto } from "../lib/email/render";
-import { armarPlano, MAX_ELEMENTOS } from "../lib/email/encima";
+import { armarPlano, MAX_ELEMENTOS, PASO_Y, sePisan, snap } from "../lib/email/encima";
 import { leerContenido, V_ACTUAL } from "../lib/email/esquema";
 import type { Bloque, ContenidoCampania, ElementoEncima } from "../lib/email/bloques";
 
@@ -281,6 +281,38 @@ console.log("\n10) 🔑 El camino RÁPIDO no sanea: la red de abajo es el render
     ok(suma === 100, `la fila del HTML suma 100 (${ws.join("+")})`, `sumó ${suma}`);
   }
   ok(h.includes("min-height:600px"), "y el alto imposible salió acotado a 600");
+}
+
+console.log("\n11) 🔴 El freno del editor: `sePisan`, y el paso de la grilla contra la tolerancia");
+{
+  const c = (x: number, y: number, ancho: number, alto: number) => ({ x, y, ancho, alto });
+  ok(sePisan(c(10, 10, 40, 20), c(20, 20, 40, 20)), "dos cajas montadas se pisan");
+  ok(!sePisan(c(0, 10, 40, 20), c(50, 10, 40, 20)), "una al lado de la otra NO se pisan");
+  ok(!sePisan(c(0, 0, 40, 20), c(0, 20, 40, 20)), "pegadas por el borde tampoco (un botón sobre otro es un diseño)");
+  ok(!sePisan(c(0, 0, 40, 20), c(0, 60, 40, 20)), "lejos, menos");
+  // La conmutatividad no es adorno: el editor pregunta por la que está en la mano
+  // contra cada una de las otras, y el orden de los argumentos no puede decidir.
+  ok(
+    sePisan(c(20, 20, 40, 20), c(10, 10, 40, 20)) === sePisan(c(10, 10, 40, 20), c(20, 20, 40, 20)),
+    "y da lo mismo en los dos órdenes",
+  );
+
+  // 🔑 La invariante que hace que la superficie no pueda mentir: el paso vertical
+  // de la grilla tiene que ser MAYOR que la tolerancia con la que se arman las
+  // filas. Si no, dos fichas que en la pantalla se ven a alturas distintas podrían
+  // caer en la misma fila del mail — o al revés — y no habría forma de saberlo.
+  const dos = (ya: number, yb: number) =>
+    armarPlano(
+      [
+        { id: "a", clase: "titulo", texto: "A", x: 0, y: ya, ancho: 40 },
+        { id: "b", clase: "titulo", texto: "B", x: 50, y: yb, ancho: 40 },
+      ],
+      400,
+    ).filas.length;
+  ok(dos(20, 20) === 1, "mismo `y` snapeado ⇒ una fila (salen al lado)", `dio ${dos(20, 20)}`);
+  ok(dos(20, 20 + PASO_Y) === 2, `un paso de grilla (${PASO_Y}) de diferencia ⇒ dos filas`, `dio ${dos(20, 20 + PASO_Y)}`);
+  ok(snap(23, PASO_Y) === 25 && snap(22, PASO_Y) === 20, "`snap` cae al múltiplo más cercano");
+  ok(snap(-10, PASO_Y) === 0 && snap(120, PASO_Y) === 100, "y nunca se va del 0-100");
 }
 
 console.log(fallos ? `\n❌ ${fallos} fallo(s)` : "\n✅ La foto con cosas encima sale como se pidió");

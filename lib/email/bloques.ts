@@ -646,8 +646,12 @@ export type Bloque = BloqueBase &
          * Alto de la banda en px (el renderer lo acota a 120-600).
          *
          * No es cosmético y no se puede sacar: **Outlook mide filas, no mide
-         * texto**, así que la banda necesita el número. Lo pone el editor a
-         * partir del tamaño real de la foto, para que entre entera.
+         * texto**, así que la banda necesita el número.
+         *
+         * 🔑 **Ausente = el alto que hace entrar la foto entera**, y lo escribe el
+         * editor la primera vez que el navegador la mide (`FotoEncima.tsx`). Una
+         * vez que hay número, una foto nueva **no lo pisa**: si lo pisara, la
+         * perilla del panel diría una cosa y el mail dibujaría otra.
          */
         alto?: number;
         /** Cuánto se tapa la foto con el color `bg`, 0-100. Ausente = 0. */
@@ -824,9 +828,14 @@ export function nuevoBloque(tipo: TipoBloque): Bloque {
     // documento: es un tipo nuevo, no hay un solo mail guardado al que cambiarle
     // el aspecto. Es la diferencia con el `velo` del `hero`, cuyo default tiene
     // que seguir siendo 0 para siempre y por eso la opinión vive en el editor.
+    //
+    // ⚠️ **Sin `alto`**, y eso es lo que deja que el alto salga solo: ausente
+    // significa "el que haga entrar la foto entera", y lo escribe el editor cuando
+    // el navegador la mide. Un 320 acá lo apagaría para siempre — la perilla no
+    // puede distinguir un número de fábrica de uno elegido.
     case "foto-encima":
       return {
-        id, tipo, foto: "", alto: 320, bg: "#111111", velo: 45,
+        id, tipo, foto: "", bg: "#111111", velo: 45,
         elementos: [{ id: nuevoId(), clase: "titulo", texto: "Título encima", x: 8, y: 58, ancho: 84 }],
       };
     case "cupon": return { id, tipo, texto: "Usá este código en el checkout", codigo: "DESCUENTO10", botonTexto: "Comprar", botonUrl: "" };

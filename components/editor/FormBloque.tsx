@@ -1,9 +1,10 @@
 "use client";
 
-import { nuevoId, type Bloque, type ClaseEncima, type Columna, type ElementoEncima } from "@/lib/email/render";
-import { MAX_ELEMENTOS } from "@/lib/email/encima";
+import type { Bloque, Columna } from "@/lib/email/render";
 import { ProductosBlock } from "@/components/ProductosBlock";
 import { ProductosDinamicosBlock } from "@/components/editor/ProductosDinamicosBlock";
+import { ColorFijo } from "@/components/editor/ColorFijo";
+import { FormFotoEncima } from "@/components/editor/FotoEncima";
 import { ImagenDrop } from "@/components/editor/ImagenDrop";
 import { Rango } from "@/components/editor/Rango";
 import { CampoRico } from "@/components/editor/CampoRico";
@@ -60,13 +61,6 @@ function linkDeBanda(conFoto: boolean, botonTexto: string | undefined, botonUrl:
  * en que se ofrecen las opciones es lo que decide si la gente clava un hex o usa
  * el color de su marca.
  */
-
-/** Cómo se llama cada cosa que va encima de una foto, para quien arma el mail. */
-const ETIQUETA_CLASE: Record<ClaseEncima, string> = {
-  titulo: "Título",
-  texto: "Texto",
-  boton: "Botón",
-};
 
 /**
  * Lo secundario de un bloque, plegado.
@@ -397,138 +391,11 @@ export function FormBloque({
       );
     }
 
-    /**
-     * La foto y lo que va encima de ella.
-     *
-     * 🔑 Las posiciones son NÚMEROS en esta tanda: primero que el mail salga
-     * bien, después la superficie para arrastrar. Un arrastre sobre un render que
-     * todavía no se sabe si Outlook respeta sería una pantalla linda encima de un
-     * mail roto — y el orden inverso deja los números como la red que queda
-     * cuando el arrastre no alcanza para el último píxel.
-     */
-    case "foto-encima": {
-      const elementos = b.elementos ?? [];
-      // Se reescribe la lista entera, igual que `celdas` en `columnas`: `set` hace
-      // un merge superficial, así que mutar un elemento sin devolver el array
-      // nuevo le deja a React la misma referencia y el panel no se redibuja.
-      const setEl = (i: number, campos: Partial<ElementoEncima>) =>
-        set({ elementos: elementos.map((el, j) => (j === i ? { ...el, ...campos } : el)) } as Partial<Bloque>);
-      const agregar = (clase: ClaseEncima) => {
-        // Nace en la mitad de lo que queda libre para abajo y no siempre en el
-        // mismo lugar: dos elementos nuevos con el mismo `y` salen uno al lado del
-        // otro —una fila— y parece que el segundo no se agregó.
-        const y = Math.min(90, 10 + elementos.length * 18);
-        set({
-          elementos: [
-            ...elementos,
-            {
-              id: nuevoId(),
-              clase,
-              texto: clase === "boton" ? "Comprar" : clase === "titulo" ? "Título" : "Un texto encima",
-              ...(clase === "boton" ? { url: "" } : null),
-              x: 8,
-              y,
-              ancho: 84,
-            },
-          ],
-        } as Partial<Bloque>);
-      };
-      return (
-        <div className="space-y-3">
-          <ImagenDrop value={b.foto} onChange={(foto) => set({ foto })} placeholder="URL de la foto de fondo" />
-          <Rango label="Alto de la banda" value={b.alto ?? 280} onChange={(alto) => set({ alto })} min={120} max={600} step={10} />
-          <Rango label="Cuánto se tapa la foto" value={b.velo ?? 0} onChange={(velo) => set({ velo })} min={0} max={90} step={5} />
-          <ColorFijo label="Color de respaldo y del velo" value={b.bg} onChange={(bg) => set({ bg })} />
-          <p className="text-xs text-subtle">
-            Si la foto no carga —Outlook las bloquea— queda el color solo, con los textos encima.
-            Outlook tampoco puede medir el texto: si queda apretado, subí el alto.
-          </p>
-          {elementos.map((el, i) => (
-            <Desplegable
-              key={el.id ?? i}
-              tono="rol"
-              titulo={`${ETIQUETA_CLASE[el.clase] ?? "Texto"} ${i + 1}`}
-              abiertoDeFabrica={i === elementos.length - 1}
-              resumen={el.texto?.trim() || "sin texto"}
-            >
-              <Select
-                label="Qué es"
-                fullWidth
-                value={el.clase}
-                onChange={(e) => setEl(i, { clase: e.target.value as ClaseEncima })}
-              >
-                <option value="titulo">Título</option>
-                <option value="texto">Texto</option>
-                <option value="boton">Botón</option>
-              </Select>
-              <Input
-                label="Texto"
-                fullWidth
-                value={el.texto}
-                placeholder={el.clase === "boton" ? "Comprar" : "Lo que dice"}
-                hint={el.texto?.trim() ? undefined : "Vacío no se dibuja."}
-                onChange={(e) => setEl(i, { texto: e.target.value })}
-              />
-              {el.clase === "boton" && (
-                <Input
-                  label="Link del botón"
-                  fullWidth
-                  value={el.url ?? ""}
-                  placeholder="https://…"
-                  onChange={(e) => setEl(i, { url: e.target.value })}
-                />
-              )}
-              <div className="grid grid-cols-2 gap-2">
-                <Rango label="Desde la izquierda" value={el.x} onChange={(x) => setEl(i, { x })} min={0} max={95} step={1} sufijo="%" />
-                <Rango label="Desde arriba" value={el.y} onChange={(y) => setEl(i, { y })} min={0} max={100} step={1} sufijo="%" />
-              </div>
-              <Rango
-                label="Ancho"
-                value={el.ancho ?? 100 - el.x}
-                onChange={(ancho) => setEl(i, { ancho })}
-                min={5}
-                max={100}
-                step={1}
-                sufijo="%"
-              />
-              <button
-                type="button"
-                onClick={() => set({ elementos: elementos.filter((_, j) => j !== i) } as Partial<Bloque>)}
-                className="flex items-center gap-1 text-xs text-danger-foreground transition-opacity hover:opacity-70"
-              >
-                <X className="h-3.5 w-3.5" aria-hidden /> Quitar
-              </button>
-            </Desplegable>
-          ))}
-          {/* 🔑 El aviso de la MISMA ALTURA va acá y no como error: dos cosas a la
-              misma altura salen una al lado de la otra —es una fila de la tabla— y
-              eso es una forma de usarlo, no un problema. Lo que no se puede es que
-              se pisen, y de eso se ocupa el renderer corriendo la segunda. */}
-          {elementos.length < MAX_ELEMENTOS ? (
-            <div className="flex flex-wrap gap-2">
-              {(["titulo", "texto", "boton"] as const).map((clase) => (
-                <button
-                  key={clase}
-                  type="button"
-                  onClick={() => agregar(clase)}
-                  className="rounded-lg border border-border-strong px-2.5 py-1 text-xs text-muted transition-colors hover:bg-surface-muted"
-                >
-                  + {ETIQUETA_CLASE[clase]}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-subtle">
-              Ocho es el tope: cada uno se lleva su celda y más angosto que eso no entra una palabra.
-            </p>
-          )}
-          <p className="text-xs text-subtle">
-            Dos elementos a la misma altura salen uno al lado del otro. No se pueden superponer: un
-            mail no puede apilar dos cosas en el mismo lugar, así que el que se monte sale corrido.
-          </p>
-        </div>
-      );
-    }
+    // La foto y lo que va encima. Vive en su propio archivo porque necesita
+    // ESTADO —cuál ficha está agarrada, cuál elegida, qué avisar— y un hook no
+    // puede vivir adentro de un `case`.
+    case "foto-encima":
+      return <FormFotoEncima b={b} set={set} pal={pal} />;
 
     case "cupon": {
       const variante = b.variante ?? "caja";
@@ -1039,35 +906,3 @@ export function FormBloque({
   }
 }
 
-/**
- * Color propio del bloque, de los que NO pasan por la cascada.
- *
- * Son los dos `bg` que existen desde antes del motor de estilos (`hero` y
- * `seccion`) y que el renderer usa para calcular la legibilidad del texto de
- * adentro. Quedan como color libre a propósito: moverlos a la cascada es cambiar
- * la forma del Json de todo mail guardado, y eso tiene su propia migración.
- */
-function ColorFijo({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <label className="flex items-center justify-between gap-3">
-      <span className="text-xs font-semibold text-muted">{label}</span>
-      <span className="flex items-center gap-2">
-        <input
-          type="color"
-          value={value || "#ffffff"}
-          onChange={(e) => onChange(e.target.value)}
-          className="h-8 w-12 cursor-pointer rounded border border-border-strong bg-background"
-        />
-        <span className="w-16 text-xs tabular-nums text-muted">{value}</span>
-      </span>
-    </label>
-  );
-}
