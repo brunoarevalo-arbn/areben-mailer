@@ -90,8 +90,25 @@ function rolesDe(b: Bloque): readonly RolEstilo[] {
   ]);
 }
 
-/** Los roles que tiene sentido fijar para todo el mail de una sola vez. */
-const ROLES_DOC: readonly RolEstilo[] = ["titulo", "subtitulo", "cuerpo", "boton", "nota"];
+/**
+ * Los roles que tiene sentido fijar para todo el mail de una sola vez.
+ *
+ * 🔑 `caja` va **al final y último**, por lo mismo que `cajaAlFinal`: el panel
+ * abre de fábrica la primera sección, y no se entra a la capa de documento para
+ * tocar márgenes. Entró el 18-ago-2026 y es lo que hace que "que este mail vaya
+ * compacto" —o pegado a los bordes— sea **una perilla y no diez**: la cascada ya
+ * lo soportaba, sólo faltaba quién lo escribiera.
+ */
+const ROLES_DOC: readonly RolEstilo[] = ["titulo", "subtitulo", "cuerpo", "boton", "nota", "caja"];
+
+/**
+ * Lo que la caja NO ofrece cuando se la fija para todo el mail.
+ *
+ * ⛔ Ocultar en celular o en escritorio es por bloque y sólo por bloque: aplicado
+ * a la capa de documento es **un mail vacío** en esa vista, y nadie escribe eso a
+ * propósito.
+ */
+const OMITIR_DOC = ["ocultarMovil", "ocultarEscritorio"] as const;
 
 /**
  * ¿El foco está adentro de algo donde se escribe?
@@ -789,6 +806,7 @@ export function EditorMail({
                   }
                   pal={pal}
                   roles={ROLES_DOC}
+                  omitir={OMITIR_DOC}
                   avanzado={avanzado}
                 />
               </fieldset>

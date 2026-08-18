@@ -231,9 +231,47 @@ const clasesTitulo = (e: EstiloResuelto, campo?: TextoRico): string[] => [
   ...clasesDe(e),
 ].filter(Boolean);
 
-/** Contenedor con padding horizontal para los bloques "de texto". */
-const pad = (inner: string, e?: EstiloResuelto) =>
-  `<div${clase(CLASES.pad, ...(e ? clasesDe(e) : []))} style="padding:0 ${px(e?.padX ?? 32)}">${inner}</div>`;
+/**
+ * Contenedor con padding para los bloques "de texto".
+ *
+ * 🔴 **`m-pad` se cuelga solo si nadie eligió el margen lateral.** Es la misma
+ * doctrina de `m-h1` —una clase nunca pisa una elección— y acá arregla un
+ * defecto que se veía: la media query emite
+ * `padding-left:20px!important` (`shell.ts`), así que elegir margen 0 en el
+ * panel **no llegaba nunca al celular**. La perilla decía 0, el mail salía con
+ * 20, y justo en el caso que más se nota: la foto que tiene que ir de punta a
+ * punta. Sin elegir nada, sale byte por byte como salía.
+ *
+ * ⚠️ El margen vertical entra **solo si alguien lo eligió**, y por bytes: sin
+ * elegirlo el `padding` se escribe `0 32px` como siempre, que es lo que compara
+ * el golden. `padCss()` no sirve acá porque escribiría `0px`.
+ */
+const pad = (inner: string, e?: EstiloResuelto) => {
+  const padY = e?.elegidas.has("padY") ? e.padY : undefined;
+  const vert = padY === undefined ? "0" : px(padY);
+  return `<div${clase(e?.elegidas.has("padX") ? undefined : CLASES.pad, ...(e ? clasesDe(e) : []))} style="padding:${vert} ${px(e?.padX ?? 32)}">${inner}</div>`;
+};
+
+/**
+ * El margen vertical cableado de un bloque — salvo que alguien haya elegido el
+ * margen de la caja, y entonces manda ese.
+ *
+ * 🔴 Existe porque "que el espaciado sea 0" **no se podía ni pedir**: el aire de
+ * arriba y abajo de cada bloque estaba escrito a mano en su `case`
+ * (`margin:16px 0` en el título, `0 0 16px` en el texto, `8px 0 20px` en el
+ * botón…) y ninguna perilla lo tocaba. Sumar `padY` sin esto sólo habría dejado
+ * **sumar** aire, nunca sacarlo.
+ *
+ * 🔑 La elección de `padY` **reemplaza** el margen, no se le suma: si no, poner
+ * 0 dejaría igual los 16px de fábrica y la perilla sería mentira. Y por eso la
+ * pregunta es `elegidas`, no el valor: `padY: 0` elegido tiene que ganar, y
+ * mirando el número no se distingue de "nadie lo tocó".
+ *
+ * ⚠️ Sin elegir nada devuelve exactamente la cadena de siempre, byte por byte:
+ * es lo que compara el golden.
+ */
+const margen = (e: EstiloResuelto | undefined, porDefecto: string) =>
+  e?.elegidas.has("padY") ? "margin:0" : `margin:${porDefecto}`;
 
 /**
  * Botón: el VML para Outlook de escritorio y el ancla para todo el resto.
@@ -530,7 +568,7 @@ function renderCarrito(items: ProductoEmail[], pal: Paleta, e: EstProducto, rest
     restantes > 0
       ? `<div style="margin:4px 0 0;font-size:14px;color:${pal.medio}"><a href="\${cart.url}" style="color:${pal.link}">y ${restantes} producto${restantes === 1 ? "" : "s"} más</a></div>`
       : "";
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px">${filas}</table>${mas}`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(e.caja, "8px 0 16px")}">${filas}</table>${mas}`;
 }
 
 /** Productos de mentira para el preview del editor. NUNCA salen en un envío real. */
@@ -552,6 +590,13 @@ interface EstProducto {
   img: EstiloResuelto;
   /** El botón por tarjeta. Se resuelve siempre; solo se dibuja si hay texto. */
   boton: EstiloResuelto;
+  /**
+   * La caja del bloque. Se mira **solo** para el margen vertical de la tabla:
+   * el padding lateral y las clases los pone `pad()` desde el `case`. Está acá
+   * y no como parámetro suelto para no sumarle un octavo positional a
+   * `renderProductos`, que ya es ilegible.
+   */
+  caja: EstiloResuelto;
 }
 
 function estProducto(tipo: TipoBloque, rolNombre: RolEstilo, ctx: Ctx, propio: Estilos | undefined): EstProducto {
@@ -561,6 +606,7 @@ function estProducto(tipo: TipoBloque, rolNombre: RolEstilo, ctx: Ctx, propio: E
     nota: est(tipo, "nota", ctx, propio),
     img: est(tipo, "imagen", ctx, propio),
     boton: est(tipo, "boton", ctx, propio),
+    caja: est(tipo, "caja", ctx, propio),
   };
 }
 
@@ -621,7 +667,7 @@ function renderProductos(
     );
     filas.push(`<tr>${celdas.join("")}</tr>`);
   }
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px">${filas.join("")}</table>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(e.caja, "8px 0 16px")}">${filas.join("")}</table>`;
 }
 
 function renderBloque(b: Bloque, ctx: Ctx): string {
@@ -692,15 +738,18 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     }
     case "titulo": {
       const t = e("titulo");
-      return pad(`<h1${clase(...clasesTitulo(t, b.texto))} style="margin:16px 0;font-size:${px(t.tamano ?? 26)};line-height:${t.interlinea ?? 1.25};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${tituloHtml(b.texto, ctx.pal)}</h1>`, caja());
+      const c = caja();
+      return pad(`<h1${clase(...clasesTitulo(t, b.texto))} style="${margen(c, "16px 0")};font-size:${px(t.tamano ?? 26)};line-height:${t.interlinea ?? 1.25};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${tituloHtml(b.texto, ctx.pal)}</h1>`, caja());
     }
     case "texto": {
       const t = e("cuerpo");
-      return pad(`<p style="margin:0 0 16px;font-size:${px(t.tamano ?? 16)};line-height:${t.interlinea ?? 1.6};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${cuerpoHtml(b.texto, ctx.pal)}</p>`, caja());
+      const c = caja();
+      return pad(`<p style="${margen(c, "0 0 16px")};font-size:${px(t.tamano ?? 16)};line-height:${t.interlinea ?? 1.6};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${cuerpoHtml(b.texto, ctx.pal)}</p>`, caja());
     }
     case "boton": {
       const t = e("boton");
-      return pad(`<div style="text-align:${b.align ?? t.align ?? "left"};margin:8px 0 20px">${botonAnchor(b.texto, b.url, t, pal, b.full)}</div>`, caja());
+      const c = caja();
+      return pad(`<div style="text-align:${b.align ?? t.align ?? "left"};${margen(c, "8px 0 20px")}">${botonAnchor(b.texto, b.url, t, pal, b.full)}</div>`, c);
     }
     case "imagen": {
       // Sin URL no se dibuja nada. Un `<img src="">` no es una imagen vacía: el
@@ -768,7 +817,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       if (b.ancho === undefined && b.align === undefined) {
         return pad(
           conEnlace(
-            `<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}"${borde} style="max-width:100%;height:auto;border-radius:${px(t.radio ?? 8)};margin:8px 0 16px;display:block${resto}" />`,
+            `<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}"${borde} style="max-width:100%;height:auto;border-radius:${px(t.radio ?? 8)};${margen(c, "8px 0 16px")};display:block${resto}" />`,
             "block",
           ),
           c,
@@ -806,7 +855,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // sí respeta el `text-align` del párrafo que contiene a la imagen. El
       // margen se muda al contenedor por lo mismo. Es literalmente la forma del
       // ícono de celda, que ya anda en los tres clientes.
-      return pad(`<div style="margin:8px 0 16px;text-align:${b.align ?? "left"}">${img}</div>`, c);
+      return pad(`<div style="${margen(c, "8px 0 16px")};text-align:${b.align ?? "left"}">${img}</div>`, c);
     }
     case "productos":
       return pad(
@@ -999,7 +1048,8 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
 
       const html = celdas.map(({ c, img }, i) => (img ? celdaImagen(c, pcts[i]) : celdaTexto(c, pcts[i]))).join("");
 
-      return pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px"><tr>${html}</tr></table>`, caja());
+      const cCaja = caja();
+      return pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(cCaja, "8px 0 16px")}"><tr>${html}</tr></table>`, cCaja);
     }
     case "video": {
       // El ▶ estaba superpuesto con `position:absolute`, y **Gmail elimina
@@ -1008,8 +1058,9 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // lados y encima dice qué es, que un ▶ solo no lo dice.
       const t = e("imagen");
       const btn = e("boton");
+      const c = caja();
       return b.imagen
-        ? pad(`<a href="${esc(b.url || "#")}" style="display:block;text-decoration:none;margin:8px 0 16px"><img src="${esc(b.imagen)}" width="100%" style="max-width:100%;border-radius:${px(t.radio ?? 8)};display:block" alt="Ver el video" /><span style="display:inline-block;margin-top:10px;padding:8px 18px;font-size:14px;font-weight:600;color:${btn.color};background:${btn.fondo};border-radius:${px(btn.radio ?? 8)};text-decoration:none">▶&nbsp; Ver el video</span></a>`, caja())
+        ? pad(`<a href="${esc(b.url || "#")}" style="display:block;text-decoration:none;${margen(c, "8px 0 16px")}"><img src="${esc(b.imagen)}" width="100%" style="max-width:100%;border-radius:${px(t.radio ?? 8)};display:block" alt="Ver el video" /><span style="display:inline-block;margin-top:10px;padding:8px 18px;font-size:14px;font-weight:600;color:${btn.color};background:${btn.fondo};border-radius:${px(btn.radio ?? 8)};text-decoration:none">▶&nbsp; Ver el video</span></a>`, c)
         : "";
     }
     case "redes": {
@@ -1031,7 +1082,8 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // que `imagen`, `video` y `carrito`. Antes dejaba un `<div>` vacío con 32
       // px de aire adentro de un mail que no muestra nada ahí.
       if (!lista.length) return "";
-      return pad(`<div style="text-align:center;margin:16px 0">${lista
+      const cRedes = caja();
+      return pad(`<div style="text-align:center;${margen(cRedes, "16px 0")}">${lista
         .map((l) => {
           const red = redConIcono(l.red);
           const src = red && urlIcono(ctx.assetsBase, red, b.iconos, pal.esOscuro);
@@ -1046,7 +1098,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
             : `<span style="color:${t.color};font-size:${px(t.tamano ?? 14)}${extra(t, ["color", "tamano", "align", "subrayado"])}">${esc(l.red)}</span>`;
           return `<a href="${esc(l.url)}" style="display:inline-block;margin:0 8px;text-decoration:none">${dentro}</a>`;
         })
-        .join("")}</div>`, caja());
+        .join("")}</div>`, cRedes);
     }
     case "menu": {
       const c = caja();
@@ -1088,7 +1140,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     }
     case "divisor": {
       const t = e("caja");
-      return pad(`<hr style="border:0;border-top:${px(t.bordeAncho ?? 1)} ${t.bordeEstilo ?? "solid"} ${t.bordeColor ?? pal.bordeSuave};margin:24px 0" />`, t);
+      return pad(`<hr style="border:0;border-top:${px(t.bordeAncho ?? 1)} ${t.bordeEstilo ?? "solid"} ${t.bordeColor ?? pal.bordeSuave};${margen(t, "24px 0")}" />`, t);
     }
     case "espaciador": {
       // `font-size:0;line-height:0` no es adorno: sin eso Outlook le mete la
@@ -1379,20 +1431,30 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
   // fondo saturado. Ver `tenueSobre` — ahí abajo vive el link de baja.
   const tenuePie = tenueSobre(pal.fondo, pal.tenue);
 
+  // El aire de la CÁSCARA: el marco de la página y los dos colchones de adentro
+  // de la tarjeta. Sale de la capa de DOCUMENTO —`contenido.estilos.caja`— y no
+  // de `resolverEstilo`, porque acá no hay bloque: la pregunta es "¿este mail va
+  // apretado?", y sólo la contesta quien lo eligió para el mail entero.
+  // ⚠️ Ausente ≠ 0, como en toda la cascada: sin elegir nada sale 24/16/12/16
+  // como salió siempre, que es lo que compara el golden.
+  const aireDoc = contenido.estilos?.caja;
+  const aireY = aireDoc?.padY;
+  const colchon = (alto: number) => `<div style="height:${aireY === undefined ? px(alto) : px(aireY)}"></div>`;
+
   // El namespace de VML va en el <html> o Outlook no dibuja los botones.
   return `<!doctype html>
 <html lang="${esc(pal.idioma)}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 ${cabeza(pal)}
 <body style="margin:0;padding:0;background:${pal.fondo};font-family:${pal.fuente}">
   ${preheader}
-${apertura(pal)}
+${apertura(pal, { x: aireDoc?.padX, y: aireY })}
     <!-- Encabezado de marca (bloque; se puede editar o borrar) -->
     ${cabecera ? marca(cabecera) : ""}
     <!-- Cuerpo -->
     <div style="${cajaCuerpo};overflow:hidden">
-      <div style="height:12px"></div>
+      ${colchon(12)}
       ${cuerpo}
-      <div style="height:16px"></div>
+      ${colchon(16)}
     </div>
     <!-- Footer -->
     <div style="text-align:center;color:${tenuePie};font-size:12px;line-height:1.6;margin-top:20px">

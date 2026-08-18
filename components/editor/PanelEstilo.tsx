@@ -106,6 +106,7 @@ export function PanelEstilo({
   pal,
   bg,
   roles,
+  omitir,
   avanzado,
   abiertos,
   onAbiertosChange,
@@ -125,6 +126,16 @@ export function PanelEstilo({
   bg?: string;
   /** Qué roles mostrar. Por defecto, los que el bloque dibuja de verdad. */
   roles?: readonly RolEstilo[];
+  /**
+   * Perillas que este llamador NO quiere ofrecer, aunque el rol las tenga.
+   *
+   * 🔑 Existe por la **capa de documento**: ahí la caja se ofrece para poner el
+   * aire de todo el mail de una vez, pero `ocultarMovil`/`ocultarEscritorio`
+   * viven en el mismo rol y aplicados a todo el mail significan **mandar un mail
+   * vacío**. No es una perilla fina —no alcanza con `avanzado`—: es una que en
+   * esa capa no tiene sentido ninguno.
+   */
+  omitir?: readonly Prop[];
   /** ¿Se ven las perillas finas? Cuelga del rol, no de una preferencia del navegador. */
   avanzado: boolean;
   /**
@@ -195,7 +206,12 @@ export function PanelEstilo({
    * panel abre cerrado entero.
    */
   const secciones = lista
-    .map((rol) => ({ rol, visibles: (propsDeRol(tipo, rol) as readonly Prop[]).filter((k) => avanzado || !CAMPO[k].avanzado) }))
+    .map((rol) => ({
+      rol,
+      visibles: (propsDeRol(tipo, rol) as readonly Prop[]).filter(
+        (k) => !omitir?.includes(k) && (avanzado || !CAMPO[k].avanzado),
+      ),
+    }))
     .filter((s) => s.visibles.length);
 
   /**

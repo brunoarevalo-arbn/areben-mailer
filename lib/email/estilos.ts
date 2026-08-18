@@ -597,8 +597,14 @@ const PROPS_POR_ROL: Record<RolEstilo, readonly (keyof EstiloBloque)[]> = {
   imagen: ["radio"],
 };
 
-/** Lo que `pad()` le da a la caja de cualquier bloque: margen lateral y visibilidad. */
-const CAJA_BASE = ["padX", "ocultarMovil", "ocultarEscritorio"] as const satisfies readonly (keyof EstiloBloque)[];
+/**
+ * Lo que `pad()` le da a la caja de cualquier bloque: márgenes y visibilidad.
+ *
+ * `padY` entró el 18-ago-2026: hasta ese día el aire de arriba y abajo de casi
+ * todo bloque era el `margin` cableado en su `case` y **no había perilla**, así
+ * que "que el espaciado sea 0" no se podía ni pedir.
+ */
+const CAJA_BASE = ["padX", "padY", "ocultarMovil", "ocultarEscritorio"] as const satisfies readonly (keyof EstiloBloque)[];
 
 /**
  * La caja del bloque, que es el rol menos parejo de todos.
@@ -627,7 +633,7 @@ function propsCaja(tipo: TipoBloque): readonly (keyof EstiloBloque)[] {
     case "cupon":
       return ["fondo", "padX", "padY", "radio", "bordeAncho", "bordeEstilo", "bordeColor"];
     case "divisor":
-      return ["padX", "bordeAncho", "bordeEstilo", "bordeColor", "ocultarMovil", "ocultarEscritorio"];
+      return ["padX", "padY", "bordeAncho", "bordeEstilo", "bordeColor", "ocultarMovil", "ocultarEscritorio"];
     default:
       return CAJA_BASE;
   }

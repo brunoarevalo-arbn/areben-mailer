@@ -70,6 +70,7 @@ node --import tsx scripts/probar-marcado.ts    # el `data-b` del preview NO sale
 node --import tsx scripts/probar-esquema.ts    # el Json de bloques migra sin perder nada
 node --import tsx scripts/probar-portapapeles.ts # lo que se pega es un bloque nuestro, y sale con id nuevo
 node --import tsx scripts/probar-estilos.ts    # la cascada respeta el orden y no inyecta
+node --import tsx scripts/probar-espaciado.ts  # el margen se puede llevar a CERO, y elegirlo reemplaza el cableado
 node --import tsx scripts/probar-render.ts     # golden: el mail no cambió sin querer
 node --import tsx scripts/probar-html.ts       # VML, media queries, tracking, peso
 node --import tsx scripts/probar-banda-link.ts # una foto puede ser un link, y NUNCA un <a> dentro de otro
