@@ -176,6 +176,11 @@ export function rolesDibujados(b: Bloque, opts: OpcionesRevision = {}): readonly
      * ⛔ Los que quedan afuera: `imagen`, `divisor` y `espaciador` no dibujan
      * texto, y el `html` es de quien lo escribió —con sus colores adentro, que
      * el motor no conoce y no va a adivinar.
+     *
+     * `mosaico` también: es una foto cortada en pedazos y no dibuja **una sola
+     * letra**. Su riesgo es el opuesto al del contraste —que con las imágenes
+     * apagadas no se lea NADA— y eso no se mide con un ratio: lo cobra el editor
+     * contando los pedazos sin texto alternativo.
      */
     default:
       return [];

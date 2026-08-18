@@ -2,6 +2,8 @@
 // sin next/headers.
 
 import { encuadre, ANCHO_MAX, POS_CENTRO } from '@/lib/imagenes-encuadre';
+import { escalaDe, normalizar, pedazosDe, PREFIJO_PEDAZO } from '@/lib/email/mosaico';
+import type { FilaMosaico } from '@/lib/email/bloques';
 
 /** Lo que devuelve /api/imagenes. Es el modelo de Prisma con las fechas en string. */
 export interface ImagenMailDto {
@@ -243,4 +245,103 @@ async function subirArchivo(
   if (r.ok) return { ok: true, imagen: (await r.json()).imagen };
   const d = await r.json().catch(() => ({}));
   return { ok: false, error: d.error || 'No se pudo subir la imagen.' };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cortar una foto en pedazos (el bloque `mosaico`)
+//
+// 🔴 El único camino que existe para que una zona de una foto sea un link en un
+// mail: `<map>`/`<area>` lo borra Gmail, así que cada zona tiene que ser **su
+// propia imagen**. El corte lo hace el navegador con el mismo `<canvas>` que ya
+// recorta al 16:9 — **cero infra nueva en el servidor**, que es lo que hace que
+// esto se pueda tener hoy.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Corta la foto según la grilla y sube cada pedazo. Devuelve la grilla con las
+ * URLs puestas.
+ *
+ * 🔑 **La foto original queda intacta.** Los pedazos son objetos nuevos: es la
+ * misma regla que el recorte a un formato, y es lo que permite volver a cortar de
+ * otra manera sin haber perdido nada.
+ *
+ * 🔴 **Si un pedazo falla, los anteriores YA se subieron.** No hay transacción
+ * posible contra un store de blobs, así que en vez de fingir que se puede volver
+ * atrás se devuelve el error y la grilla NO se toca: el bloque sigue mostrando la
+ * foto entera y quien vuelve a cortar deja los huérfanos de la vez pasada. Se
+ * pagan; no se pierde ningún mail.
+ *
+ * `avance` se llama por pedazo terminado: doce recortes de una foto de 4000 px no
+ * son instantáneos y sin esto el botón se queda mudo.
+ */
+export async function cortarEnPedazos(
+  fuente: string,
+  nombre: string,
+  mime: string,
+  filas: readonly FilaMosaico[],
+  anchoUtil: number,
+  avance?: (hechos: number, total: number) => void,
+): Promise<{ ok: true; filas: FilaMosaico[] } | { ok: false; error: string }> {
+  // Un GIF animado sale muerto de cualquier canvas, y acá saldría muerto doce
+  // veces. Es la misma pared que en `recortarImagen`, por la misma razón.
+  if (esGif(mime)) {
+    return { ok: false, error: 'Un GIF no se puede cortar: cada pedazo perdería la animación.' };
+  }
+
+  let img: HTMLImageElement;
+  try {
+    img = await cargarImagen(fuente);
+  } catch {
+    return {
+      ok: false,
+      error: 'Esta foto vive en otro servidor y no se puede cortar desde acá. Subila a tu biblioteca.',
+    };
+  }
+  if (!(img.naturalWidth > 0) || !(img.naturalHeight > 0)) {
+    return { ok: false, error: 'No se pudo leer el tamaño de la foto.' };
+  }
+
+  const escala = escalaDe(img.naturalWidth, anchoUtil);
+  // 🔴 **La grilla se normaliza UNA vez y es la que vuelve.** `pedazosDe` normaliza
+  // igual, así que usar la de entrada para repartir las URLs sería numerar lo mismo
+  // de dos formas: una fila con cinco columnas se recorta a cuatro, y el reparto
+  // quedaría corrido — el pedazo de abajo a la derecha puesto arriba a la izquierda.
+  const grilla = normalizar(filas);
+  const trozos = pedazosDe(grilla, img.naturalWidth, img.naturalHeight, escala);
+  // El PNG conserva su transparencia; todo lo demás sale JPEG, que es lo que
+  // dibuja cualquier cliente de mail. Mismo criterio que `procesarImagen`.
+  const destino = mime === 'image/png' ? 'image/png' : 'image/jpeg';
+  const base = (nombre.split('/').pop() || 'foto').replace(/\.[^.]+$/, '');
+
+  const urls: string[] = [];
+  for (let i = 0; i < trozos.length; i++) {
+    const t = trozos[i];
+    const lienzo = document.createElement('canvas');
+    lienzo.width = t.dw;
+    lienzo.height = t.dh;
+    const ctx = lienzo.getContext('2d');
+    if (!ctx) return { ok: false, error: 'El navegador no pudo dibujar la imagen.' };
+    ctx.drawImage(img, t.sx, t.sy, t.sw, t.sh, 0, 0, t.dw, t.dh);
+    const blob = await new Promise<Blob | null>((res) => lienzo.toBlob(res, destino, 0.72));
+    if (!blob) return { ok: false, error: `No se pudo generar el pedazo ${i + 1}.` };
+    // 🔑 El nombre arranca con `PREFIJO_PEDAZO` y de eso depende que la biblioteca
+    // no se llene: el listado filtra por ahí. La fila y la columna van adentro
+    // para poder reconocer un pedazo suelto en el store.
+    const archivo = archivoDe(blob, `${PREFIJO_PEDAZO}${base}-${t.fila + 1}x${t.celda + 1}`);
+    if (archivo.size > MAX_BYTES) {
+      return { ok: false, error: `El pedazo ${i + 1} pesa ${formatoBytes(archivo.size)}. El tope son 5 MB.` };
+    }
+    const r = await subirArchivo(archivo);
+    if (!r.ok) return { ok: false, error: r.error };
+    urls.push(r.imagen.url);
+    avance?.(i + 1, trozos.length);
+  }
+
+  // Las URLs vuelven en el orden de `pedazosDe`: fila por fila y de izquierda a
+  // derecha. Se reparten recorriendo la MISMA grilla normalizada.
+  let k = 0;
+  return {
+    ok: true,
+    filas: grilla.map((f) => ({ ...f, celdas: f.celdas.map((c) => ({ ...c, url: urls[k++] })) })),
+  };
 }

@@ -11,8 +11,9 @@
 // y, como `resolverPaleta`, **nunca lanza**: un contenido roto no puede impedir
 // que salga la campaña.
 
-import { TIPOS_BLOQUE, nuevoId, type Bloque, type ClaseEncima, type Columna, type ContenidoCampania } from "./bloques";
+import { TIPOS_BLOQUE, nuevoId, type Bloque, type ClaseEncima, type Columna, type ContenidoCampania, type FilaMosaico } from "./bloques";
 import { MAX_ELEMENTOS } from "./encima";
+import { normalizar } from "./mosaico";
 import { sanearEstilos } from "./estilos";
 import { temaDe } from "./tema";
 import { sanearTrozos, CAMPOS_RICOS, CAMPOS_RICOS_CELDA } from "./texto-rico";
@@ -218,6 +219,40 @@ function sanearBloque(v: unknown, usados: Set<string>): Bloque | null {
         }
         return out;
       });
+  }
+
+  // Los pedazos de una foto cortada: la grilla acotada a algo dibujable, y cada
+  // pedazo con sus tres strings.
+  //
+  // ⚠️ **No es la red del renderer**: `armarMosaico` vuelve a normalizar, y tiene
+  // que hacerlo porque `esActual()` deja pasar los documentos ya guardados sin
+  // re-sanear. Esto es lo que hace que un Json editado a mano quede GUARDADO sano
+  // la próxima vez que alguien toque la campaña. Misma doctrina que `foto-encima`.
+  if (b.tipo === "mosaico") {
+    const filas = normalizar(
+      (Array.isArray(b.filas) ? (b.filas as unknown[]) : [])
+        .filter((f): f is Bruto => !!f && typeof f === "object" && !Array.isArray(f))
+        .map((f) => ({
+          alto: Number(f.alto),
+          celdas: (Array.isArray(f.celdas) ? (f.celdas as unknown[]) : [])
+            .filter((c): c is Bruto => !!c && typeof c === "object" && !Array.isArray(c))
+            .map((c) => ({
+              ancho: Number(c.ancho),
+              // Un `url` que no es string se BORRA, y eso apaga la grilla entera
+              // hacia "la foto entera" (ver `estaCortado`) en vez de dejar un
+              // `<img src="undefined">` en la casilla de otra persona.
+              ...(typeof c.url === "string" && c.url.trim() ? { url: c.url.trim() } : null),
+              ...(typeof c.enlace === "string" && c.enlace.trim() ? { enlace: c.enlace.trim() } : null),
+              ...(typeof c.alt === "string" ? { alt: c.alt } : null),
+            })),
+        })) as FilaMosaico[],
+    );
+    b.filas = filas;
+    // El ratio es una propiedad de la FOTO, no una elección: un valor ilegible se
+    // borra y el renderer sale sin alto declarado, que es peor pero no está roto.
+    const r = Number(b.ratio);
+    if (Number.isFinite(r) && r > 0) b.ratio = r;
+    else delete b.ratio;
   }
 
   // Los 8 campos que admiten formato por selección (`texto-rico.ts`). El saneo

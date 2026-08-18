@@ -75,6 +75,7 @@ node --import tsx scripts/probar-render.ts     # golden: el mail no cambió sin 
 node --import tsx scripts/probar-html.ts       # VML, media queries, tracking, peso
 node --import tsx scripts/probar-banda-link.ts # una foto puede ser un link, y NUNCA un <a> dentro de otro
 node --import tsx scripts/probar-foto-encima.ts # una foto lleva VARIOS botones encima, y el condicional de Outlook no se cierra antes de tiempo
+node --import tsx scripts/probar-mosaico.ts   # una foto cortada en pedazos: la fila no desborda, y a medio cortar sale la foto ENTERA
 node --import tsx scripts/probar-imagen-escala.ts # una foto puede salir más chica y alineada, y Outlook obedece
 node --import tsx scripts/probar-recorte.ts     # el recorte no deforma ni agranda, y el deslizador mueve un solo eje
 node --import tsx scripts/probar-precio-oculto.ts # lo que el HTML oculta, el text/plain tampoco lo manda
@@ -126,6 +127,8 @@ app/api/…         tn/* (OAuth + webhooks) · track/{open,click} · webhooks/{r
 lib/email/…       motor: proveedor.ts (gate+contrato), cola.ts, procesar.ts,
                   enviar.ts, render.ts, tema.ts, tracking.ts, supresion.ts
                   bloques.ts  ← QUÉ es un mail (tipos + nuevoBloque). Sin HTML.
+                  encima.ts   ← (x,y) de lo que va SOBRE una foto → filas y celdas
+                  mosaico.ts  ← una foto CORTADA en pedazos → grilla exacta en px
                   esquema.ts  ← leerContenido(): ÚNICA puerta al Json de la base
                                 (v4 desde el 1-ago-2026: `columnas` es `celdas[]`)
                   estilos.ts  ← cascada de estilo por bloque (tokens + lista blanca)
@@ -730,6 +733,8 @@ hay que pasarle `token` a `put()`.
   cuando no puede dar el pedido). El recorte **siempre parte del original**
   (`bloque.urlOriginal`, que se escribe una sola vez): recortar un recorte
   compone la pérdida y no hay vuelta atrás.
+- ⚠️ **Los pedazos de un `mosaico` no aparecen en el listado** (nombre con prefijo
+  `pedazo--`, filtrado en el WHERE del GET). Sí suman al contador de bytes.
 - ⚠️ **Cada recorte es un objeto nuevo en Blob y el anterior no se borra**, por
   lo mismo que no se borra ninguna: la URL puede estar en un mail ya entregado.
 - **El `cuentaId` va en el WHERE**, nunca en un chequeo después del `findUnique`.
@@ -748,6 +753,49 @@ hay que pasarle `token` a `put()`.
   ⚠️ el token de Blob vive en **`.env.local`**, no en el `.env` que usan los demás
   scripts. El catálogo es `lib/plantillas/fotos.ts` y el porqué está en
   `PLANTILLAS.md`.
+
+### Una foto en pedazos, con link por zona (bloque `mosaico`, 18-ago-2026)
+
+El mail que **es** una foto —viene diseñada entera de Canva— y en el que cada zona
+lleva a un lado distinto.
+
+- ⛔ **Nada de `<map>`/`<area>`**: Gmail los borra y queda una foto grande que no
+  lleva a ningún lado. La única salida que llega a la casilla es que **cada zona
+  sea su propia imagen** en su celda de tabla ⇒ los cortes van en **bandas y
+  columnas**, porque una tabla es una grilla y no un plano.
+- **El corte lo hace el navegador**, con el mismo `<canvas>` que ya recorta al
+  16:9 (`cortarEnPedazos` en `lib/imagenes.ts`). **Cero infra nueva en el
+  servidor.** Al doble del ancho que se muestra, por las pantallas finas, y
+  🔴 **nunca se agranda**.
+- 🔑 **La geometría entera vive en `lib/email/mosaico.ts`, puro.** Es lo único del
+  bloque que se puede probar sin mirar HTML, y ahí está la invariante que lo
+  gobierna todo: **los pedazos EMBALDOSAN**. Sobre la foto (o se pierde una franja,
+  o se dibuja dos veces) y sobre el ancho del mail: tres columnas de 33,33%
+  redondeadas por separado suman un píxel de más y **Outlook desborda la tabla y se
+  lleva el resto del correo**. Por eso todo reparto va con **bordes acumulados**
+  (`repartir`), nunca redondeando parte por parte.
+- 🔴 **Mientras falte UN pedazo, el mail sale con la foto ENTERA** (`estaCortado`).
+  Una grilla a medias dibujaría dos pedazos y cuatro huecos, y eso llega a la
+  casilla sin arreglo. Mover un corte **tira los pedazos** (son de la grilla
+  anterior): el link y el `alt` se quedan, que son del destino.
+- **El alto va declarado y es el mismo para toda la fila.** Si cada pedazo calcula
+  el suyo de su relación de aspecto, los redondeos difieren en un píxel entre
+  vecinos y aparece el escalón. Sale del `ratio` de la foto, que el editor escribe
+  al medirla — y que **sí se pisa** con una foto nueva: no es la elección de nadie.
+- 🔴 **El precio, dicho en voz alta**: una pieza 100% imagen **no dice una letra**
+  con las imágenes apagadas (el default de Outlook) y su gemelo `text/plain` sale
+  vacío, que es señal de spam. Por eso cada pedazo lleva `alt`, `bloqueATexto` los
+  emite con su link, y el editor **cuenta a la vista los que faltan**.
+- ⚠️ **Los pedazos no salen en la biblioteca**: se suben con el nombre prefijado
+  `pedazo--` y `/api/imagenes` los excluye **en el WHERE** (filtrar en la pantalla
+  dejaría igual consumidos los 200 del `take`). El contador de bytes **sí** los
+  cuenta: se pagan igual.
+- El bloque va **a sangre de fábrica** (`BASE_POR_TIPO.mosaico.caja.padX = 0`, como
+  `html`). El default vive en la cascada y no en un `?? 0` del renderer: si no, el
+  panel diría "Automático (32)" al lado de un mail que dibuja 0.
+- Tope: **12 pedazos**. No es la grilla: cada pedazo es una imagen que se descarga
+  **una vez por destinatario** — doce en un envío a 16.800 contactos son 200.000
+  pedidos.
 
 ## Importar contactos de afuera (`lib/contactos/importar.ts`)
 

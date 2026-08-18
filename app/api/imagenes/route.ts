@@ -10,6 +10,7 @@
 import { put } from '@vercel/blob';
 import { autorizarApi } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { PREFIJO_PEDAZO } from '@/lib/email/mosaico';
 
 /**
  * Formatos que un cliente de mail dibuja. La lista es blanca a propósito.
@@ -33,8 +34,16 @@ export async function GET() {
   const ctx = await autorizarApi('ver');
   if (ctx instanceof Response) return ctx;
 
+  // 🔴 **Los pedazos de un mosaico no entran en el listado, y el filtro va en el
+  // WHERE.** Cada foto cortada en pedazos son hasta 12 archivos nuevos, y con el
+  // `take` de abajo tres piezas dejarían la biblioteca sin una sola de las fotos
+  // que el comerciante subió a mano. Filtrarlos en la pantalla no alcanzaría: los
+  // 200 slots ya estarían consumidos.
+  //
+  // ⚠️ El total de bytes SÍ los cuenta (ver el agregado de abajo): se pagan igual,
+  // y esconder lo que se factura es peor que un listado largo.
   const imagenes = await prisma.imagenMail.findMany({
-    where: { cuentaId: ctx.cuenta.id },
+    where: { cuentaId: ctx.cuenta.id, NOT: { nombre: { startsWith: PREFIJO_PEDAZO } } },
     orderBy: { createdAt: 'desc' },
     take: 200,
   });
@@ -51,7 +60,11 @@ export async function GET() {
   return Response.json({
     imagenes,
     total: { archivos: total._count, bytes: total._sum.bytes ?? 0 },
-    truncado: total._count > imagenes.length,
+    // 🔑 **Se lee del `take`, no del agregado.** El conteo de la cuenta incluye los
+    // pedazos de los mosaicos, que el listado filtra: comparar contra él diría "hay
+    // más" con la biblioteca entera a la vista, en cuanto haya una foto cortada.
+    // "¿Se llenó la página?" se contesta con el tamaño de la página.
+    truncado: imagenes.length >= 200,
   });
 }
 

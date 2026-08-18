@@ -4,10 +4,11 @@ import { useState } from "react";
 import { ETIQUETA_BLOQUE, TIPOS_BLOQUE, type Bloque, type TipoBloque } from "@/lib/email/render";
 import { textoPlano } from "@/lib/email/texto-rico";
 import { ETIQUETA_FUENTE } from "@/lib/email/bloques";
+import { cuantosPedazos, estaCortado, normalizar } from "@/lib/email/mosaico";
 import {
   AlignLeft, ChevronDown, ChevronUp, Code2, Columns2, Copy, GripVertical, ImageIcon,
   LayoutTemplate, Menu as MenuIcon, Minus, MousePointerClick, MoveVertical, PanelTop, Play, Plus,
-  Share2, ShoppingBag, ShoppingCart, Sparkles, Ticket, Trash2, Type, TypeOutline,
+  Share2, ShoppingBag, ShoppingCart, Sparkles, Grid2x2, Ticket, Trash2, Type, TypeOutline,
 } from "lucide-react";
 
 /**
@@ -46,6 +47,7 @@ const ICONO: Record<TipoBloque, typeof Type> = {
   hero: LayoutTemplate,
   seccion: AlignLeft,
   "foto-encima": TypeOutline,
+  mosaico: Grid2x2,
   cupon: Ticket,
   titulo: Type,
   texto: AlignLeft,
@@ -96,6 +98,15 @@ function resumen(b: Bloque): string {
       if (!b.foto) return "Sin foto";
       const arriba = [...(b.elementos ?? [])].filter((el) => el.texto?.trim()).sort((x, y) => x.y - y.y)[0];
       return arriba?.texto.trim() || "Sin textos encima";
+    }
+    // Cuántos pedazos, y si ya están cortados: son las dos cosas que cambian lo
+    // que llega a la casilla. Un mosaico de seis pedazos SIN cortar sale como la
+    // foto entera y sin un solo link, y eso tiene que poder leerse sin abrirlo.
+    case "mosaico": {
+      if (!b.foto) return "Sin foto";
+      const n = cuantosPedazos(normalizar(b.filas));
+      if (n <= 1) return "La foto entera";
+      return estaCortado(normalizar(b.filas)) ? `${n} pedazos` : `${n} pedazos · sin cortar`;
     }
     case "cupon":
       return b.codigo.trim() || "—";

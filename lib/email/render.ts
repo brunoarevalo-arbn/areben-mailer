@@ -17,6 +17,7 @@ import { iconoDe, urlIconoCelda } from "./iconos";
 import { trozoCss, textoPlano, tieneTamano, tieneLink, fusionar, sanearUrl, type TextoRico, type Trozo } from "./texto-rico";
 import type { Bloque, Columna, ContenidoCampania, ElementoEncima, PorFila, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
 import { armarPlano, type CeldaEncima } from "./encima";
+import { armarMosaico, estaCortado, normalizar, type CeldaPlano } from "./mosaico";
 
 // Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
 // sin ciclo) pero se re-exportan desde acá: media app importa `Bloque` y
@@ -24,8 +25,16 @@ import { armarPlano, type CeldaEncima } from "./encima";
 export type { Bloque, BloqueBase, TipoBloque, ContenidoCampania, ProductoEmail, Columna, PorFilaMovil, PorFila, ElementoEncima, ClaseEncima } from "./bloques";
 export { nuevoBloque, duplicarBloque, nuevoId, TIPOS_BLOQUE, ETIQUETA_BLOQUE } from "./bloques";
 
+// 🔴 **La comilla doble también se escapa, y no es cosmética.** Casi todo lo que
+// pasa por acá termina adentro de un atributo (`alt="…"`, `href="…"`, `title="…"`),
+// y una comilla en el texto lo CIERRA: `alt="Ver "Girlhood""` sale como una
+// etiqueta rota con un atributo de más — que es la puerta por la que entra un
+// `onerror=`. Escapar sólo `& < >` alcanzaba cuando esto era texto de nodo.
+//
+// ⚠️ Verificado que **no mueve el golden**: `&quot;` sólo aparece donde antes salía
+// una comilla cruda, y en contenido de texto los dos se leen igual en pantalla.
 const esc = (s: string) =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /**
  * `**palabra**` → `<strong>palabra</strong>`.
@@ -1321,6 +1330,89 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         interior: plano.filas.length ? { mso: tabla("mso"), resto: tabla("resto") } : "",
       });
     }
+    /**
+     * Una foto cortada en pedazos, cada uno con su link.
+     *
+     * ⛔ **Nada de `<map>`/`<area>`**: Gmail los borra y el mail queda con una
+     * foto grande que no lleva a ningún lado. Cada pedazo es **su propia imagen**
+     * adentro de su propia celda, que es la única cosa que un cliente de mail
+     * dibuja igual en todas partes.
+     *
+     * 🔴 **Los tres detalles sin los cuales la foto sale con costuras**, y los
+     * tres son de Outlook/Word:
+     *   1. `font-size:0;line-height:0` en el `<td>`: sin eso el td hereda la
+     *      altura de línea del texto y aparece una franja blanca abajo de cada
+     *      pedazo. Es el mismo truco del `espaciador`.
+     *   2. `border="0"` **como atributo** del `<img>`, no sólo en el CSS: Word
+     *      dibuja un marco azul de link alrededor de una imagen dentro de un
+     *      `<a>` y el `border` de CSS no lo saca. Acá va **siempre**, con link o
+     *      sin él: en una grilla el marco de UNO se ve como una raya entre dos.
+     *   3. El **alto declarado y el mismo para toda la fila**. Si cada pedazo
+     *      calcula el suyo de su relación de aspecto, los redondeos difieren en
+     *      un píxel entre celdas vecinas y aparece el escalón. Sale de
+     *      `armarMosaico`, que lo reparte contra el `ratio` de la foto.
+     *
+     * 🔑 **Los anchos de una fila suman EXACTAMENTE el ancho útil.** No es
+     * prolijidad: tres columnas de 33,33% redondeadas por separado suman un píxel
+     * de más, y en Outlook eso desborda la tabla y se lleva el resto del mail.
+     * Lo garantiza `repartir` con bordes acumulados.
+     */
+    case "mosaico": {
+      // Sin foto no hay nada que cortar. Mismo criterio que `imagen` sin `url`:
+      // un `<img src="">` es el ícono de imagen rota en la casilla de otra
+      // persona, sin arreglo posible.
+      if (!b.foto) return "";
+      const c = caja();
+      // Padding 0 de fábrica, al revés que un bloque de texto: este bloque ES la
+      // pieza, y la foto que viene diseñada de afuera va de punta a punta. Quien
+      // quiera margen lo pone en el panel, y ahí el ancho útil se achica solo.
+      const padX = c.padX ?? 0;
+      const util = Math.max(1, pal.ancho - 2 * padX);
+      // 🔴 **Mientras falte UN pedazo, sale la foto entera.** Una grilla a medio
+      // cortar dibujaría dos pedazos y cuatro huecos, y eso llega a la casilla.
+      // La foto entera es lo que había antes de cortar: nunca se ve roto, y lo
+      // único que se pierde son los links —que es exactamente lo que el editor
+      // dice cuando avisa que hay que volver a cortar.
+      const filas = estaCortado(normalizar(b.filas)) ? b.filas : undefined;
+      const plano = armarMosaico(filas, util, b.ratio);
+      /** Un pedazo: la imagen, y su ancla si tiene destino. */
+      const pedazo = (cel: CeldaPlano, altoFila: number): string => {
+        // La foto entera cuando el pedazo todavía no se cortó: ver arriba. Con
+        // `filas` en `undefined`, `armarMosaico` devuelve la grilla de 1×1 y esta
+        // celda es la única, así que la foto sale a ancho completo.
+        const src = cel.celda.url || b.foto;
+        const alto = altoFila > 0 ? ` height="${altoFila}"` : "";
+        const altoCss = altoFila > 0 ? `height:${px(altoFila)};` : "height:auto;";
+        const img = `<img src="${esc(src)}" alt="${esc(cel.celda.alt ?? "")}" width="${cel.ancho}"${alto} border="0" style="width:${px(cel.ancho)};${altoCss}display:block;border:0" />`;
+        // Se sanea acá y no en el esquema: `esActual()` saltea el saneo de lo ya
+        // guardado, así que el emisor es la frontera. Misma doctrina que el
+        // `enlace` del bloque `imagen` y el `url` de un elemento encima.
+        const destino = sanearUrl(cel.celda.enlace);
+        // El ancla va `display:block` por lo mismo que en el bloque `imagen`: una
+        // `<a>` inline apoya en la línea de base y deja abajo una franja
+        // clickeable que no es la foto — acá, además, empujaría el pedazo de al lado.
+        return destino
+          ? `<a href="${esc(destino)}" style="text-decoration:none;display:block;border:0">${img}</a>`
+          : img;
+      };
+      const filasHtml = plano.filas
+        .map(
+          (f) =>
+            `<tr>${f.celdas
+              .map(
+                (cel) =>
+                  `<td width="${cel.ancho}" valign="top" style="width:${px(cel.ancho)};font-size:0;line-height:0;padding:0">${pedazo(cel, f.alto)}</td>`,
+              )
+              .join("")}</tr>`,
+        )
+        .join("");
+      // `border-collapse:collapse` y `cellspacing="0"` los dos: el atributo es el
+      // que obedece Word, y sin él quedan dos píxeles de tarjeta entre pedazo y
+      // pedazo. El `width` en atributo además del inline, por lo mismo que en
+      // toda imagen de este motor: Outlook ignora `max-width`.
+      const tabla = `<table role="presentation" width="${plano.ancho}" cellpadding="0" cellspacing="0" border="0" style="width:${px(plano.ancho)};border-collapse:collapse;max-width:100%">${filasHtml}</table>`;
+      return `<div${clase(...clasesDe(c))} style="${padCss(c.padY ?? 0, padX)}${extra(c, ["padX", "padY"])}">${tabla}</div>`;
+    }
     case "cupon": {
       const c = caja();
       const bg = superficieDe("cupon", c, pal);
@@ -1698,6 +1790,32 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
         .map((el) =>
           el.clase === "boton" ? link(el.texto, el.url) : el.clase === "texto" ? sinNegritas(el.texto) : el.texto,
         )
+        .join("\n") || null;
+    /**
+     * Los pedazos de la foto, de arriba a abajo y de izquierda a derecha: el
+     * texto alternativo de cada uno con su link.
+     *
+     * 🔴 **Es TODO lo que sobrevive de este bloque, y por eso es el bloque en el
+     * que más importa.** Una pieza que es 100% imagen no dibuja una sola letra:
+     * sin esto, un mail que es una foto grande sale con la parte `text/plain`
+     * vacía —la señal de spam más vieja que hay, y encima de ahí saca el buzón el
+     * texto de preview—. Es la misma deuda que ya se pagó con la portada cuya
+     * banda entera es el link.
+     *
+     * ⚠️ Un pedazo **sin `alt` y sin link no aporta nada**, y eso es correcto: no
+     * hay qué decir de él. Lo que hace que la pieza no salga muda es que el editor
+     * cuente los que faltan, no que acá se invente un texto.
+     */
+    case "mosaico":
+      return (b.filas ?? [])
+        .flatMap((f) => f.celdas)
+        .map((cel) => {
+          const alt = cel.alt?.trim();
+          const url = cel.enlace?.trim();
+          if (!alt && !url) return null;
+          return link(alt || url!, alt ? url : undefined);
+        })
+        .filter(Boolean)
         .join("\n") || null;
     case "cupon":
       return [b.texto, b.codigo, b.botonTexto ? link(b.botonTexto, b.botonUrl) : null].filter(Boolean).join("\n") || null;

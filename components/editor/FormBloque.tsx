@@ -5,6 +5,7 @@ import { ProductosBlock } from "@/components/ProductosBlock";
 import { ProductosDinamicosBlock } from "@/components/editor/ProductosDinamicosBlock";
 import { ColorFijo } from "@/components/editor/ColorFijo";
 import { FormFotoEncima } from "@/components/editor/FotoEncima";
+import { FormMosaico } from "@/components/editor/Mosaico";
 import { ImagenDrop } from "@/components/editor/ImagenDrop";
 import { Rango } from "@/components/editor/Rango";
 import { CampoRico } from "@/components/editor/CampoRico";
@@ -396,6 +397,12 @@ export function FormBloque({
     // puede vivir adentro de un `case`.
     case "foto-encima":
       return <FormFotoEncima b={b} set={set} pal={pal} />;
+
+    // La foto cortada en pedazos, cada uno con su link. Mismo motivo para vivir
+    // aparte: necesita estado —qué pedazo está elegido, qué corte está agarrado,
+    // cuántos pedazos ya se subieron.
+    case "mosaico":
+      return <FormMosaico b={b} set={set} pal={pal} />;
 
     case "cupon": {
       const variante = b.variante ?? "caja";

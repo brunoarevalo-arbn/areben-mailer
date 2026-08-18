@@ -268,6 +268,44 @@ export interface ElementoEncima {
 export type ClaseEncima = "titulo" | "texto" | "boton";
 
 /**
+ * Un pedazo de una foto cortada: su ancho, su imagen y a dónde lleva tocarlo.
+ *
+ * 🔴 **`url` es el pedazo YA recortado y subido, no la foto entera.** Un mail no
+ * puede tener zonas clickeables adentro de una imagen —`<map>`/`<area>` lo borra
+ * Gmail—, así que "esta parte lleva a las camperas" sólo se puede decir de una
+ * forma: esa parte es **su propia imagen**, adentro de su propia celda.
+ *
+ * ⚠️ **Ausente = todavía no se cortó**, y entonces el mail dibuja la foto entera
+ * (ver `estaCortado` en `mosaico.ts`). Es lo que hace que mover un corte no deje
+ * nunca una grilla a medias en la casilla de otra persona: al mover, los pedazos
+ * se tiran y el bloque vuelve a ser la foto de siempre hasta que se corte de nuevo.
+ */
+export interface CeldaMosaico {
+  /** Cuánto ocupa de ancho dentro de su banda, en % (5-100). Suman 100. */
+  ancho: number;
+  /** El pedazo recortado. Vacío = sin cortar. */
+  url?: string;
+  /** A dónde lleva tocar este pedazo. Se sanea al emitir, como todo link. */
+  enlace?: string;
+  /**
+   * Lo que se lee con las imágenes apagadas.
+   *
+   * 🔴 No es un extra: una pieza que es 100% imagen **no dice absolutamente nada**
+   * si el cliente de mail bloquea las fotos —que es el default de Outlook— y su
+   * gemelo en texto plano sale vacío, que es señal de spam clásica. Es el precio
+   * de este bloque y el editor lo cobra a la vista.
+   */
+  alt?: string;
+}
+
+/** Una banda de la foto: su alto, y las columnas en que está partida. */
+export interface FilaMosaico {
+  /** Cuánto ocupa de alto, en % de la foto (5-100). Suman 100. */
+  alto: number;
+  celdas: CeldaMosaico[];
+}
+
+/**
  * Lo que todo bloque tiene, sea del tipo que sea.
  *
  * Se intersecta con la unión de abajo en vez de repetirse en cada variante. El
@@ -661,6 +699,41 @@ export type Bloque = BloqueBase &
         /** Lo que va encima. El orden de la lista no importa: el lugar es `x`/`y`. */
         elementos: ElementoEncima[];
       }
+    /**
+     * Una foto CORTADA EN PEDAZOS, cada uno con su link.
+     *
+     * Es el mail que viene diseñado entero de afuera (Canva, Photoshop) y en el
+     * que cada zona tiene que llevar a un lado distinto: el vestido a vestidos,
+     * la campera a camperas.
+     *
+     * ⛔ **No se hace con `<map>`/`<area>`**: Gmail los borra y el mail queda con
+     * una foto grande que no lleva a ningún lado. La única forma que llega a la
+     * casilla es cortar la foto y que cada pedazo sea su propia imagen adentro de
+     * una celda — o sea que los cortes van en **bandas y columnas**, porque una
+     * tabla es una grilla. La geometría entera vive en `lib/email/mosaico.ts`.
+     *
+     * 🔴 **El precio, dicho en voz alta**: una pieza que es 100% imagen no se ve
+     * con las imágenes apagadas. Por eso cada pedazo lleva su `alt`, el editor
+     * cuenta los que faltan, y `bloqueATexto` los emite con su link — sin eso el
+     * `text/plain` sale vacío, que es la señal de spam más vieja que hay.
+     */
+    | {
+        tipo: "mosaico";
+        /** La foto entera, sin cortar. **Sin ella el bloque no dibuja nada.** */
+        foto: string;
+        /**
+         * Alto sobre ancho de la foto original.
+         *
+         * 🔑 Lo escribe el editor en cuanto el navegador la mide, y **una foto
+         * nueva SÍ lo pisa**: al revés que el `alto` de `foto-encima`, esto no es
+         * una elección de nadie sino una propiedad de la imagen. Sin él las
+         * bandas salen sin alto declarado y reaparece el escalón de un píxel
+         * entre pedazos vecinos.
+         */
+        ratio?: number;
+        /** Las bandas, de arriba a abajo. Una sola con una sola celda = sin cortar. */
+        filas: FilaMosaico[];
+      }
     | {
         tipo: "cupon";
         /**
@@ -701,7 +774,7 @@ export type TipoBloque = Bloque["tipo"];
 /** Todos los tipos que existen. El editor arma su paleta con esto. */
 export const TIPOS_BLOQUE = [
   "encabezado",
-  "hero", "seccion", "foto-encima", "cupon", "titulo", "texto", "boton", "imagen",
+  "hero", "seccion", "foto-encima", "mosaico", "cupon", "titulo", "texto", "boton", "imagen",
   "productos", "productos-dinamicos", "carrito", "columnas", "video", "redes", "menu",
   "divisor", "espaciador", "html",
 ] as const satisfies readonly TipoBloque[];
@@ -719,6 +792,10 @@ export const ETIQUETA_BLOQUE = {
   hero: "Portada",
   seccion: "Sección con fondo",
   "foto-encima": "Foto con textos encima",
+  // "Foto en pedazos" y no "mosaico": el nombre interno describe la técnica y
+  // quien arma el mail no tiene por qué saberla. Lo que él hace es cortar una
+  // foto para que cada parte lleve a un lado distinto.
+  mosaico: "Foto en pedazos",
   cupon: "Cupón",
   titulo: "Título",
   texto: "Texto",
@@ -838,6 +915,14 @@ export function nuevoBloque(tipo: TipoBloque): Bloque {
         id, tipo, foto: "", bg: "#111111", velo: 45,
         elementos: [{ id: nuevoId(), clase: "titulo", texto: "Título encima", x: 8, y: 58, ancho: 84 }],
       };
+    // Nace SIN cortes: una sola banda de una sola columna, que es exactamente
+    // "la foto entera". Así el bloque se ve funcionando en el preview desde que
+    // se elige la foto, y cortar es una decisión posterior y visible.
+    //
+    // 🔑 Y no es un caso especial: la foto entera **es** una grilla de 1×1, así
+    // que el renderer no tiene una rama para "todavía no cortó" — tiene la misma
+    // tabla con un solo pedazo.
+    case "mosaico": return { id, tipo, foto: "", filas: [{ alto: 100, celdas: [{ ancho: 100 }] }] };
     case "cupon": return { id, tipo, texto: "Usá este código en el checkout", codigo: "DESCUENTO10", botonTexto: "Comprar", botonUrl: "" };
     case "html": return { id, tipo, contenido: "" };
   }

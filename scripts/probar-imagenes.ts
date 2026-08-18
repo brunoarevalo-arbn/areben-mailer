@@ -50,8 +50,12 @@ titulo("Una marca no ve ni borra las imágenes de otra");
   // Lo que importa no es que se chequee la cuenta: es que el `cuentaId` esté en
   // el WHERE. Con un findUnique por id suelto, el chequeo posterior se puede
   // olvidar en el próximo cambio y nadie se entera.
+  // ⚠️ El WHERE puede llevar MÁS condiciones (desde el 18-ago-2026 excluye los
+  // pedazos de un mosaico, ver `PREFIJO_PEDAZO`), así que la aserción termina en
+  // "coma o llave" y no en "llave". Lo que se exige sigue siendo lo mismo: que el
+  // `cuentaId` esté ADENTRO del WHERE y no en un chequeo posterior.
   ok(
-    /findMany\(\{\s*where: \{ cuentaId: ctx\.cuenta\.id \}/.test(lista),
+    /findMany\(\{\s*where: \{ cuentaId: ctx\.cuenta\.id[,}]/.test(lista),
     "el listado filtra por cuentaId",
   );
   ok(

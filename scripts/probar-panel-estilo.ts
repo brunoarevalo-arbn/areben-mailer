@@ -81,6 +81,21 @@ function muestra(tipo: TipoBloque): Bloque {
       { id: "e3", clase: "boton", texto: "Comprar", url: "https://ejemplo.com", x: 5, y: 70, ancho: 40 },
     ];
   }
+  // Sin foto no dibuja nada, y con un solo pedazo tampoco se vería el reparto de
+  // anchos: dos columnas cortadas es el mínimo que ejercita la tabla entera.
+  if (tipo === "mosaico") {
+    b.foto = "https://ejemplo.com/f.jpg";
+    b.ratio = 1.25;
+    b.filas = [
+      {
+        alto: 100,
+        celdas: [
+          { ancho: 50, url: "https://ejemplo.com/p1.jpg", enlace: "https://ejemplo.com", alt: "Uno" },
+          { ancho: 50, url: "https://ejemplo.com/p2.jpg", alt: "Dos" },
+        ],
+      },
+    ];
+  }
   if (tipo === "seccion" || tipo === "cupon") { b.botonTexto = "Comprar"; b.botonUrl = "https://ejemplo.com"; }
   if (tipo === "columnas") {
     // "imagen-texto" ejercita los dos tipos de celda en el mismo fixture: la

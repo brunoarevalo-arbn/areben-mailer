@@ -53,6 +53,9 @@ for (const b of todos) {
   if (b.tipo === 'columnas') b.celdas = [{ imagen: 'a.jpg', url: '#' }, { imagen: 'b.jpg', url: '#' }];
   // Nace con un título encima pero SIN foto, y sin foto no hay banda que marcar.
   if (b.tipo === 'foto-encima') b.foto = 'https://ejemplo.com/fondo.jpg';
+  // Ídem: sin foto no hay pedazos que marcar. Nace con la grilla de 1×1, así que
+  // con la foto puesta ya dibuja la tabla —de un solo pedazo, la foto entera.
+  if (b.tipo === 'mosaico') b.foto = 'https://ejemplo.com/pieza.jpg';
 }
 
 /**

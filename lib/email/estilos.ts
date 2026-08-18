@@ -419,6 +419,15 @@ const BASE_POR_TIPO: Partial<Record<TipoBloque, Estilos>> = {
     cuerpo: { tamano: 14, interlinea: 1.5 },
     boton: { tamano: 14, padX: 18, padY: 10 },
   },
+  // Ídem, y por una razón más fuerte: una foto en pedazos **ES la pieza**, viene
+  // diseñada entera de afuera y va de punta a punta. Con los 32 de `BASE` el
+  // pedazo de la izquierda arrancaría a 32px del borde y la foto no se vería
+  // continua con nada.
+  //
+  // 🔑 Va acá y no como un `?? 0` adentro del `case`: el default tiene que vivir
+  // en la cascada, que es lo que el panel LEE. Un default propio del renderer
+  // haría que la perilla dijera "Automático (32)" al lado de un mail que dibuja 0.
+  mosaico: { caja: { padX: 0 } },
   // Sin margen lateral por default: la escotilla de HTML crudo es a sangre
   // salvo que alguien elija lo contrario desde el panel del bloque.
   html: { caja: { padX: 0 } },
@@ -566,6 +575,11 @@ export const ROLES_POR_TIPO: Record<TipoBloque, readonly RolEstilo[]> = {
   // foto con tamaños distintos es un diseño, no un default que el panel deba
   // ofrecer.
   "foto-encima": ["caja", "titulo", "cuerpo", "boton"],
+  // Sólo la caja: una foto en pedazos **no dibuja una sola letra**. Ni siquiera
+  // `imagen`, que es el rol del radio: una esquina redondeada en cada pedazo
+  // dejaría cuatro puntitos del color de la tarjeta en cada costura, o sea el
+  // borde blanco que este bloque existe para no tener.
+  mosaico: ["caja"],
   cupon: ["caja", "titulo", "cuerpo", "boton"],
   html: ["caja"],
 };
