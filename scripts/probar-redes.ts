@@ -12,6 +12,7 @@ import sharp from "sharp";
 import { renderEmailHtml } from "../lib/email/render";
 import { REDES, redConIcono, SIMPLE_CON_CLARO } from "../lib/email/redes";
 import type { Bloque } from "../lib/email/bloques";
+import { urlRegresiva } from "../lib/email/regresiva";
 
 let fallos = 0;
 function ok(cond: boolean, que: string) {
@@ -58,6 +59,32 @@ const prefijos = proxy.slice(proxy.indexOf("PUBLIC_PREFIXES"), proxy.indexOf("ex
 for (const dir of ["/redes/", "/iconos/"]) {
   ok(new RegExp(`['"]\\${dir}['"]`.replace("\\/", "\\/")).test(prefijos), `'${dir}' está en PUBLIC_PREFIXES del proxy`);
 }
+
+console.log("\n1-ter) 🔴 …y el PNG de la cuenta regresiva también");
+// Misma trampa que `/iconos/` y con la misma consecuencia, pero peor: acá lo que
+// rebota al login no es un ícono de 24px al pie, es el bloque entero. Un 307 y
+// la cuenta regresiva es un cuadradito roto en el medio del mail.
+//
+// 🔑 **No se compara contra un string escrito a mano**: se le pide la URL a
+// `urlRegresiva` —la misma función que usa el renderer— y se pregunta si ALGÚN
+// prefijo del proxy la cubre. Así, renombrar la ruta pone esto en rojo el mismo
+// día en vez de dejar el chequeo verde mirando un camino que ya no existe.
+const declarados = [...prefijos.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+const camino = new URL(
+  urlRegresiva("https://links.zattia.com.ar", {
+    hasta: "2026-12-24T23:59:00.000Z",
+    ancho: 536,
+    etiquetas: ["DÍAS", "HORAS", "MIN"],
+    fin: "¡TERMINÓ!",
+    bg: "#111111",
+    tinta: "#ffffff",
+    rotulo: "#ffffffb3",
+  }),
+).pathname;
+ok(
+  declarados.some((p) => camino.startsWith(p)),
+  `el camino del PNG (${camino}) lo cubre un prefijo público del proxy`,
+);
 
 console.log("\n2) Una red conocida sale como icono");
 const h1 = html([{ red: "Instagram", url: "https://instagram.com/zattia_co" }], HOST);

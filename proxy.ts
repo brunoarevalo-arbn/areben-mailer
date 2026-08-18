@@ -10,6 +10,7 @@ const PUBLIC_PREFIXES = [
   '/api/tn/', // callback OAuth + webhooks LGPD (los llama Tiendanube)
   '/api/health',
   '/api/track/', // pixel de apertura + redirect de clicks (los abren los destinatarios)
+  '/api/regresiva', // el PNG de la cuenta regresiva: lo pide el cliente de mail del destinatario
   '/api/ses/', // notificaciones SNS de rebotes/quejas (las llama AWS)
   '/api/webhooks/', // rebotes/quejas de Resend y SendGrid (los llaman ellos)
   '/api/automations/procesar', // lo llama el cron (protegido por CRON_SECRET)

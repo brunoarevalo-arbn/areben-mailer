@@ -188,7 +188,7 @@ Los patrones que van apareciendo en las referencias, y qué puede hacer el motor
 | barra fina de aviso ("Envío gratis a partir de…") | ✅ | `barra()` de `comun.ts`: un `seccion` sin título con `caja.padY`. Se pudo cuando el `<p>` dejó de arrastrar 16px de margen cableado. R-022 la usa **dos veces**, negra, para abrir y para cerrar | 007 · 008 · 022 |
 | menú lateral adentro de la portada | 🔴 | el `hero` es una columna: el menú al costado es otra tabla | 006 · 019 |
 | reseña / testimonio con estrellas | 🔴 | no hay bloque | — |
-| contador regresivo | 🔴 | un mail no tiene JS: sería un GIF servido, con fecha adentro | 017 |
+| contador regresivo | ✅ | bloque `regresiva` (18-ago-2026): un **PNG** dibujado por apertura desde `/api/regresiva`, no un GIF. Con la fecha escrita abajo, que es lo único que queda con las imágenes apagadas | 017 |
 | letra gigante de fondo detrás del texto | 🔴 | es superposición: `position` prohibido | 011 |
 | grilla de 4 fotos tipo lookbook | 🔴 | | 005 |
 | dos tipografías en el mismo renglón | 🔴 | `negritas()` sólo entiende `**bold**`; `italica`, `fuente` y `mayusculas` son **por rol**, no dentro de una frase. Se aproxima partiendo el título en dos renglones, que es otro diseño | 022 |
@@ -252,7 +252,7 @@ Ordenado por cuántas referencias lo pidieron. **Nada de acá se implementa hast
 | 2 | producto único destacado | bloque propio, no `productos` con n=1 |
 | ✅ 2 | barra fina de aviso | **hecho el 2-ago-2026**: salió gratis con el margen muerto del `seccion`. Es `barra()` en `comun.ts` |
 | 2 | menú lateral en la portada | el `hero` es de una columna; esto es una tabla de dos con el menú a un costado |
-| 1 | contador regresivo | sin JS: sería un GIF servido con la fecha adentro. Caro y con un servicio atrás |
+| ✅ 1 | contador regresivo | **hecho el 18-ago-2026**: bloque `regresiva`. La fila decía "un GIF servido con la fecha adentro" y es un **PNG dibujado por apertura** (`app/api/regresiva`, con `next/og`, que viene adentro de Next ⇒ cero dependencias nuevas). 🔑 Lo que esta fila no decía y es lo que más muerde: **el `<img>` declara su tamaño el día del envío y el PNG se dibuja horas después** ⇒ los dos números salen del mismo cálculo entero o el mail estira la imagen. Y **la pantalla de "ya terminó" mide igual que la cuenta corriendo**, porque es el mismo `<img>`. 🔴 El servicio atrás **no toca la base** —Neon está al filo— y **`/api/regresiva` va en `PUBLIC_PREFIXES`** o sale rota para todos |
 | 1 | letra gigante de fondo | superposición ⇒ `position` ⇒ prohibido. Se aproxima con una imagen |
 | 1 | grilla de 4 fotos | |
 | 1 | dos tipografías en el mismo renglón | dentro de una frase el motor no cambia de fuente: `negritas()` es el único marcado inline y sólo hace `**bold**` |

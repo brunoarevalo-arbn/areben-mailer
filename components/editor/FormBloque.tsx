@@ -15,6 +15,9 @@ import { Textarea } from "@/components/ui/Textarea";
 import type { Marca } from "@/lib/marca";
 import { REDES, redConIcono, type EstiloIconos } from "@/lib/email/redes";
 import { estiloCupon } from "@/lib/email/estilos";
+import { etiquetasDe, FIN_BASE, MAX_ETIQUETA, MAX_FIN } from "@/lib/email/regresiva";
+import { diaLocal, horaDelDia, instanteLocal } from "@/lib/fechas";
+import { campoBase } from "@/lib/ui";
 import { Desplegable } from "@/components/ui/Desplegable";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
@@ -403,6 +406,91 @@ export function FormBloque({
     // cuántos pedazos ya se subieron.
     case "mosaico":
       return <FormMosaico b={b} set={set} pal={pal} />;
+
+    /**
+     * La cuenta regresiva. Sin estado propio: el día y la hora se leen del
+     * `hasta` guardado y se vuelven a escribir con `instanteLocal`, que es el
+     * mismo par que usa la programación de campañas.
+     *
+     * 🔑 **Día y hora por separado, y no un `datetime-local`.** El nativo
+     * resuelve en la zona del NAVEGADOR, y la zona de este negocio es fija
+     * (`lib/fechas.ts`): con el nativo, la misma campaña editada desde otro huso
+     * terminaría a otra hora que la que se ve escrita en el mail.
+     */
+    case "regresiva": {
+      const hasta = b.hasta ? new Date(b.hasta) : undefined;
+      const vale = hasta && Number.isFinite(hasta.getTime());
+      const dia = vale ? diaLocal(hasta) : "";
+      const hora = vale ? horaDelDia(hasta) : "";
+      // Escribir una sola de las dos mitades no puede dejar el bloque sin fecha:
+      // la que falta cae en un valor obvio —hoy, o el final del día— en vez de
+      // descartar lo que la persona acaba de tipear.
+      const fijar = (d: string, h: string) => {
+        if (!d && !h) return set({ hasta: "" });
+        set({ hasta: instanteLocal(d || diaLocal(new Date()), h || "23:59").toISOString() });
+      };
+      const et = etiquetasDe(b.etiquetas);
+      const ponerEtiqueta = (i: number, v: string) => {
+        const proximas = [...et] as [string, string, string];
+        proximas[i] = v;
+        set({ etiquetas: proximas });
+      };
+      return (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="text-xs text-muted">
+              Día
+              <input
+                type="date"
+                className={`${campoBase} mt-1 block`}
+                value={dia}
+                onChange={(e) => fijar(e.target.value, hora)}
+              />
+            </label>
+            <label className="text-xs text-muted">
+              Hora
+              <input
+                type="time"
+                className={`${campoBase} mt-1 block`}
+                value={hora}
+                onChange={(e) => fijar(dia, e.target.value)}
+              />
+            </label>
+          </div>
+          {/* 🔴 Lo que hay que decir en voz alta, porque no se ve en el preview:
+              el número lo dibuja el servidor cuando alguien ABRE el mail, y la
+              fecha escrita de abajo es lo único que queda con las imágenes
+              apagadas. Sin este párrafo, la primera reacción a la línea de texto
+              es querer sacarla. */}
+          <p className="text-xs text-subtle">
+            El contador se dibuja <b>cada vez que alguien abre el mail</b>, así que el número
+            siempre está al día. Abajo va la fecha escrita: es lo único que se lee cuando el
+            cliente de mail bloquea las imágenes, que es lo que hace Outlook de fábrica.
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {(["Días", "Horas", "Minutos"] as const).map((rotulo, i) => (
+              <Input
+                key={rotulo}
+                label={rotulo}
+                fullWidth
+                value={et[i]}
+                maxLength={MAX_ETIQUETA}
+                onChange={(e) => ponerEtiqueta(i, e.target.value)}
+              />
+            ))}
+          </div>
+          <Input
+            label="Cuando ya pasó, dice"
+            fullWidth
+            value={b.fin ?? ""}
+            maxLength={MAX_FIN}
+            placeholder={FIN_BASE}
+            onChange={(e) => set({ fin: e.target.value })}
+          />
+          <ColorFijo label="Fondo de las casillas" value={b.bg ?? ""} onChange={(bg) => set({ bg })} />
+        </div>
+      );
+    }
 
     case "cupon": {
       const variante = b.variante ?? "caja";

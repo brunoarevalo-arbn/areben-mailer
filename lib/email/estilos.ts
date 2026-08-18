@@ -589,6 +589,13 @@ export const ROLES_POR_TIPO: Record<TipoBloque, readonly RolEstilo[]> = {
   // dejaría cuatro puntitos del color de la tarjeta en cada costura, o sea el
   // borde blanco que este bloque existe para no tener.
   mosaico: ["caja"],
+  // Sólo la caja, y por el mismo motivo que `mosaico`: lo que se ve son NÚMEROS
+  // DIBUJADOS ADENTRO DE UN PNG. Ofrecer los roles `titulo` o `cuerpo` pondría
+  // en el panel el tamaño, el peso, la fuente y la interlínea de un texto que no
+  // es texto — nueve perillas que no mueven un píxel del mail, que es la peor
+  // clase de bug de UI. Los dos colores que sí manda alguien (el fondo de la
+  // casilla y, derivado de él, la tinta) son campos del BLOQUE, no de la cascada.
+  regresiva: ["caja"],
   cupon: ["caja", "titulo", "cuerpo", "boton"],
   html: ["caja"],
 };

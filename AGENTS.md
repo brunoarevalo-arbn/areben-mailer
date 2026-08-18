@@ -76,6 +76,7 @@ node --import tsx scripts/probar-html.ts       # VML, media queries, tracking, p
 node --import tsx scripts/probar-banda-link.ts # una foto puede ser un link, y NUNCA un <a> dentro de otro
 node --import tsx scripts/probar-foto-encima.ts # una foto lleva VARIOS botones encima, y el condicional de Outlook no se cierra antes de tiempo
 node --import tsx scripts/probar-mosaico.ts   # una foto cortada en pedazos: la fila no desborda, y a medio cortar sale la foto ENTERA
+node --import tsx scripts/probar-regresiva.ts  # la cuenta regresiva: el PNG mide lo que el <img> declara (leído de los bytes) y la ruta no toca la base
 node --import tsx scripts/probar-imagen-escala.ts # una foto puede salir más chica y alineada, y Outlook obedece
 node --import tsx scripts/probar-recorte.ts     # el recorte no deforma ni agranda, y el deslizador mueve un solo eje
 node --import tsx scripts/probar-precio-oculto.ts # lo que el HTML oculta, el text/plain tampoco lo manda
@@ -796,6 +797,54 @@ lleva a un lado distinto.
 - Tope: **12 pedazos**. No es la grilla: cada pedazo es una imagen que se descarga
   **una vez por destinatario** — doce en un envío a 16.800 contactos son 200.000
   pedidos.
+
+### La cuenta regresiva (bloque `regresiva`, 18-ago-2026)
+
+"Faltan 2 días 14 horas 37 minutos", con el número al día en cada apertura.
+
+- 🔴 **Es el único bloque del motor con un servicio atrás**, y no se puede hacer de
+  otra forma: el HTML de un mail se congela al mandarlo, así que lo único que puede
+  cambiar entre el envío y la apertura es una **imagen**, que el cliente vuelve a
+  pedir. La dibuja `app/api/regresiva/route.ts` con `next/og` — que viene adentro de
+  Next, **cero dependencias nuevas** — y sólo pesa en esa ruta.
+- 🔴 **La ruta NO toca Postgres.** La base es compartida con Resorty y está al filo
+  de los 100 CU-h de Neon: una escritura por apertura sobre 16.800 contactos la
+  voltea. Quien mide aperturas es el pixel de `/api/track/open`, que ya escribe una
+  sola vez por envío.
+- 🔴 **`/api/regresiva` va en `PUBLIC_PREFIXES` del `proxy.ts`.** Sin esa línea el
+  proxy contesta 307 a `/login` —el destinatario no tiene sesión— y el bloque entero
+  es un cuadradito roto para el 100% de los que reciben el mail. Ya pasó el
+  2-ago-2026 con `/iconos/`. Lo clava `probar-redes.ts` §1-ter, y **no comparando un
+  string escrito a mano**: le pide la URL a `urlRegresiva` y pregunta si algún
+  prefijo la cubre, así renombrar la ruta se pone rojo el mismo día.
+- 🔑 **La invariante que lo gobierna todo: el `<img>` DECLARA un tamaño y el PNG se
+  dibuja horas después, en otro proceso.** Si los dos no salen del mismo cálculo, el
+  cliente de mail estira la imagen. Por eso las medidas se calculan una vez en
+  enteros (`medidas`) y la escala es una multiplicación entera arriba (`escalar`): a
+  escala 2 todo mide exactamente el doble, nunca "el doble redondeado".
+- 🔴 **El PNG de "ya terminó" mide EXACTAMENTE lo mismo que el de la cuenta
+  corriendo**: es el mismo `<img>` con los mismos atributos, escritos el día del
+  envío. Y **llena el lienzo**: `ImageResponse` recorta al tamaño pedido, así que una
+  caja más baja sale igual de grande con una franja transparente abajo — que en el
+  editor no se ve (fondo blanco) y en una casilla con tema oscuro sí. El oráculo son
+  los PÍXELES, no el tamaño del archivo.
+- 🔑 **El `alt` es la FECHA, nunca la cuenta.** El `alt` se escribe al enviar y no
+  cambia más: "faltan 2 días" es una mentira con una hora de vencimiento. Y lo mismo
+  la línea de texto de abajo del PNG, que **sale siempre y no tiene perilla**: es lo
+  único que sobrevive a las imágenes apagadas (el default de Outlook), la misma deuda
+  que ya se pagó con los `alt` de `mosaico`.
+- ⛔ **Sin segundos.** Gmail sirve las imágenes desde su propio proxy y las cachea:
+  el número de la primera apertura es el que se ve en las siguientes. Con minutos el
+  error es de un minuto; con segundos el mail muestra un cronómetro clavado.
+- ⚠️ **El texto de cierre se achica según su largo** (`cuerpoFin`): al cuerpo de un
+  número de dos dígitos, "¡ÚLTIMA CHANCE, SE ACABÓ!" mide el triple que el PNG y
+  satori no achica — lo parte y lo recorta.
+- El panel ofrece **sólo el rol `caja`** (más `cuerpo`, que es la línea de la fecha):
+  lo que se ve son números DIBUJADOS ADENTRO DE UN PNG, así que ofrecer el tamaño, el
+  peso o la fuente serían nueve perillas que no mueven un píxel.
+- El día y la hora van en **dos inputs separados** y se resuelven con
+  `instanteLocal` de `lib/fechas.ts` —el mismo par que la programación de campañas—:
+  un `datetime-local` resuelve en la zona del NAVEGADOR y la de este negocio es fija.
 
 ## Importar contactos de afuera (`lib/contactos/importar.ts`)
 

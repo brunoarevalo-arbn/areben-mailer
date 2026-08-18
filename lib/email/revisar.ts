@@ -150,6 +150,17 @@ export function rolesDibujados(b: Bloque, opts: OpcionesRevision = {}): readonly
       if (vivos.some((el) => el.clase === "boton")) roles.push("boton");
       return roles;
     }
+    /**
+     * Lo único que este bloque dibuja con TEXTO es la fecha escrita de abajo del
+     * PNG, y va con el rol `cuerpo`.
+     *
+     * 🔑 Y es justo el renglón que más importa que se lea: es lo que queda
+     * cuando el cliente de mail bloquea las imágenes. Los números no entran acá
+     * —los dibuja el endpoint, sobre el fondo de la casilla, con una tinta que
+     * el renderer recalcula por luminancia y que nadie puede dejar ilegible.
+     */
+    case "regresiva":
+      return b.hasta ? ["cuerpo"] : [];
     // El código del cupón va en `titulo` (y no se recalcula: es color de marca).
     case "cupon": {
       const roles: RolEstilo[] = [];

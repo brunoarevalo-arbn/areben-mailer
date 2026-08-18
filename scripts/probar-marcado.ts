@@ -56,6 +56,9 @@ for (const b of todos) {
   // Ídem: sin foto no hay pedazos que marcar. Nace con la grilla de 1×1, así que
   // con la foto puesta ya dibuja la tabla —de un solo pedazo, la foto entera.
   if (b.tipo === 'mosaico') b.foto = 'https://ejemplo.com/pieza.jpg';
+  // Nace SIN fecha y sin fecha no dibuja nada: un contador que corre hacia
+  // "ninguna fecha" no existe. Con `hasta` puesto ya emite el <img> y su línea.
+  if (b.tipo === 'regresiva') b.hasta = '2026-12-24T23:59:00.000Z';
 }
 
 /**

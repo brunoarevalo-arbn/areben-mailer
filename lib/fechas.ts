@@ -161,6 +161,12 @@ const FMT_HORA = new Intl.DateTimeFormat("es-AR", {
 });
 
 /**
+ * Sólo la hora del reloj del negocio: `23:59`. Es lo que espera un
+ * `<input type="time">`, y el inverso exacto de lo que `instanteLocal` recibe.
+ */
+export const horaDelDia = (instante: Date): string => FMT_HORA.format(instante);
+
+/**
  * Un instante escrito como lo diría una persona: `lunes 3 de agosto, 19:00`.
  *
  * Se arma **por partes** y no con un formato combinado: el separador que mete

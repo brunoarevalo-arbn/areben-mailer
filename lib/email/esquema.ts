@@ -14,6 +14,7 @@
 import { TIPOS_BLOQUE, nuevoId, type Bloque, type ClaseEncima, type Columna, type ContenidoCampania, type FilaMosaico } from "./bloques";
 import { MAX_ELEMENTOS } from "./encima";
 import { normalizar } from "./mosaico";
+import { instante, MAX_ETIQUETA, MAX_FIN } from "./regresiva";
 import { sanearEstilos } from "./estilos";
 import { temaDe } from "./tema";
 import { sanearTrozos, CAMPOS_RICOS, CAMPOS_RICOS_CELDA } from "./texto-rico";
@@ -253,6 +254,31 @@ function sanearBloque(v: unknown, usados: Set<string>): Bloque | null {
     const r = Number(b.ratio);
     if (Number.isFinite(r) && r > 0) b.ratio = r;
     else delete b.ratio;
+  }
+
+  // La cuenta regresiva: la fecha tiene que ser un instante legible, los rótulos
+  // strings cortos y el fondo un color.
+  //
+  // ⚠️ **No es la red del endpoint**: `leerParams` sanea otra vez lo que llega
+  // por la URL y tiene que hacerlo —esa ruta es pública y cualquiera le arma una
+  // query—. Esto es lo que hace que el DOCUMENTO quede guardado sano. Misma
+  // doctrina que `foto-encima` y `mosaico`.
+  //
+  // 🔴 Una fecha ilegible se BORRA y el bloque deja de dibujarse, en vez de caer
+  // a "ahora": un `hasta` inventado sale como una cuenta regresiva que corre
+  // hacia una fecha que nadie eligió, y eso llega a la casilla igual de bien que
+  // la buena.
+  if (b.tipo === "regresiva") {
+    b.hasta = instante(b.hasta)?.toISOString() ?? "";
+    const et = Array.isArray(b.etiquetas) ? (b.etiquetas as unknown[]) : undefined;
+    if (et) {
+      b.etiquetas = [0, 1, 2].map((i) =>
+        (typeof et[i] === "string" ? (et[i] as string) : "").trim().slice(0, MAX_ETIQUETA),
+      );
+    } else delete b.etiquetas;
+    if (typeof b.fin === "string") b.fin = b.fin.trim().slice(0, MAX_FIN);
+    else delete b.fin;
+    if (typeof b.bg !== "string") delete b.bg;
   }
 
   // Los 8 campos que admiten formato por selección (`texto-rico.ts`). El saneo

@@ -19,7 +19,7 @@
 // `new Date(dia + "T" + hora)` —la forma natural y equivocada— el primero pasa y
 // el segundo se cae: ahí está todo el sentido de este archivo.
 
-import { ZONA, diaLocal, ultimosDias, desdeUtc, instanteLocal, horaLocal } from "../lib/fechas";
+import { ZONA, diaLocal, ultimosDias, desdeUtc, instanteLocal, horaLocal, horaDelDia } from "../lib/fechas";
 
 let fallas = 0;
 const ok = (cond: boolean, msg: string) => {
@@ -141,6 +141,17 @@ ok(
   horaLocal(new Date("2026-08-03T00:30:00.000Z")) === "domingo 2 de agosto, 21:30",
   "y a las 21:30 dice el domingo 2, no el lunes 3",
 );
+
+console.log("\nIda y vuelta: lo que el panel muestra vuelve al mismo instante");
+// 🔴 Es literalmente lo que hace el bloque de cuenta regresiva: parte el `hasta`
+// guardado en los dos inputs (`diaLocal` + `horaDelDia`) y lo vuelve a armar con
+// `instanteLocal` en cuanto alguien toca uno. Si el par no cerrara, abrir el
+// panel y no tocar nada correría la fecha límite de una promoción.
+for (const iso of ["2026-08-03T22:00:00.000Z", "2026-12-25T02:59:00.000Z", "2026-01-01T03:00:00.000Z"]) {
+  const d = new Date(iso);
+  const vuelta = instanteLocal(diaLocal(d), horaDelDia(d));
+  ok(vuelta.getTime() === d.getTime(), `${iso} sobrevive el ida y vuelta (dio ${vuelta.toISOString()})`);
+}
 
 console.log();
 if (fallas) {

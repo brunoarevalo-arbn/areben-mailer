@@ -97,6 +97,9 @@ function muestra(tipo: TipoBloque): Bloque {
     ];
   }
   if (tipo === "seccion" || tipo === "cupon") { b.botonTexto = "Comprar"; b.botonUrl = "https://ejemplo.com"; }
+  // Sin fecha el bloque no dibuja nada y sus cuatro controles de caja se leerían
+  // como perillas desconectadas.
+  if (tipo === "regresiva") b.hasta = "2026-12-24T23:59:00.000Z";
   if (tipo === "columnas") {
     // "imagen-texto" ejercita los dos tipos de celda en el mismo fixture: la
     // izquierda dibuja imagen (rol `imagen`) y la derecha texto (`titulo` y

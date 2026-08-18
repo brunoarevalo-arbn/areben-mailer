@@ -734,6 +734,45 @@ export type Bloque = BloqueBase &
         /** Las bandas, de arriba a abajo. Una sola con una sola celda = sin cortar. */
         filas: FilaMosaico[];
       }
+    /**
+     * La CUENTA REGRESIVA: "faltan 2 días 14 horas 37 minutos".
+     *
+     * 🔴 **Es el único bloque del motor con un servicio atrás.** No se puede
+     * hacer de otra forma: el HTML de un mail se congela cuando se manda, así que
+     * la única parte que puede cambiar entre el envío y la apertura es una
+     * imagen, que el cliente vuelve a pedir. La dibuja `app/api/regresiva`, y esa
+     * ruta **no toca la base** (ver el comentario de arriba del archivo).
+     *
+     * 🔴 **Siempre sale acompañado de la fecha ESCRITA.** Con las imágenes
+     * apagadas —el default de Outlook— la cuenta desaparece entera, y un mail que
+     * dice "aprovechá antes de que termine" sin decir cuándo termina no sirve
+     * para nada. Es la misma deuda que ya se pagó con los `alt` de `mosaico`, y
+     * por eso el renderer emite esa línea SIEMPRE y no hay perilla para sacarla.
+     */
+    | {
+        tipo: "regresiva";
+        /**
+         * El instante límite, en ISO. **Sin él el bloque no dibuja nada**: un PNG
+         * que dice `NaN` llega igual a la casilla que uno que dice 02.
+         */
+        hasta: string;
+        /**
+         * Los tres rótulos de abajo de cada número. Ausente = "DÍAS / HORAS / MIN".
+         * Se pueden escribir porque la misma marca manda en dos idiomas y porque
+         * "MIN" no es lo que todos escriben.
+         */
+        etiquetas?: [string, string, string];
+        /**
+         * Lo que dibuja el PNG cuando la fecha ya pasó. Ausente = "¡TERMINÓ!".
+         *
+         * 🔑 Existe porque un mail se abre tarde: tres días después la cuenta ya
+         * no cuenta nada, y dibujar `00 00 00` es un contador congelado que se
+         * lee como roto. Acá quien arma el mail decide qué dice en ese momento.
+         */
+        fin?: string;
+        /** Fondo de cada casilla. Vacío = la tinta de la marca. */
+        bg?: string;
+      }
     | {
         tipo: "cupon";
         /**
@@ -774,7 +813,7 @@ export type TipoBloque = Bloque["tipo"];
 /** Todos los tipos que existen. El editor arma su paleta con esto. */
 export const TIPOS_BLOQUE = [
   "encabezado",
-  "hero", "seccion", "foto-encima", "mosaico", "cupon", "titulo", "texto", "boton", "imagen",
+  "hero", "seccion", "foto-encima", "mosaico", "regresiva", "cupon", "titulo", "texto", "boton", "imagen",
   "productos", "productos-dinamicos", "carrito", "columnas", "video", "redes", "menu",
   "divisor", "espaciador", "html",
 ] as const satisfies readonly TipoBloque[];
@@ -796,6 +835,7 @@ export const ETIQUETA_BLOQUE = {
   // quien arma el mail no tiene por qué saberla. Lo que él hace es cortar una
   // foto para que cada parte lleve a un lado distinto.
   mosaico: "Foto en pedazos",
+  regresiva: "Cuenta regresiva",
   cupon: "Cupón",
   titulo: "Título",
   texto: "Texto",
@@ -923,6 +963,10 @@ export function nuevoBloque(tipo: TipoBloque): Bloque {
     // que el renderer no tiene una rama para "todavía no cortó" — tiene la misma
     // tabla con un solo pedazo.
     case "mosaico": return { id, tipo, foto: "", filas: [{ alto: 100, celdas: [{ ancho: 100 }] }] };
+    // Nace SIN fecha y por eso no se dibuja: es lo mismo que `imagen` sin `url`.
+    // La alternativa —nacer con "dentro de tres días"— pondría una fecha que
+    // nadie eligió en un mail que se puede mandar sin abrir el bloque.
+    case "regresiva": return { id, tipo, hasta: "" };
     case "cupon": return { id, tipo, texto: "Usá este código en el checkout", codigo: "DESCUENTO10", botonTexto: "Comprar", botonUrl: "" };
     case "html": return { id, tipo, contenido: "" };
   }

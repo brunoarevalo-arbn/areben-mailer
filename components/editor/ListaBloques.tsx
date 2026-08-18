@@ -5,10 +5,11 @@ import { ETIQUETA_BLOQUE, TIPOS_BLOQUE, type Bloque, type TipoBloque } from "@/l
 import { textoPlano } from "@/lib/email/texto-rico";
 import { ETIQUETA_FUENTE } from "@/lib/email/bloques";
 import { cuantosPedazos, estaCortado, normalizar } from "@/lib/email/mosaico";
+import { horaLocal } from "@/lib/fechas";
 import {
   AlignLeft, ChevronDown, ChevronUp, Code2, Columns2, Copy, GripVertical, ImageIcon,
   LayoutTemplate, Menu as MenuIcon, Minus, MousePointerClick, MoveVertical, PanelTop, Play, Plus,
-  Share2, ShoppingBag, ShoppingCart, Sparkles, Grid2x2, Ticket, Trash2, Type, TypeOutline,
+  Share2, ShoppingBag, ShoppingCart, Sparkles, Grid2x2, Ticket, Timer, Trash2, Type, TypeOutline,
 } from "lucide-react";
 
 /**
@@ -48,6 +49,7 @@ const ICONO: Record<TipoBloque, typeof Type> = {
   seccion: AlignLeft,
   "foto-encima": TypeOutline,
   mosaico: Grid2x2,
+  regresiva: Timer,
   cupon: Ticket,
   titulo: Type,
   texto: AlignLeft,
@@ -107,6 +109,12 @@ function resumen(b: Bloque): string {
       const n = cuantosPedazos(normalizar(b.filas));
       if (n <= 1) return "La foto entera";
       return estaCortado(normalizar(b.filas)) ? `${n} pedazos` : `${n} pedazos · sin cortar`;
+    }
+    // La fecha límite escrita, que es el dato que decide si el bloque sirve. Sin
+    // ella el bloque no se dibuja, y eso tiene que poder leerse sin abrirlo.
+    case "regresiva": {
+      const hasta = b.hasta ? new Date(b.hasta) : undefined;
+      return hasta && Number.isFinite(hasta.getTime()) ? horaLocal(hasta) : "Sin fecha";
     }
     case "cupon":
       return b.codigo.trim() || "—";

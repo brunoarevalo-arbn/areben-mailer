@@ -3,7 +3,7 @@
 //
 // El aspecto (colores, ancho, fuente) vive en lib/email/tema.ts y llega acá ya
 // resuelto como `Paleta`. Este archivo no decide de qué color es nada.
-import { resolverPaleta, combinarTema, type Paleta, type Tema } from "./tema";
+import { esColorOscuro, resolverPaleta, combinarTema, type Paleta, type Tema } from "./tema";
 import { leerContenido } from "./esquema";
 import {
   resolverEstilo, extra, px, padCss, alineacion, tenueSobre, ocultoEnTodas,
@@ -18,6 +18,7 @@ import { trozoCss, textoPlano, tieneTamano, tieneLink, fusionar, sanearUrl, type
 import type { Bloque, Columna, ContenidoCampania, ElementoEncima, PorFila, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
 import { armarPlano, type CeldaEncima } from "./encima";
 import { armarMosaico, estaCortado, normalizar, type CeldaPlano } from "./mosaico";
+import { etiquetasDe, instante, lineaRegresiva, medidas, tenue, urlRegresiva, FIN_BASE } from "./regresiva";
 
 // Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
 // sin ciclo) pero se re-exportan desde acá: media app importa `Bloque` y
@@ -1413,6 +1414,64 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const tabla = `<table role="presentation" width="${plano.ancho}" cellpadding="0" cellspacing="0" border="0" style="width:${px(plano.ancho)};border-collapse:collapse;max-width:100%">${filasHtml}</table>`;
       return `<div${clase(...clasesDe(c))} style="${padCss(c.padY ?? 0, padX)}${extra(c, ["padX", "padY"])}">${tabla}</div>`;
     }
+    /**
+     * La cuenta regresiva: un PNG que se dibuja en cada apertura, y **abajo la
+     * fecha escrita**.
+     *
+     * 🔴 **Los dos, siempre.** La línea de texto no es un pie decorativo: es lo
+     * único de este bloque que sobrevive a las imágenes apagadas, que es el
+     * default de Outlook de escritorio. Sin ella, un mail que dice "aprovechá
+     * antes de que se termine" no dice cuándo se termina — la misma deuda que ya
+     * se pagó con los `alt` de `mosaico`, y por eso acá no hay perilla para
+     * sacarla.
+     *
+     * 🔑 **Y por eso el `alt` es la FECHA y no la cuenta.** El `alt` se escribe
+     * cuando se manda el mail y no cambia nunca más: "faltan 2 días" queda
+     * congelado en el instante del envío y miente en cuanto pasa una hora. La
+     * fecha límite es verdad para siempre.
+     *
+     * 🔴 **Sin `assetsBase` no se dibuja el `<img>`**, sólo la línea. Un `src`
+     * relativo adentro de un mail lo resuelve el cliente contra su propio
+     * dominio (`mail.google.com/api/regresiva`) y sale una imagen rota para el
+     * 100% de los destinatarios. Mismo criterio que los íconos de `redes`.
+     */
+    case "regresiva": {
+      // Sin fecha no hay nada que contar, igual que `imagen` sin `url`: el
+      // bloque desaparece en vez de mandar un PNG que dice `NaN`.
+      const hasta = instante(b.hasta);
+      if (!hasta) return "";
+      const c = caja();
+      const t = e("cuerpo");
+      const m = medidas(pal.ancho - 2 * (c.padX ?? 32));
+      // El fondo elegido manda; ausente es la tinta de la marca, que es lo que
+      // hace que la cuenta se lea como parte del mail y no como un widget
+      // pegado. Con fondo propio la tinta se recalcula por luminancia: un blanco
+      // sobre un amarillo elegido a mano no se ve, y acá no hay panel de
+      // contraste que avise porque lo que se dibuja no es texto.
+      const propio = b.bg?.trim();
+      const bg = propio || pal.acento;
+      const tinta = propio ? (esColorOscuro(bg) ? "#ffffff" : "#111111") : pal.sobreAcento;
+      const linea = lineaRegresiva(hasta);
+      const src = ctx.assetsBase
+        ? urlRegresiva(ctx.assetsBase, {
+            hasta: hasta.toISOString(),
+            ancho: m.ancho,
+            etiquetas: etiquetasDe(b.etiquetas),
+            fin: b.fin?.trim() || FIN_BASE,
+            bg,
+            tinta,
+            rotulo: tenue(tinta),
+          })
+        : "";
+      // `width`/`height` como ATRIBUTOS —Outlook no escala por CSS y dibujaría el
+      // PNG a su tamaño real, que es el doble— y `height:auto` en el style, que
+      // es lo que hace que al achicarse en el teléfono no salga aplastado.
+      const img = src
+        ? `<img src="${esc(src)}" alt="${esc(linea)}" width="${m.ancho}" height="${m.alto}" border="0" style="width:${px(m.ancho)};max-width:100%;height:auto;display:block;border:0" />`
+        : "";
+      const nota = `<p style="margin:${px(m.hueco)} 0 0;font-size:${px(t.tamano ?? 14)};line-height:${t.interlinea ?? 1.5};color:${t.color};text-align:${t.align ?? "center"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${esc(linea)}</p>`;
+      return pad(`<div style="${margen(c, "8px 0 16px")}">${img}${nota}</div>`, c);
+    }
     case "cupon": {
       const c = caja();
       const bg = superficieDe("cupon", c, pal);
@@ -1817,6 +1876,19 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
         })
         .filter(Boolean)
         .join("\n") || null;
+    /**
+     * La fecha límite escrita, que es exactamente la misma línea que el HTML
+     * emite abajo del PNG.
+     *
+     * 🔴 Un contador es 100% imagen: sin esto, un mail cuyo gancho es "quedan
+     * dos días" manda un `text/plain` que no lo dice. Y **no lleva números**:
+     * este texto se escribe al enviar y no cambia más, así que "faltan 2 días"
+     * sería una mentira con fecha de vencimiento de una hora.
+     */
+    case "regresiva": {
+      const hasta = instante(b.hasta);
+      return hasta ? lineaRegresiva(hasta) : null;
+    }
     case "cupon":
       return [b.texto, b.codigo, b.botonTexto ? link(b.botonTexto, b.botonUrl) : null].filter(Boolean).join("\n") || null;
     // Sin conversión razonable a texto plano: es la escotilla de HTML libre.

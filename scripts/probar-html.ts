@@ -333,7 +333,11 @@ titulo("Lo que no puede faltar nunca");
     // aporta a la parte de texto es lo que alguien escriba en cada pedazo. Que SÍ
     // aporte cuando los tiene lo fija `probar-mosaico.ts` §8, que es donde importa
     // —una pieza que es 100% imagen sin `text/plain` es la señal de spam clásica.
-    if (["espaciador", "imagen", "carrito", "productos", "productos-dinamicos", "columnas", "video", "redes", "menu", "html", "mosaico"].includes(t)) return false;
+    // "regresiva" nace sin fecha, y sin fecha no dibuja nada: un contador que
+    // corre hacia ninguna fecha no existe. Con `hasta` puesto SÍ aporta —la
+    // fecha escrita, que es lo único de ese bloque que sobrevive a las imágenes
+    // apagadas— y eso lo fija `probar-regresiva.ts` §6.
+    if (["espaciador", "imagen", "carrito", "productos", "productos-dinamicos", "columnas", "video", "redes", "menu", "html", "mosaico", "regresiva"].includes(t)) return false;
     return renderEmailTexto({ ...base, bloques: [b] }, OPTS) === vacio;
   });
   ok(sinTexto.length === 0, "todo tipo con contenido aporta algo a la parte de texto", sinTexto.join(", "));
