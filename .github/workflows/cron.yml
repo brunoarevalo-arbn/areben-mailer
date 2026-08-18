@@ -1,7 +1,21 @@
 name: Procesar automations y cola de envío
 on:
   schedule:
-    - cron: "*/15 * * * *" # cada 15 minutos
+    # 🔑 DOS HORARIOS, y el motivo es la FACTURA DE NEON, no el mailer.
+    #
+    # La base `areben-mailer-db` está COMPARTIDA con Resorty y se cobra por hora de compute
+    # DESPIERTO (autosuspend a los 5 min de inactividad, fijo en Free y en Launch). Entre las
+    # 3 y las 10 de la mañana ART no hay tráfico de storefront: este cron es **lo único** que
+    # la despierta en esa franja, y cada corrida le cuesta 5 minutos de compute como piso.
+    #
+    # ⚠️ El cron de GitHub va en **UTC**, así que la franja nocturna ART (03-10) es **06-13 UTC**.
+    # Medido: GitHub no dispara cada 15 sino cada 16-30 min, y en cola cargada mucho peor.
+    #
+    # Lo que cuesta: un carrito abandonado de madrugada se detecta hasta una hora más tarde.
+    # De noche no hay checkout, así que no cuesta nada real. La bienvenida de un lead de pop-up
+    # NO depende de esto: Resorty pincha el procesador de una (`pincharProcesadorMailer`).
+    - cron: "*/15 13-23,0-5 * * *" # día ART (10:00-02:59) → cada 15 min
+    - cron: "0 6-12 * * *" # madrugada ART (03:00-09:59) → cada 60 min
   workflow_dispatch: {}
 
 jobs:
