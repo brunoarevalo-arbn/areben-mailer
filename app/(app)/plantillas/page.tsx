@@ -12,7 +12,7 @@ import { leerContenido } from "@/lib/email/esquema";
 import { combinarTema, resolverPaleta } from "@/lib/email/tema";
 import { marcaDe } from "@/lib/marca";
 import { TarjetaPlantilla } from "@/components/TarjetaPlantilla";
-import { automationDelTrigger, esTrigger } from "@/lib/automations";
+import { esTrigger, puedeCrearOtra } from "@/lib/automations";
 import { TRIGGERS_UI } from "@/app/(app)/automations/presets-ui";
 import { AccionesModal } from "./AccionesModal";
 import { tapTarget } from "@/lib/ui";
@@ -58,13 +58,14 @@ export default async function PlantillasPage({
    * Modo "elegí el diseño de esta automation". Se llega desde `/automations`,
    * que es donde el contexto ya está puesto.
    *
-   * 🔴 Si ese disparador YA tiene automation, el modo se apaga: una por trigger
-   * y por cuenta, porque el disparador manda todas las que matcheen ⇒ la segunda
-   * es un segundo mail a la misma persona. La guarda de verdad está igual en la
+   * 🔴 Si ese disparador ya llegó a su tope de automations, el modo se apaga:
+   * el disparador manda todas las que matcheen ⇒ la de más es un mail de más a
+   * la misma persona. Cuántas caben lo decide `MAX_POR_TRIGGER` (el carrito
+   * abandonado admite dos: la secuencia). La guarda de verdad está igual en la
    * action; esto es para no ofrecer un botón que no va a crear nada.
    */
   const para =
-    paraParam && esTrigger(paraParam) && !automationDelTrigger(automations, paraParam)
+    paraParam && esTrigger(paraParam) && puedeCrearOtra(automations, paraParam)
       ? paraParam
       : undefined;
 

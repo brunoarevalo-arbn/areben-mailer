@@ -4,7 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { autorizar, chequear } from "@/lib/auth";
 import { presetDe } from "@/lib/plantillas/presets";
 import { getRemitenteEnvio } from "@/lib/remitentes";
-import { automationDelTrigger, esTrigger, type Trigger } from "@/lib/automations";
+import {
+  automationDelTrigger,
+  ESPERA_SCHEMA_HORAS,
+  esTrigger,
+  nacimientoDelMail,
+  puedeCrearOtra,
+  type Trigger,
+} from "@/lib/automations";
 import { V_ACTUAL } from "@/lib/email/esquema";
 import { nuevoBloque, type ContenidoCampania } from "@/lib/email/render";
 import { revalidatePath } from "next/cache";
@@ -77,8 +84,12 @@ export async function usarComoAutomation(
     where: { cuentaId: cuenta.id },
     select: { id: true, trigger: true, createdAt: true },
   });
-  const ya = automationDelTrigger(existentes, trigger);
-  if (ya) redirect(`/automations/${ya.id}`);
+  // Mismo criterio que `crearAutomation`: al tope se va a editar la que hay.
+  if (!puedeCrearOtra(existentes, trigger)) {
+    const ya = automationDelTrigger(existentes, trigger);
+    if (ya) redirect(`/automations/${ya.id}`);
+  }
+  const orden = existentes.filter((a) => a.trigger === trigger).length + 1;
 
   let nombre: string;
   let asunto: string;
@@ -99,8 +110,20 @@ export async function usarComoAutomation(
     contenido = p.contenido as object;
   }
 
+  // ⚠️ Una plantilla de galería NO trae espera propia —sólo la traen los presets
+  // de automation—, así que el 1º nace con la del schema (1 h), escrita acá para
+  // que se vea. Lo que cambia en el 2º de una secuencia es el nombre y la espera,
+  // o son dos filas idénticas que salen a la misma hora.
+  const nace = nacimientoDelMail(orden, { nombre, esperaHoras: ESPERA_SCHEMA_HORAS });
   const a = await prisma.automation.create({
-    data: { cuentaId: cuenta.id, nombre, trigger, asunto, contenido },
+    data: {
+      cuentaId: cuenta.id,
+      nombre: nace.nombre,
+      trigger,
+      esperaHoras: nace.esperaHoras,
+      asunto,
+      contenido,
+    },
   });
   redirect(`/automations/${a.id}`);
 }

@@ -9,7 +9,13 @@ import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { sendEmail } from "@/lib/email/enviar";
 import { estadoEnvioMarca, getRemitenteEnvio, motivoEnTexto } from "@/lib/remitentes";
-import { automationDelTrigger, motivoNoBorrable, type Trigger } from "@/lib/automations";
+import {
+  automationDelTrigger,
+  motivoNoBorrable,
+  nacimientoDelMail,
+  puedeCrearOtra,
+  type Trigger,
+} from "@/lib/automations";
 import { presetDeTrigger } from "@/lib/plantillas/presets";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -17,30 +23,37 @@ import { redirect } from "next/navigation";
 export async function crearAutomation(trigger: Trigger) {
   const { cuenta } = await autorizar("editar");
 
-  // Una automation por trigger y por cuenta. El disparador manda TODAS las que
-  // matcheen, así que dos activas con el mismo trigger son dos mails a la misma
-  // persona — y una bienvenida es una sola vez en la vida del contacto.
+  // Cuántas automations admite el trigger lo dice `MAX_POR_TRIGGER`: una para
+  // casi todos —el disparador manda TODAS las que matcheen, así que la segunda
+  // es un segundo mail a la misma persona, y una bienvenida es una sola vez en
+  // la vida del contacto— y DOS para el carrito abandonado, donde ese segundo
+  // mail es la secuencia y no el accidente.
   //
   // La guarda va acá y no solo en la tarjeta de `/automations`: la página puede
-  // estar desactualizada, o alguien hace doble click. Redirige a la que ya
-  // existe en vez de fallar, que es lo que quien apretó "Crear" venía a hacer.
-  // Fue lo que duplicó la bienvenida de Zattia el 31-jul-2026: entrar a la
-  // pantalla "a ver cómo era" y apretar el botón.
+  // estar desactualizada, o alguien hace doble click. Al llegar al tope redirige
+  // a la que ya existe en vez de fallar, que es lo que quien apretó "Crear"
+  // venía a hacer. Fue lo que duplicó la bienvenida de Zattia el 31-jul-2026:
+  // entrar a la pantalla "a ver cómo era" y apretar el botón.
   const existentes = await prisma.automation.findMany({
     where: { cuentaId: cuenta.id, trigger },
     select: { id: true, trigger: true, createdAt: true },
   });
-  const ya = automationDelTrigger(existentes, trigger);
-  if (ya) redirect(`/automations/${ya.id}`);
+  if (!puedeCrearOtra(existentes, trigger)) {
+    const ya = automationDelTrigger(existentes, trigger);
+    if (ya) redirect(`/automations/${ya.id}`);
+  }
 
   const rem = await getRemitenteEnvio(cuenta.id);
   const p = presetDeTrigger(trigger, cuenta, rem?.email);
+  // El 2º mail de una secuencia no puede nacer con el nombre y la espera del 1º:
+  // serían dos filas idénticas a la misma hora.
+  const nace = nacimientoDelMail(existentes.filter((a) => a.trigger === trigger).length + 1, p);
   const a = await prisma.automation.create({
     data: {
       cuentaId: cuenta.id,
-      nombre: p.nombre,
+      nombre: nace.nombre,
       trigger,
-      esperaHoras: p.esperaHoras,
+      esperaHoras: nace.esperaHoras,
       asunto: p.asunto,
       // El contenido ENTERO, no `{ bloques }`: el preset ya viene con la versión
       // del esquema, los ids y la cabecera de marca puestos, y enumerar campos a

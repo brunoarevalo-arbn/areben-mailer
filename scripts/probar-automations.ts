@@ -1,4 +1,4 @@
-// Una automation por trigger y por cuenta. Lógica pura: sin base, sin red.
+// Cuántas automations admite cada trigger, y cuál se edita. Puro: sin base, sin red.
 //
 //   node --import tsx scripts/probar-automations.ts
 //
@@ -9,14 +9,30 @@
 // siempre, sin mirar si ya había una, y entrar a la pantalla "a ver cómo era"
 // dejó una duplicada.
 //
-// El arreglo no es un cartel: es que la tarjeta y la action `crearAutomation`
-// decidan con **la misma función**, `automationDelTrigger`. Lo que se prueba acá
-// es esa función, más el hecho de que la pantalla ofrece exactamente los cuatro
-// triggers que existen — un trigger nuevo sin tarjeta es una automation que no
-// se puede crear, y una tarjeta de un trigger que no existe es un botón que
-// revienta al apretarlo.
+// 🔑 **Desde el 20-ago-2026 la regla ya no es "una por trigger".** El carrito
+// abandonado admite DOS, porque ahí el segundo mail al mismo contacto es la
+// secuencia (a la hora y al otro día) y no el accidente. O sea que la regla pasó
+// a ser un NÚMERO por trigger (`MAX_POR_TRIGGER`), y este script prueba las dos
+// puntas: que el carrito llegue a dos y **se frene en dos**, y que la bienvenida
+// se siga frenando en una.
+//
+// El arreglo no es un cartel: es que las cuatro puertas que crean —la tarjeta de
+// `/automations`, la galería de plantillas y sus dos actions— decidan con **las
+// mismas funciones**, `puedeCrearOtra` y `automationDelTrigger`. Lo que se prueba
+// acá son esas funciones, más el hecho de que la pantalla ofrece exactamente los
+// cuatro triggers que existen — un trigger nuevo sin tarjeta es una automation
+// que no se puede crear, y una tarjeta de un trigger que no existe es un botón
+// que revienta al apretarlo.
 
-import { automationDelTrigger, motivoNoBorrable, type Trigger } from "../lib/automations";
+import {
+  automationDelTrigger,
+  ESPERA_SIGUIENTE_HORAS,
+  MAX_POR_TRIGGER,
+  motivoNoBorrable,
+  nacimientoDelMail,
+  puedeCrearOtra,
+  type Trigger,
+} from "../lib/automations";
 import { TRIGGERS_UI } from "../app/(app)/automations/presets-ui";
 import { presetDeTrigger } from "../lib/plantillas/presets";
 
@@ -59,19 +75,26 @@ titulo("Con una del mismo trigger se edita esa, no se crea otra");
   );
 }
 
-titulo("Dos llamadas seguidas dejan UNA fila");
-{
-  // La forma que tiene el servidor: la action consulta, y si hay algo redirige
-  // sin insertar. Simular las dos llamadas es la prueba del doble click.
+// La forma que tiene el servidor: la action consulta, y si ya llegó al tope
+// redirige sin insertar. Simular las llamadas seguidas es la prueba del doble
+// click, que es como se duplicó la bienvenida de Zattia.
+const simulador = () => {
   const base: ReturnType<typeof fila>[] = [];
   const crear = (t: Trigger) => {
-    const ya = automationDelTrigger(base, t);
-    if (ya) return { redirigioA: ya.id, creo: false };
+    if (!puedeCrearOtra(base, t)) {
+      const ya = automationDelTrigger(base, t);
+      return { redirigioA: ya?.id, creo: false };
+    }
     const nueva = fila(`n${base.length + 1}`, t, 20 + base.length);
     base.push(nueva);
     return { redirigioA: nueva.id, creo: true };
   };
+  return { base, crear };
+};
 
+titulo("Dos llamadas seguidas dejan UNA fila (los triggers de tope 1)");
+{
+  const { base, crear } = simulador();
   const uno = crear("NUEVO_SUSCRIPTOR");
   const dos = crear("NUEVO_SUSCRIPTOR");
   ok(uno.creo && !dos.creo, "la segunda no inserta");
@@ -80,6 +103,52 @@ titulo("Dos llamadas seguidas dejan UNA fila");
 
   const otro = crear("COMPRA");
   ok(otro.creo && base.length === 2, "otro trigger SÍ se puede crear");
+}
+
+titulo("El carrito abandonado llega a DOS, y se frena en dos");
+{
+  const { base, crear } = simulador();
+  const uno = crear("CARRITO_ABANDONADO");
+  const dos = crear("CARRITO_ABANDONADO");
+  const tres = crear("CARRITO_ABANDONADO");
+  ok(uno.creo && dos.creo, "el 2º mail de la secuencia SÍ se crea");
+  ok(!tres.creo, "el 3º no", "el tope está en 2 mientras no haya cupón atado al trigger");
+  ok(base.length === 2, "quedan dos filas", `quedaron ${base.length}`);
+  ok(tres.redirigioA === uno.redirigioA, "y el intento de más lleva a la PRIMERA, no a la última");
+}
+
+titulo("Cada trigger declara su tope, y ninguno queda en cero");
+{
+  // `Record` completo: un trigger nuevo no compila sin decidir esto. Lo que el
+  // tipo no puede exigir es que el número tenga sentido.
+  for (const t of TODOS) {
+    ok(MAX_POR_TRIGGER[t] >= 1, `${t}: admite al menos una`, `declara ${MAX_POR_TRIGGER[t]}`);
+  }
+  ok(MAX_POR_TRIGGER.CARRITO_ABANDONADO > 1, "el carrito es el único con secuencia");
+  ok(
+    TODOS.filter((t) => MAX_POR_TRIGGER[t] > 1).length === 1,
+    "y es el ÚNICO",
+    "un segundo trigger con tope >1 es un segundo mail a la misma persona: tiene que ser una decisión, no un arrastre",
+  );
+}
+
+titulo("El 2º mail no nace igual que el 1º");
+{
+  // Sin esto, `/automations` dibuja dos filas idénticas y la única forma de
+  // saber cuál se edita es abrirlas.
+  const base = { nombre: "Carrito abandonado", esperaHoras: 3 };
+  const primero = nacimientoDelMail(1, base);
+  const segundo = nacimientoDelMail(2, base);
+  ok(primero.nombre === base.nombre, "el 1º conserva el nombre del preset");
+  ok(primero.esperaHoras === base.esperaHoras, "y su espera");
+  ok(segundo.nombre !== primero.nombre, "el 2º se llama distinto", segundo.nombre);
+  ok(segundo.nombre.includes("2º"), "y el nombre dice QUÉ NÚMERO es", segundo.nombre);
+  ok(
+    segundo.esperaHoras === ESPERA_SIGUIENTE_HORAS && segundo.esperaHoras !== primero.esperaHoras,
+    "y no sale a la misma hora que el 1º",
+    `1º ${primero.esperaHoras}h · 2º ${segundo.esperaHoras}h`,
+  );
+  ok(nacimientoDelMail(0, base).nombre === base.nombre, "un orden 0 se trata como el 1º, no revienta");
 }
 
 titulo("Con duplicadas ya existentes gana la más vieja");

@@ -5,7 +5,12 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
-import { automationDelTrigger, motivoNoBorrable, type Trigger } from "@/lib/automations";
+import {
+  automationDelTrigger,
+  motivoNoBorrable,
+  puedeCrearOtra,
+  type Trigger,
+} from "@/lib/automations";
 import { BotonVistaPrevia } from "@/components/BotonVistaPrevia";
 import { BotonEliminar } from "@/components/BotonEliminar";
 import { TRIGGERS_UI } from "./presets-ui";
@@ -50,14 +55,18 @@ export default async function AutomationsPage() {
         subtitle="Emails que se envían solos cuando pasa algo en tu tienda."
       />
 
-      {/* Presets. La tarjeta de un trigger que YA tiene automation no ofrece
-          crear otra: el disparador manda todas las que matcheen, así que la
-          segunda es un segundo mail a la misma persona. La guarda de verdad está
-          en `crearAutomation` —esta página puede estar cacheada—, pero un botón
-          que dice "Crear" y no crea nada es peor que uno que dice "Editar". */}
+      {/* Presets. La tarjeta de un trigger que llegó a su tope no ofrece crear
+          otra: el disparador manda todas las que matcheen, así que la de más es
+          un mail de más a la misma persona. El tope lo decide `MAX_POR_TRIGGER`
+          y para el carrito abandonado son DOS —la secuencia—, así que ahí la
+          tarjeta ofrece las dos cosas a la vez. La guarda de verdad está en
+          `crearAutomation` —esta página puede estar cacheada—, pero un botón que
+          dice "Crear" y no crea nada es peor que uno que dice "Editar". */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {TRIGGERS_UI.map(({ trigger, titulo, texto }) => {
           const ya = automationDelTrigger(automations, trigger);
+          const cuantas = automations.filter((a) => a.trigger === trigger).length;
+          const entraOtra = puedeCrearOtra(automations, trigger);
           const Icono = ICONO[trigger];
           return (
             <Card key={trigger}>
@@ -67,10 +76,21 @@ export default async function AutomationsPage() {
               </div>
               <p className="mt-1 text-sm text-muted">{texto}</p>
               {ya ? (
-                <div className="mt-3">
+                <div className="mt-3 space-y-2">
                   <Link href={`/automations/${ya.id}`} className={BOTON}>
                     Editar
                   </Link>
+                  {/* Sólo aparece donde caben varias, o sea el carrito. El texto
+                      dice el ORDEN y no "otra": dos mails de carrito son una
+                      secuencia (a la hora y al otro día), no dos automations
+                      sueltas que compiten. */}
+                  {entraOtra && (
+                    <form action={crearAutomation.bind(null, trigger)}>
+                      <button className="text-xs text-muted underline transition-colors hover:text-foreground">
+                        …o sumar el {cuantas + 1}º mail de la secuencia
+                      </button>
+                    </form>
+                  )}
                 </div>
               ) : (
                 /* Dos formas de arrancar, y la decisión es UNA sola: con qué

@@ -25,15 +25,16 @@ export const TRIGGERS = [
 export const esTrigger = (x: string): x is Trigger => (TRIGGERS as readonly string[]).includes(x);
 
 /**
- * Qué hacer cuando alguien pide la automation de un trigger: llevarlo a la que
- * ya existe, o crearla.
+ * CUÁL es la automation de un trigger: la que se abre al apretar "Editar".
+ *
+ * ⚠️ **Ya no contesta "¿se puede crear otra?"** — eso lo decide `MAX_POR_TRIGGER`
+ * acá abajo, porque el carrito abandonado admite dos. Esta sigue contestando
+ * "cuál", que es una pregunta distinta y que un trigger con secuencia también
+ * tiene (la primera es la que la gente venía editando).
  *
  * 🔴 Es puro y lo usan LOS DOS lados —la tarjeta de `/automations` y la action
- * `crearAutomation`— a propósito. El disparador manda **todas** las automations
- * que matcheen el trigger, así que una segunda fila con el mismo trigger es un
- * segundo mail a la misma persona; y una bienvenida es una sola vez en la vida
- * del contacto. Con el criterio escrito dos veces, alcanza con que uno de los
- * dos se quede viejo para que el bug vuelva.
+ * `crearAutomation`— a propósito. Con el criterio escrito dos veces, alcanza con
+ * que uno de los dos se quede viejo para que el bug vuelva.
  *
  * Devuelve el id de la existente —no un booleano— porque quien apretó el botón
  * viene a editar esa: fallar sería correcto y además inútil.
@@ -49,6 +50,86 @@ export function automationDelTrigger<T extends { id: string; trigger: string; cr
   return existentes
     .filter((a) => a.trigger === trigger)
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+}
+
+/**
+ * Cuántas automations admite cada trigger.
+ *
+ * 🔴 **La regla NO es "una por trigger": es "una por trigger, salvo el carrito".**
+ * Lo que la fundamenta está escrito arriba —el disparador manda TODAS las que
+ * matcheen, así que una segunda fila es un segundo mail a la misma persona— y en
+ * el carrito abandonado ese segundo mail **es el producto**, no el bug: recordar
+ * a la hora y volver al día siguiente es la secuencia entera. En una bienvenida,
+ * en cambio, sigue siendo el bug: es una sola vez en la vida del contacto.
+ *
+ * Que sea un `Record` completo y no una lista de excepciones es a propósito, por
+ * lo mismo que el `Record` de iconos de `/automations`: un trigger nuevo **tiene
+ * que decidir esto para compilar**. Una lista de excepciones deja que el valor
+ * por defecto lo elija el olvido.
+ *
+ * ⚠️ La base **no tiene índice único** y nunca lo tuvo (ver `AGENTS.md`): la
+ * decisión de cuántas caben vive acá, en código, donde se puede cambiar. Un
+ * `@@unique` es DDL que después no se saca.
+ *
+ * ⚠️ Subir el número del carrito a 3 es lo ÚNICO que hace falta para un tercer
+ * mail. Está en 2 porque el tercer toque de una secuencia de carrito es casi
+ * siempre el del descuento, y hoy **no hay cupón atado a este trigger**
+ * (`aplicarCuponDelTrigger` mira `triggerData.origen`, que el carrito no manda).
+ */
+export const MAX_POR_TRIGGER: Record<Trigger, number> = {
+  NUEVO_CLIENTE: 1,
+  NUEVO_SUSCRIPTOR: 1,
+  COMPRA: 1,
+  CARRITO_ABANDONADO: 2,
+};
+
+/**
+ * ¿Entra otra automation de este trigger?
+ *
+ * Puro y compartido por los dos lados —la tarjeta de `/automations`, la de la
+ * galería de plantillas y las dos actions que crean— por lo mismo que
+ * `automationDelTrigger`: con el criterio escrito cuatro veces, alcanza con que
+ * uno se quede viejo para que vuelva el bug de las dos bienvenidas.
+ */
+export function puedeCrearOtra(existentes: { trigger: string }[], trigger: Trigger): boolean {
+  return existentes.filter((a) => a.trigger === trigger).length < MAX_POR_TRIGGER[trigger];
+}
+
+/**
+ * La espera con la que nace el segundo mail de una secuencia, en horas.
+ *
+ * Es un **default del panel**, no una regla: quien lo arma la cambia desde
+ * `/automations` o desde el panel de carrito de Resorty. Existe para que el
+ * segundo no nazca con la misma espera que el primero, que es un mail duplicado
+ * a la misma hora.
+ */
+export const ESPERA_SIGUIENTE_HORAS = 24;
+
+/**
+ * El `@default(1)` de `Automation.esperaHoras` en el schema, como constante.
+ *
+ * Existe para que la puerta que crea una automation desde una PLANTILLA de
+ * galería —que no trae espera propia— pueda escribir el valor en vez de omitir
+ * la columna: omitirla funciona igual, pero deja el número invisible en el
+ * llamador y `nacimientoDelMail` necesita saber de qué parte.
+ */
+export const ESPERA_SCHEMA_HORAS = 1;
+
+/**
+ * Con qué nombre y con qué espera nace el mail número `orden` (1-based) de un
+ * trigger, partiendo de lo que trae su preset.
+ *
+ * 🔑 **El nombre tiene que distinguirlos en la lista.** Sin esto, `/automations`
+ * dibuja dos filas idénticas ("Carrito abandonado", "Carrito abandonado") y la
+ * única forma de saber cuál se está editando es abrirlas: la pantalla afirmaría
+ * que son la misma cosa. Es el mismo motivo por el que la espera no se repite.
+ */
+export function nacimientoDelMail(
+  orden: number,
+  base: { nombre: string; esperaHoras: number },
+): { nombre: string; esperaHoras: number } {
+  if (orden <= 1) return { nombre: base.nombre, esperaHoras: base.esperaHoras };
+  return { nombre: `${base.nombre} — ${orden}º mail`, esperaHoras: ESPERA_SIGUIENTE_HORAS };
 }
 
 /**
