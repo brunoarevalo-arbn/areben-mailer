@@ -20,9 +20,9 @@
 // `/automations`, la galería de plantillas y sus dos actions— decidan con **las
 // mismas funciones**, `puedeCrearOtra` y `automationDelTrigger`. Lo que se prueba
 // acá son esas funciones, más el hecho de que la pantalla ofrece exactamente los
-// cuatro triggers que existen — un trigger nuevo sin tarjeta es una automation
-// que no se puede crear, y una tarjeta de un trigger que no existe es un botón
-// que revienta al apretarlo.
+// triggers que existen — un trigger nuevo sin tarjeta es una automation que no
+// se puede crear, y una tarjeta de un trigger que no existe es un botón que
+// revienta al apretarlo.
 
 import {
   automationDelTrigger,
@@ -52,10 +52,10 @@ const fila = (id: string, trigger: Trigger, dia: number) => ({
   createdAt: new Date(2026, 6, dia),
 });
 
-// Los cuatro valores del enum. Escritos a mano y no derivados de `TRIGGERS_UI`:
-// si la pantalla perdiera una tarjeta, derivarla haría que este script perdiera
-// la prueba junto con ella.
-const TODOS: Trigger[] = ["NUEVO_CLIENTE", "COMPRA", "CARRITO_ABANDONADO", "NUEVO_SUSCRIPTOR"];
+// Los valores del enum. Escritos a mano y no derivados de `TRIGGERS_UI`: si la
+// pantalla perdiera una tarjeta, derivarla haría que este script perdiera la
+// prueba junto con ella.
+const TODOS: Trigger[] = ["NUEVO_CLIENTE", "COMPRA", "CARRITO_ABANDONADO", "NUEVO_SUSCRIPTOR", "RESENA"];
 
 titulo("Sin automations previas se crea");
 {

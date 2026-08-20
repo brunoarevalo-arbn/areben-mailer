@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Hand, MailPlus, ShoppingBag, ShoppingCart, type LucideIcon } from "lucide-react";
+import { Hand, MailPlus, ShoppingBag, ShoppingCart, Star, type LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -23,6 +23,7 @@ const TRIGGER_LABEL: Record<string, string> = {
   COMPRA: "Compra pagada",
   CARRITO_ABANDONADO: "Carrito abandonado",
   NUEVO_SUSCRIPTOR: "Nuevo suscriptor",
+  RESENA: "Compra pagada (reseña)",
 };
 
 // `Record` completo y no un mapa suelto: un trigger nuevo sin icono no compila.
@@ -31,6 +32,7 @@ const ICONO: Record<Trigger, LucideIcon> = {
   NUEVO_SUSCRIPTOR: MailPlus,
   COMPRA: ShoppingBag,
   CARRITO_ABANDONADO: ShoppingCart,
+  RESENA: Star,
 };
 
 const BOTON =

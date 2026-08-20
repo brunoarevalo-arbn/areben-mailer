@@ -92,6 +92,33 @@ ok(
   'texto plano: nombre, variante, cantidad y precio formateado',
 );
 
+// ─── El «y N más» emite un placeholder, y quien lo emita tiene que resolverlo ─
+// 🔴 El bloque `carrito` escribe `${cart.url}` **por su cuenta** cuando quedan
+// productos afuera, y hasta el 20-ago-2026 el procesador lo reemplazaba sólo
+// para el trigger `CARRITO_ABANDONADO`. Mientras el bloque fue exclusivo de ese
+// mail eso alcanzaba; dejó de alcanzar el día que el pedido de reseña usó el
+// mismo bloque, y ese mail salía con el texto `${cart.url}` escrito tal cual en
+// la casilla de un cliente. Medido antes de arreglarlo, en el HTML y en el texto.
+//
+// Esta comprobación fija el HECHO —el bloque emite el placeholder— para que se
+// vea por qué el reemplazo del procesador no puede estar gateado por el trigger.
+ok(
+  (() => {
+    const h = html([{ tipo: 'carrito', items: P, restantes: 2 }]);
+    const t = texto([{ tipo: 'carrito', items: P, restantes: 2 }]);
+    return h.includes('${cart.url}') && t.includes('${cart.url}');
+  })(),
+  'con productos afuera, el bloque emite ${cart.url} en HTML y en texto (el procesador lo resuelve SIEMPRE, sea cual sea el trigger)',
+);
+ok(
+  (() => {
+    const h = html([{ tipo: 'carrito', items: P, restantes: 0 }]);
+    const t = texto([{ tipo: 'carrito', items: P, restantes: 0 }]);
+    return !h.includes('${cart.url}') && !t.includes('${cart.url}');
+  })(),
+  'y sin productos afuera no lo emite: por eso el pedido de reseña manda restantes 0',
+);
+
 console.log();
 if (errores.length) {
   for (const e of errores) console.error(`❌ ${e}`);

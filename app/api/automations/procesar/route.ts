@@ -97,7 +97,13 @@ export async function GET(req: Request) {
     // una grilla de tarjetas (`productos`) y ahora van las líneas de carrito. Es
     // una mejora, no una ruptura — ninguna de las tres llegó a mandar un carrito
     // real todavía, y una grilla nunca fue la forma de decir "esto dejaste".
-    if (esCarrito && td.productos?.length) {
+    // 🔑 La condición es "¿el disparador trajo productos?", **no** "¿es el
+    // carrito?". Desde que existe el pedido de reseña hay dos triggers que los
+    // traen —el carrito manda lo que se dejó, la reseña lo que se compró— y
+    // preguntar por el trigger dejaba el mail de reseña sin la única parte que lo
+    // hace concreto, en silencio. Un trigger que no los trae no entra igual: el
+    // `?.length` ya lo cubre.
+    if (td.productos?.length) {
       const tieneBloque = bloques.some((b) => b.tipo === "carrito");
       if (tieneBloque) {
         bloques = bloques.map((b) =>
@@ -164,15 +170,26 @@ export async function GET(req: Request) {
     // lo fue, los estilos de documento lo son— se perdiera **solo en el envío**:
     // el preview del editor la mostraba y el mail salía sin ella. Un bug que solo
     // se ve en el correo que ya se mandó.
+    // 🔴 **El `${cart.url}` se reemplaza SIEMPRE, no sólo en el carrito.**
+    // Estaba gateado por `esCarrito`, y eso alcanzaba mientras el placeholder
+    // sólo pudiera aparecer ahí. Dejó de ser cierto: el bloque `carrito` lo emite
+    // solo, en la línea «y N productos más», y ese bloque hoy lo usa también el
+    // pedido de reseña. Con la guarda puesta, ese mail salía con el texto
+    // `${cart.url}` escrito tal cual en la casilla de un cliente.
+    //
+    // El destino de la vuelta es el carrito abandonado si lo hay y, si no, la
+    // tienda: un link que lleva a algún lado. ⚠️ `"#"` como último recurso — una
+    // marca sin sitio cargado— porque un `href` vacío recarga la misma página.
+    const urlVuelta = td.abandonedUrl || opts.urlCuenta || "#";
     let html = renderEmailHtml({ ...contenido, bloques }, opts);
     html = aplicarMergeTags(html, contacto);
-    if (esCarrito) html = html.replaceAll("${cart.url}", td.abandonedUrl ?? "#");
+    html = html.replaceAll("${cart.url}", urlVuelta);
     // El tracking va al final: sobre el HTML ya resuelto, para que envuelva
     // también los links que salieron de los merge tags y del carrito.
     if (host) html = inyectarTracking(html, envio.id, host);
     // Parte text/plain: un mail solo-HTML es señal de spam, sobre todo en Outlook.
     let texto = aplicarMergeTags(renderEmailTexto({ ...contenido, bloques }, opts), contacto);
-    if (esCarrito) texto = texto.replaceAll("${cart.url}", td.abandonedUrl ?? "#");
+    texto = texto.replaceAll("${cart.url}", urlVuelta);
 
     try {
       const res = await sendEmail({

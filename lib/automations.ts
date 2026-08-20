@@ -6,10 +6,15 @@ import { leerConfigCuenta } from "./marca";
 // nombra es el evento ("alguien se anotó"), no el widget: la fuente viaja en
 // `triggerData.origen`, así que una superficie nueva no pide un valor de enum
 // nuevo (que es DDL + deploy y no se puede sacar).
-export type Trigger = "NUEVO_CLIENTE" | "COMPRA" | "CARRITO_ABANDONADO" | "NUEVO_SUSCRIPTOR";
+export type Trigger =
+  | "NUEVO_CLIENTE"
+  | "COMPRA"
+  | "CARRITO_ABANDONADO"
+  | "NUEVO_SUSCRIPTOR"
+  | "RESENA";
 
 /**
- * Los cuatro valores del enum `TriggerTipo`, como lista.
+ * Los cinco valores del enum `TriggerTipo`, como lista.
  *
  * Es lo que valida un trigger que llega de un formulario: el enum de la base no
  * viaja al cliente, y un valor inventado lo descubriría Prisma al insertar.
@@ -20,6 +25,7 @@ export const TRIGGERS = [
   "NUEVO_SUSCRIPTOR",
   "COMPRA",
   "CARRITO_ABANDONADO",
+  "RESENA",
 ] as const satisfies readonly Trigger[];
 
 export const esTrigger = (x: string): x is Trigger => (TRIGGERS as readonly string[]).includes(x);
@@ -81,6 +87,7 @@ export const MAX_POR_TRIGGER: Record<Trigger, number> = {
   NUEVO_SUSCRIPTOR: 1,
   COMPRA: 1,
   CARRITO_ABANDONADO: 2,
+  RESENA: 1,
 };
 
 /**

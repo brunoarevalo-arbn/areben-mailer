@@ -66,6 +66,13 @@ enum TriggerTipo {
   // superficies de captura, y la fuente viaja en `triggerData.origen`.
   // Agregado por scripts/add-trigger-suscriptor.ts (SQL crudo, nunca db push).
   NUEVO_SUSCRIPTOR
+  // Pedido de reseña post-compra. Cuelga del MISMO evento que `COMPRA`
+  // (`order/paid`) y se distingue por la espera —diez días, no una hora— y por
+  // el mail. Se llama por el trabajo y no por el evento porque el evento ya
+  // tiene nombre y está tomado; ver scripts/add-trigger-resena.ts.
+  // ⚠️ Por eso `EVENT_TRIGGER` es uno-a-MUCHOS: con el mapa inverso uno-a-uno,
+  // uno de los dos dejaba de dispararse sin un error.
+  RESENA
 }
 
 enum EstadoAutomation {

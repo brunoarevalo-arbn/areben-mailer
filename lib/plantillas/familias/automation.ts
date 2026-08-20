@@ -91,4 +91,37 @@ export const AUTOMATION: readonly DefPreset[] = [
       ],
     }),
   },
+  {
+    id: "auto-resena",
+    nombre: "Pedir una reseña",
+    descripcion: "Sale sola diez días después de la compra, con lo que compró.",
+    trigger: "RESENA",
+    // 🔑 240 h = 10 días, y el campo es un `Int` de HORAS: no hay unidad de días
+    // en el modelo. El número sale de que el envío a todo el país tarda entre 3 y
+    // 7 días hábiles — pedir la opinión de algo que todavía no llegó es pedirle a
+    // alguien que califique una espera.
+    esperaHoras: 240,
+    arma: ({ marca }) => ({
+      asunto: `¿Cómo te fue con tu compra en ${marca}?`,
+      bloques: [
+        { tipo: "titulo", texto: "¿Nos contás qué te pareció, ${contacto.nombre}?" },
+        {
+          tipo: "texto",
+          texto:
+            "Tu opinión ayuda a quien está por comprar lo mismo. Es un minuto: entrá al producto y contanos cómo te fue.",
+        },
+        // Lo que compró, con el link a cada ficha — que es donde vive el
+        // formulario de opiniones. Lo rellena el procesador con
+        // `triggerData.productos`, igual que el carrito.
+        //
+        // 🔴 **Sin bloque `boton` a propósito.** Un botón único tendría que ir a
+        // algún lado: a la tienda (donde no se opina de nada) o a UN producto
+        // elegido a dedo entre los que compró. Acá el destino es cada ficha, y de
+        // eso ya se encarga cada línea del bloque. Si TN no devuelve ninguna
+        // ficha, el bloque desaparece solo y el mail sale con su título y su
+        // texto: incompleto, pero nunca con un link roto.
+        { tipo: "carrito", items: [] },
+      ],
+    }),
+  },
 ];

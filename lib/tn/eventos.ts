@@ -3,6 +3,10 @@ import { tnGet, tnPost } from "./client";
 /**
  * Mapeo trigger de automation → evento webhook de Tiendanube.
  *
+ * ⚠️ **Dos triggers pueden compartir un evento** (`COMPRA` y `RESENA` cuelgan los
+ * dos de `order/paid`). Lo que los separa es la espera y el mail, no el
+ * disparador. El mapa inverso está preparado para eso; ver su comentario.
+ *
  * 🔴 **`CARRITO_ABANDONADO` NO está acá, y no es un olvido.** Tiendanube **no
  * publica ningún evento de checkout ni de cart**: su lista completa es app,
  * category, customer, order, product, product_variant, domain,
@@ -25,11 +29,34 @@ import { tnGet, tnPost } from "./client";
 export const TRIGGER_EVENT: Record<string, string> = {
   NUEVO_CLIENTE: "customer/created",
   COMPRA: "order/paid",
+  // 🔑 El MISMO evento que `COMPRA`, y no es un error de copiar y pegar: el
+  // pedido de reseña sale de que alguien pagó, sólo que diez días después. Lo
+  // que los distingue no es el disparador sino la espera y el mail. Ver
+  // `scripts/add-trigger-resena.ts`.
+  RESENA: "order/paid",
 };
 
-export const EVENT_TRIGGER: Record<string, string> = Object.fromEntries(
-  Object.entries(TRIGGER_EVENT).map(([k, v]) => [v, k]),
-);
+/**
+ * El mapa al revés: qué triggers despierta un evento de Tiendanube.
+ *
+ * 🔴 **Es uno-a-MUCHOS, y eso no es una generalización por las dudas.** Era
+ * `Object.fromEntries` del mapa de arriba invertido —o sea uno-a-uno— y el día
+ * que `RESENA` se colgó de `order/paid` ese `fromEntries` empezó a devolver **un
+ * solo trigger**, el último que se hubiera declarado. El otro dejaba de
+ * dispararse **sin un error, sin un log y sin una fila**: el webhook llegaba,
+ * contestaba 200, y la automation de agradecimiento simplemente no encolaba
+ * nunca más. Un modo de falla idéntico al `catch {}` vacío que dejó al carrito
+ * abandonado activo y sordo durante semanas.
+ *
+ * Devuelve `[]` para un evento que no le interesa a nadie, así quien llama no
+ * tiene que distinguir "no hay trigger" de "no hay evento".
+ */
+export const EVENT_TRIGGER: Record<string, string[]> = Object.entries(TRIGGER_EVENT).reduce<
+  Record<string, string[]>
+>((acc, [trigger, evento]) => {
+  (acc[evento] ??= []).push(trigger);
+  return acc;
+}, {});
 
 interface TnWebhook {
   id: number;

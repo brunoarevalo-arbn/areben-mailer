@@ -109,10 +109,40 @@ const html = (bloques: Bloque[]) => renderEmailHtml({ bloques }, OPTS);
 // Es lo que hace que el trigger no necesite un filtro en ningún lado: el
 // webhook resuelve evento → trigger con este mapa, y el que no está no existe.
 // Si alguien le agrega un evento acá, esta invariante se pone roja el mismo día.
+//
+// 🔴 **El `.flat()` no es cosmético.** `EVENT_TRIGGER` pasó a ser uno-a-MUCHOS
+// el 20-ago-2026 (dos triggers cuelgan de `order/paid`), y con el `.includes()`
+// pelado sobre un array de ARRAYS esta comprobación quedó **verde por vacía**:
+// buscaba un string adentro de una lista de listas, o sea nunca lo encontraba y
+// siempre pasaba. Nada la iba a cazar: `tsconfig` excluye `scripts/`, así que ni
+// `tsc --noEmit` mira este archivo.
 {
+  const todosLosTriggers = Object.values(EVENT_TRIGGER).flat();
   ok(!('NUEVO_SUSCRIPTOR' in TRIGGER_EVENT), 'NUEVO_SUSCRIPTOR no mapea a ningún evento de Tiendanube');
-  ok(!Object.values(EVENT_TRIGGER).includes('NUEVO_SUSCRIPTOR'), 'ningún evento de TN resuelve a NUEVO_SUSCRIPTOR');
+  ok(!todosLosTriggers.includes('NUEVO_SUSCRIPTOR'), 'ningún evento de TN resuelve a NUEVO_SUSCRIPTOR');
   ok(TRIGGER_EVENT.NUEVO_CLIENTE === 'customer/created', 'NUEVO_CLIENTE sí sigue colgando de customer/created');
+  // Y la prueba de que el `.flat()` mide algo: un trigger que SÍ está tiene que
+  // aparecer. Sin esto, la comprobación de arriba volvería a poder pasar vacía.
+  ok(todosLosTriggers.includes('NUEVO_CLIENTE'), 'y el mapa aplanado sí encuentra a los que existen');
+}
+
+// ─── 7-bis. Un evento puede despertar VARIOS triggers ────────────────────────
+// 🔴 El modo de falla que esto custodia es MUDO. `EVENT_TRIGGER` era el inverso
+// de `TRIGGER_EVENT` armado con `Object.fromEntries`: uno-a-uno. Cuando `RESENA`
+// se colgó de `order/paid` —el mismo evento que `COMPRA`— ese inverso empezó a
+// devolver UN solo trigger, el último declarado, y el otro dejaba de encolar
+// runs **sin un error, sin un log y sin una fila**. El webhook seguía
+// contestando 200.
+{
+  const dePago = EVENT_TRIGGER['order/paid'] ?? [];
+  ok(Array.isArray(dePago), 'EVENT_TRIGGER devuelve una LISTA de triggers, no uno');
+  ok(dePago.includes('COMPRA'), 'order/paid sigue despertando el agradecimiento');
+  ok(dePago.includes('RESENA'), 'y también el pedido de reseña');
+  ok(dePago.length === 2, 'los dos, no uno', `devolvió ${JSON.stringify(dePago)}`);
+  ok(TRIGGER_EVENT.RESENA === 'order/paid', 'RESENA cuelga de order/paid, igual que COMPRA');
+  // Un evento que no le interesa a nadie devuelve vacío y no `undefined`: quien
+  // llama no tiene que distinguir "no hay trigger" de "no existe el evento".
+  ok((EVENT_TRIGGER['product/created'] ?? []).length === 0, 'un evento sin triggers no despierta nada');
 }
 
 // ─── 8. Un mail sin bloque `cupon` no se rompe ───────────────────────────────

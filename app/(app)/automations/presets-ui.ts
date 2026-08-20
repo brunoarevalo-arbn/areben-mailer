@@ -5,7 +5,7 @@ import { type Trigger } from "@/lib/automations";
  *
  * Vive en su propio archivo —y sin los iconos— para que `probar-automations.ts`
  * pueda importarlo sin arrastrar la página entera (que trae Prisma y lucide).
- * Lo que ese script fija es que acá estén **los cuatro triggers del enum y nada
+ * Lo que ese script fija es que acá estén **todos los triggers del enum y nada
  * más**: uno de menos es una automation que no se puede crear, uno de más es un
  * botón que revienta al apretarlo.
  *
@@ -35,5 +35,13 @@ export const TRIGGERS_UI: { trigger: Trigger; titulo: string; texto: string }[] 
     trigger: "CARRITO_ABANDONADO",
     titulo: "Carrito abandonado",
     texto: "Recupera ventas: incluye el link al carrito y los productos que dejó.",
+  },
+  // Mismo disparador que "Post-compra" (`order/paid`) y otra tarjeta, porque lo
+  // que las separa es la espera: el agradecimiento sale el día que pagó, la
+  // reseña cuando ya lo tiene en la mano. Una sola tarjeta obligaría a elegir.
+  {
+    trigger: "RESENA",
+    titulo: "Pedir una reseña",
+    texto: "Se envía días después de la compra, con lo que compró y el link para opinar.",
   },
 ];
