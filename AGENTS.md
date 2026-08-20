@@ -1155,40 +1155,50 @@ que se anota en un pop-up y el que compra por primera vez.
 
 ## Estado del trabajo
 
-### 🔴 LO QUE FALTA HACER A MANO (20-ago-2026), en este orden
+### 🔴 LO QUE FALTA HACER A MANO (20-ago-2026 14:30), en este orden
 
-Hay dos tandas de código **pusheadas y sin deployar**, y las dos esperan lo mismo:
+**Ya no falta nada de código ni de base.** Lo que queda son **manos de Bruno**, y
+está en este orden porque el paso 4 tiene que pasar antes que el 5 o cada carrito
+recibe dos mails de dos remitentes.
 
-0. **🔴🔴 Neon está CORTADO por cuota.** Medido contra la base el 20-ago: toda
-   consulta devuelve `53000 — Your account or project has exceeded the compute
-   time quota`. Se renueva el **1-sep** o lo destraba pagar Neon Launch. ⛔ Es
-   plata: lo decide Bruno. Mientras tanto **el mailer entero está caído**, y en
-   Resorty **cada lead de pop-up se pierde** (`/api/lead` escribe directo a
-   Postgres, no pasa por el colchón de Upstash).
-1. **`node --import tsx --env-file=.env scripts/add-doc-version.ts`** ⇒ la columna
-   `docVersion` en Campania, Automation y Plantilla. ⛔ **ANTES del deploy**: el
-   código nuevo la pide en el WHERE de todo guardado y sin la columna revienta
-   **todo** guardado, que es peor que el problema que viene a resolver.
-   ✅ **Corrido el 20-ago-2026.**
-2. **`node --import tsx --env-file=.env scripts/add-trigger-resena.ts`** ⇒ el
-   valor `RESENA` al enum. ⛔ **ANTES del deploy, sin excepción**: el webhook de
-   `order/paid` ahora consulta `trigger IN ('COMPRA','RESENA')` y Postgres
-   rechaza un valor de enum que no existe. Deployar primero es romper el webhook
-   de toda orden pagada.
-3. **`vercel --prod --yes`** en `areben-mailer`, y el deploy de `areben-popups`
-   (ninguno de los dos autodeploya).
+✅ **Neon está PAGADO** (medido el 20-ago 14:25 contra la API de Vercel: los tres
+proyectos —`areben-mailer-db`, `areben-marketing`, `creativa-db`— figuran en
+`launch_v3`, no en `free`). La base contesta, el mailer está enviando (último
+envío 14:26, 0 `ENCOLADO` y 0 `FALLIDO` en toda la cola) y los leads de pop-up de
+Resorty vuelven a guardarse. ⇒ el corte del 20-ago a la mañana está cerrado.
+
+✅ **Los dos DDL corridos y verificados contra la base** (20-ago): `docVersion`
+está en `Campania`, `Plantilla` y `Automation`, y `TriggerTipo` tiene los cinco
+valores (`NUEVO_CLIENTE`, `COMPRA`, `CARRITO_ABANDONADO`, `NUEVO_SUSCRIPTOR`,
+`RESENA`). Los dos scripts son idempotentes: volver a correrlos no hace nada.
+
+✅ **Los dos repos deployados**: `areben-mailer` el 20-ago 14:23 (HEAD `d81cffe`,
+incluye el arreglo de los bloques sin id) y `areben-popups` a las 10:22 (HEAD
+`00f8e0a`). Oráculo de que el `RESENA` de la base no rompe la pantalla:
+`/automations` en prod contesta **307** al login, no 500.
+
 4. **Apagar el mail de carrito abandonado de Tiendanube** en el admin de TN.
-   Hoy TN manda el suyo; el nuestro lo reemplaza. Si se prenden los dos, cada
-   carrito recibe dos mails de dos remitentes distintos.
+   ⛔ **Decisión de Bruno.** Hoy TN manda el suyo; el nuestro lo reemplaza. Si se
+   prenden los dos, cada carrito recibe dos mails de dos remitentes distintos.
+   🔑 Para saber de quién es un mail de carrito: **el pie**. Los nuestros llevan
+   link de baja en el 100% de los renders; el de TN no lo tiene.
 5. **Prender el 1º mail de carrito** desde el panel de Resorty
    (`/carrito-abandonado`), **temprano a la mañana**: el poller no avanza el
    cursor mientras está pausado, así que la primera corrida encola todo lo
-   abandonado dentro de la ventana dura de 24 h. Antes conviene simular con
-   `curl "…/api/carritos/detectar?secret=$CRON_SECRET&dry=1"`.
+   abandonado dentro de la ventana dura de 24 h.
+   📏 **Ya está medido cuánto es** (simulado en prod el 20-ago 14:26 con
+   `curl "…/api/carritos/detectar?secret=$CRON_SECRET&dry=1"`): **21 mails en la
+   primera corrida** — BDI 17 (de 168 checkouts leídos, 151 fuera de ventana),
+   Zattia 4 (de 54), Stunned 0 (de 3). No es una avalancha.
    🔑 **El primer mail real ES la prueba**: `ENVIO_REAL=true` gana sobre el modo
    ensayo, así que no hay forma de mandarse uno sin frenar el resto.
-6. **Crear la automation de reseña** desde `/automations` (⛔ desde la UI, que es
-   lo que registra el webhook `order/paid` en TN) y prenderla.
+6. **Prender la automation de reseña.** ⚠️ Ojo: **ya está CREADA** — «Pedir una
+   reseña», cuenta **BDI Accesorios**, estado `PAUSADO`, creada el 20-ago 16:09
+   UTC. Lo que falta es **prenderla desde la UI** (`/automations`), y no es un
+   detalle: **hoy BDI NO tiene el webhook `order/paid` registrado en TN**
+   (verificado con `GET /webhooks`: sólo tiene `app/uninstalled` y
+   `customer/created`). El registro lo hace `toggleAutomation` al ACTIVAR, así
+   que un `UPDATE` a mano la deja **activa y sorda**.
 
 **Lo que ninguna prueba de acá ejerció y hay que caminar**: el panel de carrito
 con DOS mails, el mail de reseña llegando a una casilla, y una reseña real
