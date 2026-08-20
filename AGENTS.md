@@ -1153,6 +1153,45 @@ que se anota en un pop-up y el que compra por primera vez.
 
 ## Estado del trabajo
 
+### 🔴 LO QUE FALTA HACER A MANO (20-ago-2026), en este orden
+
+Hay dos tandas de código **pusheadas y sin deployar**, y las dos esperan lo mismo:
+
+0. **🔴🔴 Neon está CORTADO por cuota.** Medido contra la base el 20-ago: toda
+   consulta devuelve `53000 — Your account or project has exceeded the compute
+   time quota`. Se renueva el **1-sep** o lo destraba pagar Neon Launch. ⛔ Es
+   plata: lo decide Bruno. Mientras tanto **el mailer entero está caído**, y en
+   Resorty **cada lead de pop-up se pierde** (`/api/lead` escribe directo a
+   Postgres, no pasa por el colchón de Upstash).
+1. **`node --import tsx --env-file=.env scripts/add-trigger-resena.ts`** ⇒ el
+   valor `RESENA` al enum. ⛔ **ANTES del deploy, sin excepción**: el webhook de
+   `order/paid` ahora consulta `trigger IN ('COMPRA','RESENA')` y Postgres
+   rechaza un valor de enum que no existe. Deployar primero es romper el webhook
+   de toda orden pagada.
+2. **`vercel --prod --yes`** en `areben-mailer`, y el deploy de `areben-popups`
+   (ninguno de los dos autodeploya).
+3. **Apagar el mail de carrito abandonado de Tiendanube** en el admin de TN.
+   Hoy TN manda el suyo; el nuestro lo reemplaza. Si se prenden los dos, cada
+   carrito recibe dos mails de dos remitentes distintos.
+4. **Prender el 1º mail de carrito** desde el panel de Resorty
+   (`/carrito-abandonado`), **temprano a la mañana**: el poller no avanza el
+   cursor mientras está pausado, así que la primera corrida encola todo lo
+   abandonado dentro de la ventana dura de 24 h. Antes conviene simular con
+   `curl "…/api/carritos/detectar?secret=$CRON_SECRET&dry=1"`.
+   🔑 **El primer mail real ES la prueba**: `ENVIO_REAL=true` gana sobre el modo
+   ensayo, así que no hay forma de mandarse uno sin frenar el resto.
+5. **Crear la automation de reseña** desde `/automations` (⛔ desde la UI, que es
+   lo que registra el webhook `order/paid` en TN) y prenderla.
+
+**Lo que ninguna prueba de acá ejerció y hay que caminar**: el panel de carrito
+con DOS mails, el mail de reseña llegando a una casilla, y una reseña real
+entrando por su link a la cola de moderación. Tampoco se pudo verificar contra la
+API real de TN **qué trae un producto adentro de una orden** (`lib/tn/` asume la
+misma forma que en un checkout, que sí está medida).
+
+### Historial
+
+
 - 🟢 **El mailer ESTÁ ENVIANDO** (medido contra prod el 3-ago-2026). El gate está
   **abierto** (`ENVIO_REAL=true`), el proveedor es **SES** y hay dos cosas en el aire:
   - **La bienvenida de Zattia** (`NUEVO_SUSCRIPTOR`) está **`ACTIVO`** y lleva **20 runs
