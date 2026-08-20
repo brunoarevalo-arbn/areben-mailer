@@ -339,6 +339,24 @@ function esActual(v: unknown): v is ContenidoCampania {
   ) {
     return false;
   }
+  // 🔴 **Un bloque sin `id` NO está en la forma actual**, por más que el `v` diga
+  // 4 — y esto no es cosmético ni una validación de más. El editor identifica
+  // cada bloque por su `id`: `RenderOpts.marcarBloques` lo emite como `data-b` y
+  // el click sobre el preview resuelve con eso cuál formulario abrir. Un bloque
+  // sin id **se dibuja perfecto y es intocable**.
+  //
+  // Pasó de verdad el 20-ago-2026: un script escribió los bloques del mail de
+  // carrito de BDI a mano, sin id, y 8 de 12 quedaron imposibles de seleccionar.
+  // ⚠️ **Nada lo vio**: el HTML es idéntico, el golden no se movió y las 16
+  // auditorías pasaron en verde. Sólo se nota clickeando, en un navegador.
+  //
+  // Con esta línea el documento cae al camino lento y `sanearBloque` le pone un
+  // `nuevoId()` a lo que no lo traiga ⇒ **se repara solo al leerse**, venga de
+  // donde venga: de un script, de una migración a mano o de un Json editado. Es
+  // el mismo argumento que los dos casos de acá arriba.
+  if (bs.some((b) => typeof (b as Bruto | null)?.id !== "string" || !(b as Bruto).id)) {
+    return false;
+  }
   const cabs = bs.filter((b) => (b as Bruto | null)?.tipo === "encabezado");
   return cabs.length === 0 || (cabs.length === 1 && cabs[0] === bs[0]);
 }

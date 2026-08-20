@@ -332,5 +332,63 @@ titulo("Ningún archivo lee el contenido con un cast");
   ok(culpables.length === 0, "cero `as ContenidoCampania` en el repo", culpables.join("\n      "));
 }
 
+// ─── Un bloque sin `id` no puede entrar por el camino rápido ─────────────────
+// 🔴 El editor identifica cada bloque por su `id`: `marcarBloques` lo emite como
+// `data-b` y el click sobre el preview resuelve con eso cuál formulario abrir.
+// Un bloque sin id **se dibuja perfecto y es intocable**.
+//
+// Pasó el 20-ago-2026: un script escribió los bloques del mail de carrito de BDI
+// sin id y 8 de 12 quedaron imposibles de seleccionar. ⚠️ Nada lo vio — el HTML
+// era idéntico, el golden no se movió y las 16 auditorías dieron verde. Se
+// encontró clickeando, a mano, en Safari.
+//
+// La red no es "acordate de poner el id": es que un documento así **no sea la
+// forma actual**, caiga al camino lento y `sanearBloque` se lo ponga. Así se
+// repara solo al leerse, venga de un script, de una migración o de un Json
+// editado a mano.
+console.log("\nUn bloque sin id se repara al leerse");
+{
+  const sano = leerContenido({
+    v: V_ACTUAL,
+    bloques: [nuevoBloque("encabezado"), nuevoBloque("titulo"), nuevoBloque("texto")],
+  });
+  ok(
+    sano.bloques.every((b) => typeof (b as { id?: string }).id === "string" && (b as { id?: string }).id),
+    "un documento sano sale con todos sus ids",
+  );
+
+  // El caso real: `v` dice la versión actual, pero un bloque no trae id.
+  const roto = {
+    v: V_ACTUAL,
+    bloques: [
+      nuevoBloque("encabezado"),
+      { tipo: "titulo", texto: "Escrito por un script" },
+      { tipo: "boton", texto: "COMPRAR", url: "https://ejemplo.com" },
+    ],
+  };
+  const reparado = leerContenido(roto);
+  const sinId = reparado.bloques.filter((b) => !(b as { id?: string }).id);
+  ok(sinId.length === 0, "un bloque sin id sale CON id después de leerlo", `quedaron ${sinId.length} sin id`);
+  ok(
+    reparado.bloques.map((b) => b.tipo).join(",") === "encabezado,titulo,boton",
+    "y no se pierde ni se reordena ningún bloque",
+    reparado.bloques.map((b) => b.tipo).join(","),
+  );
+  ok(
+    new Set(reparado.bloques.map((b) => (b as { id?: string }).id)).size === reparado.bloques.length,
+    "los ids que se asignan no se repiten entre sí",
+  );
+
+  // La otra punta: el camino rápido tiene que seguir siendo rápido para lo sano.
+  // Si `esActual` empezara a devolver false siempre, esto se pondría verde por
+  // el motivo equivocado y el saneo correría en cada render.
+  const dosVeces = leerContenido(sano);
+  ok(dosVeces === sano, "un documento sano sigue entrando por el camino rápido (misma referencia)");
+  ok(
+    leerContenido(roto) !== roto,
+    "y uno roto NO: se lo copia y sanea",
+  );
+}
+
 console.log(fallas === 0 ? "\n✅ Esquema OK\n" : `\n❌ ${fallas} fallas\n`);
 process.exit(fallas === 0 ? 0 : 1);
