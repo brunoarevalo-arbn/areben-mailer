@@ -29,6 +29,7 @@ export default async function PlantillaEditorPage({
         id={plantilla.id}
         marca={marcaDe(cuenta, process.env.APP_URL ?? "")}
         initial={{ nombre: plantilla.nombre, contenido: leerContenido(plantilla.contenido) }}
+        version={plantilla.docVersion}
       />
     </div>
   );

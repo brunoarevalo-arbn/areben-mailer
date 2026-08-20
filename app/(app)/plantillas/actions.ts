@@ -13,6 +13,7 @@ import {
   type Trigger,
 } from "@/lib/automations";
 import { V_ACTUAL } from "@/lib/email/esquema";
+import { veredictoGuardado, type ResultadoGuardado } from "@/lib/documentos";
 import { nuevoBloque, type ContenidoCampania } from "@/lib/email/render";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -150,25 +151,39 @@ export async function crearPlantilla() {
 }
 
 /** Guarda el diseño de una plantilla ya existente (desde su editor). */
-export async function guardarPlantilla(input: { id: string; nombre: string; contenido: ContenidoCampania }) {
+export async function guardarPlantilla(input: {
+  id: string;
+  nombre: string;
+  contenido: ContenidoCampania;
+  version: number;
+}): Promise<ResultadoGuardado> {
   const auth = await chequear("editar");
-  if (!auth.ok) return { ok: false, error: auth.error };
+  if (!auth.ok) return { ok: false, error: auth.error ?? "Sin permiso", conflicto: false };
   const cuenta = auth.ctx.cuenta;
 
   // `updateMany` con el `cuentaId` en el WHERE: un `update` por id dejaría que
-  // una cuenta pisara la plantilla de otra si se adivinara el id.
+  // una cuenta pisara la plantilla de otra si se adivinara el id. Y el
+  // `docVersion` es lo que impide que dos personas se pisen entre sí — ver
+  // `lib/documentos.ts`.
   const r = await prisma.plantilla.updateMany({
-    where: { id: input.id, cuentaId: cuenta.id },
+    where: { id: input.id, cuentaId: cuenta.id, docVersion: input.version },
     data: {
       nombre: input.nombre.trim() || "Plantilla sin título",
       // El contenido ENTERO, tal como lo tiene el editor. Enumerar campos a
       // mano es lo que perdía la versión del esquema y los estilos de documento.
       contenido: input.contenido as object,
+      docVersion: { increment: 1 },
     },
   });
-  if (r.count === 0) return { ok: false, error: "No se encontró la plantilla" };
+  if (r.count === 0) {
+    const existe = await prisma.plantilla.findFirst({
+      where: { id: input.id, cuentaId: cuenta.id },
+      select: { id: true },
+    });
+    return veredictoGuardado(0, Boolean(existe), input.version);
+  }
   revalidatePath("/plantillas");
-  return { ok: true };
+  return veredictoGuardado(r.count, true, input.version + 1);
 }
 
 /** Copia una plantilla para partir de ella sin tocar la original. */

@@ -40,6 +40,7 @@ export default async function AutomationPage({ params }: { params: Promise<{ id:
           capDias: a.capDias,
           contenido: leerContenido(a.contenido),
         }}
+        version={a.docVersion}
       />
     </div>
   );

@@ -94,6 +94,8 @@ node --import tsx scripts/probar-negritas.ts   # `**negrita**` se resuelve DESPU
 node --import tsx scripts/probar-texto-rico.ts # un campo de texto rico rinde el MISMO html que el string de siempre
 node --env-file=.env --import tsx scripts/probar-segmentos.ts # el "no abrió/no clickeó" es RECIBIÓ y no lo hizo, nunca "no me consta"
 node --import tsx scripts/probar-automations.ts # una automation por trigger: dos son dos mails a la misma persona
+node --import tsx scripts/probar-guardado.ts    # el veredicto distingue "te lo pisaron" de "lo borraron", y guardar dos veces seguidas no choca contra uno mismo
+node --import tsx scripts/auditar-guardado.ts   # las DOS mitades del conflicto: el servidor se niega, y ningún llamador tira el resultado
 node --import tsx scripts/probar-fechas.ts      # el día de las métricas es el del calendario local, no el día UTC
 ```
 
@@ -1163,24 +1165,29 @@ Hay dos tandas de código **pusheadas y sin deployar**, y las dos esperan lo mis
    plata: lo decide Bruno. Mientras tanto **el mailer entero está caído**, y en
    Resorty **cada lead de pop-up se pierde** (`/api/lead` escribe directo a
    Postgres, no pasa por el colchón de Upstash).
-1. **`node --import tsx --env-file=.env scripts/add-trigger-resena.ts`** ⇒ el
+1. **`node --import tsx --env-file=.env scripts/add-doc-version.ts`** ⇒ la columna
+   `docVersion` en Campania, Automation y Plantilla. ⛔ **ANTES del deploy**: el
+   código nuevo la pide en el WHERE de todo guardado y sin la columna revienta
+   **todo** guardado, que es peor que el problema que viene a resolver.
+   ✅ **Corrido el 20-ago-2026.**
+2. **`node --import tsx --env-file=.env scripts/add-trigger-resena.ts`** ⇒ el
    valor `RESENA` al enum. ⛔ **ANTES del deploy, sin excepción**: el webhook de
    `order/paid` ahora consulta `trigger IN ('COMPRA','RESENA')` y Postgres
    rechaza un valor de enum que no existe. Deployar primero es romper el webhook
    de toda orden pagada.
-2. **`vercel --prod --yes`** en `areben-mailer`, y el deploy de `areben-popups`
+3. **`vercel --prod --yes`** en `areben-mailer`, y el deploy de `areben-popups`
    (ninguno de los dos autodeploya).
-3. **Apagar el mail de carrito abandonado de Tiendanube** en el admin de TN.
+4. **Apagar el mail de carrito abandonado de Tiendanube** en el admin de TN.
    Hoy TN manda el suyo; el nuestro lo reemplaza. Si se prenden los dos, cada
    carrito recibe dos mails de dos remitentes distintos.
-4. **Prender el 1º mail de carrito** desde el panel de Resorty
+5. **Prender el 1º mail de carrito** desde el panel de Resorty
    (`/carrito-abandonado`), **temprano a la mañana**: el poller no avanza el
    cursor mientras está pausado, así que la primera corrida encola todo lo
    abandonado dentro de la ventana dura de 24 h. Antes conviene simular con
    `curl "…/api/carritos/detectar?secret=$CRON_SECRET&dry=1"`.
    🔑 **El primer mail real ES la prueba**: `ENVIO_REAL=true` gana sobre el modo
    ensayo, así que no hay forma de mandarse uno sin frenar el resto.
-5. **Crear la automation de reseña** desde `/automations` (⛔ desde la UI, que es
+6. **Crear la automation de reseña** desde `/automations` (⛔ desde la UI, que es
    lo que registra el webhook `order/paid` en TN) y prenderla.
 
 **Lo que ninguna prueba de acá ejerció y hay que caminar**: el panel de carrito

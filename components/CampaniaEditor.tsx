@@ -21,6 +21,8 @@ import type { Marca } from "@/lib/marca";
 import { Button } from "@/components/ui/Button";
 import { BarraAcciones } from "@/components/ui/BarraAcciones";
 import { usePermisos } from "@/components/PermisosProvider";
+import { useGuardadoDoc } from "@/components/useGuardadoDoc";
+import { AvisoConflicto } from "@/components/AvisoConflicto";
 import { AISoonButton } from "@/components/ui/AISoonButton";
 import { Desplegable } from "@/components/ui/Desplegable";
 import { inputClass, campoBase } from "@/lib/ui";
@@ -68,6 +70,8 @@ interface Props {
   abInfo?: AbInfo;
   /** Elegibles que todavía NO recibieron esta campaña. Solo se calcula si ya salió. */
   restantes?: number;
+  /** El `docVersion` que tenía la fila al abrir. Ver `lib/documentos.ts`. */
+  version: number;
 }
 
 const PCT_OPCIONES = [10, 20, 30, 50];
@@ -82,7 +86,7 @@ const HORA_SUGERIDA = "19:00";
 const tasa = (ap: number, env: number) => (env ? Math.round((ap / env) * 100) : 0);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPrueba, estado, programadaAt, abInfo, restantes = 0 }: Props) {
+export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPrueba, estado, programadaAt, abInfo, restantes = 0, version }: Props) {
   const router = useRouter();
   const [nombre, setNombre] = useState(initial.nombre);
   const [asunto, setAsunto] = useState(initial.asunto);
@@ -108,6 +112,7 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
   const [sending, startSend] = useTransition();
+  const { conflicto, guardarDoc } = useGuardadoDoc(version);
 
   const campData = () => ({
     id,
@@ -120,16 +125,22 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
     abTestPct: abActivo ? abPct : null,
   });
 
+  // 🔴 Los cuatro caminos que guardan frenan si el guardado NO escribió.
+  // Guardar-y-después-enviar con un guardado rechazado manda **lo viejo**: es el
+  // accidente del 8-ago (una pantalla vieja revirtió el destino y el envío iba a
+  // salir a 178 personas que ya lo tenían) reproducido al revés.
+  const escribio = () => guardarDoc((v) => guardarCampania({ ...campData(), version: v }));
+
   const guardar = () =>
     startSave(async () => {
-      await guardarCampania(campData());
+      if (!(await escribio())) return;
       setMsg("Guardado ✓");
       setTimeout(() => setMsg(null), 2000);
     });
 
   const prueba = () =>
     startSend(async () => {
-      await guardarCampania(campData());
+      if (!(await escribio())) return;
       const r = await enviarPrueba(id, pruebaEmail);
       setMsg(r.ok ? `Prueba enviada a ${pruebaEmail} ✓` : `Error: ${r.error}`);
       setTimeout(() => setMsg(null), 5000);
@@ -219,7 +230,7 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
         : "¿Enviar esta campaña a toda la lista (contactos que aceptan marketing)?";
     if (!confirmar(q)) return;
     setEnviado(true);
-    await guardarCampania(campData());
+    if (!(await escribio())) { setEnviado(false); return; }
     const r = await enviarCampania(id, conTope ? n : undefined);
     if (!r.ok) { setProgreso(`Error: ${r.error}`); setEnviado(false); return; }
     // En ensayo el destino real fue mucho más chico que la lista: decirlo, o el
@@ -263,7 +274,7 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
     const aviso = preguntaAntesDeMandar(hallazgos);
     if (aviso && !confirm(`${aviso}\n\n¿Dejarla programada igual?`)) return;
     setProgramando(true);
-    await guardarCampania(campData());
+    if (!(await escribio())) { setProgramando(false); return; }
     const r = await programarCampania(id, dia, hora);
     setProgramando(false);
     if (!r.ok) { setProgreso(`Error: ${r.error}`); return; }
@@ -328,6 +339,7 @@ export function CampaniaEditor({ id, marca, initial, listas, segmentos, emailPru
     // `data-editor` levanta el cap de 1152px del layout (ver el `has-[]` de
     // `app/(app)/layout.tsx`): en el editor el ancho ES la herramienta.
     <div data-editor className="space-y-4 pb-24">
+      <AvisoConflicto texto={conflicto} />
       {/* Los datos de envío arriba, a lo ancho: el editor de abajo necesita las
           tres columnas enteras y antes estaba metido en media pantalla.
 

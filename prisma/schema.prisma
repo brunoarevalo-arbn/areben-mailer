@@ -51,6 +51,12 @@ model Plantilla {
   createdAt DateTime @default(now())
 
   @@index([cuentaId])
+
+  /// Marcador de versión del DOCUMENTO, para que dos personas editando no se
+  /// pisen. Lo mueve **sólo** el guardado del editor (`+1` por guardado), nunca
+  /// las otras escrituras de esta tabla — por eso no se usa `updatedAt`, que lo
+  /// mueve cualquiera. Ver `lib/documentos.ts` y `scripts/add-doc-version.ts`.
+  docVersion Int @default(0)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -98,6 +104,12 @@ model Automation {
   runs AutomationRun[]
 
   @@index([cuentaId, trigger, estado])
+
+  /// Marcador de versión del DOCUMENTO, para que dos personas editando no se
+  /// pisen. Lo mueve **sólo** el guardado del editor (`+1` por guardado), nunca
+  /// las otras escrituras de esta tabla — por eso no se usa `updatedAt`, que lo
+  /// mueve cualquiera. Ver `lib/documentos.ts` y `scripts/add-doc-version.ts`.
+  docVersion Int @default(0)
 }
 
 enum EstadoRun {
@@ -445,6 +457,12 @@ model Campania {
 
   @@index([cuentaId, estado])
   @@index([estado, procesandoHasta])
+
+  /// Marcador de versión del DOCUMENTO, para que dos personas editando no se
+  /// pisen. Lo mueve **sólo** el guardado del editor (`+1` por guardado), nunca
+  /// las otras escrituras de esta tabla — por eso no se usa `updatedAt`, que lo
+  /// mueve cualquiera. Ver `lib/documentos.ts` y `scripts/add-doc-version.ts`.
+  docVersion Int @default(0)
 }
 
 /// Bitácora de la cola de envío. Tabla creada por scripts/add-evento-cola.ts.

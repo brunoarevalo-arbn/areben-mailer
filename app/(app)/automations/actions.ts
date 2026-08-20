@@ -17,6 +17,7 @@ import {
   type Trigger,
 } from "@/lib/automations";
 import { presetDeTrigger } from "@/lib/plantillas/presets";
+import { veredictoGuardado, type ResultadoGuardado } from "@/lib/documentos";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -64,6 +65,13 @@ export async function crearAutomation(trigger: Trigger) {
   redirect(`/automations/${a.id}`);
 }
 
+/**
+ * Guarda el mail de una automation, **negándose si alguien lo pisó**.
+ *
+ * `version` es el `docVersion` que el editor leyó al abrir. Va en el WHERE del
+ * `updateMany`: si en el medio otra persona guardó, no matchea ninguna fila y no
+ * se escribe nada. Ver el porqué entero en `lib/documentos.ts`.
+ */
 export async function guardarAutomation(input: {
   id: string;
   nombre: string;
@@ -72,13 +80,17 @@ export async function guardarAutomation(input: {
   asunto: string;
   preheader: string;
   contenido: ContenidoCampania;
-}) {
+  version: number;
+}): Promise<ResultadoGuardado> {
   const auth = await chequear("editar");
-  if (!auth.ok) return { ok: false, error: auth.error };
+  if (!auth.ok) return { ok: false, error: auth.error ?? "Sin permiso", conflicto: false };
   const cuenta = auth.ctx.cuenta;
 
-  await prisma.automation.update({
-    where: { id: input.id, cuentaId: cuenta.id },
+  // `updateMany` y no `update`: `update` tira cuando el WHERE no matchea, y acá
+  // "no matcheó" es una respuesta legítima que hay que poder contestar. El
+  // `cuentaId` sigue en el WHERE por lo de siempre (multi-tenant).
+  const r = await prisma.automation.updateMany({
+    where: { id: input.id, cuentaId: cuenta.id, docVersion: input.version },
     data: {
       nombre: input.nombre,
       esperaHoras: input.esperaHoras,
@@ -86,10 +98,18 @@ export async function guardarAutomation(input: {
       asunto: input.asunto,
       preheader: input.preheader,
       contenido: input.contenido as object,
+      docVersion: { increment: 1 },
     },
   });
+  if (r.count === 0) {
+    const existe = await prisma.automation.findFirst({
+      where: { id: input.id, cuentaId: cuenta.id },
+      select: { id: true },
+    });
+    return veredictoGuardado(0, Boolean(existe), input.version);
+  }
   revalidatePath(`/automations/${input.id}`);
-  return { ok: true };
+  return veredictoGuardado(r.count, true, input.version + 1);
 }
 
 export async function toggleAutomation(id: string) {

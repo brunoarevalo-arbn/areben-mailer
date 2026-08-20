@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { autorizar, chequear } from "@/lib/auth";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
+import { veredictoGuardado, type ResultadoGuardado } from "@/lib/documentos";
 import { leerContenido } from "@/lib/email/esquema";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { marcaDe, hostDeEnvio } from "@/lib/marca";
@@ -44,6 +45,8 @@ export interface GuardarInput {
   /** A/B de asunto: asuntoB vacío o abTestPct null = sin A/B. */
   asuntoB?: string;
   abTestPct?: number | null;
+  /** El `docVersion` que el editor leyó al abrir. Ver `lib/documentos.ts`. */
+  version: number;
 }
 
 function parseDestino(destino: string): { listaId: string | null; segmentoId: string | null } {
@@ -52,17 +55,27 @@ function parseDestino(destino: string): { listaId: string | null; segmentoId: st
   return { listaId: null, segmentoId: null };
 }
 
-export async function guardarCampania(input: GuardarInput) {
+/**
+ * Guarda la campaña, **negándose si alguien la pisó**.
+ *
+ * `version` es el `docVersion` que el editor leyó al abrir. De los dos casos
+ * reales del 8-ago-2026, éste es el que casi cuesta caro: una pantalla vieja
+ * revirtió `nombre`, `listaId` y `segmentoId`, y el envío iba a salir a 178
+ * personas que ya tenían ese mismo mail en la casilla. Ver `lib/documentos.ts`.
+ */
+export async function guardarCampania(input: GuardarInput): Promise<ResultadoGuardado> {
   const auth = await chequear("editar");
-  if (!auth.ok) return { ok: false, error: auth.error };
+  if (!auth.ok) return { ok: false, error: auth.error ?? "Sin permiso", conflicto: false };
   const cuenta = auth.ctx.cuenta;
 
   const { listaId, segmentoId } = parseDestino(input.destino);
   const asuntoB = input.asuntoB?.trim() || null;
   // Solo hay A/B si hay asuntoB y un porcentaje válido.
   const abTestPct = asuntoB && input.abTestPct ? input.abTestPct : null;
-  await prisma.campania.update({
-    where: { id: input.id, cuentaId: cuenta.id },
+  // `updateMany` y no `update`: `update` tira cuando el WHERE no matchea, y acá
+  // "no matcheó" es una respuesta legítima que hay que poder contestar.
+  const r = await prisma.campania.updateMany({
+    where: { id: input.id, cuentaId: cuenta.id, docVersion: input.version },
     data: {
       nombre: input.nombre,
       asunto: input.asunto,
@@ -72,10 +85,18 @@ export async function guardarCampania(input: GuardarInput) {
       contenido: input.contenido as object,
       asuntoB: abTestPct ? asuntoB : null,
       abTestPct,
+      docVersion: { increment: 1 },
     },
   });
+  if (r.count === 0) {
+    const existe = await prisma.campania.findFirst({
+      where: { id: input.id, cuentaId: cuenta.id },
+      select: { id: true },
+    });
+    return veredictoGuardado(0, Boolean(existe), input.version);
+  }
   revalidatePath(`/campanias/${input.id}`);
-  return { ok: true };
+  return veredictoGuardado(r.count, true, input.version + 1);
 }
 
 /**

@@ -13,6 +13,8 @@ import { BarraAcciones } from "@/components/ui/BarraAcciones";
 import { usePermisos } from "@/components/PermisosProvider";
 import { Pause, Play } from "lucide-react";
 import { campoBase } from "@/lib/ui";
+import { useGuardadoDoc } from "@/components/useGuardadoDoc";
+import { AvisoConflicto } from "@/components/AvisoConflicto";
 
 
 export function AutomationEditor({
@@ -22,6 +24,7 @@ export function AutomationEditor({
   estadoInicial,
   emailPrueba,
   initial,
+  version,
 }: {
   id: string;
   /** Nombre, logo, sitio, pie y tema de la marca (`marcaDe(cuenta)`). */
@@ -31,6 +34,8 @@ export function AutomationEditor({
   /** Mail de quien está mirando: la prueba sale a su casilla, no a una fija. */
   emailPrueba: string;
   initial: { nombre: string; asunto: string; preheader: string; esperaHoras: number; capDias: number; contenido: ContenidoCampania };
+  /** El `docVersion` que tenía la fila al abrir. Ver `lib/documentos.ts`. */
+  version: number;
 }) {
   const [nombre, setNombre] = useState(initial.nombre);
   const [asunto, setAsunto] = useState(initial.asunto);
@@ -47,14 +52,20 @@ export function AutomationEditor({
   const [saving, startSave] = useTransition();
   const [sending, startSend] = useTransition();
   const [toggling, startToggle] = useTransition();
+  const { conflicto, guardarDoc } = useGuardadoDoc(version);
 
   // El contenido ENTERO, no `{ bloques, tema }`: enumerar los campos a mano
   // hacía que la versión del esquema y los estilos de documento se perdieran en
   // cada guardado, y el mail salía distinto de lo que mostraba el editor.
   const payload = () => ({ id, nombre, asunto, preheader, esperaHoras, capDias, contenido });
 
-  const guardar = () => startSave(async () => { await guardarAutomation(payload()); setMsg("Guardado ✓"); setTimeout(() => setMsg(null), 2000); });
-  const prueba = () => startSend(async () => { await guardarAutomation(payload()); const r = await enviarPruebaAutomation(id, pruebaEmail); setMsg(r.ok ? `Prueba enviada ✓` : `Error: ${r.error}`); setTimeout(() => setMsg(null), 4000); });
+  // 🔴 Los tres caminos frenan si el guardado NO escribió. Mandar una prueba o
+  // activar después de un guardado rechazado sería mandar el mail viejo — el
+  // accidente que la detección de conflicto viene a evitar, al revés.
+  const escribio = () => guardarDoc((v) => guardarAutomation({ ...payload(), version: v }));
+
+  const guardar = () => startSave(async () => { if (!(await escribio())) return; setMsg("Guardado ✓"); setTimeout(() => setMsg(null), 2000); });
+  const prueba = () => startSend(async () => { if (!(await escribio())) return; const r = await enviarPruebaAutomation(id, pruebaEmail); setMsg(r.ok ? `Prueba enviada ✓` : `Error: ${r.error}`); setTimeout(() => setMsg(null), 4000); });
   // 🔴 El resultado del toggle SE MIRA. Antes se descartaba entero, así que
   // "no podés encender: la marca no tiene remitente" no llegaba a la pantalla y
   // el botón parecía no hacer nada. El `aviso` es la otra mitad: la automation
@@ -75,7 +86,7 @@ export function AutomationEditor({
       const aviso = preguntaAntesDeMandar(hallazgos);
       if (aviso && !confirm(`${aviso}\n\n¿Activar igual? A partir de acá el mail sale solo.`)) return;
     }
-    await guardarAutomation(payload());
+    if (!(await escribio())) return;
     const r = await toggleAutomation(id);
     if (!r.ok) { setMsg(`Error: ${r.error ?? "no se pudo cambiar el estado"}`); return; }
     if (r.estado) setEstado(r.estado);
@@ -86,6 +97,7 @@ export function AutomationEditor({
     // `data-editor` levanta el cap de 1152px del layout (ver el `has-[]` de
     // `app/(app)/layout.tsx`): en el editor el ancho ES la herramienta.
     <div data-editor className="space-y-4 pb-24">
+      <AvisoConflicto texto={conflicto} />
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-accent-subtle-foreground/30 bg-accent-subtle p-4">
         <div className="text-sm text-foreground">
           <span className="text-muted">Disparador:</span> <b>{triggerLabel}</b>

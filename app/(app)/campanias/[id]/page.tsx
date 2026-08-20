@@ -146,6 +146,7 @@ export default async function CampaniaEditorPage({
           asuntoB: campania.asuntoB ?? "",
           abTestPct: campania.abTestPct ?? null,
         }}
+        version={campania.docVersion}
         listas={listas}
         segmentos={segmentos}
         emailPrueba={email}
