@@ -93,7 +93,9 @@ node --import tsx scripts/probar-redes.ts      # cada red de la lista tiene su P
 node --import tsx scripts/probar-negritas.ts   # `**negrita**` se resuelve DESPUÉS de escapar, y solo en los cuatro campos que se escriben
 node --import tsx scripts/probar-texto-rico.ts # un campo de texto rico rinde el MISMO html que el string de siempre
 node --env-file=.env --import tsx scripts/probar-segmentos.ts # el "no abrió/no clickeó" es RECIBIÓ y no lo hizo, nunca "no me consta"
-node --import tsx scripts/probar-automations.ts # una automation por trigger: dos son dos mails a la misma persona
+node --import tsx scripts/probar-automations.ts # el carrito llega a TRES mails, y ninguno sale a la misma hora que otro
+node --import tsx scripts/probar-cupon-carrito.ts # el bloque `cupon` sin código REAL detrás se elimina; el placeholder nunca sale
+RESENA_SECRET=vector-fijo-de-ensayo node --import tsx scripts/probar-resena-token.ts # el link de las estrellas no se puede editar (vector fijo, espejado en areben-popups)
 node --import tsx scripts/probar-guardado.ts    # el veredicto distingue "te lo pisaron" de "lo borraron", y guardar dos veces seguidas no choca contra uno mismo
 node --import tsx scripts/auditar-guardado.ts   # las DOS mitades del conflicto: el servidor se niega, y ningún llamador tira el resultado
 node --import tsx scripts/probar-fechas.ts      # el día de las métricas es el del calendario local, no el día UTC
@@ -1155,11 +1157,55 @@ que se anota en un pop-up y el que compra por primera vez.
 
 ## Estado del trabajo
 
-### 🔴 LO QUE FALTA HACER A MANO (20-ago-2026 14:30), en este orden
+### 🔴 LO QUE FALTA HACER A MANO (21-ago-2026), en este orden
 
 **Ya no falta nada de código ni de base.** Lo que queda son **manos de Bruno**, y
 está en este orden porque el paso 4 tiene que pasar antes que el 5 o cada carrito
 recibe dos mails de dos remitentes.
+
+#### Lo que entró el 21-ago-2026 (carrito 2 y 3 · reseñas por mail · Google)
+
+✅ **El carrito llega a TRES mails.** `MAX_POR_TRIGGER.CARRITO_ABANDONADO` pasó de
+2 a 3 y `ESPERA_SIGUIENTE_HORAS` —una constante única para todo `orden > 1`— se
+partió en **`ESPERAS_SIGUIENTES`, una escalera por trigger** (`[24, 72]`, con el
+1º trayendo sus 3 h del preset). 🔴 Sin esa escalera el 2º y el 3º nacían con la
+MISMA espera: dos mails a la misma hora, que es justo el defecto que
+`nacimientoDelMail` existe para evitar. El invariante que lo ata —la escalera
+tiene un escalón por cada mail menos el 1º— lo custodia `probar-automations.ts`,
+verificado en rojo.
+
+✅ **El 3er mail lleva un cupón real, escalado.** Lo acuña **Resorty**
+(`POST /api/carrito/cupon`), no el mailer: ver `lib/carrito-cupon.ts` (la red) y
+`lib/email/cupon-carrito.ts` (lo puro, con `probar-cupon-carrito.ts`). 🔴 Se pide
+al **ENVIAR**, nunca al encolar. 🔴 Si Resorty o TN fallan, **el bloque `cupon` se
+elimina** — mandar el `CARRITO10` del preset es darle a un cliente un código que
+el checkout rechaza. ⛔ **La perilla nace APAGADA** en `/carrito-abandonado` de
+Resorty: emite descuentos reales en la tienda de alguien.
+
+✅ **Las estrellas del mail de reseña.** El bloque `carrito` gana `modo: "resena"`
+y dibuja cinco estrellas debajo de cada línea, cada una un **link firmado**
+(`lib/resena-token.ts`, espejado en `areben-popups`, env `RESENA_SECRET` cargada
+en los dos proyectos de Vercel). 🔴 Van en su **propio `<tr>`**: la línea ya es un
+ancla y un `<a>` dentro de otro lo resuelve distinto cada cliente. 🔴 Son **PNG**
+(`public/estrellas/estrella.png`, `scripts/dibujar-estrellas.ts`), no el carácter
+`★`, que en Outlook sale como un rombo. 🔑 La palabra «Puntuá» **no es una imagen
+y sale siempre**: con las imágenes apagadas es lo único que dice para qué está la
+fila. El golden se movió **una sola entrada** (`auto-resena.html.muestra`) y está
+bendecida.
+
+✅ **Los DDL corridos y verificados contra la base** (21-ago): `Resena` tiene
+`email`, `orderId` y `verificada` más el único **parcial**
+`(cuentaId, orderId, productoId) WHERE orderId IS NOT NULL`, y existe la tabla
+`CuponCarrito` con su único `(cuentaId, checkoutId)`.
+
+⚠️ **`RESENA_SECRET` quedó en Production y Development de los dos proyectos, NO en
+Preview** (el CLI pide una forma distinta y se dejó afuera a propósito: por un
+preview no sale ningún mail). Un preview renderiza el mail de reseña **sin
+estrellas**, entero.
+
+⚠️ **Lo que hoy NO se mide**: cuántos de los cupones de carrito se canjean.
+`CuponCarrito` es tabla propia (ver el porqué en el `AGENTS.md` de Resorty) y el
+barrido de `lib/canjes.ts` no la mira. Es trabajo pendiente, no un olvido.
 
 ✅ **Neon está PAGADO** (medido el 20-ago 14:25 contra la API de Vercel: los tres
 proyectos —`areben-mailer-db`, `areben-marketing`, `creativa-db`— figuran en
@@ -1182,7 +1228,7 @@ incluye el arreglo de los bloques sin id) y `areben-popups` a las 10:22 (HEAD
    prenden los dos, cada carrito recibe dos mails de dos remitentes distintos.
    🔑 Para saber de quién es un mail de carrito: **el pie**. Los nuestros llevan
    link de baja en el 100% de los renders; el de TN no lo tiene.
-5. **Prender el 1º mail de carrito** desde el panel de Resorty
+5. **Prender los mails de carrito** desde el panel de Resorty
    (`/carrito-abandonado`), **temprano a la mañana**: el poller no avanza el
    cursor mientras está pausado, así que la primera corrida encola todo lo
    abandonado dentro de la ventana dura de 24 h.
@@ -1200,9 +1246,14 @@ incluye el arreglo de los bloques sin id) y `areben-popups` a las 10:22 (HEAD
    `customer/created`). El registro lo hace `toggleAutomation` al ACTIVAR, así
    que un `UPDATE` a mano la deja **activa y sorda**.
 
-**Lo que ninguna prueba de acá ejerció y hay que caminar**: el panel de carrito
-con DOS mails, el mail de reseña llegando a una casilla, y una reseña real
-entrando por su link a la cola de moderación. Tampoco se pudo verificar contra la
+**Lo que ninguna prueba de acá ejerció y hay que caminar** (21-ago): el panel de
+carrito con TRES mails, **el mail de reseña con las estrellas en Gmail web, Gmail
+app y Outlook de escritorio —y una vez con las imágenes APAGADAS**, que es donde
+se nota si el `<a>` quedó anidado y si el `alt` alcanza; **una reseña real
+entrando por `/opinar` a la cola de moderación** y saliendo publicada en la ficha
+de BDI; **un cupón de carrito existiendo de verdad en TN** (`GET coupons?code=…`
+con `max_uses: 1`); y **el botón de Google llegando al formulario de la ficha
+correcta**. Tampoco se pudo verificar contra la
 API real de TN **qué trae un producto adentro de una orden** (`lib/tn/` asume la
 misma forma que en un checkout, que sí está medida).
 
