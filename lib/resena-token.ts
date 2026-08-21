@@ -62,10 +62,16 @@ export function firmarResena(p: PayloadResena): string | null {
 /**
  * Devuelve el payload si el token es nuestro y está vigente; `null` si no.
  *
- * 🔴 **Todo lo que decide algo sale de ACÁ, nunca del querystring ni del body
- * del POST.** El `rating` suelto en la URL deja que cualquiera edite un 1 por un
- * 5 y publique en nombre de otra persona; el `productoId` suelto convierte el
- * token de un producto en un permiso para reseñar cualquier otro.
+ * 🔴 **`cuentaId`, `orderId` y `productoId` salen de ACÁ y NUNCA del body del
+ * POST.** Sueltos, un token legítimo de un producto sirve para dejar una reseña
+ * «compra verificada» en cualquier otro producto de la tienda — que es justo lo
+ * que esa marca promete que no pasa.
+ *
+ * ⚠️ **El `rating` es la excepción, y a propósito.** Acá viaja el que la persona
+ * apretó en el mail, y sirve para que el link no se pueda editar: pegar `?r=5` en
+ * la URL no prefija nada. Pero el que se GUARDA sale del formulario, porque la
+ * página deja cambiarlo —apretar 3 y arrepentirse es normal— y porque tener el
+ * token ya prueba que es esa persona: elegir 1 o 5 es su derecho.
  */
 export function verificarResena(token: string): PayloadResena | null {
   const s = secreto();
