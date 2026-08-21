@@ -56,9 +56,45 @@ const prefijos = proxy.slice(proxy.indexOf("PUBLIC_PREFIXES"), proxy.indexOf("ex
 // tres renglones más arriba y con el chequeo de `/redes/` en verde. Un
 // directorio nuevo de imágenes de mail se agrega en tres lugares: `public/`, el
 // helper que arma la URL, y acá.
-for (const dir of ["/redes/", "/iconos/"]) {
-  ok(new RegExp(`['"]\\${dir}['"]`.replace("\\/", "\\/")).test(prefijos), `'${dir}' está en PUBLIC_PREFIXES del proxy`);
+const declarados = [...prefijos.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+
+// 🔴 **El chequeo NO nombra los directorios a mano, y esa es toda la lección.**
+// Hasta el 21-ago-2026 acá había una lista literal `["/redes/", "/iconos/"]`, y
+// ese día las estrellas del mail de reseña se deployaron con `/estrellas/`
+// afuera de `PUBLIC_PREFIXES`: **307 a `/login`** en producción, con este chequeo
+// en verde mirando otros dos directorios. Fue la TERCERA vez que pasa lo mismo.
+//
+// Ahora la lista sale del **HTML renderizado**: se dibuja un mail por cada bloque
+// que sabe pedir un asset propio, se junta todo `src` que apunte a `assetsBase` y
+// se exige que un prefijo lo cubra. Un directorio nuevo entra solo al oráculo el
+// día que el renderer lo emite.
+const CON_ASSETS: Array<{ nombre: string; bloques: Bloque[]; muestra?: boolean }> = [
+  { nombre: "redes", bloques: [{ tipo: "redes", iconos: "pleno", links: [{ red: "Instagram", url: "https://x/y" }] } as Bloque] },
+  {
+    nombre: "columnas con ícono",
+    bloques: [{ tipo: "columnas", variante: "iconos", celdas: [{ icono: "envio", titulo: "Envío", texto: "" }] } as unknown as Bloque],
+  },
+  // Las estrellas del pedido de reseña. `muestra` prende el carrito de ejemplo,
+  // que es el único camino por el que este bloque dibuja algo sin un run real.
+  { nombre: "estrellas del mail de reseña", bloques: [{ tipo: "carrito", modo: "resena" } as Bloque], muestra: true },
+];
+
+const dirsVistos = new Set<string>();
+for (const caso of CON_ASSETS) {
+  const h = renderEmailHtml({ bloques: caso.bloques }, { ...OPTS, assetsBase: HOST, muestraCarrito: caso.muestra });
+  const srcs = [...h.matchAll(/src="([^"]+)"/g)].map((m) => m[1]).filter((u) => u.startsWith(HOST));
+  ok(srcs.length > 0, `${caso.nombre}: emite al menos un asset propio (si no, este caso no prueba nada)`);
+  // Deduplicado: cinco estrellas son cinco `src` al mismo archivo, y repetir la
+  // misma comprobación cinco veces sólo hace ruido en la salida.
+  for (const camino of new Set(srcs.map((u) => new URL(u).pathname))) {
+    dirsVistos.add(camino);
+    ok(
+      declarados.some((pref) => camino.startsWith(pref)),
+      `${caso.nombre}: ${camino} lo cubre un prefijo público del proxy`,
+    );
+  }
 }
+ok(dirsVistos.size > 0, "el barrido encontró assets que revisar");
 
 console.log("\n1-ter) 🔴 …y el PNG de la cuenta regresiva también");
 // Misma trampa que `/iconos/` y con la misma consecuencia, pero peor: acá lo que
@@ -69,7 +105,6 @@ console.log("\n1-ter) 🔴 …y el PNG de la cuenta regresiva también");
 // `urlRegresiva` —la misma función que usa el renderer— y se pregunta si ALGÚN
 // prefijo del proxy la cubre. Así, renombrar la ruta pone esto en rojo el mismo
 // día en vez de dejar el chequeo verde mirando un camino que ya no existe.
-const declarados = [...prefijos.matchAll(/'([^']+)'/g)].map((m) => m[1]);
 const camino = new URL(
   urlRegresiva("https://links.zattia.com.ar", {
     hasta: "2026-12-24T23:59:00.000Z",

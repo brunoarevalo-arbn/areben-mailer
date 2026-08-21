@@ -32,6 +32,14 @@ const PUBLIC_PREFIXES = [
   // directorios que el renderer sabe pedir.
   '/redes/',
   '/iconos/',
+  // 🔴 21-ago-2026: **TERCERA vez.** Las estrellas del mail de reseña se
+  // deployaron y `/estrellas/estrella.png` contestó **307 a `/login`** — con el
+  // comentario de arriba escrito y con el chequeo de los otros dos en verde,
+  // porque ese chequeo nombraba los directorios A MANO. Desde hoy el oráculo de
+  // `probar-redes.ts` §1-bis **sale del HTML renderizado**: junta todo `src` que
+  // apunte a `assetsBase` y exige que un prefijo de esta lista lo cubra. Un
+  // directorio nuevo ya no puede entrar sin su línea.
+  '/estrellas/',
 ];
 
 export async function proxy(req: NextRequest) {
