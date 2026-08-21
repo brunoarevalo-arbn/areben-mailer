@@ -1182,6 +1182,28 @@ elimina** — mandar el `CARRITO10` del preset es darle a un cliente un código 
 el checkout rechaza. ⛔ **La perilla nace APAGADA** en `/carrito-abandonado` de
 Resorty: emite descuentos reales en la tienda de alguien.
 
+✅ **El 2º y el 3er mail de BDI ya están armados** (21-ago 15:52) — **borrador**:
+«Carrito abandonado — 2º mail» (24 h) y «— 3º mail» (72 h), los dos `PAUSADO`,
+creados con `scripts/crear-secuencia-carrito.ts`. Heredan del 1º el tema, el
+bloque `encabezado` (el logo que ya subió el comerciante) y **el link de
+WhatsApp** — 🔴 nunca se escribe un `wa.me` a mano: sin el `9` después del código
+de país abre un chat con un número que no existe. El 3º es el **único** con
+bloque `cupon`.
+
+🔴 **Ni el asunto ni ningún texto de afuera del bloque `cupon` nombran el
+descuento**, y eso es una regla del mail, no una preferencia:
+`aplicarCuponDeCarrito` **borra el bloque entero** cuando la perilla está apagada
+(hoy), cuando el escalado no mejora lo que la persona ya tiene, o cuando TN falla
+al acuñarlo. El bloque se puede borrar; un asunto que prometió un premio, no.
+
+🔑 El script **nunca pisa un mail que ya existe** —ni el 1º ni uno editado a
+mano—: el texto fino se ajusta en `/automations`, que es donde vive el documento.
+Verificado renderizando los tres por el mismo camino que el envío (merge tags,
+`conCarrito`, `${cart.url}` resuelto): sin cupón no queda ningún `href` vacío ni
+`#`, no sale el placeholder `CARRITO10` y **ninguna palabra del mail nombra un
+premio que no llegó**; con cupón emitido sale el código real, el `20% OFF` y la
+letra chica.
+
 ✅ **Las estrellas del mail de reseña.** El bloque `carrito` gana `modo: "resena"`
 y dibuja cinco estrellas debajo de cada línea, cada una un **link firmado**
 (`lib/resena-token.ts`, espejado en `areben-popups`, env `RESENA_SECRET` cargada
@@ -1229,7 +1251,11 @@ incluye el arreglo de los bloques sin id) y `areben-popups` a las 10:22 (HEAD
    🔑 Para saber de quién es un mail de carrito: **el pie**. Los nuestros llevan
    link de baja en el 100% de los renders; el de TN no lo tiene.
 5. **Prender los mails de carrito** desde el panel de Resorty
-   (`/carrito-abandonado`), **temprano a la mañana**: el poller no avanza el
+   (`/carrito-abandonado`), **temprano a la mañana**. ⚠️ Los **tres ya existen en
+   BDI** (el 2º y el 3º son el borrador del 21-ago): lo que falta antes de
+   prender es el **texto fino** en `/automations` y, si el 3º va a llevar premio,
+   **los números del cupón** (base, escalón, tope, días, mínimo) en ese mismo
+   panel — sin ellos el 3º sale **sin** bloque cupón, no roto: el poller no avanza el
    cursor mientras está pausado, así que la primera corrida encola todo lo
    abandonado dentro de la ventana dura de 24 h.
    📏 **Ya está medido cuánto es** (simulado en prod el 20-ago 14:26 con

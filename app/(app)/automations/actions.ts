@@ -30,8 +30,8 @@ export async function crearAutomation(trigger: Trigger) {
   // Cuántas automations admite el trigger lo dice `MAX_POR_TRIGGER`: una para
   // casi todos —el disparador manda TODAS las que matcheen, así que la segunda
   // es un segundo mail a la misma persona, y una bienvenida es una sola vez en
-  // la vida del contacto— y DOS para el carrito abandonado, donde ese segundo
-  // mail es la secuencia y no el accidente.
+  // la vida del contacto— y TRES para el carrito abandonado, donde esos mails
+  // de más son la secuencia y no el accidente.
   //
   // La guarda va acá y no solo en la tarjeta de `/automations`: la página puede
   // estar desactualizada, o alguien hace doble click. Al llegar al tope redirige
