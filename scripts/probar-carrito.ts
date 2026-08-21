@@ -13,6 +13,7 @@ import {
   type Bloque,
   type ProductoEmail,
 } from '../lib/email/render.ts';
+import { conCarrito, muestraDePrueba, urlVueltaDePrueba } from '../lib/email/prueba.ts';
 
 const OPTS = { unsubscribeUrl: '#', nombreCuenta: 'BDI' };
 
@@ -125,3 +126,54 @@ if (errores.length) {
   process.exit(1);
 }
 console.log('✅ Invariantes del carrito OK.\n');
+
+// ─── El mail de PRUEBA se parece al que va a salir ───────────────────────────
+// 🔴 El agujero medido el 21-ago-2026: «mandar una prueba» renderizaba el
+// documento tal como está guardado, sin nada de lo que pone el procesador. El
+// pedido de reseña llegaba SIN el bloque `carrito` —o sea sin productos y sin
+// estrellas, su único contenido concreto— y el carrito abandonado llegaba con
+// `${cart.url}` LITERAL en el href del botón. Los dos sin ningún error: el mail
+// parecía terminado. Y «mandar una prueba» es el único camino para mirar el
+// correo en Gmail y en Outlook de verdad.
+{
+  // El documento del preset de reseña: título, texto y el `carrito` en modo resena.
+  const doc: Bloque[] = [
+    { tipo: 'titulo', texto: '¿Nos contás qué te pareció?' },
+    { tipo: 'carrito', items: [], modo: 'resena' } as Bloque,
+  ];
+
+  ok(
+    !html(doc).includes('Puntuá'),
+    'sin items, el bloque no se dibuja (es la causa del agujero, no un bug)',
+  );
+
+  const TIENDA = 'https://bdiaccesorios.com.ar';
+  // ⚠️ Con el `unsubscribeUrl` REAL de una prueba y no el `'#'` de `OPTS`: si no,
+  // el chequeo de «ningún link muerto» se pondría rojo por el pie del propio
+  // ensayo y no por el mail.
+  const htmlPrueba = (bs: Bloque[]) =>
+    renderEmailHtml({ bloques: bs }, { ...OPTS, unsubscribeUrl: `${TIENDA}/baja?token=preview` });
+  const items = muestraDePrueba(TIENDA, (pid, _n, r) => `https://resorty.test/opinar/tok-${pid}-${r}`);
+  const conMuestra = htmlPrueba(conCarrito(doc, items));
+  ok(conMuestra.includes('Puntuá'), 'PRUEBA de reseña: la fila de estrellas SÍ se dibuja');
+  ok(
+    (conMuestra.match(/opinar\/tok-/g) ?? []).length === 10,
+    'PRUEBA de reseña: cinco estrellas por cada uno de los dos productos de muestra',
+    `salieron ${(conMuestra.match(/opinar\/tok-/g) ?? []).length}`,
+  );
+  // 🔴 Un `#` en una casilla es un link que no lleva a ningún lado.
+  ok(!conMuestra.includes('href="#"'), 'PRUEBA de reseña: NINGÚN link del mail apunta a "#" (ni la estrella ni la línea)');
+
+  // Sin poder firmar (falta RESENA_SECRET) NO salen cinco links rotos: no salen.
+  const sinFirma = htmlPrueba(conCarrito(doc, muestraDePrueba(TIENDA, () => null)));
+  ok(sinFirma.includes('Producto de ejemplo'), 'sin firma: los productos igual se dibujan');
+  ok(!sinFirma.includes('Puntuá'), 'sin firma: NO se dibuja media escala de estrellas');
+
+  // El bloque appendeado, para las automations viejas que no lo declaran.
+  const viejo = conCarrito([{ tipo: 'titulo', texto: 'Hola' }], items);
+  ok(viejo.some((b) => b.tipo === 'carrito'), 'sin bloque declarado, la prueba lo appendea igual que el procesador');
+
+  // Y el destino de `${cart.url}`.
+  ok(urlVueltaDePrueba('https://bdiaccesorios.com.ar') === 'https://bdiaccesorios.com.ar', 'la vuelta lleva a la tienda');
+  ok(urlVueltaDePrueba(undefined) === '#', 'sin sitio cargado, "#" — un href vacío recarga la misma página');
+}

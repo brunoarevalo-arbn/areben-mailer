@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { autorizar, chequear, getAuth } from "@/lib/auth";
 import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
+import { conCarrito, muestraDePrueba, urlVueltaDePrueba } from "@/lib/email/prueba";
+import { firmarResena, VIDA_MS } from "@/lib/resena-token";
+import { RESORTY_URL } from "@/lib/carrito-cupon";
 import { leerContenido } from "@/lib/email/esquema";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { marcaDe, hostDeEnvio } from "@/lib/marca";
@@ -217,9 +220,9 @@ export async function enviarPruebaAutomation(id: string, email: string) {
   const a = await prisma.automation.findFirst({ where: { id, cuentaId: cuenta.id } });
   if (!a?.asunto) return { ok: false, error: "Falta el asunto" };
   const contenido = leerContenido(a.contenido);
-  // Ídem campañas: la prueba resuelve los productos automáticos. El `carrito`
-  // no, y está bien — en una prueba no hay carrito abandonado que mostrar.
+  // Ídem campañas: la prueba resuelve los productos automáticos.
   const productosDinamicos = await resolverProductosDinamicos(contenido.bloques, cuenta);
+
   // La prueba tiene que colgar del mismo dominio que el envío real: si no, se
   // estaría juzgando un mail con otros links que el que va a salir.
   const hostPrueba = hostDeEnvio(cuenta, process.env.APP_URL ?? "");
@@ -230,8 +233,59 @@ export async function enviarPruebaAutomation(id: string, email: string) {
     productosDinamicos,
     ...marcaDe(cuenta, process.env.APP_URL ?? ""),
   };
+
+  // 🔴 **`${cart.url}` se reemplaza también en la prueba.** Sin esto la prueba del
+  // carrito abandonado llegaba con el literal `${cart.url}` en el `href` del
+  // botón —medido el 21-ago-2026—: un botón que no lleva a ningún lado, en el
+  // único mail que existe para juzgar cómo va a quedar. Mismo orden de destinos
+  // que el procesador; acá no hay carrito, así que va la tienda.
+  //
+  // Va acá arriba porque es también el destino de las LÍNEAS de la muestra: sin
+  // ficha real que ofrecer, un producto de ejemplo tiene que llevar a la tienda y
+  // no a `"#"`.
+  const urlVuelta = urlVueltaDePrueba(opts.urlCuenta);
+
+  // 🔴 **Y el `carrito` TAMBIÉN, con la muestra.** Hasta el 21-ago-2026 acá decía
+  // «en una prueba no hay carrito abandonado que mostrar», y era cierto cuando el
+  // bloque sólo dibujaba eso. Dejó de serlo: el **pedido de reseña** usa el mismo
+  // bloque, y ahí adentro viven las estrellas — o sea que la prueba llegaba sin
+  // lo único concreto que ese mail tiene, y sin la parte que hay que mirar en
+  // Gmail y en Outlook. Un `carrito` sin items no se dibuja, así que no salía
+  // nada y no había ningún error: el mail parecía terminado.
+  //
+  // 🔑 Se rellena el bloque **acá y no con `muestraCarrito`** porque la prueba
+  // tiene que recorrer el MISMO camino que el envío real (el procesador también
+  // le mete los items al bloque). Con la opción del renderer, la prueba probaría
+  // una rama que ningún envío usa.
+  const items =
+    a.trigger === "RESENA"
+      ? muestraDePrueba(urlVuelta, (productoId, producto, rating) => {
+          const t = firmarResena({
+            cuentaId: cuenta.id,
+            // Una orden que no existe y que se ve que es de prueba. Si alguien
+            // llega a publicar desde acá, queda `pendiente` y se rechaza en un
+            // click, como cualquier otra.
+            orderId: `PRUEBA-${a.id}`,
+            productoId,
+            producto,
+            email: destino,
+            nombre: nombre ?? "",
+            rating,
+            exp: Date.now() + VIDA_MS,
+          });
+          return t && `${RESORTY_URL}/opinar/${t}`;
+        })
+      : a.trigger === "CARRITO_ABANDONADO"
+        ? muestraDePrueba(urlVuelta)
+        : [];
+  const bloques = conCarrito(contenido.bloques, items);
+
   const destinatario = { nombre: nombre ?? "", email: destino };
-  const html = aplicarMergeTags(renderEmailHtml(contenido, opts), destinatario);
+  const doc = { ...contenido, bloques };
+  const html = aplicarMergeTags(renderEmailHtml(doc, opts), destinatario).replaceAll(
+    "${cart.url}",
+    urlVuelta,
+  );
   // Ídem la prueba de campañas: la parte text/plain y el header
   // `List-Unsubscribe` no son cosméticos, son dos de las señales que mira el
   // filtro. Sin ellos la prueba salía MEJOR clasificada como spam que el envío
@@ -239,7 +293,10 @@ export async function enviarPruebaAutomation(id: string, email: string) {
   // existe. Lo pagó la primera prueba de la bienvenida de Zattia (31-jul-2026):
   // cayó en "no deseado" mandando desde un dominio con DKIM, SPF alineado y
   // DMARC en orden.
-  const texto = aplicarMergeTags(renderEmailTexto(contenido, opts), destinatario);
+  const texto = aplicarMergeTags(renderEmailTexto(doc, opts), destinatario).replaceAll(
+    "${cart.url}",
+    urlVuelta,
+  );
   const rem = await getRemitenteEnvio(cuenta.id);
   try {
     const res = await sendEmail({

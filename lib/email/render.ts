@@ -660,8 +660,16 @@ function renderCarrito(
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(e.caja, "8px 0 16px")}">${filas}</table>${mas}`;
 }
 
-/** Productos de mentira para el preview del editor. NUNCA salen en un envío real. */
-const CARRITO_MUESTRA: ProductoEmail[] = [
+/**
+ * Productos de mentira para el preview del editor y para el mail de PRUEBA.
+ * 🔴 **NUNCA salen en un envío real**: lo fija `probar-carrito.ts`, y el único
+ * que los enciende en el renderer es la opción `muestraCarrito`.
+ *
+ * 🔑 Se exporta para que «mandar una prueba» use **esta misma lista** en vez de
+ * armarse la suya: dos muestras serían dos mails distintos, y la prueba existe
+ * justamente para juzgar el que va a salir.
+ */
+export const CARRITO_MUESTRA: ProductoEmail[] = [
   // ⚠️ Las cinco `estrellas` van en la MUESTRA para que el editor dibuje la fila
   // en el modo `resena` — si no, quien arma el mail no ve la única parte que ese
   // modo agrega. Son `#`: el preview no navega a ningún lado (el iframe va con
