@@ -557,6 +557,58 @@ const MINIATURA_CARRITO = 72;
  * Es la diferencia de fondo con `renderCard`: una grilla de tarjetas dice "mirá
  * estos productos", y un carrito abandonado tiene que decir "esto dejaste".
  */
+/** El lado de la estrella en el mail. 26px: se toca con el dedo y no domina la línea. */
+const ESTRELLA_PX = 26;
+
+/**
+ * La fila de cinco estrellas de un producto, en el mail de reseña.
+ *
+ * 🔴 **Va en su PROPIO `<tr>`, debajo de la línea del producto, y ésa es la
+ * única forma que hay.** La línea ya es un ancla a la ficha: meter las estrellas
+ * adentro sería un `<a>` dentro de otro, que es HTML inválido y que cada cliente
+ * de mail resuelve distinto (Outlook se queda con el de afuera y las cinco
+ * estrellas llevan al mismo lado). Es la misma regla que custodia
+ * `probar-banda-link.ts` para la foto de una banda.
+ *
+ * 🔴 **Las estrellas son PNG, no el carácter `★`.** El glifo depende de la fuente
+ * del cliente: en Outlook de escritorio sale como un rombo o un cuadrado vacío, y
+ * en algunos Android como un emoji de color que no se puede alinear. Mismo
+ * mecanismo —y mismo motivo— que los iconos del bloque `redes`.
+ *
+ * 🔑 **La palabra «Puntuá» NO es una imagen y sale siempre.** Con las imágenes
+ * apagadas —el default de Outlook de escritorio— lo único que queda es el `alt`
+ * de cada estrella; sin esta etiqueta, la fila entera es cinco textos sueltos que
+ * no dicen para qué están. Es la misma deuda que ya se pagó en `regresiva` con la
+ * línea de la fecha.
+ *
+ * ⚠️ Sin `assetsBase` no se dibuja ningún `<img>`: salen los cinco links en
+ * texto. Nunca un `src` vacío, que es un cuadradito roto para el 100% de los
+ * destinatarios.
+ */
+function renderEstrellas(p: ProductoEmail, ctx: Ctx, pal: Paleta, eNota: EstiloResuelto): string {
+  const urls = p.estrellas;
+  if (!urls || urls.length !== 5) return "";
+  const base = (ctx.assetsBase ?? "").replace(/\/+$/, "");
+  const src = base ? `${base}/estrellas/estrella.png` : "";
+  const celdas = urls
+    .map((u, i) => {
+      const n = i + 1;
+      const alt = `Puntuar con ${n}`;
+      const dentro = src
+        ? `<img src="${esc(src)}" alt="${esc(alt)}" width="${ESTRELLA_PX}" height="${ESTRELLA_PX}" style="width:${px(ESTRELLA_PX)};height:${px(ESTRELLA_PX)};display:block;border:0" />`
+        : esc(String(n));
+      return `<td style="padding:0 3px 0 0"><a href="${esc(u)}" style="text-decoration:none;color:${pal.link}">${dentro}</a></td>`;
+    })
+    .join("");
+  const etiqueta = `<td style="padding:0 8px 0 0;font-size:${px(eNota.tamano ?? 13)};color:${eNota.color};white-space:nowrap">Puntuá:</td>`;
+  return `<tr>
+    <td colspan="3" style="padding:0 0 12px">
+      <!-- Tabla y no flex: \`flex\`/\`grid\` están prohibidos en el shell. -->
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${etiqueta}${celdas}</tr></table>
+    </td>
+  </tr>`;
+}
+
 function renderLineaCarrito(p: ProductoEmail, eNombre: EstiloResuelto, ePrecio: EstiloResuelto, eNota: EstiloResuelto, eImg: EstiloResuelto): string {
   const foto = p.imagen
     ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="${MINIATURA_CARRITO}" height="${MINIATURA_CARRITO}" style="width:${px(MINIATURA_CARRITO)};height:${px(MINIATURA_CARRITO)};object-fit:cover;border-radius:${px(eImg.radio ?? 8)};display:block" />`
@@ -583,10 +635,23 @@ function renderLineaCarrito(p: ProductoEmail, eNombre: EstiloResuelto, ePrecio: 
  * El `${cart.url}` del link lo resuelve el procesador de automations sobre el
  * HTML ya armado, igual que el resto de los links del carrito.
  */
-function renderCarrito(items: ProductoEmail[], pal: Paleta, e: EstProducto, restantes = 0): string {
+function renderCarrito(
+  items: ProductoEmail[],
+  pal: Paleta,
+  e: EstProducto,
+  restantes = 0,
+  ctx?: Ctx,
+  modo?: "resena",
+): string {
   if (items.length === 0) return "";
   const filas = items
-    .map((p) => renderLineaCarrito(p, e.nombre, e.precio, e.nota, e.img))
+    .map((p) => {
+      const linea = renderLineaCarrito(p, e.nombre, e.precio, e.nota, e.img);
+      // Las estrellas sólo en el modo `resena` y sólo si el procesador firmó las
+      // cinco. Un producto sin ficha —o un token que no se pudo firmar— sale como
+      // la línea de siempre, nunca con media escala.
+      return modo === "resena" && ctx ? linea + renderEstrellas(p, ctx, pal, e.nota) : linea;
+    })
     .join(`<tr><td colspan="3" style="border-top:1px solid ${pal.borde};font-size:0;line-height:0">&nbsp;</td></tr>`);
   const mas =
     restantes > 0
@@ -597,8 +662,12 @@ function renderCarrito(items: ProductoEmail[], pal: Paleta, e: EstProducto, rest
 
 /** Productos de mentira para el preview del editor. NUNCA salen en un envío real. */
 const CARRITO_MUESTRA: ProductoEmail[] = [
-  { nombre: "Producto de ejemplo", variante: "Variante · Color", cantidad: 2, precio: "12990", imagen: "", url: "#" },
-  { nombre: "Otro producto", variante: "Variante", precio: "10990", precioPromo: "7490", imagen: "", url: "#" },
+  // ⚠️ Las cinco `estrellas` van en la MUESTRA para que el editor dibuje la fila
+  // en el modo `resena` — si no, quien arma el mail no ve la única parte que ese
+  // modo agrega. Son `#`: el preview no navega a ningún lado (el iframe va con
+  // `pointer-events:none`) y una URL firmada de mentira sería peor.
+  { nombre: "Producto de ejemplo", variante: "Variante · Color", cantidad: 2, precio: "12990", imagen: "", url: "#", estrellas: ["#", "#", "#", "#", "#"] },
+  { nombre: "Otro producto", variante: "Variante", precio: "10990", precioPromo: "7490", imagen: "", url: "#", estrellas: ["#", "#", "#", "#", "#"] },
 ];
 
 /**
@@ -908,7 +977,14 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // desaparece. La muestra es solo del preview del editor.
       const items = b.items?.length ? b.items : ctx.muestraCarrito ? CARRITO_MUESTRA : [];
       return pad(
-        renderCarrito(items, pal, estProducto(b.tipo, "titulo", ctx, b.estilo), b.items?.length ? b.restantes ?? 0 : 0),
+        renderCarrito(
+          items,
+          pal,
+          estProducto(b.tipo, "titulo", ctx, b.estilo),
+          b.items?.length ? b.restantes ?? 0 : 0,
+          ctx,
+          b.modo,
+        ),
         caja(),
       );
     }

@@ -3,6 +3,9 @@ import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ProductoEmail
 import { leerContenido } from "@/lib/email/esquema";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { aplicarCuponDelTrigger, type TriggerPopup } from "@/lib/email/cupon-trigger";
+import { pideCupon, aplicarCuponDeCarrito, type CuponEmitido } from "@/lib/email/cupon-carrito";
+import { pedirCuponDeCarrito, RESORTY_URL } from "@/lib/carrito-cupon";
+import { firmarResena, VIDA_MS } from "@/lib/resena-token";
 import { sendEmail } from "@/lib/email/enviar";
 import { destinatarioPermitido } from "@/lib/email/proveedor";
 import { inyectarTracking } from "@/lib/email/tracking";
@@ -65,6 +68,7 @@ export async function GET(req: Request) {
 
     const td = run.triggerData as TriggerPopup & {
       checkoutId?: string; abandonedUrl?: string; productos?: ProductoEmail[]; restantes?: number;
+      orderId?: string;
     };
     const esCarrito = automation.trigger === "CARRITO_ABANDONADO";
 
@@ -104,13 +108,47 @@ export async function GET(req: Request) {
     // hace concreto, en silencio. Un trigger que no los trae no entra igual: el
     // `?.length` ya lo cubre.
     if (td.productos?.length) {
+      // Las cinco URLs firmadas de cada producto, sólo para el pedido de reseña.
+      //
+      // 🔴 Se firman ACÁ y no en el renderer: firmar necesita `RESENA_SECRET` y
+      // `node:crypto`, y `lib/email/render.ts` lo importa también el navegador
+      // para el preview del editor. Y se firman al ENVIAR, que es de donde sale
+      // el vencimiento de 30 días: un token firmado al encolar llegaría con la
+      // espera de 10 días ya descontada.
+      //
+      // ⚠️ Un producto sin `productoId` —o sin `RESENA_SECRET` cargada— se queda
+      // sin estrellas y sale como una línea normal, con su link a la ficha y su
+      // `?resena=1`. El mail nunca se frena por esto.
+      const productos =
+        automation.trigger === "RESENA" && td.orderId
+          ? td.productos.map((p) => {
+              if (!p.productoId) return p;
+              const estrellas = [1, 2, 3, 4, 5].map((r) =>
+                firmarResena({
+                  cuentaId: automation.cuentaId,
+                  orderId: td.orderId!,
+                  productoId: p.productoId!,
+                  producto: p.nombre,
+                  email: contacto.email,
+                  nombre: contacto.nombre ?? "",
+                  rating: r,
+                  exp: Date.now() + VIDA_MS,
+                }),
+              );
+              // Todas o ninguna: media escala de estrellas es peor que ninguna.
+              return estrellas.every(Boolean)
+                ? { ...p, estrellas: estrellas.map((t) => `${RESORTY_URL}/opinar/${t}`) }
+                : p;
+            })
+          : td.productos;
+
       const tieneBloque = bloques.some((b) => b.tipo === "carrito");
       if (tieneBloque) {
         bloques = bloques.map((b) =>
-          b.tipo === "carrito" ? { ...b, items: td.productos!, restantes: td.restantes ?? 0 } : b,
+          b.tipo === "carrito" ? { ...b, items: productos, restantes: td.restantes ?? 0 } : b,
         );
       } else {
-        bloques.push({ tipo: "carrito", items: td.productos, restantes: td.restantes ?? 0 });
+        bloques.push({ tipo: "carrito", items: productos, restantes: td.restantes ?? 0 });
       }
     }
 
@@ -121,6 +159,25 @@ export async function GET(req: Request) {
     // y no tiene sentido resolverle una consulta a TN a un bloque que no va a
     // salir. Ver el porqué de cada camino en lib/email/cupon-trigger.ts.
     bloques = aplicarCuponDelTrigger(bloques, td);
+
+    // El cupón del ÚLTIMO mail de la secuencia de carrito. Lo acuña Resorty en
+    // Tiendanube y lo escala contra el que la persona ya ganó en la ruleta.
+    //
+    // 🔴 **Se pide acá, al ENVIAR, y no cuando el poller encoló el run.** Entre
+    // una cosa y la otra pasan 72 h: un cupón acuñado al encolar llegaría con la
+    // mitad de su vida gastada, y se le habría emitido a gente que compró
+    // mientras tanto — justo la que el `completed_at` de más arriba saltea.
+    //
+    // 🔑 La condición es "¿ESTE mail declara el bloque?", no "¿es el 3º?": no
+    // hay ningún concepto de paso en la base, y preguntar por un número obligaría
+    // a inventarlo. Los dos primeros mails no lo declaran y no pagan ni la
+    // llamada.
+    if (esCarrito && pideCupon(bloques)) {
+      const emitido: CuponEmitido | null = td.checkoutId
+        ? await pedirCuponDeCarrito(automation.cuentaId, contacto.email, td.checkoutId)
+        : null;
+      bloques = aplicarCuponDeCarrito(bloques, emitido);
+    }
 
     // Productos automáticos: lo mismo que hace la cola de campañas, pero acá el
     // caché de `resolverProductosDinamicos` pesa más todavía. Este cron corre

@@ -61,6 +61,26 @@ export interface ProductoEmail {
   variante?: string;
   /** Unidades. Solo se muestra si es > 1: un "Cantidad: 1" en cada línea es ruido. */
   cantidad?: number;
+  /**
+   * El id del producto en Tiendanube.
+   *
+   * 🔑 Existe por las ESTRELLAS del mail de reseña: cada estrella es un link
+   * firmado que dice de qué producto se está opinando, y `url` no sirve para eso
+   * —es una URL pública que cualquiera puede escribir—. Sólo lo trae el trigger
+   * `RESENA` (`productosDeOrden`); el carrito no lo necesita y no lo manda, así
+   * que el campo es opcional y su ausencia **apaga las estrellas de esa línea**,
+   * nunca dibuja un link roto.
+   */
+  productoId?: string;
+  /**
+   * Las CINCO URLs firmadas de las estrellas, en orden de 1 a 5.
+   *
+   * 🔑 Las arma el procesador al enviar (`lib/resena-token.ts`) y no el renderer:
+   * firmar necesita el secreto y `node:crypto`, y este motor lo importa también
+   * el navegador para el preview. Ausente, o con menos de cinco, **la fila de
+   * estrellas no se dibuja** — nunca media escala ni un link sin firma.
+   */
+  estrellas?: string[];
 }
 
 export interface Columna {
@@ -541,7 +561,22 @@ export type Bloque = BloqueBase &
     // Placeholder: no se carga a mano. El procesador de automations le mete el
     // carrito real del contacto justo antes de enviar, EN ESTE LUGAR de la lista
     // — que es la diferencia con `productos`, que es una grilla curada.
-    | { tipo: "carrito"; items?: ProductoEmail[]; restantes?: number }
+    | {
+        tipo: "carrito";
+        items?: ProductoEmail[];
+        restantes?: number;
+        /**
+         * `"resena"` dibuja, debajo de cada línea, **cinco estrellas que son
+         * cinco links**: apretar una abre `/opinar` con ese puntaje ya elegido.
+         *
+         * Ausente = la línea de siempre (lo que se dejó en el carrito). Es una
+         * variante del MISMO bloque y no un bloque nuevo porque lo que dibuja es
+         * idéntico —foto, nombre, variante, precio— y sólo se le agrega un
+         * renglón: un bloque aparte sería mantener dos veces la línea de
+         * producto, que ya tiene su propia historia de arreglos de Outlook.
+         */
+        modo?: "resena";
+      }
     /**
      * La fila: de 2 a 4 celdas, cada una con foto o con texto.
      *

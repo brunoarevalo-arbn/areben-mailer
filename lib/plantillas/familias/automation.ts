@@ -120,7 +120,13 @@ export const AUTOMATION: readonly DefPreset[] = [
         // eso ya se encarga cada línea del bloque. Si TN no devuelve ninguna
         // ficha, el bloque desaparece solo y el mail sale con su título y su
         // texto: incompleto, pero nunca con un link roto.
-        { tipo: "carrito", items: [] },
+        //
+        // 🔑 `modo: "resena"` es lo que agrega las CINCO ESTRELLAS debajo de cada
+        // línea. Cada una es un link firmado que abre `/opinar` con ese puntaje
+        // ya elegido, así opinar arranca con un solo toque desde la casilla en
+        // vez de con una ficha de producto que hay que scrollear. Sin el modo, el
+        // bloque dibuja lo mismo que en el carrito abandonado.
+        { tipo: "carrito", items: [], modo: "resena" },
       ],
     }),
   },

@@ -87,6 +87,11 @@ async function productosDeOrden(
     }
     if (!url) continue;
     salida.push({
+      // 🔑 El id, que es lo que necesitan las ESTRELLAS: cada una es un link
+      // firmado que dice de qué producto se opina. La URL no sirve para eso —es
+      // pública y cualquiera la escribe—, y sin el id el token no se puede
+      // armar. Ver `lib/resena-token.ts`.
+      productoId: String(p.product_id),
       // Mismo criterio que el carrito: `name` viene con la variante pegada y la
       // variante va en su propio renglón. `name_without_variants` es **null** en
       // los productos sin variantes, de ahí el fallback.
