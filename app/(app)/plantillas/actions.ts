@@ -115,7 +115,7 @@ export async function usarComoAutomation(
   // de automation—, así que el 1º nace con la del schema (1 h), escrita acá para
   // que se vea. Lo que cambia en el 2º de una secuencia es el nombre y la espera,
   // o son dos filas idénticas que salen a la misma hora.
-  const nace = nacimientoDelMail(orden, { nombre, esperaHoras: ESPERA_SCHEMA_HORAS });
+  const nace = nacimientoDelMail(orden, { nombre, esperaHoras: ESPERA_SCHEMA_HORAS }, trigger);
   const a = await prisma.automation.create({
     data: {
       cuentaId: cuenta.id,

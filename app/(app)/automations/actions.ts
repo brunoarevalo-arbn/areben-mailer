@@ -48,7 +48,11 @@ export async function crearAutomation(trigger: Trigger) {
   const p = presetDeTrigger(trigger, cuenta, rem?.email);
   // El 2º mail de una secuencia no puede nacer con el nombre y la espera del 1º:
   // serían dos filas idénticas a la misma hora.
-  const nace = nacimientoDelMail(existentes.filter((a) => a.trigger === trigger).length + 1, p);
+  const nace = nacimientoDelMail(
+    existentes.filter((a) => a.trigger === trigger).length + 1,
+    p,
+    trigger,
+  );
   const a = await prisma.automation.create({
     data: {
       cuentaId: cuenta.id,

@@ -77,16 +77,21 @@ export function automationDelTrigger<T extends { id: string; trigger: string; cr
  * decisión de cuántas caben vive acá, en código, donde se puede cambiar. Un
  * `@@unique` es DDL que después no se saca.
  *
- * ⚠️ Subir el número del carrito a 3 es lo ÚNICO que hace falta para un tercer
- * mail. Está en 2 porque el tercer toque de una secuencia de carrito es casi
- * siempre el del descuento, y hoy **no hay cupón atado a este trigger**
- * (`aplicarCuponDelTrigger` mira `triggerData.origen`, que el carrito no manda).
+ * ⚠️ El carrito pasó de 2 a 3 el 21-ago-2026, cuando el tercer toque —el del
+ * descuento— consiguió su cupón: `lib/email/cupon-carrito.ts` se lo pide a
+ * Resorty al ENVIAR. Antes no lo tenía (`aplicarCuponDelTrigger` mira
+ * `triggerData.origen`, que el carrito no manda) y un 3er mail habría sido el
+ * mismo mail una vez más.
+ *
+ * 🔴 Subir este número **obliga a alargar `ESPERAS_SIGUIENTES`**, o el mail que
+ * se agrega nace con la espera del anterior y salen los dos a la misma hora. Lo
+ * custodia `probar-automations.ts`, que compara los dos largos.
  */
 export const MAX_POR_TRIGGER: Record<Trigger, number> = {
   NUEVO_CLIENTE: 1,
   NUEVO_SUSCRIPTOR: 1,
   COMPRA: 1,
-  CARRITO_ABANDONADO: 2,
+  CARRITO_ABANDONADO: 3,
   RESENA: 1,
 };
 
@@ -103,12 +108,39 @@ export function puedeCrearOtra(existentes: { trigger: string }[], trigger: Trigg
 }
 
 /**
- * La espera con la que nace el segundo mail de una secuencia, en horas.
+ * La escalera de esperas de una secuencia, en horas, **del 2º mail en adelante**.
+ *
+ * El 1º no está acá a propósito: su espera la trae el preset del trigger
+ * (`auto-carrito` nace en 3 h) y repetirla acá serían dos fuentes para el mismo
+ * número. `ESPERAS_SIGUIENTES[t][0]` es el 2º mail, `[1]` el 3º.
+ *
+ * 🔴 Hasta el 21-ago-2026 esto era **una sola constante para todo `orden > 1`**.
+ * Con el tope del carrito en 2 no se notaba; con tres mails, el 2º y el 3º
+ * nacían con la MISMA espera —24 h los dos— o sea dos mails a la misma hora,
+ * que es exactamente el defecto que `nacimientoDelMail` existe para evitar.
  *
  * Es un **default del panel**, no una regla: quien lo arma la cambia desde
- * `/automations` o desde el panel de carrito de Resorty. Existe para que el
- * segundo no nazca con la misma espera que el primero, que es un mail duplicado
- * a la misma hora.
+ * `/automations` o desde el panel de carrito de Resorty. Y es un `Record`
+ * completo por lo mismo que `MAX_POR_TRIGGER`: un trigger nuevo tiene que
+ * decidir su escalera **para compilar**, no heredarla del olvido.
+ */
+export const ESPERAS_SIGUIENTES: Record<Trigger, readonly number[]> = {
+  NUEVO_CLIENTE: [],
+  NUEVO_SUSCRIPTOR: [],
+  COMPRA: [],
+  // 3 h (el preset) → 24 h → 72 h. El 3º es el del cupón: se espera tres días
+  // porque es el último toque y el que trae el premio.
+  CARRITO_ABANDONADO: [24, 72],
+  RESENA: [],
+};
+
+/**
+ * La espera de un mail de secuencia cuya escalera se quedó corta.
+ *
+ * ⚠️ **No se alcanza**: `puedeCrearOtra` no deja pasar del tope y el ensayo
+ * exige `ESPERAS_SIGUIENTES[t].length === MAX_POR_TRIGGER[t] - 1` para los
+ * cinco triggers. Está para que un descuido escriba un número raro en vez de un
+ * `undefined`, que Prisma rechazaría recién al insertar.
  */
 export const ESPERA_SIGUIENTE_HORAS = 24;
 
@@ -130,13 +162,22 @@ export const ESPERA_SCHEMA_HORAS = 1;
  * dibuja dos filas idénticas ("Carrito abandonado", "Carrito abandonado") y la
  * única forma de saber cuál se está editando es abrirlas: la pantalla afirmaría
  * que son la misma cosa. Es el mismo motivo por el que la espera no se repite.
+ *
+ * 🔑 **`trigger` es parámetro y no se deduce de `base`**: la espera del 3er mail
+ * no es una propiedad del mail anterior sino de la secuencia entera, y los dos
+ * llamadores ya lo tienen a mano.
  */
 export function nacimientoDelMail(
   orden: number,
   base: { nombre: string; esperaHoras: number },
+  trigger: Trigger,
 ): { nombre: string; esperaHoras: number } {
   if (orden <= 1) return { nombre: base.nombre, esperaHoras: base.esperaHoras };
-  return { nombre: `${base.nombre} — ${orden}º mail`, esperaHoras: ESPERA_SIGUIENTE_HORAS };
+  const escalon = ESPERAS_SIGUIENTES[trigger][orden - 2];
+  return {
+    nombre: `${base.nombre} — ${orden}º mail`,
+    esperaHoras: escalon ?? ESPERA_SIGUIENTE_HORAS,
+  };
 }
 
 /**

@@ -27,6 +27,7 @@
 import {
   automationDelTrigger,
   ESPERA_SIGUIENTE_HORAS,
+  ESPERAS_SIGUIENTES,
   MAX_POR_TRIGGER,
   motivoNoBorrable,
   nacimientoDelMail,
@@ -105,16 +106,18 @@ titulo("Dos llamadas seguidas dejan UNA fila (los triggers de tope 1)");
   ok(otro.creo && base.length === 2, "otro trigger SÍ se puede crear");
 }
 
-titulo("El carrito abandonado llega a DOS, y se frena en dos");
+titulo("El carrito abandonado llega a TRES, y se frena en tres");
 {
   const { base, crear } = simulador();
   const uno = crear("CARRITO_ABANDONADO");
   const dos = crear("CARRITO_ABANDONADO");
   const tres = crear("CARRITO_ABANDONADO");
+  const cuatro = crear("CARRITO_ABANDONADO");
   ok(uno.creo && dos.creo, "el 2º mail de la secuencia SÍ se crea");
-  ok(!tres.creo, "el 3º no", "el tope está en 2 mientras no haya cupón atado al trigger");
-  ok(base.length === 2, "quedan dos filas", `quedaron ${base.length}`);
-  ok(tres.redirigioA === uno.redirigioA, "y el intento de más lleva a la PRIMERA, no a la última");
+  ok(tres.creo, "y el 3º también", "es el del cupón; entró el 21-ago-2026");
+  ok(!cuatro.creo, "el 4º no", "el tope está en 3: un cuarto toque a la misma persona es acoso");
+  ok(base.length === 3, "quedan tres filas", `quedaron ${base.length}`);
+  ok(cuatro.redirigioA === uno.redirigioA, "y el intento de más lleva a la PRIMERA, no a la última");
 }
 
 titulo("Cada trigger declara su tope, y ninguno queda en cero");
@@ -125,6 +128,17 @@ titulo("Cada trigger declara su tope, y ninguno queda en cero");
     ok(MAX_POR_TRIGGER[t] >= 1, `${t}: admite al menos una`, `declara ${MAX_POR_TRIGGER[t]}`);
   }
   ok(MAX_POR_TRIGGER.CARRITO_ABANDONADO > 1, "el carrito es el único con secuencia");
+  // 🔴 El invariante que hace inalcanzable el fallback de `nacimientoDelMail`:
+  // la escalera tiene que tener un escalón por cada mail MENOS el 1º (que trae
+  // el suyo del preset). Sin esto, subir el tope y olvidar la escalera saca dos
+  // mails a la misma hora, callado.
+  for (const t of TODOS) {
+    ok(
+      ESPERAS_SIGUIENTES[t].length === MAX_POR_TRIGGER[t] - 1,
+      `${t}: la escalera acompaña al tope`,
+      `tope ${MAX_POR_TRIGGER[t]} · escalones ${ESPERAS_SIGUIENTES[t].length}`,
+    );
+  }
   ok(
     TODOS.filter((t) => MAX_POR_TRIGGER[t] > 1).length === 1,
     "y es el ÚNICO",
@@ -132,23 +146,48 @@ titulo("Cada trigger declara su tope, y ninguno queda en cero");
   );
 }
 
-titulo("El 2º mail no nace igual que el 1º");
+titulo("Los tres mails nacen distintos, y NINGUNO a la misma hora que otro");
 {
-  // Sin esto, `/automations` dibuja dos filas idénticas y la única forma de
-  // saber cuál se edita es abrirlas.
+  // Sin esto, `/automations` dibuja filas idénticas y la única forma de saber
+  // cuál se edita es abrirlas.
   const base = { nombre: "Carrito abandonado", esperaHoras: 3 };
-  const primero = nacimientoDelMail(1, base);
-  const segundo = nacimientoDelMail(2, base);
+  const primero = nacimientoDelMail(1, base, "CARRITO_ABANDONADO");
+  const segundo = nacimientoDelMail(2, base, "CARRITO_ABANDONADO");
+  const tercero = nacimientoDelMail(3, base, "CARRITO_ABANDONADO");
   ok(primero.nombre === base.nombre, "el 1º conserva el nombre del preset");
   ok(primero.esperaHoras === base.esperaHoras, "y su espera");
   ok(segundo.nombre !== primero.nombre, "el 2º se llama distinto", segundo.nombre);
   ok(segundo.nombre.includes("2º"), "y el nombre dice QUÉ NÚMERO es", segundo.nombre);
+  ok(tercero.nombre.includes("3º"), "el 3º también", tercero.nombre);
+
+  // 🔴 ESTE es el caso que no existía antes del 21-ago: con una constante única
+  // para todo `orden > 1`, el 2º y el 3º salían los dos a las 24 h.
+  const horas = [primero.esperaHoras, segundo.esperaHoras, tercero.esperaHoras];
   ok(
-    segundo.esperaHoras === ESPERA_SIGUIENTE_HORAS && segundo.esperaHoras !== primero.esperaHoras,
-    "y no sale a la misma hora que el 1º",
-    `1º ${primero.esperaHoras}h · 2º ${segundo.esperaHoras}h`,
+    new Set(horas).size === 3,
+    "las tres esperas son distintas",
+    `1º ${horas[0]}h · 2º ${horas[1]}h · 3º ${horas[2]}h`,
   );
-  ok(nacimientoDelMail(0, base).nombre === base.nombre, "un orden 0 se trata como el 1º, no revienta");
+  ok(
+    horas[0] < horas[1] && horas[1] < horas[2],
+    "y van de menor a mayor: cada toque espera más que el anterior",
+    horas.join(" < "),
+  );
+  ok(
+    segundo.esperaHoras === ESPERAS_SIGUIENTES.CARRITO_ABANDONADO[0] &&
+      tercero.esperaHoras === ESPERAS_SIGUIENTES.CARRITO_ABANDONADO[1],
+    "y salen de la escalera, no de una constante suelta",
+  );
+  ok(
+    nacimientoDelMail(0, base, "CARRITO_ABANDONADO").nombre === base.nombre,
+    "un orden 0 se trata como el 1º, no revienta",
+  );
+  // Un trigger sin secuencia nunca llega acá (lo frena `puedeCrearOtra`), pero
+  // si llegara tiene que dar un número, no `undefined`.
+  ok(
+    nacimientoDelMail(2, base, "COMPRA").esperaHoras === ESPERA_SIGUIENTE_HORAS,
+    "un trigger sin escalera cae en el fallback, no en undefined",
+  );
 }
 
 titulo("Con duplicadas ya existentes gana la más vieja");
