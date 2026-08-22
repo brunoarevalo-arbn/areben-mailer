@@ -19,6 +19,7 @@ import type { Bloque, Columna, ContenidoCampania, ElementoEncima, PorFila, PorFi
 import { armarPlano, type CeldaEncima } from "./encima";
 import { armarMosaico, estaCortado, normalizar, type CeldaPlano } from "./mosaico";
 import { etiquetasDe, instante, lineaRegresiva, medidas, tenue, urlRegresiva, FIN_BASE } from "./regresiva";
+import { resolverTienda, type Tienda } from "./tienda";
 
 // Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
 // sin ciclo) pero se re-exportan desde acá: media app importa `Bloque` y
@@ -1724,6 +1725,19 @@ export interface RenderOpts {
    * ~102 KB con los que Gmail recorta.
    */
   marcarBloques?: boolean;
+  /**
+   * Los datos duros del comercio (`Cuenta.config.tienda`), que es de donde el
+   * documento saca lo que escribe con `${tienda.envioGratis}` y compañía.
+   *
+   * 🔑 Viaja por acá y **no adentro del Json** por lo mismo que el logo, las
+   * redes y el domicilio: el mismo documento tiene que poder salir con los
+   * números de cada marca. Antes de esto el umbral de envío gratis estaba
+   * copiado en once documentos de BDI y los once decían el número viejo.
+   *
+   * Ausente = los tags no encuentran dato: el texto que los lleva se vacía y el
+   * trozo se cae. **Nunca sale el tag crudo.** Ver `lib/email/tienda.ts`.
+   */
+  tienda?: Tienda;
 }
 
 /**
@@ -1751,7 +1765,11 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
   // Cinturón y tiradores: los call sites ya normalizan, pero si alguno se olvida
   // el mail sale igual bien. Es barato — un contenido que ya está en la versión
   // actual se devuelve tal cual, sin recorrer nada.
-  const contenido = leerContenido(entrada);
+  // 🔑 Los `${tienda.…}` se resuelven ACÁ, sobre el documento y antes de dibujar
+  // nada: el número no está adentro del Json, lo pone la cuenta al renderizar.
+  // Es el único lugar por el que pasan los dos formatos (HTML y texto plano) y
+  // los ocho call sites que arman un mail, editores incluidos.
+  const contenido = resolverTienda(leerContenido(entrada), opts.tienda);
   // El tema de la campaña pisa al de la marca, campo por campo.
   const pal = resolverPaleta(combinarTema(opts.temaMarca, contenido.tema));
   const ctx: Ctx = {
@@ -2035,7 +2053,10 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
  * miden. El costo es que un click desde la versión texto no queda registrado.
  */
 export function renderEmailTexto(entrada: ContenidoCampania, opts: RenderOpts): string {
-  const contenido = leerContenido(entrada);
+  // Igual que el HTML: si el text/plain no resolviera los tags, el mail saldría
+  // con el número en una mitad y con `${tienda.envioGratis}` en la otra — y la
+  // que lee el filtro de spam es justamente ésta.
+  const contenido = resolverTienda(leerContenido(entrada), opts.tienda);
   // Mismo criterio que el HTML: el encabezado va primero, esté donde esté en la
   // lista. Si alguien lo borró, el mail arranca directo por el contenido.
   const bloques = contenido.bloques ?? [];

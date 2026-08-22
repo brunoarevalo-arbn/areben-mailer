@@ -13,6 +13,7 @@ import { ESTILO_CUPON_COMPACTO, type Estilos } from "@/lib/email/estilos";
 import type { Tema } from "@/lib/email/tema";
 import type { Trigger } from "@/lib/automations";
 import { foto, type ClaveFoto } from "./fotos";
+import type { Tienda } from "@/lib/email/tienda";
 
 /** Lo que un preset sabe de la cuenta que lo instancia. */
 export interface CtxPreset {
@@ -24,6 +25,15 @@ export interface CtxPreset {
    * un link roto, que es peor que no tener botón.
    */
   tienda: string;
+  /**
+   * Los datos duros del comercio (`Cuenta.config.tienda`). **Puede venir vacío**:
+   * una cuenta que todavía no los cargó nace SIN la barra de garantías, y eso es
+   * deliberado — ver `garantias()`.
+   *
+   * ⚠️ No confundir con `tienda` de acá arriba, que es el SITIO. Este es el dato
+   * comercial: envío gratis, cuotas, plazos.
+   */
+  datosTienda?: Tienda;
 }
 
 /** Lo que devuelve un preset antes de pasar por `leerContenido`. */
@@ -450,3 +460,36 @@ export const cuponCompacto = (
   ...(boton ? cta(boton.texto, boton.url) : sinBoton),
   estilo: ESTILO_CUPON_COMPACTO,
 });
+
+/**
+ * La barra de garantías de la marca, con los datos de la cuenta puestos como
+ * tags.
+ *
+ * 🔴 **Por qué es condicional y no una barra fija** (22-ago-2026). El umbral de
+ * envío gratis estaba escrito a mano en once documentos de BDI, y por eso ahora
+ * los mails lo leen de la cuenta (`lib/email/tienda.ts`). Pero una barra que
+ * nazca SIEMPRE es peor que ninguna: sin dato cargado, "Envíos gratis" queda como
+ * un título sin condición, o sea **una promesa que la tienda no hizo**. Es la
+ * misma lección del 21-ago con el bloque `cupon`: el bloque se puede borrar, un
+ * asunto que prometió un premio no.
+ *
+ * Entonces: **una celda por dato cargado, y sin datos no hay bloque.** Cargar
+ * los datos en Remitentes es lo que hace aparecer la barra en los mails nuevos.
+ *
+ * 🔑 **El texto va como tag y no como valor.** El preset no puede guardar
+ * "$44.000" adentro del Json por lo mismo que no guarda el logo: el documento se
+ * clona, se comparte y sobrevive al cambio de precio. Con el tag, cambiar el
+ * umbral en una pantalla lo cambia en todos los mails que ya existen.
+ *
+ * ⚠️ `plazoDespacho` y `local` **no** entran en la barra: son datos de pie y de
+ * sección, y una barra de cinco celdas no entra en 600px. Se escriben a mano en
+ * el mail que los necesite, con su tag.
+ */
+export const garantias = (t: Tienda | undefined): Bloque[] => {
+  if (!t) return [];
+  const celdas: { titulo: string; texto: string; icono?: string }[] = [];
+  if (t.envioGratis) celdas.push({ titulo: "Envíos gratis", texto: "En compras mayores a ${tienda.envioGratis}", icono: "envio" });
+  if (t.cuotas) celdas.push({ titulo: "Cuotas sin interés", texto: "${tienda.cuotas}", icono: "tarjeta" });
+  if (t.plazoCambio) celdas.push({ titulo: "Cambios y devoluciones", texto: "${tienda.plazoCambio}", icono: "cambios" });
+  return celdas.length ? [fila(celdas)] : [];
+};

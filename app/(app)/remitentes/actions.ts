@@ -7,6 +7,7 @@ import { autorizar, chequear } from "@/lib/auth";
 import { altaDominioSes, getIdentityStatus } from "@/lib/email/proveedores/ses";
 import { leerStore } from "@/lib/tn/client";
 import { configConTienda, leerConfigCuenta, marcaDe, normalizarDominioEnvio } from "@/lib/marca";
+import { leerTienda } from "@/lib/email/tienda";
 import type { Tema } from "@/lib/email/tema";
 
 /**
@@ -387,4 +388,41 @@ export async function guardarDireccionOculta(oculta: boolean) {
   await prisma.cuenta.update({ where: { id: cuenta.id }, data: { config: nuevo } });
   revalidatePath("/remitentes");
   return { ok: true as const };
+}
+
+/**
+ * Los datos duros del comercio: envío gratis, cuotas, plazos, el local.
+ *
+ * 🔴 **Por qué están acá y no adentro de cada mail** (22-ago-2026): el umbral de
+ * envío gratis estaba escrito a mano en 10 campañas de BDI **y en la automation
+ * de Bienvenida, que estaba ACTIVA**, y las once decían $50.000 cuando el real
+ * es $44.000. Cambiar el número obligaba a editar once documentos. Ahora se
+ * edita acá y el mail lo lee con `${tienda.envioGratis}`.
+ *
+ * ⚠️ **Tiendanube no devuelve nada de esto**, así que "Traer de mi tienda" no lo
+ * toca ni lo puede pisar. Se escribe a mano, una vez, igual que las redes.
+ *
+ * Un campo vacío **borra la clave** en vez de guardar `""`: ausente y vacío
+ * significan lo mismo para el render, y así el Json no junta basura. La validación
+ * de verdad —tipos, largos, claves desconocidas— vive en `leerTienda()`, que es
+ * la misma puerta por la que el dato se lee al renderizar.
+ */
+export async function guardarDatosTienda(datos: Record<string, string>) {
+  const chk = await chequear("remitentes");
+  if (!chk.ok) return chk;
+  const { cuenta } = chk.ctx;
+
+  // Se normaliza con la MISMA función que lee el render: si acá se guardara algo
+  // que `leerTienda` descarta, la pantalla diría "Guardado" y el mail saldría sin
+  // el dato. Es el bug del preview que mostraba una cosa y el envío otra.
+  const limpio = leerTienda(datos);
+
+  const config = (cuenta.config as Prisma.JsonObject) ?? {};
+  const nuevo: Prisma.JsonObject = { ...config };
+  if (limpio) nuevo.tienda = limpio as Prisma.JsonObject;
+  else delete nuevo.tienda;
+
+  await prisma.cuenta.update({ where: { id: cuenta.id }, data: { config: nuevo } });
+  revalidatePath("/remitentes");
+  return { ok: true as const, tienda: limpio ?? {} };
 }

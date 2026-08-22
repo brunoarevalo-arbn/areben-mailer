@@ -32,7 +32,9 @@
 import { leerContenido } from "@/lib/email/esquema";
 import type { ContenidoCampania } from "@/lib/email/render";
 import { urlTiendaDe, type Trigger } from "@/lib/automations";
-import { type CtxPreset, type DefPreset, type Familia } from "./comun";
+import { garantias, type CtxPreset, type DefPreset, type Familia } from "./comun";
+import { leerConfigCuenta } from "@/lib/marca";
+import type { Bloque } from "@/lib/email/render";
 import { CATALOGO } from "./familias/catalogo";
 import { VENTA } from "./familias/venta";
 import { PRODUCTO } from "./familias/producto";
@@ -83,8 +85,46 @@ export interface CuentaPreset {
   config: unknown;
 }
 
+/**
+ * ¿Este mail ya tiene una barra de beneficios propia?
+ *
+ * Es exactamente la forma de la barra: una fila de celdas de TEXTO. Se pregunta
+ * por la forma y no por un id porque la mitad de los presets la traen escrita
+ * adentro desde antes de que los datos existieran, y dos barras seguidas es peor
+ * que una sola.
+ */
+const yaTieneBarra = (bloques: Bloque[]) =>
+  bloques.some((b) => b.tipo === "columnas" && (b as { variante?: string }).variante === "textos");
+
+/**
+ * Todo mail nuevo nace con la barra de garantías de la marca — **si la marca
+ * tiene los datos cargados**.
+ *
+ * 🔑 Va acá, en `resolver()`, y no repetido en los 42 presets: es la única puerta
+ * por la que un preset se convierte en documento, así que una plantilla nueva la
+ * hereda sin que su autor tenga que acordarse. Enumerarlo preset por preset es
+ * cómo se llega a que 12 de ellos cierren con un bloque `redes` que no dibuja
+ * nada (pasó, 1-ago-2026).
+ *
+ * 🔴 **Un preset NO arregla lo ya creado.** Los documentos que existen se migran
+ * con `scripts/tienda-a-tags.ts`, y ese paso va ANTES que éste — es lo que ya
+ * mordió con el bloque `cupon` sin `modo: "resena"`.
+ *
+ * Se mete antes del cierre de redes: la barra es contenido, los iconos son la
+ * firma. Si el preset no cierra con redes, va al final.
+ */
+function conGarantias(bloques: Bloque[], datos: CtxPreset["datosTienda"]): Bloque[] {
+  const barra = garantias(datos);
+  if (!barra.length || yaTieneBarra(bloques)) return bloques;
+  const i = bloques.length - 1;
+  return i >= 0 && bloques[i].tipo === "redes"
+    ? [...bloques.slice(0, i), ...barra, bloques[i]]
+    : [...bloques, ...barra];
+}
+
 function resolver(d: DefPreset, ctx: CtxPreset): Preset {
-  const { bloques, tema, estilos, asunto } = d.arma(ctx);
+  const { bloques: crudos, tema, estilos, asunto } = d.arma(ctx);
+  const bloques = conGarantias(crudos, ctx.datosTienda);
   return {
     id: d.id,
     nombre: d.nombre,
@@ -107,8 +147,22 @@ function resolver(d: DefPreset, ctx: CtxPreset): Preset {
  * `remitenteEmail` es el fallback del sitio de la tienda para las cuentas que
  * todavía no tienen `config.url` — ver `urlTiendaDe`.
  */
+/**
+ * El contexto de una cuenta, en un solo lugar.
+ *
+ * Los tres puntos de entrada lo armaban a mano y por eso un campo nuevo entraba
+ * sólo en el que uno estaba mirando: `presetDe` y `presetDeTrigger` se habrían
+ * quedado sin los datos de la tienda. Es la misma razón por la que `marcaDe()`
+ * devuelve un pedazo de `RenderOpts` entero.
+ */
+const ctxDe = (cuenta: CuentaPreset, remitenteEmail?: string | null): CtxPreset => ({
+  marca: cuenta.nombre,
+  tienda: urlTiendaDe(cuenta, remitenteEmail),
+  datosTienda: leerConfigCuenta(cuenta.config).tienda,
+});
+
 export function presetsPara(cuenta: CuentaPreset, remitenteEmail?: string | null): Preset[] {
-  const ctx: CtxPreset = { marca: cuenta.nombre, tienda: urlTiendaDe(cuenta, remitenteEmail) };
+  const ctx = ctxDe(cuenta, remitenteEmail);
   return DEFS.map((d) => resolver(d, ctx));
 }
 
@@ -119,7 +173,7 @@ export function presetsGaleria(cuenta: CuentaPreset, remitenteEmail?: string | n
 
 export function presetDe(id: string, cuenta: CuentaPreset, remitenteEmail?: string | null): Preset | undefined {
   const d = DEFS.find((x) => x.id === id);
-  return d ? resolver(d, { marca: cuenta.nombre, tienda: urlTiendaDe(cuenta, remitenteEmail) }) : undefined;
+  return d ? resolver(d, ctxDe(cuenta, remitenteEmail)) : undefined;
 }
 
 /** El contenido inicial de una automation, con la marca que la crea adentro. */
@@ -129,7 +183,7 @@ export function presetDeTrigger(trigger: Trigger, cuenta: CuentaPreset, remitent
   // y `Trigger` es una unión cerrada. Si alguien agrega un trigger sin preset,
   // que reviente acá y no con una automation vacía llegándole a un cliente.
   if (!d) throw new Error(`Sin preset para el trigger ${trigger}`);
-  return resolver(d, { marca: cuenta.nombre, tienda: urlTiendaDe(cuenta, remitenteEmail) });
+  return resolver(d, ctxDe(cuenta, remitenteEmail));
 }
 
 /** Los ids que existen. Para las pruebas, que recorren todos. */

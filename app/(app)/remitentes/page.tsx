@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
 import { RemitentesManager } from "@/components/RemitentesManager";
 import { TemaMarca } from "@/components/TemaMarca";
+import { DatosTienda } from "@/components/DatosTienda";
 import { temaDe } from "@/lib/email/tema";
 import { leerConfigCuenta, marcaDe } from "@/lib/marca";
 
@@ -47,6 +48,11 @@ export default async function RemitentesPage() {
         dominioEnvio={config.dominioEnvio}
         appUrl={process.env.APP_URL ?? ""}
       />
+      {/* Los datos duros del comercio. Van después del diseño porque se cargan
+          una vez y no se vuelven a mirar, pero en ESTA página porque son la
+          misma clase de dato que el domicilio y las redes: de la cuenta, no del
+          mail. Ver `lib/email/tienda.ts`. */}
+      <DatosTienda inicial={config.tienda ?? {}} />
     </div>
   );
 }

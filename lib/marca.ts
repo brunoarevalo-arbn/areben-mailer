@@ -12,6 +12,7 @@
 // ⚠️ Puro: lo importa el servidor Y el cliente (el preview del editor arma las
 // mismas opciones de render). Sin prisma, sin next/headers.
 import { temaDe, type Tema } from "./email/tema";
+import { leerTienda, type Tienda } from "./email/tienda";
 import type { RenderOpts } from "./email/render";
 import type { DatosTienda } from "./tn/client";
 
@@ -94,6 +95,18 @@ export interface ConfigCuenta {
    * tenerlo los dibujaba en texto.
    */
   dominioEnvio?: string;
+  /**
+   * Los datos duros del comercio —envío gratis, cuotas, plazos, el local— que
+   * los mails leen con `${tienda.…}` en vez de tenerlos escritos adentro.
+   *
+   * 🔑 Vive acá por lo mismo que el logo y las redes: el documento se comparte
+   * entre marcas y no puede llevar el número adentro. Ver `lib/email/tienda.ts`,
+   * que es donde está la historia de los once mails que decían $50.000.
+   *
+   * ⚠️ Tiendanube **no** devuelve nada de esto en `/store`, así que "Traer de mi
+   * tienda" no lo toca: se escribe a mano en `/remitentes`, una vez.
+   */
+  tienda?: Tienda;
 }
 
 /**
@@ -154,6 +167,7 @@ export type Marca = Pick<
   | "permiteHtmlCrudo"
   | "redesMarca"
   | "assetsBase"
+  | "tienda"
 >;
 
 const txt = (v: unknown): string | undefined => {
@@ -208,6 +222,7 @@ export function leerConfigCuenta(valor: unknown): ConfigCuenta {
     // Se re-valida al LEER, no solo al guardar: el config es un Json libre que
     // también tocan scripts y podría entrar editado a mano.
     dominioEnvio: normalizarDominioEnvio(c.dominioEnvio),
+    tienda: leerTienda(c.tienda),
   };
 }
 
@@ -249,6 +264,11 @@ export function marcaDe(cuenta: { nombre: string; config: unknown }, appUrl: str
     // a los ocho lugares que dibujan un mail, editores incluidos, sin que
     // ninguno tenga que acordarse.
     assetsBase: hostDeEnvio(cuenta, appUrl),
+    // Igual que el logo, el domicilio y las redes: el dato de la tienda lo
+    // resuelve el render y no el documento. Entra por acá y no suelto para que
+    // llegue a los ocho call sites sin que ninguno tenga que acordarse — es la
+    // misma razón por la que `assetsBase` terminó adentro de `Marca`.
+    tienda: c.tienda,
   };
 }
 

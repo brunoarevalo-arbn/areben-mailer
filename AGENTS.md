@@ -83,6 +83,7 @@ node --import tsx scripts/probar-precio-oculto.ts # lo que el HTML oculta, el te
 node --import tsx scripts/probar-encabezado.ts # el link de baja no se puede borrar
 node --import tsx scripts/probar-imagenes.ts   # permisos, multi-tenant y SVG de /api/imagenes
 node --import tsx scripts/probar-marca.ts      # la marca de TN no se guarda adentro del Json
+node --import tsx scripts/probar-tienda.ts     # los datos de la tienda salen de la CUENTA, y un tag sin dato nunca sale crudo
 node --import tsx scripts/probar-panel-estilo.ts # ningún control del panel está desconectado
 node --import tsx scripts/probar-presets.ts    # ninguna plantilla prearmada tiene un botón que no lleva a nada
 node --import tsx scripts/probar-import.ts     # la supresión de un import es de una sola vía
@@ -137,6 +138,8 @@ lib/email/…       motor: proveedor.ts (gate+contrato), cola.ts, procesar.ts,
                   esquema.ts  ← leerContenido(): ÚNICA puerta al Json de la base
                                 (v4 desde el 1-ago-2026: `columnas` es `celdas[]`)
                   estilos.ts  ← cascada de estilo por bloque (tokens + lista blanca)
+                  tienda.ts   ← los datos duros del comercio: `${tienda.envioGratis}`
+                                sale de la CUENTA, no del documento
 lib/auth.ts       autorizar/chequear/autorizarApi ← ÚNICO camino de autorización
 lib/permisos.ts   matriz de roles (puro: lo importa server Y cliente)
 lib/fechas.ts     ZONA + el día del calendario ← ÚNICO lugar con una zona horaria.
@@ -710,6 +713,62 @@ en **`Cuenta.config`** (Json libre — sin columna nueva: la base es compartida)
   bajo CAN-SPAM para lo que entra a EE.UU. y una señal que miran los filtros:
   apagarlo es decisión del comerciante. **El link de baja no se puede apagar** —
   por eso el pie no es un bloque.
+
+## Los datos de la tienda en UN lugar (`lib/email/tienda.ts`, 22-ago-2026)
+
+🔴 **De dónde salió.** Se buscó en la base si el umbral de envío gratis ya estaba
+escrito en algún mail, para copiarlo en vez de inventarlo. Estaba: **el mismo
+bloque de garantías en 10 campañas de BDI y en la automation de Bienvenida**, y
+las once decían *"En compras mayores a $50.000"* cuando el real es **$44.000**.
+La Bienvenida estaba **ACTIVA**: cada lead nuevo recibía un umbral seis mil pesos
+más alto. La lección no es que alguien se olvidó — es que cambiar el umbral
+obligaba a editar **once documentos**, y un dato copiado es un dato que se va a
+desincronizar.
+
+**La regla, en una línea: un dato de la tienda va como tag, nunca como número.**
+
+- **Cinco campos**, en `Cuenta.config.tienda` y editables en `/remitentes`:
+  `envioGratis` · `cuotas` · `plazoCambio` · `plazoDespacho` · `local`. La lista
+  vive en `CAMPOS_TIENDA` y **es la única definición**: de ahí salen el
+  formulario, la validación al guardar y el resolvedor. ⛔ No se agregan datos
+  "por si sirven": cada uno es una frase que ya estaba copiada en un mail.
+- **El mail los escribe `${tienda.envioGratis}`** y el número lo pone la cuenta al
+  renderizar — igual que el logo, las redes y el domicilio. El Json no lleva el
+  número adentro, así que **el mismo documento sale con los datos de cada marca**.
+- **Se resuelve en `renderEmailHtml`/`renderEmailTexto`**, sobre el documento y
+  antes de dibujar: un solo lugar para los dos formatos y para los ocho call
+  sites. Viaja en `RenderOpts.tienda`, que llega por `marcaDe()` — o sea, un call
+  site que hace `{...marcaDe(cuenta, appUrl)}` no tiene que acordarse de nada.
+- 🔴 **Un tag sin dato NUNCA sale crudo a una casilla.** El string que lo lleva se
+  vacía, y si estaba en un trozo de texto rico **se cae el trozo** (un `<a></a>`
+  sin texto es peor que nada). La **celda sobrevive con su título**: una barra de
+  tres celdas con una vacía queda coja. Tampoco sale la frase mutilada
+  ("En compras mayores a "). Una clave inventada cae por el mismo lado.
+- 🔑 **El recorrido es genérico sobre el Json**, no una lista de campos por tipo
+  de bloque: enumerarlos es cómo se pierde un campo **sólo en el envío** (regla 6).
+- ⚠️ **El asunto y el preheader NO pasan por el resolvedor**: no son parte del
+  documento. Un `${tienda.…}` escrito en el asunto sale crudo. Hoy nadie los
+  escribe ahí —los tags entran por el preset y por el script— pero si algún día
+  se ofrece, va con su propia guarda.
+
+**Migrar lo que ya existe: `scripts/tienda-a-tags.ts`** (`--cuenta=bdi --dry`).
+
+- 🔑 **La tabla de reemplazos ES la tabla de datos**: busca el VALOR de la cuenta
+  y pone su tag. Por construcción el mail no puede cambiar de contenido — y eso
+  **se verifica**: un documento sólo se guarda si
+  `renderEmailHtml(nuevo, datos) === renderEmailHtml(viejo, {})`.
+- 🔴 **Un barrido por patrón habría roto cosas.** En la base, el 22-ago: los
+  `$50.000` de las campañas de Zattia son **precios de producto**, y el "7 días"
+  de la Bienvenida de BDI es el vencimiento del **cupón**, no el plazo de cambio.
+- ⛔ No toca automations **ACTIVAS** (las saltea nombrándolas) ni campañas
+  **ENVIADAS** (`--enviadas` las incluye): una campaña enviada es el registro de
+  lo que se mandó. Guarda copia del Json y escribe con `updateMany` por
+  `docVersion`, como el editor.
+
+**Los mails nuevos: `conGarantias()` en `resolver()`** — todo preset nace con la
+barra si la cuenta tiene datos, y **sin datos no nace ninguna barra**: una celda
+"Envíos gratis" sin condición es una promesa que la tienda no hizo. Ver la regla
+8 de `PLANTILLAS.md`. 🔴 **Un preset no arregla lo ya creado**: el script va antes.
 
 ## Biblioteca de imágenes (Vercel Blob)
 

@@ -83,7 +83,23 @@ siguiente arranque con **una sola lectura** es el punto de todo esto.
 7. **Un `id` de preset no se cambia nunca.** Es la clave de
    `scripts/fixtures/render-golden.json` y la que usa `usarPreset(id)`.
 
-8. **Cada preset declara su `familia`.** Es lo que agrupa `/plantillas`, que **renderiza
+8. **Un dato de la tienda va como TAG, nunca como número.** El envío gratis, las cuotas y
+   los plazos viven en la cuenta (`Cuenta.config.tienda`, se cargan en `/remitentes`) y el
+   mail los lee con `${tienda.envioGratis}`, `${tienda.cuotas}`, `${tienda.plazoCambio}`,
+   `${tienda.plazoDespacho}` y `${tienda.local}`. Escribir "$44.000" adentro de un preset es
+   la regla 1 otra vez, con un número en lugar de un logo.
+
+   - **Todo mail nuevo nace con la barra de garantías** — la pone `conGarantias()` en
+     `resolver()`, la única puerta por la que un preset se vuelve documento, así que una
+     plantilla nueva la hereda sin que su autor haga nada. Un preset que ya trae su propia
+     fila de celdas de texto **no** recibe una segunda.
+   - 🔴 **Sin datos cargados no hay barra, y eso es deliberado**: una celda "Envíos gratis"
+     sin condición es una promesa que la tienda no hizo. Es la lección del bloque `cupon` del
+     21-ago-2026 — el bloque se puede borrar, un asunto que prometió un premio no.
+   - Un tag sin dato **no sale crudo**: se vacía el texto y, si estaba en un trozo, se cae el
+     trozo. La celda sobrevive con su título. Lo fija `probar-tienda.ts`.
+
+9. **Cada preset declara su `familia`.** Es lo que agrupa `/plantillas`, que **renderiza
    solo la familia activa**: con 30+ plantillas, dibujar todas en cada visita manda más de
    un megabyte al navegador de un comerciante que abre el panel desde el celular.
 
