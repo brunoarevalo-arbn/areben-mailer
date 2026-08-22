@@ -13,6 +13,10 @@ const PUBLIC_PREFIXES = [
   '/api/regresiva', // el PNG de la cuenta regresiva: lo pide el cliente de mail del destinatario
   '/api/ses/', // notificaciones SNS de rebotes/quejas (las llama AWS)
   '/api/webhooks/', // rebotes/quejas de Resend y SendGrid (los llaman ellos)
+  // 🔴 El reloj de los cuatro pasos, que desde el 22-ago-2026 lo dispara **Vercel Cron** y ya no
+  // GitHub Actions (ver el encabezado de `app/api/cron/procesar/route.ts`). Sin esta línea el
+  // proxy le contesta 401 y el cron "corre" sin hacer nada: en el panel de Vercel se ve verde.
+  '/api/cron/', // orquestador del reloj (protegido por CRON_SECRET, falla cerrado)
   '/api/automations/procesar', // lo llama el cron (protegido por CRON_SECRET)
   '/api/campanias/procesar-cola', // worker de la cola de envío (protegido por CRON_SECRET)
   '/api/carritos/detectar', // poller de carritos abandonados (protegido por CRON_SECRET)

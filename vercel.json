@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/procesar", "schedule": "*/15 13-23,0-5 * * *" },
+    { "path": "/api/cron/procesar", "schedule": "0 6-12 * * *" }
+  ]
+}
