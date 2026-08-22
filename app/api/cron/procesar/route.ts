@@ -63,6 +63,12 @@ export async function GET(req: Request) {
     }
   }
 
+  // 🔑 **Una línea por corrida, SIEMPRE, aunque no haya hecho nada.** Sin esto una corrida buena no
+  // deja rastro, y entonces «el cron no corre» y «el cron corre y no encuentra nada» se ven
+  // exactamente igual en los logs — que es la forma en que este reloj podría estar apagado durante
+  // días sin que nadie lo note. El cuerpo de la respuesta no alcanza: nadie lo lee.
+  console.log('cron/procesar:', JSON.stringify(resultados));
+
   // 200 aunque algún paso haya fallado: el detalle va en el cuerpo y en el log. Un 500 acá haría
   // que Vercel marque la corrida en rojo por un fallo de TN que se reintenta solo en 15 minutos.
   return Response.json(resultados);
