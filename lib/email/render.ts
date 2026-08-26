@@ -2116,12 +2116,38 @@ export function renderEmailTexto(entrada: ContenidoCampania, opts: RenderOpts): 
   ].join("\n");
 }
 
+/**
+ * El primer nombre de una persona, para saludarla como la saludaría alguien.
+ *
+ * 🔴 **Existe porque `nombre` casi nunca es un nombre: es nombre y apellido.**
+ * Medido el 26-ago-2026 sobre BDI: **16.660 de 16.842** contactos con nombre
+ * cargado (99%) tienen un espacio adentro. O sea que "Hola ${contacto.nombre}"
+ * le llega a prácticamente todo el mundo como *"Hola Luana Sotelo"*, que es
+ * exactamente como no saluda ningún humano.
+ *
+ * ⚠️ **Se queda con el primer token y nada más.** No intenta adivinar nombres
+ * compuestos ("Martin Miguel Boubila" → "Martin"): equivocarse por defecto en
+ * "María José" es infinitamente más barato que devolver un apellido, y
+ * cualquier regla más lista falla distinto en cada cultura.
+ *
+ * ⚠️ Sin nombre devuelve `""`, igual que `${contacto.nombre}` — así el saludo
+ * tiene que estar escrito para funcionar vacío en los dos casos. Es la misma
+ * deuda que ya tiene la bienvenida de los pop-ups.
+ */
+export const primerNombre = (nombre?: string | null): string =>
+  (nombre ?? "").trim().split(/\s+/)[0] ?? "";
+
 /** Reemplaza merge tags (${contacto.nombre}, etc.) con datos del contacto. */
 export function aplicarMergeTags(
   html: string,
   contacto: { nombre?: string | null; email: string },
 ): string {
   return html
+    // 🔴 **El más largo primero.** `${contacto.nombre}` no es prefijo de
+    // `${contacto.primerNombre}` —los dos empiezan distinto después del punto—
+    // así que hoy el orden da igual; queda declarado porque el día que entre un
+    // `${contacto.nombreCompleto}` sí importaría, y ese bug sale a una casilla.
+    .replace(/\$\{contacto\.primerNombre\}/g, primerNombre(contacto.nombre))
     .replace(/\$\{contacto\.nombre\}/g, contacto.nombre ?? "")
     .replace(/\$\{contacto\.email\}/g, contacto.email);
 }

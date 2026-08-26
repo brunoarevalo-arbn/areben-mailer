@@ -661,6 +661,23 @@ botones vacíos**.
   la bienvenida sale sin el premio que la persona ganó
   (`aplicarCuponDelTrigger` **pisa** el bloque, no lo crea).
 
+### El saludo: `${contacto.primerNombre}` (26-ago-2026)
+
+🔴 **`nombre` casi nunca es un nombre: es nombre y apellido.** Medido sobre BDI:
+**16.660 de 16.842** contactos con nombre cargado (99%) tienen un espacio
+adentro, así que `Hola ${contacto.nombre}` le llega a prácticamente todo el mundo
+como *«Hola Luana Sotelo»* — que es exactamente como no saluda ningún humano.
+
+- `primerNombre()` en `render.ts` se queda con **el primer token y nada más**.
+  ⛔ No adivina nombres compuestos: equivocarse en «María José» es infinitamente
+  más barato que devolver un apellido, y cualquier regla más lista falla distinto
+  en cada cultura.
+- ⚠️ Sin nombre devuelve `""`, igual que `${contacto.nombre}` ⇒ **el saludo se
+  escribe para funcionar vacío**. Es la misma deuda que ya tiene la bienvenida de
+  los pop-ups (4.241 de los 5.280 de `Nuby — suscriptores` no tienen nombre).
+- Lo fija `probar-tienda.ts`, verificado en rojo con `primerNombre` devolviendo
+  el nombre entero.
+
 ## Productos automáticos (`productos-dinamicos`)
 
 El bloque que justifica que este mailer viva sobre Tiendanube. Se ve igual que

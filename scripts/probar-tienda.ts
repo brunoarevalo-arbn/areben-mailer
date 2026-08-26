@@ -25,7 +25,7 @@
 
 import { leerTienda, resolverTienda, tagsSinDato, CAMPOS_TIENDA, type Tienda } from "../lib/email/tienda";
 import { leerConfigCuenta, marcaDe } from "../lib/marca";
-import { renderEmailHtml, renderEmailTexto } from "../lib/email/render";
+import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, primerNombre } from "../lib/email/render";
 import type { Bloque, ContenidoCampania } from "../lib/email/render";
 import { presetsPara } from "../lib/plantillas/presets";
 
@@ -244,6 +244,29 @@ titulo("Un mail nuevo nace con la barra puesta");
     ok(html.includes("En compras mayores a $44.000"), "…y renderiza el umbral real");
     ok(!html.includes("${tienda."), "…sin dejar ni un tag crudo");
   }
+}
+
+// ─── El saludo usa un NOMBRE, no un nombre y apellido ────────────────────────
+//
+// 🔴 Medido el 26-ago-2026: 16.660 de los 16.842 contactos de BDI con nombre
+// cargado (99%) tienen un espacio adentro. "Hola ${contacto.nombre}" le llega a
+// casi todo el mundo como "Hola Luana Sotelo".
+titulo("${contacto.primerNombre}");
+{
+  ok(primerNombre("Luana Sotelo") === "Luana", "se queda con el primer token");
+  ok(primerNombre("Martin Miguel Boubila") === "Martin", "y con UNO solo, no adivina compuestos");
+  ok(primerNombre("  Elian   Peña ") === "Elian", "aguanta espacios de más");
+  ok(primerNombre("Ian") === "Ian", "un nombre suelto queda igual");
+  // ⚠️ Sin nombre devuelve vacío, igual que `${contacto.nombre}`: el saludo
+  // tiene que estar escrito para funcionar vacío en los dos casos.
+  ok(primerNombre(null) === "" && primerNombre("") === "", "sin nombre, vacío");
+
+  const html = 'Hola ${contacto.primerNombre}, tu compra ${contacto.nombre} <${contacto.email}>';
+  const sale = aplicarMergeTags(html, { nombre: "Luana Sotelo", email: "l@x.com" });
+  ok(sale === "Hola Luana, tu compra Luana Sotelo <l@x.com>", "los tres tags conviven", sale);
+  // 🔴 El tag largo no puede quedar a medias: un `${contacto.nombre}` que se
+  // reemplaza ANTES dejaría `${contacto.primerLuana Sotelo}` en la casilla.
+  ok(!sale.includes("${contacto."), "y no queda ningún tag mordido");
 }
 
 console.log(fallas === 0 ? "\n✅ Datos de tienda OK\n" : `\n❌ ${fallas} fallas\n`);

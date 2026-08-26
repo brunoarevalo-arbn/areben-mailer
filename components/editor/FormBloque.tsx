@@ -279,7 +279,7 @@ export function FormBloque({
             cuerpo={!esTitulo}
             multilinea={!esTitulo}
             filas={esTitulo ? 2 : 6}
-            hint="Podés usar ${contacto.nombre}."
+            hint="Podés usar ${contacto.primerNombre} o ${contacto.nombre}."
           />
           <Alineacion value={b.align ?? "left"} onChange={(align) => set({ align })} />
         </div>
