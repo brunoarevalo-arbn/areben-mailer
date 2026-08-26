@@ -45,11 +45,21 @@ mkdirSync(DESTINO, { recursive: true });
 mkdirSync(TMP, { recursive: true });
 
 const cuerpo = nodosDe("star").map(([tag, attrs]) => `<${tag} ${atributos(attrs)} />`).join("");
-// `fill` además de `stroke`: una estrella de contorno a 28px se lee como un
-// garabato en un celular. La rellena es la forma que la gente reconoce.
+// 🔴 **VACÍA, `fill="none"`, y es lo que la fila SIGNIFICA.** Cinco estrellas
+// llenas en el mail son un puntaje ya puesto: dicen "esto ya se calificó con 5",
+// justo cuando lo que se está pidiendo es que la persona elija. El contorno es
+// una casilla sin tildar — invita en vez de afirmar. La que se llena es la del
+// otro lado del link, en `/opinar`, que abre con las estrellas hasta la apretada
+// pintadas: **el "se completó" pasa ahí, no en el mail**, porque un mail no
+// puede repintar nada al tocarlo.
+//
+// ⚠️ El trazo sube de 1,5 a 2,25 por esto mismo. A los 26px del mail, 1,5 sobre
+// un viewBox de 24 son ~1,6px de línea: en un celular se lee como un garabato
+// (era el argumento del relleno). 2,25 son ~2,4px y aguanta.
+const TRAZO = 2.25;
 const svg =
   `<svg xmlns="http://www.w3.org/2000/svg" width="${LADO}" height="${LADO}" viewBox="0 0 24 24" ` +
-  `fill="${DORADO}" stroke="${DORADO}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${cuerpo}</svg>`;
+  `fill="none" stroke="${DORADO}" stroke-width="${TRAZO}" stroke-linecap="round" stroke-linejoin="round">${cuerpo}</svg>`;
 const html = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;padding:0}</style>${svg}`;
 
 const tmpHtml = join(TMP, "_estrella.html");
