@@ -154,17 +154,20 @@ export function cabeza(pal: Paleta): string {
  * mientras el contenido queda centrado y acotado. Un `<div>` centrado con
  * `margin:0 auto` hace eso en un navegador y en Outlook no hace nada.
  */
-export function apertura(pal: Paleta, aire?: { x?: number; y?: number }): string {
+export function apertura(pal: Paleta, aire?: { x?: number; arriba?: number; abajo?: number }): string {
   // 🔑 El aire del MARCO —lo que separa la tarjeta del borde de la pantalla— es
   // lo último que falta para que un mail vaya de punta a punta: con los bloques
   // en 0 la foto seguía teniendo 16px de gutter en el celular. Sale de la capa
   // de DOCUMENTO y no de la cascada a propósito: la pregunta es "¿este mail va
   // pegado a los bordes?", y el margen de un bloque suelto no puede contestarla.
-  // ⚠️ Sin elegir nada escribe `24px 16px`, byte por byte como siempre.
-  const padY = aire?.y === undefined ? "24px" : px(aire.y);
+  // ⚠️ Sin elegir nada escribe `24px 16px`, byte por byte como siempre — y con
+  // los dos lados iguales también: el tercer valor entra sólo si difieren.
+  const arriba = aire?.arriba === undefined ? "24px" : px(aire.arriba);
+  const abajo = aire?.abajo === undefined ? "24px" : px(aire.abajo);
   const padX = aire?.x === undefined ? "16px" : px(aire.x);
+  const relleno = arriba === abajo ? `${arriba} ${padX}` : `${arriba} ${padX} ${abajo}`;
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${pal.fondo};width:100%">
-  <tr><td align="center" style="padding:${padY} ${padX}">
+  <tr><td align="center" style="padding:${relleno}">
     <table role="presentation" width="${pal.ancho}" cellpadding="0" cellspacing="0" border="0"${clase(CLASES.full)} style="width:${px(pal.ancho)};max-width:100%">
       <tr><td>`;
 }

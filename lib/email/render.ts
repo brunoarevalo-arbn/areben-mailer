@@ -6,7 +6,7 @@
 import { esColorOscuro, resolverPaleta, combinarTema, type Paleta, type Tema } from "./tema";
 import { leerContenido } from "./esquema";
 import {
-  resolverEstilo, extra, px, padCss, alineacion, tenueSobre, ocultoEnTodas,
+  resolverEstilo, extra, px, padCss, padCaja, aireCss, aireElegido, alineacion, tenueSobre, ocultoEnTodas,
   type CtxEstilo, type EstiloResuelto, type Estilos, type RolEstilo,
 } from "./estilos";
 import { superficieDe } from "./contraste";
@@ -259,14 +259,18 @@ const clasesTitulo = (e: EstiloResuelto, campo?: TextoRico): string[] => [
  * el golden. `padCss()` no sirve acá porque escribiría `0px`.
  */
 const pad = (inner: string, e?: EstiloResuelto) => {
-  const padY = e?.elegidas.has("padY") ? e.padY : undefined;
-  const vert = padY === undefined ? "0" : px(padY);
-  return `<div${clase(e?.elegidas.has("padX") ? undefined : CLASES.pad, ...(e ? clasesDe(e) : []))} style="padding:${vert} ${px(e?.padX ?? 32)}">${inner}</div>`;
+  // ⚠️ El lado sin elegir es `"0"` a secas y NO `"0px"`: es lo que se escribió
+  // siempre y lo que compara el golden. `px(0)` daría `0px` y movería 38 mails.
+  const lado = (v?: number) => (v === undefined ? "0" : px(v));
+  const arriba = lado(e?.aireY.arriba);
+  const abajo = lado(e?.aireY.abajo);
+  const x = px(e?.padX ?? 32);
+  const relleno = arriba === abajo ? `${arriba} ${x}` : `${arriba} ${x} ${abajo}`;
+  return `<div${clase(e?.elegidas.has("padX") ? undefined : CLASES.pad, ...(e ? clasesDe(e) : []))} style="padding:${relleno}">${inner}</div>`;
 };
 
 /**
- * El margen vertical cableado de un bloque — salvo que alguien haya elegido el
- * margen de la caja, y entonces manda ese.
+ * El margen vertical cableado de un bloque, **lado por lado**.
  *
  * 🔴 Existe porque "que el espaciado sea 0" **no se podía ni pedir**: el aire de
  * arriba y abajo de cada bloque estaba escrito a mano en su `case`
@@ -274,16 +278,33 @@ const pad = (inner: string, e?: EstiloResuelto) => {
  * botón…) y ninguna perilla lo tocaba. Sumar `padY` sin esto sólo habría dejado
  * **sumar** aire, nunca sacarlo.
  *
- * 🔑 La elección de `padY` **reemplaza** el margen, no se le suma: si no, poner
- * 0 dejaría igual los 16px de fábrica y la perilla sería mentira. Y por eso la
- * pregunta es `elegidas`, no el valor: `padY: 0` elegido tiene que ganar, y
- * mirando el número no se distingue de "nadie lo tocó".
+ * 🔑 Elegir el margen lo **reemplaza**, no se le suma: si no, poner 0 dejaría
+ * igual los 16px de fábrica y la perilla sería mentira. Y por eso la pregunta es
+ * si el lado está en `aireY`, no cuánto vale: un 0 elegido tiene que ganar, y
+ * mirando el número no se distingue de "nadie lo tocó". El aire elegido lo pone
+ * `pad()` como `padding`; acá sólo se apaga lo que venía cableado.
+ *
+ * 🔴 **Se apaga UN lado por vez, y ése es todo el punto.** Elegir sólo el margen
+ * de arriba no puede llevarse puesto el de abajo, que nadie tocó — devolver un
+ * `margin:0` pelado ante cualquier elección es el modo de falla que este diseño
+ * existe para cerrar, y no lo ve ninguna captura: el mail sale apretado abajo.
+ *
+ * 🔑 **Los números cableados viven acá y en ningún otro lado.** Pasárselos
+ * también a `pad()` fue la primera idea y no cierra: en `productos`,
+ * `productos-dinamicos` y `carrito` el `pad()` está en el `case` y el `margin`
+ * adentro de `renderProductos`/`renderCarrito` — el par quedaría escrito dos
+ * veces por bloque, esperando a desincronizarse. Misma doctrina que
+ * `superficieDe`: dos definiciones son un panel que dice una cosa y un mail que
+ * dibuja otra.
  *
  * ⚠️ Sin elegir nada devuelve exactamente la cadena de siempre, byte por byte:
  * es lo que compara el golden.
  */
-const margen = (e: EstiloResuelto | undefined, porDefecto: string) =>
-  e?.elegidas.has("padY") ? "margin:0" : `margin:${porDefecto}`;
+const margen = (e: EstiloResuelto | undefined, arriba: number, abajo: number = arriba) =>
+  `margin:${aireCss(
+    e?.aireY.arriba !== undefined ? 0 : arriba,
+    e?.aireY.abajo !== undefined ? 0 : abajo,
+  )}`;
 
 /**
  * Botón: el VML para Outlook de escritorio y el ancla para todo el resto.
@@ -658,7 +679,7 @@ function renderCarrito(
     restantes > 0
       ? `<div style="margin:4px 0 0;font-size:14px;color:${pal.medio}"><a href="\${cart.url}" style="color:${pal.link}">y ${restantes} producto${restantes === 1 ? "" : "s"} más</a></div>`
       : "";
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(e.caja, "8px 0 16px")}">${filas}</table>${mas}`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(e.caja, 8, 16)}">${filas}</table>${mas}`;
 }
 
 /**
@@ -769,7 +790,7 @@ function renderProductos(
     );
     filas.push(`<tr>${celdas.join("")}</tr>`);
   }
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(e.caja, "8px 0 16px")}">${filas.join("")}</table>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(e.caja, 8, 16)}">${filas.join("")}</table>`;
 }
 
 function renderBloque(b: Bloque, ctx: Ctx): string {
@@ -836,22 +857,22 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
           ? ""
           : `<div style="width:40px;height:3px;background:${c.bordeColor ?? pal.acento};margin:${m("10px")};border-radius:2px"></div>`;
 
-      return `<div${clase(...clasesDe(c))} style="text-align:${al};${padCss(c.padY ?? 12, c.padX ?? 0)}${extra(c, ["align", "padX", "padY", "bordeAncho", "bordeColor", "bordeEstilo"])}">${conLink}${barra}</div>`;
+      return `<div${clase(...clasesDe(c))} style="text-align:${al};${padCaja(c, 12, 0)}${extra(c, ["align", "padX", "padY", "bordeAncho", "bordeColor", "bordeEstilo"])}">${conLink}${barra}</div>`;
     }
     case "titulo": {
       const t = e("titulo");
       const c = caja();
-      return pad(`<h1${clase(...clasesTitulo(t, b.texto))} style="${margen(c, "16px 0")};font-size:${px(t.tamano ?? 26)};line-height:${t.interlinea ?? 1.25};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${tituloHtml(b.texto, ctx.pal)}</h1>`, caja());
+      return pad(`<h1${clase(...clasesTitulo(t, b.texto))} style="${margen(c, 16, 16)};font-size:${px(t.tamano ?? 26)};line-height:${t.interlinea ?? 1.25};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${tituloHtml(b.texto, ctx.pal)}</h1>`, caja());
     }
     case "texto": {
       const t = e("cuerpo");
       const c = caja();
-      return pad(`<p style="${margen(c, "0 0 16px")};font-size:${px(t.tamano ?? 16)};line-height:${t.interlinea ?? 1.6};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${cuerpoHtml(b.texto, ctx.pal)}</p>`, caja());
+      return pad(`<p style="${margen(c, 0, 16)};font-size:${px(t.tamano ?? 16)};line-height:${t.interlinea ?? 1.6};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${cuerpoHtml(b.texto, ctx.pal)}</p>`, caja());
     }
     case "boton": {
       const t = e("boton");
       const c = caja();
-      return pad(`<div style="text-align:${b.align ?? t.align ?? "left"};${margen(c, "8px 0 20px")}">${botonAnchor(b.texto, b.url, t, pal, b.full)}</div>`, c);
+      return pad(`<div style="text-align:${b.align ?? t.align ?? "left"};${margen(c, 8, 20)}">${botonAnchor(b.texto, b.url, t, pal, b.full)}</div>`, c);
     }
     case "imagen": {
       // Sin URL no se dibuja nada. Un `<img src="">` no es una imagen vacía: el
@@ -919,7 +940,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       if (b.ancho === undefined && b.align === undefined) {
         return pad(
           conEnlace(
-            `<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}"${borde} style="max-width:100%;height:auto;border-radius:${px(t.radio ?? 8)};${margen(c, "8px 0 16px")};display:block${resto}" />`,
+            `<img src="${esc(b.url)}" alt="${esc(b.alt ?? "")}"${borde} style="max-width:100%;height:auto;border-radius:${px(t.radio ?? 8)};${margen(c, 8, 16)};display:block${resto}" />`,
             "block",
           ),
           c,
@@ -957,7 +978,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // sí respeta el `text-align` del párrafo que contiene a la imagen. El
       // margen se muda al contenedor por lo mismo. Es literalmente la forma del
       // ícono de celda, que ya anda en los tres clientes.
-      return pad(`<div style="${margen(c, "8px 0 16px")};text-align:${b.align ?? "left"}">${img}</div>`, c);
+      return pad(`<div style="${margen(c, 8, 16)};text-align:${b.align ?? "left"}">${img}</div>`, c);
     }
     case "productos":
       return pad(
@@ -1158,7 +1179,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const html = celdas.map(({ c, img }, i) => (img ? celdaImagen(c, pcts[i]) : celdaTexto(c, pcts[i]))).join("");
 
       const cCaja = caja();
-      return pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(cCaja, "8px 0 16px")}"><tr>${html}</tr></table>`, cCaja);
+      return pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(cCaja, 8, 16)}"><tr>${html}</tr></table>`, cCaja);
     }
     case "video": {
       // El ▶ estaba superpuesto con `position:absolute`, y **Gmail elimina
@@ -1169,7 +1190,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const btn = e("boton");
       const c = caja();
       return b.imagen
-        ? pad(`<a href="${esc(b.url || "#")}" style="display:block;text-decoration:none;${margen(c, "8px 0 16px")}"><img src="${esc(b.imagen)}" width="100%" style="max-width:100%;border-radius:${px(t.radio ?? 8)};display:block" alt="Ver el video" /><span style="display:inline-block;margin-top:10px;padding:8px 18px;font-size:14px;font-weight:600;color:${btn.color};background:${btn.fondo};border-radius:${px(btn.radio ?? 8)};text-decoration:none">▶&nbsp; Ver el video</span></a>`, c)
+        ? pad(`<a href="${esc(b.url || "#")}" style="display:block;text-decoration:none;${margen(c, 8, 16)}"><img src="${esc(b.imagen)}" width="100%" style="max-width:100%;border-radius:${px(t.radio ?? 8)};display:block" alt="Ver el video" /><span style="display:inline-block;margin-top:10px;padding:8px 18px;font-size:14px;font-weight:600;color:${btn.color};background:${btn.fondo};border-radius:${px(btn.radio ?? 8)};text-decoration:none">▶&nbsp; Ver el video</span></a>`, c)
         : "";
     }
     case "redes": {
@@ -1192,7 +1213,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // px de aire adentro de un mail que no muestra nada ahí.
       if (!lista.length) return "";
       const cRedes = caja();
-      return pad(`<div style="text-align:center;${margen(cRedes, "16px 0")}">${lista
+      return pad(`<div style="text-align:center;${margen(cRedes, 16, 16)}">${lista
         .map((l) => {
           const red = redConIcono(l.red);
           const src = red && urlIcono(ctx.assetsBase, red, b.iconos, pal.esOscuro);
@@ -1244,12 +1265,21 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
             `<a href="${esc(l.url)}" style="display:inline-block;margin:0 12px;font-size:${px(t.tamano ?? 14)};font-weight:${t.peso ?? 600};color:${t.color};text-decoration:none${extra(t, ["tamano", "peso", "color", "align"])}">${esc(l.texto)}</a>`,
         )
         .join("");
-      if (!banda) return pad(`<div style="text-align:${align};margin:${px(c.padY ?? 12)} 0">${links}</div>`, c);
-      return `<div${clase(...clasesDe(c))} style="background:${c.fondo};${padCss(c.padY ?? 12, c.padX ?? 32)};text-align:${align}${extra(c, ["fondo", "align"])}">${links}</div>`;
+      // 🔴 **El margen va por `margen()`, no escrito a mano — y arreglarlo fue
+      // arreglar un DOBLE CONTEO.** Mientras el cableado se interpolaba acá
+      // (`margin:${px(c.padY ?? 12)} 0`), el mismo `c` viajaba a `pad()`, que
+      // desde el 18-ago también emite el aire elegido como `padding`: un menú
+      // sin banda con `padY: 20` salía con 20 de padding MÁS 20 de margen, o
+      // sea 40. Lo destapó partir el margen en dos lados, y ningún ensayo lo
+      // veía porque el fixture de `probar-espaciado` no tenía un `menu`.
+      // 📊 Medido antes de tocarlo: **0 de 33 documentos guardados** cambian de
+      // pixel (todo `menu` de las plantillas lleva `fondo` y va por la banda).
+      if (!banda) return pad(`<div style="text-align:${align};${margen(c, 12, 12)}">${links}</div>`, c);
+      return `<div${clase(...clasesDe(c))} style="background:${c.fondo};${padCaja(c, 12, 32)};text-align:${align}${extra(c, ["fondo", "align"])}">${links}</div>`;
     }
     case "divisor": {
       const t = e("caja");
-      return pad(`<hr style="border:0;border-top:${px(t.bordeAncho ?? 1)} ${t.bordeEstilo ?? "solid"} ${t.bordeColor ?? pal.bordeSuave};${margen(t, "24px 0")}" />`, t);
+      return pad(`<hr style="border:0;border-top:${px(t.bordeAncho ?? 1)} ${t.bordeEstilo ?? "solid"} ${t.bordeColor ?? pal.bordeSuave};${margen(t, 24, 24)}" />`, t);
     }
     case "espaciador": {
       // `font-size:0;line-height:0` no es adorno: sin eso Outlook le mete la
@@ -1285,7 +1315,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
           velo: b.velo,
           bg,
           pal,
-          estiloCaja: `${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:${alineacion(c, "center")}${extra(c, ["fondo", "padX", "padY", "align"])}`,
+          estiloCaja: `${padCaja(c, 36, 32)};text-align:${alineacion(c, "center")}${extra(c, ["fondo", "padX", "padY", "align"])}`,
           // Sin el botón: adentro del condicional de Outlook va partido en dos.
           interior: `${t}${s}`,
           boton: b.botonTexto ? botonPartes(b.botonTexto, b.botonUrl, e("boton"), pal) : undefined,
@@ -1303,7 +1333,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       }
 
       const img = b.imagen ? `<img src="${esc(b.imagen)}" alt="" style="width:100%;display:block;margin:0${extra(t0, ["radio", "align", "color", "tamano"])}" />` : "";
-      const cajaHtml = interior ? `<div style="background:${colorCss(bg, pal.tarjeta)};${padCss(c.padY ?? 36, c.padX ?? 32)};text-align:${alineacion(c, "center")}${extra(c, ["fondo", "padX", "padY", "align"])}">${interior}</div>` : "";
+      const cajaHtml = interior ? `<div style="background:${colorCss(bg, pal.tarjeta)};${padCaja(c, 36, 32)};text-align:${alineacion(c, "center")}${extra(c, ["fondo", "padX", "padY", "align"])}">${interior}</div>` : "";
       return `${img}${cajaHtml}`;
     }
     case "seccion": {
@@ -1323,7 +1353,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const t = b.titulo ? (() => { const x = e("titulo", bg); return `<h2${clase(...clasesTitulo(x, b.titulo))} style="margin:0 0 ${px(b.texto || mBtn ? 8 : 0)};font-size:${px(x.tamano ?? 22)};line-height:${x.interlinea ?? 1.3};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${tituloHtml(b.titulo, ctx.pal)}</h2>`; })() : "";
       const tx = b.texto ? (() => { const x = e("subtitulo", bg); return `<p style="margin:0 0 ${px(mBtn ? 16 : 0)};font-size:${px(x.tamano ?? 16)};line-height:${x.interlinea ?? 1.6};color:${x.color}${extra(x, ["tamano", "interlinea", "color", "align"])}">${cuerpoHtml(b.texto, ctx.pal)}</p>`; })() : "";
       const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
-      const estiloCaja = `${padCss(c.padY ?? 32, c.padX ?? 32)};text-align:${alineacion(c, "center")}${extra(c, ["fondo", "padX", "padY", "align"])}`;
+      const estiloCaja = `${padCaja(c, 32, 32)};text-align:${alineacion(c, "center")}${extra(c, ["fondo", "padX", "padY", "align"])}`;
       // La misma banda del `hero`, en el medio del mail. Con la foto, el color
       // pasa a ser el respaldo y el velo; sin ella, es la sección de siempre.
       if (b.fondoImagen) {
@@ -1410,7 +1440,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         // Padding 0 de fábrica, al revés que la portada: acá el lugar de cada cosa
         // lo dice su `x`/`y`, y un padding de 32 haría que "pegado al borde
         // izquierdo" quedara a 32px del borde. Quien lo quiera lo pone.
-        estiloCaja: `${padCss(c.padY ?? 0, c.padX ?? 0)}${extra(c, ["fondo", "padX", "padY"])}`,
+        estiloCaja: `${padCaja(c, 0, 0)}${extra(c, ["fondo", "padX", "padY"])}`,
         // Sin nada encima, la banda es la foto sola: una tabla vacía sumaría un
         // `<tr>` que Outlook dibuja con alto propio.
         interior: plano.filas.length ? { mso: tabla("mso"), resto: tabla("resto") } : "",
@@ -1536,7 +1566,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // scroll horizontal. Con el ancho en porcentaje el mínimo lo marcan las
       // celdas, que ahora también van en porcentaje. En escritorio no cambia
       // nada: 100% del contenedor de 600 son 600.
-      return `<div${clase(...clasesDe(c))} style="${padCss(c.padY ?? 0, padX)}${extra(c, ["padX", "padY"])}">${filasHtml}</div>`;
+      return `<div${clase(...clasesDe(c))} style="${padCaja(c, 0, 0)}${extra(c, ["padX", "padY"])}">${filasHtml}</div>`;
     }
     /**
      * La cuenta regresiva: un PNG que se dibuja en cada apertura, y **abajo la
@@ -1594,7 +1624,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         ? `<img src="${esc(src)}" alt="${esc(linea)}" width="${m.ancho}" height="${m.alto}" border="0" style="width:${px(m.ancho)};max-width:100%;height:auto;display:block;border:0" />`
         : "";
       const nota = `<p style="margin:${px(m.hueco)} 0 0;font-size:${px(t.tamano ?? 14)};line-height:${t.interlinea ?? 1.5};color:${t.color};text-align:${t.align ?? "center"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${esc(linea)}</p>`;
-      return pad(`<div style="${margen(c, "8px 0 16px")}">${img}${nota}</div>`, c);
+      return pad(`<div style="${margen(c, 8, 16)}">${img}${nota}</div>`, c);
     }
     case "cupon": {
       const c = caja();
@@ -1623,7 +1653,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const t = b.texto ? (() => { const x = e("cuerpo", bg); return `<div style="font-size:${px(x.tamano ?? 16)};color:${x.color}${extra(x, ["tamano", "color", "align"])};margin-bottom:${px(huecoTexto)}">${esc(b.texto)}</div>`; })() : "";
       const cod = b.codigo ? (() => { const x = e("titulo"); return `<div style="font-size:${px(x.tamano ?? 26)};font-weight:${x.peso ?? 700};letter-spacing:${px(x.espaciado ?? 3)};color:${x.color}${extra(x, ["tamano", "peso", "espaciado", "color", "align", "interlinea"])};margin-bottom:${px(huecoCodigo)}">${esc(b.codigo)}</div>`; })() : "";
       const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
-      return pad(`<div style="border:${px(c.bordeAncho ?? 2)} ${c.bordeEstilo ?? "dashed"} ${c.bordeColor ?? pal.acento};border-radius:${px(c.radio ?? 12)};background:${bg};${padCss(c.padY ?? 24, c.padX ?? 24)};text-align:center;margin:8px 0 ${px(abajo)}">${t}${cod}${btn}</div>`, undefined);
+      return pad(`<div style="border:${px(c.bordeAncho ?? 2)} ${c.bordeEstilo ?? "dashed"} ${c.bordeColor ?? pal.acento};border-radius:${px(c.radio ?? 12)};background:${bg};${padCaja(c, 24, 24)};text-align:center;margin:8px 0 ${px(abajo)}">${t}${cod}${btn}</div>`, undefined);
     }
     // ⛔ Gateado por la CUENTA, no por quién lo editó — ver el comentario en
     // `Ctx.permiteHtmlCrudo`. Sin el toggle prendido, el bloque no se dibuja
@@ -1823,8 +1853,12 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
   // ⚠️ Ausente ≠ 0, como en toda la cascada: sin elegir nada sale 24/16/12/16
   // como salió siempre, que es lo que compara el golden.
   const aireDoc = contenido.estilos?.caja;
-  const aireY = aireDoc?.padY;
-  const colchon = (alto: number) => `<div style="height:${aireY === undefined ? px(alto) : px(aireY)}"></div>`;
+  // 🔑 Los dos colchones son de FÁBRICA distintos —12 arriba, 16 abajo— y hasta
+  // hoy un solo número los igualaba en cuanto alguien elegía algo. Con el aire
+  // partido cada uno sigue a su lado, y el marco de la página también.
+  const lados = aireElegido([aireDoc]);
+  const colchon = (alto: number, elegido?: number) =>
+    `<div style="height:${elegido === undefined ? px(alto) : px(elegido)}"></div>`;
 
   // El namespace de VML va en el <html> o Outlook no dibuja los botones.
   return `<!doctype html>
@@ -1832,14 +1866,14 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
 ${cabeza(pal)}
 <body style="margin:0;padding:0;background:${pal.fondo};font-family:${pal.fuente}">
   ${preheader}
-${apertura(pal, { x: aireDoc?.padX, y: aireY })}
+${apertura(pal, { x: aireDoc?.padX, arriba: lados.arriba, abajo: lados.abajo })}
     <!-- Encabezado de marca (bloque; se puede editar o borrar) -->
     ${cabecera ? marca(cabecera) : ""}
     <!-- Cuerpo -->
     <div style="${cajaCuerpo};overflow:hidden">
-      ${colchon(12)}
+      ${colchon(12, lados.arriba)}
       ${cuerpo}
-      ${colchon(16)}
+      ${colchon(16, lados.abajo)}
     </div>
     <!-- Footer -->
     <div style="text-align:center;color:${tenuePie};font-size:12px;line-height:1.6;margin-top:20px">

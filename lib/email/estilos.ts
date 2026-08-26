@@ -161,6 +161,20 @@ export interface EstiloBloque {
   /* caja */
   padX?: number;
   padY?: number;
+  /**
+   * El margen vertical de UN lado, que **le gana a `padY` sólo en ese lado**.
+   *
+   * 🔑 Son claves aparte y no un reemplazo de `padY`, por lo mismo que
+   * `TextoRico` es una unión y no un tipo nuevo: `padY` está guardado en
+   * campañas ya enviadas y en las 38 plantillas, y ahí significa "los dos
+   * lados". Con esto sigue significando eso, y quien quiera partirlo escribe
+   * las dos claves. Por eso tampoco hay migración ni sube `V_ACTUAL`.
+   *
+   * ⚠️ La resolución **compone a través de la cascada**: el documento puede
+   * decir `padY: 20` y un bloque bajar sólo `padArriba: 0`. Ver `verticalesDe`.
+   */
+  padArriba?: number;
+  padAbajo?: number;
   radio?: number;
   bordeAncho?: number;
   bordeColor?: ValorColor;
@@ -205,6 +219,8 @@ export const RANGOS = {
   espaciado:   [-1, 10],  // negativo fuerte pega las letras en Outlook
   padX:        [0, 64],   // 64 ya deja 470px útiles sobre 600
   padY:        [0, 64],
+  padArriba:   [0, 64],   // el mismo rango que `padY`: es el mismo margen
+  padAbajo:    [0, 64],
   radio:       [0, 32],   // de acá sale el `arcsize` del botón VML
   bordeAncho:  [0, 8],
   ancho:       [10, 100], // %
@@ -317,6 +333,8 @@ export function sanearEstiloBloque(v: unknown): EstiloBloque | undefined {
 
   poner("padX", sanearNum(x.padX, RANGOS.padX));
   poner("padY", sanearNum(x.padY, RANGOS.padY));
+  poner("padArriba", sanearNum(x.padArriba, RANGOS.padArriba));
+  poner("padAbajo", sanearNum(x.padAbajo, RANGOS.padAbajo));
   poner("radio", sanearNum(x.radio, RANGOS.radio));
   poner("bordeAncho", sanearNum(x.bordeAncho, RANGOS.bordeAncho));
   poner("bordeEstilo", sanearEnum(x.bordeEstilo, BORDES));
@@ -640,8 +658,16 @@ const PROPS_POR_ROL: Record<RolEstilo, readonly (keyof EstiloBloque)[]> = {
  * `padY` entró el 18-ago-2026: hasta ese día el aire de arriba y abajo de casi
  * todo bloque era el `margin` cableado en su `case` y **no había perilla**, así
  * que "que el espaciado sea 0" no se podía ni pedir.
+ *
+ * `padArriba`/`padAbajo` entraron el 26-ago-2026 y **acompañan a `padY`, no lo
+ * reemplazan**: la perilla de a dos sigue siendo la normal y el panel las dibuja
+ * detrás de un candado. ⛔ **No van en el rol `boton`**: ahí `padY` es el relleno
+ * interno del botón, y el botón de Outlook es un `<v:roundrect>` que expresa su
+ * caja con UN `height` (`shell.ts`) — un relleno asimétrico no se puede
+ * representar, así que sería una perilla que miente justo en el cliente donde
+ * más se necesita.
  */
-const CAJA_BASE = ["padX", "padY", "ocultarMovil", "ocultarEscritorio"] as const satisfies readonly (keyof EstiloBloque)[];
+const CAJA_BASE = ["padX", "padY", "padArriba", "padAbajo", "ocultarMovil", "ocultarEscritorio"] as const satisfies readonly (keyof EstiloBloque)[];
 
 /**
  * La caja del bloque, que es el rol menos parejo de todos.
@@ -654,16 +680,16 @@ const CAJA_BASE = ["padX", "padY", "ocultarMovil", "ocultarEscritorio"] as const
 function propsCaja(tipo: TipoBloque): readonly (keyof EstiloBloque)[] {
   switch (tipo) {
     case "encabezado":
-      return ["padX", "padY", "align", "bordeColor", "ocultarMovil", "ocultarEscritorio"];
+      return ["padX", "padY", "padArriba", "padAbajo", "align", "bordeColor", "ocultarMovil", "ocultarEscritorio"];
     case "hero":
     case "seccion":
-      return ["fondo", "padX", "padY", "align"];
+      return ["fondo", "padX", "padY", "padArriba", "padAbajo", "align"];
     // La misma banda, sin `align`: el lugar de cada elemento es su `x`, y una
     // alineación de caja sería una segunda perilla para lo mismo — el bug que
     // documenta `SIN_EFECTO`. `ocultarMovil`/`ocultarEscritorio` tampoco entran:
     // la banda no pasa por `clasesDe` y no hay dónde colgar la clase (ver arriba).
     case "foto-encima":
-      return ["fondo", "padX", "padY"];
+      return ["fondo", "padX", "padY", "padArriba", "padAbajo"];
     // 🔑 El menú es el quinto que puede dibujar su propio contenedor, y solo
     // cuando alguien elige el fondo: sin `fondo` sigue pasando por `pad()`. Entró
     // por la regla 5 de `PLANTILLAS.md` (6 referencias con el menú adentro de una
@@ -672,11 +698,11 @@ function propsCaja(tipo: TipoBloque): readonly (keyof EstiloBloque)[] {
     // `SIN_EFECTO`. `padY` mueve el margen incluso sin banda, así que no es una
     // perilla que dependa de otra.
     case "menu":
-      return ["fondo", "padX", "padY", "ocultarMovil", "ocultarEscritorio"];
+      return ["fondo", "padX", "padY", "padArriba", "padAbajo", "ocultarMovil", "ocultarEscritorio"];
     case "cupon":
-      return ["fondo", "padX", "padY", "radio", "bordeAncho", "bordeEstilo", "bordeColor"];
+      return ["fondo", "padX", "padY", "padArriba", "padAbajo", "radio", "bordeAncho", "bordeEstilo", "bordeColor"];
     case "divisor":
-      return ["padX", "padY", "bordeAncho", "bordeEstilo", "bordeColor", "ocultarMovil", "ocultarEscritorio"];
+      return ["padX", "padY", "padArriba", "padAbajo", "bordeAncho", "bordeEstilo", "bordeColor", "ocultarMovil", "ocultarEscritorio"];
     default:
       return CAJA_BASE;
   }
@@ -750,9 +776,49 @@ export interface EstiloResuelto extends Omit<EstiloBloque, "color" | "fondo" | "
    * decisión de quien armó el mail.
    */
   elegidas: ReadonlySet<string>;
+  /**
+   * El aire vertical **elegido, lado por lado**. Ausente de un lado = nadie tocó
+   * ese lado, y ahí manda el cableado del bloque.
+   *
+   * 🔑 Va aparte de `padY` y no lo reemplaza: `padY` sigue siendo el valor
+   * MEZCLADO (con `BASE` y `BASE_POR_TIPO` adentro), que es lo que leen el
+   * relleno de la caja de un `hero` y el alto del botón de Outlook. Esto de acá
+   * responde la otra pregunta —¿lo eligió una persona, y de qué lado?—, que es
+   * la única que puede apagar un margen cableado.
+   */
+  aireY: AireY;
   /** Atajos de lo mismo, que son los dos casos que más se preguntan. */
   autoColor: boolean;
   autoFondo: boolean;
+}
+
+/** El aire vertical elegido. Cada lado ausente = heredar el cableado. */
+export interface AireY {
+  arriba?: number;
+  abajo?: number;
+}
+
+/**
+ * El aire vertical que eligió una persona, plegando las capas **en orden**.
+ *
+ * 🔴 **No es `padArriba ?? padY`.** Ese atajo es ciego al orden y se equivoca en
+ * un caso real: el documento dice `padArriba: 8` y el bloque dice `padY: 30`. La
+ * forma corta del bloque tiene que ganar de los dos lados —es la capa de
+ * arriba—, y el `??` devolvería 8 arriba y 30 abajo. La cascada respeta el
+ * orden; esto también.
+ *
+ * ⚠️ Adentro de UNA capa el lado fino le gana a la forma corta: escribir
+ * `{ padY: 20, padAbajo: 0 }` es decir "20 arriba, 0 abajo".
+ */
+export function aireElegido(capas: readonly (EstiloBloque | undefined)[]): AireY {
+  const a: AireY = {};
+  for (const capa of capas) {
+    if (!capa) continue;
+    if (capa.padY !== undefined) { a.arriba = capa.padY; a.abajo = capa.padY; }
+    if (capa.padArriba !== undefined) a.arriba = capa.padArriba;
+    if (capa.padAbajo !== undefined) a.abajo = capa.padAbajo;
+  }
+  return a;
 }
 
 export interface CtxEstilo {
@@ -839,6 +905,10 @@ export function resolverEstilo(
   const { color: _c, fondo: _f, bordeColor: _b, fuente: _fu, ...resto } = mezclado;
   return {
     ...resto,
+    // Las MISMAS dos capas que mira `elegidas`, y por el mismo motivo: el BASE
+    // también escribe la clave, y un margen de fábrica no puede apagar el
+    // cableado de un bloque.
+    aireY: aireElegido([ctx.doc?.[rol], ctx.propio?.[rol]]),
     color,
     fondo: resolverColor(mezclado.fondo, ctx.pal),
     bordeColor: resolverColor(mezclado.bordeColor, ctx.pal),
@@ -919,12 +989,47 @@ export const px = (n: number) => `${Math.round(n)}px`;
  * mismo pero son bytes distintos, y el golden que fija "el mail no cambió"
  * compara texto. Escribirlo como siempre se escribió deja el diff limpio.
  */
-export const padCss = (y?: number, x?: number): string => {
-  if (y === undefined && x === undefined) return "";
+export const padCss = (y?: number, x?: number, abajo?: number): string => {
+  if (y === undefined && x === undefined && abajo === undefined) return "";
   const py = y ?? 0;
   const pxx = x ?? 0;
+  // ⚠️ El tercer valor entra **sólo** cuando los dos lados difieren de verdad.
+  // Con `arriba === abajo` la salida es la de siempre, byte por byte, y por eso
+  // partir el margen no mueve el golden en ninguno de los 38 presets.
+  const pb = abajo ?? py;
+  if (pb !== py) return `padding:${px(py)} ${px(pxx)} ${px(pb)}`;
   return `padding:${py === pxx ? px(py) : `${px(py)} ${px(pxx)}`}`;
 };
+
+/**
+ * La caja de un bloque que dibuja su propio contenedor (hero, sección, cupón…).
+ *
+ * 🔑 El default por lado es el MISMO número: `BASE` y `BASE_POR_TIPO` sólo saben
+ * hablar de `padY`, nunca de un lado suelto — y eso es una invariante, no una
+ * casualidad. Un default asimétrico obligaría a que la cascada plegara tres
+ * capas por lado en vez de las dos que se eligen.
+ */
+export const padCaja = (e: EstiloResuelto, yPorDefecto: number, xPorDefecto: number): string =>
+  padCss(
+    e.aireY.arriba ?? e.padY ?? yPorDefecto,
+    e.padX ?? xPorDefecto,
+    e.aireY.abajo ?? e.padY ?? yPorDefecto,
+  );
+
+/**
+ * El valor de un `margin` vertical, escrito **como se escribió siempre**.
+ *
+ * `padding:32px` y `padding:32px 32px` significan lo mismo y son bytes
+ * distintos; con `margin` pasa igual. Los cinco cableados que hay en el motor
+ * salen de acá idénticos: (16,16)→`16px 0` · (0,16)→`0 0 16px` ·
+ * (8,20)→`8px 0 20px` · (24,24)→`24px 0` · (8,16)→`8px 0 16px` · (0,0)→`0`.
+ */
+export const aireCss = (arriba: number, abajo: number): string =>
+  arriba === 0 && abajo === 0
+    ? "0"
+    : arriba === abajo
+      ? `${px(arriba)} 0`
+      : `${arriba === 0 ? "0" : px(arriba)} 0 ${px(abajo)}`;
 
 /**
  * Lo que una persona eligió y la plantilla del bloque no escribió.

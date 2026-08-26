@@ -2,7 +2,8 @@
 //
 //   node --import tsx scripts/probar-estilos.ts
 
-import { resolverEstilo, extra, estiloCupon, ESTILO_CUPON_COMPACTO, TAMANOS_BOTON, type Estilos } from "../lib/email/estilos";
+import { resolverEstilo, extra, estiloCupon, padCss, aireCss, aireElegido, propsDeRol, ESTILO_CUPON_COMPACTO, TAMANOS_BOTON, type Estilos } from "../lib/email/estilos";
+import type { TipoBloque } from "../lib/email/bloques";
 import { renderEmailHtml } from "../lib/email/render";
 import { resolverPaleta } from "../lib/email/tema";
 
@@ -155,6 +156,80 @@ titulo("padding:32px, no padding:32px 32px");
     { unsubscribeUrl: "#", nombreCuenta: "X" },
   );
   ok(html.includes("padding:32px;"), "los dos lados iguales van en un solo valor");
+
+  // 🔑 El mismo colapso, a nivel unidad. Está acá y no sólo en el golden porque
+  // romperlo mueve los 38 presets de una: el golden lo caza —medido, 88
+  // diferencias— pero recién después de renderizar todo, y estas tres líneas lo
+  // dicen en 40 ms. El tercer valor entra SÓLO si los lados difieren de verdad.
+  ok(padCss(32, 32, 32) === "padding:32px", "padCss: tres iguales siguen siendo uno", padCss(32, 32, 32));
+  ok(padCss(10, 32, 10) === "padding:10px 32px", "padCss: arriba === abajo va en dos valores", padCss(10, 32, 10));
+  ok(padCss(10, 32, 20) === "padding:10px 32px 20px", "padCss: lados distintos van en tres", padCss(10, 32, 20));
+
+  // Y los cinco `margin` cableados del motor, que `aireCss` tiene que escribir
+  // exactamente como estaban escritos a mano antes del 26-ago-2026.
+  for (const [a, b, esperado] of [
+    [16, 16, "16px 0"], [0, 16, "0 0 16px"], [8, 20, "8px 0 20px"],
+    [24, 24, "24px 0"], [8, 16, "8px 0 16px"], [0, 0, "0"],
+  ] as [number, number, string][]) {
+    ok(aireCss(a, b) === esperado, `aireCss(${a},${b}) === "${esperado}"`, aireCss(a, b));
+  }
+}
+
+// ─── El margen partido es SOLO de la caja ────────────────────────────────────
+//
+// 🔴 Lo destapó abrir el panel en el navegador: el control compuesto se colgaba
+// del NOMBRE de la propiedad, y el rol `boton` también tiene `padY` —ahí es el
+// relleno interior del botón—, así que le aparecía el candado y escribía dos
+// claves que el emisor del botón no lee nunca. Perilla muerta.
+//
+// ⛔ Y no es que falte cablearlo: el botón de Outlook es un `<v:roundrect>` que
+// expresa su caja con UN `height` (`shell.ts`), así que un relleno asimétrico no
+// se puede representar. Partirlo sería una perilla que miente justo en el
+// cliente donde más se nota.
+titulo("el margen por lado no llega al rol `boton`");
+{
+  const conBoton: TipoBloque[] = ["boton", "cupon", "hero", "seccion", "columnas"];
+  for (const t of conBoton) {
+    const props = propsDeRol(t, "boton");
+    if (!props.length) continue;
+    ok(
+      !props.includes("padArriba") && !props.includes("padAbajo"),
+      `${t} · el rol boton NO ofrece los lados sueltos`,
+      props.join(","),
+    );
+    ok(props.includes("padY"), `${t} · pero sí sigue ofreciendo el relleno de a dos`);
+  }
+  // La contracara: donde SÍ tiene que estar, está — y los dos juntos, nunca uno.
+  for (const t of ["titulo", "texto", "hero", "seccion", "cupon", "divisor", "menu", "encabezado", "mosaico"] as TipoBloque[]) {
+    const props = propsDeRol(t, "caja");
+    ok(
+      props.includes("padArriba") === props.includes("padAbajo"),
+      `${t} · la caja ofrece los DOS lados o ninguno`,
+      props.join(","),
+    );
+  }
+}
+
+// ─── El aire vertical elegido pliega las capas EN ORDEN ──────────────────────
+titulo("aireElegido respeta el orden de la cascada");
+{
+  ok(
+    JSON.stringify(aireElegido([{ padArriba: 8 }, { padY: 30 }])) === JSON.stringify({ arriba: 30, abajo: 30 }),
+    "la forma corta de la capa de arriba gana de los DOS lados",
+    JSON.stringify(aireElegido([{ padArriba: 8 }, { padY: 30 }])),
+  );
+  ok(
+    JSON.stringify(aireElegido([{ padY: 20, padAbajo: 0 }])) === JSON.stringify({ arriba: 20, abajo: 0 }),
+    "adentro de UNA capa, el lado fino le gana a la forma corta",
+    JSON.stringify(aireElegido([{ padY: 20, padAbajo: 0 }])),
+  );
+  // 🔴 "Ausente ≠ 0" también acá: sin esto, un margen de fábrica apagaría el
+  // cableado de todos los bloques y las 38 plantillas saldrían pegadas.
+  ok(JSON.stringify(aireElegido([undefined, {}])) === "{}", "sin elegir nada no hay ningún lado");
+  ok(
+    JSON.stringify(aireElegido([{ padY: 0 }])) === JSON.stringify({ arriba: 0, abajo: 0 }),
+    "un 0 elegido SÍ está",
+  );
 }
 
 // ─── Las dos formas del cupón ────────────────────────────────────────────────

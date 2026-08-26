@@ -55,6 +55,11 @@ const VALORES: Record<string, readonly unknown[]> = {
   italica: [true],
   padX: [61],
   padY: [59],
+  // Valores que ningún bloque usa de fábrica Y distintos entre sí: con
+  // arriba === abajo el emisor colapsa a la forma corta a propósito, así que dos
+  // números iguales no probarían que el lado se resuelve por separado.
+  padArriba: [57],
+  padAbajo: [53],
   radio: [27],
   bordeAncho: [7],
   bordeEstilo: ["solid", "dashed"],

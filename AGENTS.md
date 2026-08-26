@@ -70,7 +70,7 @@ node --import tsx scripts/probar-marcado.ts    # el `data-b` del preview NO sale
 node --import tsx scripts/probar-esquema.ts    # el Json de bloques migra sin perder nada
 node --import tsx scripts/probar-portapapeles.ts # lo que se pega es un bloque nuestro, y sale con id nuevo
 node --import tsx scripts/probar-estilos.ts    # la cascada respeta el orden y no inyecta
-node --import tsx scripts/probar-espaciado.ts  # el margen se puede llevar a CERO, y elegirlo reemplaza el cableado
+node --import tsx scripts/probar-espaciado.ts  # el margen se puede llevar a CERO, elegirlo reemplaza el cableado, y cada lado se elige por separado
 node --import tsx scripts/probar-render.ts     # golden: el mail no cambió sin querer
 node --import tsx scripts/probar-html.ts       # VML, media queries, tracking, peso
 node --import tsx scripts/probar-banda-link.ts # una foto puede ser un link, y NUNCA un <a> dentro de otro
@@ -304,6 +304,60 @@ marca)` recorre el documento entero y devuelve los hallazgos; el cartel vive
 - ⚠️ **No hay freno del lado del servidor y es a propósito**: bloquear
   contradiría que un color elegido se respeta, y obligaría a persistir la
   confirmación para que el cron no frenara una campaña programada.
+
+### El margen de arriba y el de abajo, por separado (26-ago-2026)
+
+`padY` sigue siendo la perilla normal —"margen arriba y abajo", un número— y
+`padArriba`/`padAbajo` **la anulan de a un lado**. Salió de una tarjeta de Bruno:
+*«Poder ajustar margen arriba y abajo por separado»*.
+
+- 🔑 **Son claves nuevas y OPCIONALES, no un reemplazo.** `padY` está guardado en
+  campañas ya enviadas y en las 38 plantillas, y ahí significa "los dos lados";
+  con esto sigue significando eso. Por eso no hay migración, `V_ACTUAL` no sube y
+  el golden **no se movió un byte** — mismo argumento que `Columna.botonTexto`,
+  `icono` y `TextoRico`.
+- 🔴 **La resolución es un PLIEGUE de las capas en orden (`aireElegido`), no un
+  `padArriba ?? padY`.** Ese atajo es ciego al orden y se equivoca en un caso
+  real: el documento dice `padArriba: 8` y el bloque dice `padY: 30` — la forma
+  corta del bloque tiene que ganar de los dos lados, y el `??` devuelve 8 arriba.
+  Vive en `estilos.ts` y lo usan las dos capas (bloque y documento).
+  ⚠️ Adentro de UNA capa el lado fino le gana a la forma corta.
+- 🔑 **Los números cableados de cada bloque viven en `margen()` y en ningún otro
+  lado, y `margen()` apaga UN LADO POR VEZ.** La primera idea fue pasarle el par
+  también a `pad()`; no cierra, porque en `productos`, `productos-dinamicos` y
+  `carrito` el `pad()` está en el `case` y el `margin` adentro de
+  `renderProductos`/`renderCarrito` — el par quedaría escrito dos veces por
+  bloque. 🔴 Y devolver `margin:0` ante *cualquier* elección —el port ingenuo—
+  se lleva puesto el lado que nadie tocó: el mail sale pegado abajo y **eso no se
+  ve en ninguna captura del panel**. Lo fija `probar-espaciado.ts` §E.
+- ⚠️ **Todo emisor colapsa a la forma corta cuando los dos lados son iguales**
+  (`padCss` con tercer argumento, `pad`, `apertura`, `aireCss`). No es cosmética
+  del código: es lo que hace que `padY: 40` y `{padArriba:40, padAbajo:40}` sean
+  el MISMO HTML, y por lo tanto que abrir el candado del panel no mueva el mail.
+- **La capa de DOCUMENTO también se parte**: el marco de la página y los dos
+  colchones de adentro de la tarjeta, que de fábrica ya son distintos (12 arriba,
+  16 abajo) y hasta hoy un solo número los igualaba.
+- ⛔ **El rol `boton` NO se parte, y la condición del panel es que el rol ofrezca
+  los dos lados, nunca que la propiedad se llame `padY`.** Ahí `padY` es el
+  relleno INTERIOR del botón, y el botón de Outlook es un `<v:roundrect>` que
+  expresa su caja con UN `height` (`shell.ts`): un relleno asimétrico no se puede
+  representar. Con la interceptación colgada del nombre, al botón le aparecía el
+  candado y escribía claves que nadie lee. 🔴 **Lo encontró ABRIR EL PANEL en el
+  navegador**, no un script: `probar-panel-estilo` mira lo que el panel DECLARA,
+  y ese control se colaba sin declararse. Hoy el invariante está en
+  `probar-estilos.ts`.
+- 🔴 **Y arreglando esto apareció un DOBLE CONTEO viejo**: el `menu` sin banda
+  interpolaba su `margin` a mano *y* le pasaba el mismo estilo a `pad()`, así que
+  un `padY: 20` salía 40. 📊 Medido antes de tocarlo: **0 de 33 documentos
+  guardados** cambian de pixel. Ningún ensayo lo veía porque el fixture de
+  `probar-espaciado` no tenía un `menu` — ahora lo tiene.
+- 🔴 **El candado va PEGADO a la etiqueta de su control** (`accesorio` de
+  `ControlNumero`). Dibujado como fila suelta quedaba entre "Margen lateral" y
+  "Margen arriba" y se leía como si fuera del lateral: un ícono sin etiqueta toma
+  prestada la de arriba. Otra que sólo se ve abriendo el navegador.
+- **Abrir el candado sin nada elegido no escribe nada** (es un modo de vista);
+  con un `padY` ya elegido lo copia a los dos lados, que rinde idéntico. Cerrarlo
+  vuelve a la forma corta con el valor de arriba y borra los dos lados.
 
 **El panel de estilo no ofrece lo que el mail no hace.** Los controles salen de
 `propsDeRol(tipo, rol)` en `estilos.ts`, y `probar-panel-estilo.ts` renderiza el

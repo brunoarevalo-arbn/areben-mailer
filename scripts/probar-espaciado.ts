@@ -61,6 +61,11 @@ const BLOQUES: Bloque[] = [
   { id: 'i1', tipo: 'imagen', url: 'https://ejemplo.com/foto.jpg', alt: 'foto' },
   { id: 'b1', tipo: 'boton', texto: 'Comprar', url: 'https://ejemplo.com' },
   { id: 'd1', tipo: 'divisor' },
+  // 🔴 El `menu` SIN banda entró el 26-ago-2026 y no es decorativo: sin él, §A
+  // daba verde mientras ese bloque SUMABA el margen elegido al cableado en vez
+  // de reemplazarlo (20 elegidos salían 40). Un fixture al que le falta un tipo
+  // de bloque es un ensayo que promete más de lo que mira.
+  { id: 'm1', tipo: 'menu', links: [{ texto: 'Novedades', url: 'https://ejemplo.com' }] },
   { id: 'r1', tipo: 'redes', links: [{ red: 'Instagram', url: 'https://instagram.com/bdi' }] },
   { id: 'p1', tipo: 'productos', items: [{ nombre: 'Funda', precio: '1000', imagen: 'x.jpg', url: '#' }] },
 ] as Bloque[];
@@ -145,6 +150,76 @@ ok(base !== cero, 'un mail sin elegir nada y uno con todo en 0 NO rinden el mism
 ok(
   render({ caja: { padY: 0 } }) !== render({ caja: { padX: 0 } }),
   'el margen vertical y el lateral se eligen por separado',
+);
+
+console.log('\n── E · arriba y abajo se eligen POR SEPARADO');
+
+// 🔴 La aserción que sostiene todo el diseño. Elegir un solo lado NO puede
+// apagar el otro: el atajo obvio —"si eligieron algo vertical, `margin:0`"—
+// deja el bloque pegado abajo, y eso no se ve en ninguna captura del panel.
+// Verificado en rojo con esa mutación (`margen` devolviendo siempre 0).
+const soloArriba = render({ caja: { padArriba: 40 } });
+ok(
+  soloArriba.includes('margin:0 0 16px'),
+  'elegir SOLO el margen de arriba deja vivo el cableado de abajo del texto (`0 0 16px`)',
+);
+ok(!soloArriba.includes('margin:16px 0'), 'y sí apaga el de arriba del título');
+ok(
+  soloArriba.includes('padding:40px 32px 0'),
+  'el aire elegido sale como padding de a TRES valores, con el lado no elegido en 0',
+);
+
+// El otro lado del mismo caso: con abajo elegido, arriba conserva lo suyo.
+const soloAbajo = render({ caja: { padAbajo: 0 } });
+ok(soloAbajo.includes('margin:16px 0 0'), 'elegir SOLO abajo deja vivo el `16px` de arriba del título');
+ok(soloAbajo !== base, 'y mueve el mail');
+ok(
+  soloAbajo !== render({ caja: { padY: 0 } }),
+  'elegir abajo en 0 NO es lo mismo que elegir los dos lados en 0',
+);
+
+// 🔑 La forma corta y las dos largas con el MISMO número tienen que rendir el
+// mismo HTML, o el candado del panel movería el mail al abrirse. Es lo que deja
+// que `ControlAireY` copie `padY` a los dos lados sin tocar nada.
+ok(
+  render({ caja: { padY: 40 } }) === render({ caja: { padArriba: 40, padAbajo: 40 } }),
+  'con los dos lados iguales el HTML es idéntico al de la forma corta (el candado no mueve el mail)',
+);
+
+// 🔴 La cascada respeta el ORDEN, también acá. El documento pone un lado y el
+// bloque contesta con la forma corta: gana el bloque, de los DOS lados. Un
+// `padArriba ?? padY` sobre el mezclado devolvería 8 arriba y 30 abajo.
+const cruzado = renderEmailHtml(
+  {
+    v: V_ACTUAL,
+    bloques: [{ id: 'x9', tipo: 'texto', texto: 'Un párrafo.', estilo: { caja: { padY: 30 } } }],
+    estilos: { caja: { padArriba: 8 } },
+  } as never,
+  OPTS as never,
+);
+// ⚠️ La aserción ancla en el `padding` DEL BLOQUE (que lleva el `32px` lateral),
+// no en cualquier `padding:8px` del documento: el `padArriba: 8` de la capa de
+// documento también gobierna el marco de la página, y ahí sale legítimamente.
+// Es el mismo error que ya se pagó en §C, del otro lado.
+ok(
+  cruzado.includes('padding:30px 32px') && !/padding:8px 32px/.test(cruzado),
+  'la forma corta de un BLOQUE le gana al lado suelto del DOCUMENTO, de los dos lados',
+);
+
+// La cáscara acompaña, lado por lado: los dos colchones son de fábrica
+// distintos (12 y 16) y hasta hoy un solo número los igualaba.
+const partidoDoc = render({ caja: { padArriba: 0, padAbajo: 40 } });
+ok(marco(partidoDoc) === '0px 16px 40px', `el marco de la página se parte (salió ${marco(partidoDoc)})`);
+ok(!partidoDoc.includes('<div style="height:12px">'), 'el colchón de arriba sigue al lado de arriba');
+ok(partidoDoc.includes('<div style="height:40px">'), 'y el de abajo al de abajo');
+
+// ⚠️ Esto NO contradice a §A: allá el margen se elige de los DOS lados y por eso
+// no puede quedar ni un cableado vivo. Acá se elige UNO y el otro tiene que
+// sobrevivir. Si alguien "arregla" §A para que valga siempre, esta sección se
+// pone roja — que es exactamente lo que tiene que pasar.
+ok(
+  render({ caja: { padArriba: 0 } }) !== base,
+  'ausente y 0 tampoco son lo mismo para los lados sueltos',
 );
 
 console.log(errores.length ? `\n❌ ${errores.length} fallas\n` : '\n✅ El espaciado se puede llevar a cero\n');

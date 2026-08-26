@@ -7,7 +7,7 @@ import {
 import { avisarContraste, superficieDe, type AvisoContraste } from "@/lib/email/contraste";
 import { FUENTES, FUENTE_LABEL, type Paleta } from "@/lib/email/tema";
 import type { TipoBloque } from "@/lib/email/render";
-import { ControlBool, ControlColor, ControlEnum, ControlNumero, ControlTamanoBoton } from "@/components/editor/ControlEstilo";
+import { ControlAireY, ControlBool, ControlColor, ControlEnum, ControlNumero, ControlTamanoBoton } from "@/components/editor/ControlEstilo";
 import { Desplegable } from "@/components/ui/Desplegable";
 
 /**
@@ -76,6 +76,12 @@ const CAMPO: Record<Prop, Def> = {
   tamano: { tipo: "num", label: "Tamaño", rango: RANGOS.tamano },
   padX: { tipo: "num", label: "Margen lateral", rango: RANGOS.padX },
   padY: { tipo: "num", label: "Margen arriba y abajo", rango: RANGOS.padY },
+  // ⚠️ Estas dos NO las dibuja el `switch` de abajo: las dibuja `ControlAireY`,
+  // que se cuelga de `padY`. Están acá porque `CAMPO` es un `Record<Prop, Def>`
+  // —o sea que el tipo las EXIGE en cuanto entran a `EstiloBloque`— y porque de
+  // acá salen la etiqueta y el rango, que es donde tienen que vivir una sola vez.
+  padArriba: { tipo: "num", label: "Margen arriba", rango: RANGOS.padArriba },
+  padAbajo: { tipo: "num", label: "Margen abajo", rango: RANGOS.padAbajo },
   interlinea: { tipo: "num", label: "Interlineado", rango: RANGOS.interlinea, paso: 0.05, sufijo: "×", avanzado: true },
   espaciado: { tipo: "num", label: "Espacio entre letras", rango: RANGOS.espaciado, avanzado: true },
   radio: { tipo: "num", label: "Redondeo", rango: RANGOS.radio, avanzado: true },
@@ -333,6 +339,36 @@ export function PanelEstilo({
             {visibles.map((k) => {
               const def = CAMPO[k];
               const bruto = propio?.[k];
+              // 🔑 Los tres márgenes verticales son UN control, no tres. Se
+              // cuelga de `padY` —que es el que está en el orden que la persona
+              // espera— y los dos lados devuelven `null` acá: dibujarlos sueltos
+              // además del compuesto serían dos perillas para lo mismo, que es
+              // el bug que documenta `SIN_EFECTO`.
+              //
+              // 🔴 **La condición es que ESTE rol ofrezca los dos lados, no que
+              // la propiedad se llame `padY`.** El rol `boton` también tiene
+              // `padY` —ahí es el relleno INTERIOR del botón— y con la
+              // interceptación colgada del nombre le aparecía el candado: dos
+              // perillas que escriben claves que el emisor del botón no lee
+              // nunca. Una perilla que no mueve nada se lee como "el mail está
+              // roto", y ⛔ el botón no se puede partir aunque se quisiera (el
+              // `<v:roundrect>` de Outlook expresa su caja con UN `height`).
+              // Lo encontró ABRIR EL PANEL: `probar-panel-estilo` mira lo que el
+              // panel DECLARA, y este control se colaba sin declararse.
+              if (k === "padArriba" || k === "padAbajo") return null;
+              if (k === "padY" && visibles.includes("padArriba")) {
+                return (
+                  <ControlAireY
+                    key={k}
+                    valor={propio}
+                    resueltoY={res.padY}
+                    resueltoArriba={res.aireY.arriba ?? res.padY}
+                    resueltoAbajo={res.aireY.abajo ?? res.padY}
+                    rango={def.tipo === "num" ? def.rango : RANGOS.padY}
+                    onChange={(v) => setMuchas(rol, v)}
+                  />
+                );
+              }
               switch (def.tipo) {
                 case "color":
                   return (

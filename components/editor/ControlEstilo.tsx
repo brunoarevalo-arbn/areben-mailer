@@ -9,7 +9,7 @@ import type { Paleta } from "@/lib/email/tema";
 import { ratioEnTexto, type AvisoContraste } from "@/lib/email/contraste";
 import { campoCompacto, tapTarget } from "@/lib/ui";
 import { Stepper } from "@/components/ui/Stepper";
-import { Pipette, RotateCcw } from "lucide-react";
+import { Lock, LockOpen, Pipette, RotateCcw } from "lucide-react";
 
 /**
  * Los controles de la cascada de estilo. Los cuatro tienen el mismo contrato:
@@ -162,6 +162,7 @@ export function ControlNumero({
   rango,
   paso = 1,
   sufijo = "px",
+  accesorio,
   onChange,
 }: {
   label: string;
@@ -170,6 +171,15 @@ export function ControlNumero({
   rango: readonly [number, number];
   paso?: number;
   sufijo?: string;
+  /**
+   * Un botón extra en la fila de la etiqueta, pegado al nombre del control.
+   *
+   * 🔴 Existe porque el candado del margen vertical, dibujado como una fila
+   * suelta arriba, quedaba flotando **entre "Margen lateral" y "Margen arriba"**
+   * y se leía como si fuera del lateral — visto en el navegador el 26-ago-2026,
+   * con el HTML impecable. Un control sin etiqueta hereda la etiqueta de arriba.
+   */
+  accesorio?: React.ReactNode;
   onChange: (v: number | undefined) => void;
 }) {
   const [min, max] = rango;
@@ -191,7 +201,10 @@ export function ControlNumero({
     // campo. El nombre lo lleva el `aria-label` del Stepper.
     <div className="block">
       <div className="mb-1 flex items-baseline justify-between gap-2">
-        <span className="text-xs font-semibold text-muted">{label}</span>
+        <span className="flex items-center gap-1 text-xs font-semibold text-muted">
+          {label}
+          {accesorio}
+        </span>
         {valor === undefined ? (
           // El "auto" ya no puede ir pegado al número —ahora el número vive
           // adentro del campo— pero sigue siendo la señal de que esto lo está
@@ -386,6 +399,138 @@ export function ControlTamanoBoton({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * El margen de arriba y el de abajo: un número, o dos detrás de un candado.
+ *
+ * 🔑 **El caso normal sigue siendo UN número.** Partir el margen es una decisión
+ * de diseño fino y la enorme mayoría de los bloques no la necesita: dos perillas
+ * fijas donde antes había una le suben el ruido al comerciante y le duplican el
+ * costo de equivocarse, que es exactamente lo que el permiso `avanzado` existe
+ * para evitar. Por eso el candado, y por eso arranca cerrado.
+ *
+ * 🔴 **Abrir el candado sin nada elegido NO escribe nada, y eso no es pereza.**
+ * La tentación es sembrar los dos lados con "lo que hoy se ve", pero en un
+ * `titulo` eso es `undefined` —ni `BASE` ni `BASE_POR_TIPO` le ponen
+ * `caja.padY`, el aire se lo da el `margin:16px 0` cableado del renderer—, así
+ * que la siembra escribiría **0** y abrir el candado apretaría el bloque sin que
+ * nadie moviera un número. Ahí abrir es un modo de VISTA: el primer valor lo
+ * escribe el primer paso del stepper, y el lado que nadie toca queda ausente =
+ * el cableado de siempre.
+ *
+ * ⚠️ **Con un margen de a dos ya elegido sí se copia a los dos lados**, y es
+ * seguro por construcción: los emisores colapsan a la forma corta cuando los dos
+ * lados son iguales (`padCss`, `pad`, `apertura`), así que el mail sale byte por
+ * byte igual. Sin eso, abrir el candado mostraría dos "auto" al lado de un mail
+ * con 32px puestos a mano — la perilla diría que nadie eligió nada.
+ *
+ * 🔑 **Cerrarlo es la otra escritura de varias claves.** Vuelve a la
+ * forma corta con el valor de arriba (o el de abajo, si arriba estaba en
+ * automático) y borra los dos lados. Va por `setMuchas` y no por tres `set`
+ * seguidos, por el mismo motivo que `ControlTamanoBoton`: cada `set` reconstruye
+ * desde el `valor` de ESTE render y los tres se pisarían entre sí.
+ *
+ * ⚠️ El modo sale del valor guardado, no de un estado suelto: un bloque que ya
+ * tiene los lados partidos abre con el candado abierto. El `useState` sólo hace
+ * falta para el caso contrario —abrirlo antes de haber escrito nada—, que es
+ * justo el que no tiene dónde guardarse.
+ */
+export function ControlAireY({
+  valor,
+  resueltoY,
+  resueltoArriba,
+  resueltoAbajo,
+  rango,
+  onChange,
+}: {
+  /** Lo que dice ESTA capa para el rol `caja`. */
+  valor: EstiloBloque | undefined;
+  /** El margen de a dos que se ve hoy, para el "auto" del control cerrado. */
+  resueltoY: number | undefined;
+  resueltoArriba: number | undefined;
+  resueltoAbajo: number | undefined;
+  rango: readonly [number, number];
+  /** Siempre las tres claves. `undefined` borra, que es como se vuelve a heredar. */
+  onChange: (v: { padY?: number; padArriba?: number; padAbajo?: number }) => void;
+}) {
+  const guardadoPartido = valor?.padArriba !== undefined || valor?.padAbajo !== undefined;
+  const [abiertoAMano, setAbiertoAMano] = useState(false);
+  const partido = guardadoPartido || abiertoAMano;
+
+  const cerrar = () => {
+    setAbiertoAMano(false);
+    // El de arriba manda; si arriba estaba en automático, se rescata el de abajo
+    // antes de tirarlo. Con los dos en automático vuelve todo a heredar.
+    const y = valor?.padArriba ?? valor?.padAbajo;
+    onChange({ padY: y, padArriba: undefined, padAbajo: undefined });
+  };
+
+  const abrir = () => {
+    setAbiertoAMano(true);
+    // Si había un margen de a dos, se reparte a los dos lados: eso NO cambia el
+    // mail (es el mismo número) y deja los dos steppers mostrando lo que la
+    // persona ya había elegido, en vez de un "auto" que parece un borrado.
+    if (valor?.padY !== undefined) {
+      onChange({ padY: undefined, padArriba: valor.padY, padAbajo: valor.padY });
+    }
+  };
+
+  const candado = (
+    <button
+      type="button"
+      onClick={partido ? cerrar : abrir}
+      aria-pressed={partido}
+      aria-label={partido ? "Volver a un solo margen arriba y abajo" : "Poner el margen de arriba y el de abajo por separado"}
+      title={partido ? "Un solo margen" : "Arriba y abajo por separado"}
+      className={`${tapTarget} -my-1 rounded-md px-1 py-1 transition-colors ${
+        partido ? "text-accent-subtle-foreground" : "text-subtle hover:text-foreground"
+      }`}
+    >
+      {partido ? <LockOpen className="h-3.5 w-3.5" aria-hidden /> : <Lock className="h-3.5 w-3.5" aria-hidden />}
+    </button>
+  );
+
+  // 🔴 **El candado va PEGADO a la etiqueta del control que gobierna**, no en
+  // una fila propia. Dibujado suelto arriba quedaba entre "Margen lateral" y
+  // "Margen arriba" y se leía como si fuera del lateral: un ícono sin etiqueta
+  // toma prestada la de arriba. Se vio en el navegador, con el HTML impecable —
+  // ningún script de Node mira dónde CAE una cosa.
+  //
+  // ⚠️ Cuando está partido cuelga del de ARRIBA, que es el primero de los dos:
+  // cerrarlo desde el de abajo dejaría el foco saltando hacia arriba.
+  return (
+    <div className="space-y-2">
+      {partido ? (
+        <>
+          <ControlNumero
+            label="Margen arriba"
+            valor={valor?.padArriba}
+            resuelto={resueltoArriba}
+            rango={rango}
+            accesorio={candado}
+            onChange={(v) => onChange({ padArriba: v })}
+          />
+          <ControlNumero
+            label="Margen abajo"
+            valor={valor?.padAbajo}
+            resuelto={resueltoAbajo}
+            rango={rango}
+            onChange={(v) => onChange({ padAbajo: v })}
+          />
+        </>
+      ) : (
+        <ControlNumero
+          label="Margen arriba y abajo"
+          valor={valor?.padY}
+          resuelto={resueltoY}
+          rango={rango}
+          accesorio={candado}
+          onChange={(v) => onChange({ padY: v })}
+        />
+      )}
     </div>
   );
 }
