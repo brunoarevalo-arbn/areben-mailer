@@ -22,7 +22,14 @@
 //      subida.
 //   5. Una foto que no cargó (0×0) no puede producir un lienzo `NaN`, y un
 //      número guardado fuera de rango tampoco.
-import { encuadre, ejeSobrante, FORMATOS, ANCHO_MAX } from "../lib/imagenes-encuadre";
+import {
+  encuadre,
+  ejeSobrante,
+  cajaDeTinta,
+  recorteDeAire,
+  FORMATOS,
+  ANCHO_MAX,
+} from "../lib/imagenes-encuadre";
 
 let fallos = 0;
 function ok(cond: boolean, que: string, detalle = "") {
@@ -133,5 +140,105 @@ console.log("\n7. Una foto que no cargó no produce un lienzo NaN");
   ok(Number.isFinite(r.dw) && Number.isFinite(r.dh) && r.dw === 0, "0×0 devuelve 0×0", JSON.stringify(r));
 }
 
-console.log(fallos === 0 ? "\n✅ El recorte no deforma ni agranda\n" : `\n❌ ${fallos} fallo(s)\n`);
+// ─────────────────────────────────────────────────────────────────────────────
+// Recortar el AIRE (26-ago-2026)
+//
+// Mismo motivo que todo lo de arriba: el `<canvas>` no se puede probar sin un
+// navegador, así que la decisión —dónde empieza la tinta y qué rectángulo sale—
+// vive en dos funciones puras y se ejerce acá, con arrays RGBA armados a mano.
+//
+// El caso que las motivó, medido sobre los archivos reales: el logo de BDI en
+// Blob es 1080×1350 con la tinta en 1045×408, y los tres que devuelve Tiendanube
+// tienen el mismo margen vacío. El encabezado del mail dibujaba 120×150 px para
+// una marca de 116×45.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Un lienzo RGBA de un color liso, para pintarle una caja de tinta encima. */
+function lienzo(w: number, h: number, fondo: [number, number, number, number]) {
+  const d = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < w * h; i++) d.set(fondo, i * 4);
+  return {
+    d,
+    pintar(x0: number, y0: number, x1: number, y1: number, c: [number, number, number, number]) {
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) d.set(c, (y * w + x) * 4);
+      return this;
+    },
+  };
+}
+const TRANSPARENTE: [number, number, number, number] = [0, 0, 0, 0];
+const NEGRO: [number, number, number, number] = [0, 0, 0, 255];
+const BLANCO: [number, number, number, number] = [255, 255, 255, 255];
+
+console.log("\n8. Dónde empieza la tinta");
+{
+  // El caso de los cuatro logos medidos: margen transparente arriba y abajo.
+  const a = lienzo(100, 100, TRANSPARENTE).pintar(10, 40, 89, 59, NEGRO);
+  const ca = cajaDeTinta(a.d, 100, 100);
+  ok(
+    ca !== null && ca.x0 === 10 && ca.y0 === 40 && ca.x1 === 89 && ca.y1 === 59,
+    "margen transparente: la caja es exactamente la tinta",
+    JSON.stringify(ca),
+  );
+
+  // 🔴 El logo que Tiendanube devuelve para BDI: tinta BLANCA sobre transparente.
+  // Cualquier regla del tipo "tinta = lo que no es blanco" lo borra entero.
+  const b = lienzo(100, 100, TRANSPARENTE).pintar(20, 30, 79, 49, BLANCO);
+  const cb = cajaDeTinta(b.d, 100, 100);
+  ok(
+    cb !== null && cb.x0 === 20 && cb.y0 === 30 && cb.x1 === 79 && cb.y1 === 49,
+    "tinta BLANCA sobre transparente: se encuentra igual",
+    JSON.stringify(cb),
+  );
+
+  // Un logo exportado sobre blanco liso: ahí el aire es de color, no de alfa.
+  const c = lienzo(100, 100, BLANCO).pintar(5, 5, 24, 94, NEGRO);
+  const cc = cajaDeTinta(c.d, 100, 100);
+  ok(
+    cc !== null && cc.x0 === 5 && cc.y0 === 5 && cc.x1 === 24 && cc.y1 === 94,
+    "margen BLANCO liso: se mide contra el color de la esquina",
+    JSON.stringify(cc),
+  );
+
+  // Un blanco re-encodeado no queda en 255 exacto y no puede leerse como tinta.
+  const d = lienzo(100, 100, BLANCO).pintar(0, 0, 99, 9, [252, 251, 253, 255]);
+  const cd = cajaDeTinta(d.d, 100, 100);
+  ok(cd === null, "un blanco sucio de re-encode sigue siendo aire, no tinta", JSON.stringify(cd));
+
+  ok(cajaDeTinta(lienzo(50, 50, TRANSPARENTE).d, 50, 50) === null, "una imagen vacía no tiene caja");
+  ok(cajaDeTinta(new Uint8ClampedArray(0), 0, 0) === null, "0×0 tampoco");
+  ok(cajaDeTinta(new Uint8ClampedArray(16), 100, 100) === null, "ni un array más corto que la imagen que dice medir");
+}
+
+console.log("\n9. La caja como recorte: al ras, adentro del archivo, y `null` si no hay aire");
+{
+  const r = recorteDeAire(1080, 1350, { x0: 26, y0: 465, x1: 1070, y1: 872 });
+  ok(
+    r !== null && r.sx === 26 && r.sy === 465 && r.sw === 1045 && r.sh === 408,
+    "el logo real de BDI: 1080×1350 → toma 1045×408",
+    JSON.stringify(r),
+  );
+  ok(r !== null && casi(r.dw / r.dh, 1045 / 408), "y no lo deforma", r ? `${r.dw}×${r.dh}` : "null");
+  ok(r !== null && r.dw <= ANCHO_MAX, "ni lo agranda más allá del tope");
+
+  ok(recorteDeAire(100, 100, null) === null, "sin caja no hay recorte");
+  ok(recorteDeAire(0, 0, { x0: 0, y0: 0, x1: 10, y1: 10 }) === null, "una foto que no cargó tampoco");
+  ok(
+    recorteDeAire(100, 100, { x0: 0, y0: 0, x1: 99, y1: 99 }) === null,
+    "una imagen SIN aire devuelve null: no se sube un archivo nuevo para dejar la misma imagen",
+  );
+  ok(
+    recorteDeAire(100, 100, { x0: 0, y0: 0, x1: 98, y1: 99 }) === null,
+    "y una a la que sólo le sobra una columna, tampoco",
+  );
+
+  // 🔴 La caja puede venir de una medición hecha sobre una copia achicada.
+  const fuera = recorteDeAire(100, 100, { x0: -5, y0: -5, x1: 500, y1: 40 });
+  ok(
+    fuera !== null && fuera.sx === 0 && fuera.sy === 0 && fuera.sw === 100 && fuera.sy + fuera.sh <= 100,
+    "una caja que se sale del archivo se acota, nunca produce un recorte inválido",
+    JSON.stringify(fuera),
+  );
+}
+
+console.log(fallos === 0 ? "\n✅ El recorte no deforma ni agranda, y el aire se saca al ras\n" : `\n❌ ${fallos} fallo(s)\n`);
 process.exit(fallos === 0 ? 0 : 1);

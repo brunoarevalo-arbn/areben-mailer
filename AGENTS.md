@@ -78,7 +78,7 @@ node --import tsx scripts/probar-foto-encima.ts # una foto lleva VARIOS botones 
 node --import tsx scripts/probar-mosaico.ts   # una foto cortada en pedazos: la fila no desborda, y a medio cortar sale la foto ENTERA
 node --import tsx scripts/probar-regresiva.ts  # la cuenta regresiva: el PNG mide lo que el <img> declara (leído de los bytes) y la ruta no toca la base
 node --import tsx scripts/probar-imagen-escala.ts # una foto puede salir más chica y alineada, y Outlook obedece
-node --import tsx scripts/probar-recorte.ts     # el recorte no deforma ni agranda, y el deslizador mueve un solo eje
+node --import tsx scripts/probar-recorte.ts     # el recorte no deforma ni agranda, el deslizador mueve un solo eje, y el aire se saca al ras
 node --import tsx scripts/probar-precio-oculto.ts # lo que el HTML oculta, el text/plain tampoco lo manda
 node --import tsx scripts/probar-encabezado.ts # el link de baja no se puede borrar
 node --import tsx scripts/probar-imagenes.ts   # permisos, multi-tenant y SVG de /api/imagenes
@@ -789,6 +789,32 @@ hay que pasarle `token` a `put()`.
   los 5 MB ahora se miden sobre lo que SE SUBE y no sobre lo elegido (una foto
   de celular de 7 MB entra), con un techo de 40 MB antes de decodificar porque
   abrir eso en un canvas cuelga la pestaña.
+- 🔑 **«Recortar el aire»: llevar una imagen al borde de su tinta** (26-ago-2026).
+  Otro recorte, y por eso vive aparte: los formatos de abajo contestan "llevame
+  esta foto a 16:9", que es una decisión de quien arma el mail; esto saca un
+  **defecto del archivo**. El logo de BDI era un PNG de 1080×1350 con la marca en
+  1045×408 —465 px de aire arriba y 477 abajo—, así que el encabezado medía
+  **120×150 px para una marca de 116×45**, y ese vacío no lo puede sacar ni
+  `logoAncho` ni el `padY` del bloque. **No era un archivo mal exportado**: los
+  tres logos que devuelve TN en `/store` tienen lo mismo (Zattia 4506×3940 con
+  tinta 2583×2880, Stunned 2397×959 con tinta 2060×303).
+  - La geometría es pura (`cajaDeTinta` + `recorteDeAire` en
+    `lib/imagenes-encuadre.ts`), el pixel-scan va en el navegador
+    (`recortarAire` en `lib/imagenes.ts`) y el botón está **sólo en el campo del
+    logo del encabezado** (prop `aire` de `ImagenDrop`, opt-in como `formatos`).
+  - 🔴 **El alfa se mira PRIMERO y el color sólo entre los píxeles opacos.** El
+    logo que TN devuelve para BDI es **tinta BLANCA sobre transparente**:
+    cualquier regla del tipo "tinta = lo que no es blanco" —o aplanar sobre
+    blanco antes de medir— lo borra entero. Lo fija `probar-recorte.ts` §8,
+    verificado en rojo con esa mutación.
+  - ⚠️ **Al ras, sin margen**: el aire lo pone el `padY` del bloque, que se edita
+    sin volver a subir nada. Y **sin aire no sube nada** (`recorteDeAire` da
+    `null` arriba del 99% de área): apretar el botón dos veces no quema una
+    segunda clave de Blob.
+  - ⚠️ **Pesa un poco MÁS, no menos**: medido, 27 KB → 31 KB con 71% menos
+    píxeles. El `toBlob` de Chrome escribe PNG de 32 bits y no palettiza. Se
+    aceptó: el archivo lo descarga un cliente de mail una vez, y la alternativa
+    era un tope de ancho inventado.
 - El mismo camino recorta a **16:9 · 1:1 · 4:5** desde el bloque `imagen`
   (`lib/imagenes-encuadre.ts` es la geometría PURA, que es lo único que un
   script de Node puede probar). ⛔ **Un GIF no se toca nunca** (el canvas se come

@@ -9,9 +9,9 @@
 // que ya vive en la tienda.
 
 import { useRef, useState } from "react";
-import { ImageIcon, Library } from "lucide-react";
+import { ImageIcon, Library, Crop } from "lucide-react";
 import { inputClass } from "@/lib/ui";
-import { subirImagen, recortarImagen } from "@/lib/imagenes";
+import { subirImagen, recortarImagen, recortarAire } from "@/lib/imagenes";
 import { FORMATOS, POS_CENTRO, ejeSobrante, type Formato } from "@/lib/imagenes-encuadre";
 import { ImagenPicker } from "@/components/editor/ImagenPicker";
 import { BarraOpciones } from "@/components/ui/BarraOpciones";
@@ -21,6 +21,7 @@ export function ImagenDrop({
   onChange,
   placeholder = "URL de la imagen (https://…)",
   formatos = false,
+  aire = false,
   formato,
   urlOriginal,
   encuadre,
@@ -36,6 +37,17 @@ export function ImagenDrop({
    * decide el bloque. Sin la bandera, este control no existe.
    */
   formatos?: boolean;
+  /**
+   * Ofrecer «Recortar el aire». **Opt-in por lo mismo que `formatos`**, pero la
+   * pregunta es otra: la relación de aspecto es una decisión de diseño y el aire
+   * alrededor de un logo es un defecto del archivo. Hoy se enciende en el campo
+   * del logo del encabezado, que es donde ese defecto se paga en cada mail.
+   *
+   * ⚠️ Escribe por `onChange`, no por `onRecorte`: un recorte al ras no tiene
+   * formato ni encuadre que guardar. Volver atrás es elegir el original en la
+   * biblioteca, que es donde quedó.
+   */
+  aire?: boolean;
   formato?: Formato;
   urlOriginal?: string;
   encuadre?: number;
@@ -44,6 +56,12 @@ export function ImagenDrop({
 }) {
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Lo que pasó y no es un error: "esta imagen no tenía aire para sacar". Va
+   * aparte del `error` porque se dibuja en gris y no en rojo — pintar de rojo una
+   * respuesta correcta enseña a ignorar el color.
+   */
+  const [aviso, setAviso] = useState<string | null>(null);
   const [abierta, setAbierta] = useState(false);
   /**
    * Dónde está el deslizador AHORA, que no es lo mismo que el encuadre que ya se
@@ -81,16 +99,29 @@ export function ImagenDrop({
    * dispara el recorte en la misma vuelta en la que la cambia, y ahí el estado
    * todavía tiene el valor viejo.
    */
+  /**
+   * Con qué nombre y con qué tipo se vuelve a subir lo recortado.
+   *
+   * 🔴 El `mime` sale de la EXTENSIÓN de la URL y no se puede adivinar de otra
+   * forma acá: es lo que decide si el recorte sale PNG —conservando la
+   * transparencia— o JPEG, que pinta de negro lo que era transparente. En un
+   * logo eso es todo el fondo.
+   */
+  const comoArchivo = (url: string) => ({
+    nombre: url.split("/").pop() || "imagen",
+    mime: /\.png($|\?)/i.test(url) ? "image/png" : /\.gif($|\?)/i.test(url) ? "image/gif" : "image/jpeg",
+  });
+
   const recortar = async (f: Formato | "original", conPos: number = pos) => {
     if (!origen) return;
     setError(null);
+    setAviso(null);
     if (f === "original") {
       onRecorte?.({ url: origen, formato: undefined, urlOriginal: undefined, encuadre: undefined });
       return;
     }
     setSubiendo(true);
-    const nombre = origen.split("/").pop() || "imagen";
-    const mime = /\.png($|\?)/i.test(origen) ? "image/png" : /\.gif($|\?)/i.test(origen) ? "image/gif" : "image/jpeg";
+    const { nombre, mime } = comoArchivo(origen);
     const r = await recortarImagen(origen, nombre, mime, FORMATOS[f].ratio, conPos);
     setSubiendo(false);
     if (r.ok) {
@@ -116,8 +147,30 @@ export function ImagenDrop({
     void recortar(formato, pos);
   };
 
+  /**
+   * Recortar el aire: llevar la imagen al borde de su tinta.
+   *
+   * 🔑 Parte de `origen` —el original, no la última recortada— por la misma razón
+   * que `recortar`: un recorte sobre un recorte compone la pérdida del re-encode.
+   * En el campo del logo, que es donde esto se enciende hoy, no hay `urlOriginal`
+   * y `origen` es lo que se está viendo.
+   */
+  const sacarAire = async () => {
+    if (!origen) return;
+    setError(null);
+    setAviso(null);
+    setSubiendo(true);
+    const { nombre, mime } = comoArchivo(origen);
+    const r = await recortarAire(origen, nombre, mime);
+    setSubiendo(false);
+    if (r.ok) onChange(r.imagen.url);
+    else if (r.sinAire) setAviso(r.error);
+    else setError(r.error);
+  };
+
   const subir = async (file: File) => {
     setError(null);
+    setAviso(null);
     setSubiendo(true);
     const r = await subirImagen(file);
     setSubiendo(false);
@@ -161,6 +214,18 @@ export function ImagenDrop({
               <Library className="h-3.5 w-3.5" aria-hidden />
               Biblioteca
             </button>
+            {aire && value && (
+              <button
+                type="button"
+                onClick={() => void sacarAire()}
+                disabled={subiendo}
+                title="Saca el vacío que la imagen tiene alrededor, sin achicar la marca"
+                className="flex items-center gap-1.5 rounded-lg border border-border-strong px-2.5 py-1 text-xs text-muted transition-colors hover:bg-surface-muted disabled:opacity-50"
+              >
+                <Crop className="h-3.5 w-3.5" aria-hidden />
+                Recortar el aire
+              </button>
+            )}
             {value && (
               <button type="button" onClick={() => onChange("")} className="text-xs text-subtle hover:text-danger-foreground">
                 Quitar
@@ -247,6 +312,7 @@ export function ImagenDrop({
         </div>
       )}
 
+      {aviso && <div className="text-xs text-subtle">{aviso}</div>}
       {error && <div className="text-xs text-danger-foreground">{error}</div>}
 
       <input

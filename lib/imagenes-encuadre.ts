@@ -145,3 +145,158 @@ export function encuadre(
   const dw = Math.min(sw, anchoMax);
   return { sx, sy, sw, sh, dw, dh: Math.max(1, Math.round(dw / ratio)) };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Recortar el AIRE: llevar una imagen al borde de su tinta
+//
+// Es un recorte distinto del de arriba y por eso vive aparte: `encuadre()`
+// contesta "llevame esta foto a 16:9", que es una decisión de quien arma el
+// mail; esto contesta "sacale el vacío que tiene adentro", que no es una
+// decisión de nadie — es un defecto del archivo.
+//
+// 🔴 **De dónde salió.** Medido el 26-ago-2026 sobre los cuatro logos que hay
+// en uso: el de BDI en Blob es 1080×1350 con la tinta en 1045×408 (465 px de
+// aire arriba y 477 abajo), y los tres que devuelve Tiendanube en `/store`
+// tienen lo mismo — Zattia 4506×3940 con tinta 2583×2880, Stunned 2397×959 con
+// tinta 2060×303. Así vienen los logos de tienda, y ese aire lo paga el
+// encabezado de cada mail: el de BDI ocupaba 120×150 px para una marca de
+// 116×45. Ni `logoAncho` ni el `padY` del bloque lo pueden sacar, porque el
+// vacío está adentro de los píxeles.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** El rectángulo que ocupa la tinta, en píxeles del original. Ambos extremos incluidos. */
+export interface CajaTinta {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * Cuánto alfa hace falta para que un píxel cuente como tinta.
+ *
+ * No es 0: un PNG exportado de Illustrator deja un halo de 1-2 de alfa alrededor
+ * del trazo, y con el umbral en 0 la caja sale del tamaño del archivo y el
+ * recorte no saca nada.
+ */
+export const TOL_ALFA = 16;
+
+/**
+ * Cuánto se tiene que apartar un píxel OPACO del fondo para contar como tinta.
+ *
+ * Sólo se usa cuando el margen es de color liso (un logo exportado sobre
+ * blanco). Un JPEG de un logo sobre blanco tiene el blanco a 250-255 por el
+ * re-encode, así que el umbral no puede ser 0.
+ */
+export const TOL_COLOR = 24;
+
+/**
+ * Qué proporción del archivo tiene que quedar para que valga la pena recortar.
+ *
+ * Arriba de esto no hay aire que sacar y `recorteDeAire` devuelve `null`. Sin
+ * este freno, apretar el botón sobre un logo ya recortado sube un archivo nuevo
+ * —una clave de Blob que ya no se puede borrar, porque su URL puede estar en un
+ * mail entregado— y una vuelta de re-encode, para dejar la misma imagen.
+ */
+const SIN_AIRE = 0.99;
+
+/** La diferencia de color más grande entre dos píxeles, canal por canal. */
+const distancia = (
+  r: number, g: number, b: number,
+  rr: number, rg: number, rb: number,
+) => Math.max(Math.abs(r - rr), Math.abs(g - rg), Math.abs(b - rb));
+
+/**
+ * El color de fondo del que se mide el aire: el que tienen las CUATRO esquinas.
+ *
+ * `null` cuando no coinciden, y eso significa "el margen no es liso" ⇒ el
+ * llamador se queda sólo con el alfa. Es la respuesta correcta y no un problema:
+ * una imagen con las esquinas distintas no tiene un margen de color que sacar, y
+ * recortar por color ahí cortaría la foto.
+ */
+function fondoDe(rgba: ArrayLike<number>, ancho: number, alto: number): number[] | null {
+  const px = (x: number, y: number) => {
+    const i = (y * ancho + x) * 4;
+    return [rgba[i], rgba[i + 1], rgba[i + 2], rgba[i + 3]];
+  };
+  const ref = px(0, 0);
+  for (const [x, y] of [[ancho - 1, 0], [0, alto - 1], [ancho - 1, alto - 1]] as const) {
+    const o = px(x, y);
+    // Dos esquinas transparentes son el mismo fondo aunque su RGB no coincida:
+    // un PNG guarda cualquier cosa abajo de un alfa 0.
+    if (ref[3] <= TOL_ALFA && o[3] <= TOL_ALFA) continue;
+    if (o[3] !== ref[3] || distancia(o[0], o[1], o[2], ref[0], ref[1], ref[2]) > TOL_COLOR) return null;
+  }
+  return ref;
+}
+
+/**
+ * Dónde empieza y dónde termina la tinta de una imagen. `null` = está vacía.
+ *
+ * **Puro: recibe el RGBA crudo, no un canvas.** Es lo mismo que hace el resto de
+ * este archivo y por el mismo motivo — así un script de Node lo puede ejercer
+ * con un array armado a mano (`scripts/probar-recorte.ts`), que es la única
+ * forma de probar un recorte sin navegador.
+ *
+ * 🔴 **El alfa se mira PRIMERO, y el color sólo entre los píxeles opacos.** El
+ * logo que Tiendanube devuelve para BDI es tinta BLANCA sobre transparente:
+ * cualquier regla del tipo "tinta = lo que no es blanco" —o aplanar sobre blanco
+ * antes de medir— borra el logo entero y deja la caja vacía. Sobre un fondo
+ * transparente, tener alfa YA es ser tinta, sin mirar de qué color.
+ */
+export function cajaDeTinta(
+  rgba: ArrayLike<number>,
+  ancho: number,
+  alto: number,
+): CajaTinta | null {
+  if (!(ancho > 0) || !(alto > 0) || rgba.length < ancho * alto * 4) return null;
+
+  const fondo = fondoDe(rgba, ancho, alto);
+  // Fondo opaco ⇒ el aire es de color y hay que compararlo. Fondo transparente,
+  // o esquinas que no coinciden ⇒ el único criterio confiable es el alfa.
+  const porColor = fondo !== null && fondo[3] > TOL_ALFA;
+
+  let x0 = ancho, y0 = alto, x1 = -1, y1 = -1;
+  for (let y = 0; y < alto; y++) {
+    for (let x = 0; x < ancho; x++) {
+      const i = (y * ancho + x) * 4;
+      if (rgba[i + 3] <= TOL_ALFA) continue;
+      if (porColor && distancia(rgba[i], rgba[i + 1], rgba[i + 2], fondo[0], fondo[1], fondo[2]) <= TOL_COLOR) continue;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+  }
+  return x1 < 0 ? null : { x0, y0, x1, y1 };
+}
+
+/**
+ * La caja de tinta, como recorte listo para el canvas. `null` = no hay aire.
+ *
+ * Devuelve el mismo `Recorte` que `encuadre()` para que el módulo del canvas
+ * dibuje los dos con el mismo código: qué rectángulo se toma y de qué tamaño
+ * sale es toda la decisión, y toda la decisión vive acá.
+ *
+ * ⚠️ **Al ras, sin margen.** El aire alrededor del logo lo pone el `padY` del
+ * bloque, que se edita sin volver a subir nada: los píxeles para la marca, el
+ * CSS para el aire. Un margen horneado en el archivo es exactamente el problema
+ * que esto vino a arreglar.
+ */
+export function recorteDeAire(
+  natAncho: number,
+  natAlto: number,
+  caja: CajaTinta | null,
+  anchoMax = ANCHO_MAX,
+): Recorte | null {
+  if (!(natAncho > 0) || !(natAlto > 0) || !caja) return null;
+  // La caja puede venir de una medición hecha sobre una copia achicada: se acota
+  // acá, que es el único lugar por el que pasa todo, igual que el deslizador.
+  const sx = Math.min(Math.max(0, Math.round(caja.x0)), natAncho - 1);
+  const sy = Math.min(Math.max(0, Math.round(caja.y0)), natAlto - 1);
+  const sw = Math.min(Math.max(1, Math.round(caja.x1) - sx + 1), natAncho - sx);
+  const sh = Math.min(Math.max(1, Math.round(caja.y1) - sy + 1), natAlto - sy);
+  if (sw * sh >= natAncho * natAlto * SIN_AIRE) return null;
+  const dw = Math.min(sw, anchoMax);
+  return { sx, sy, sw, sh, dw, dh: Math.max(1, Math.round((sh * dw) / sw)) };
+}

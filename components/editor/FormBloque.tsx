@@ -218,7 +218,11 @@ export function FormBloque({
 
           {b.variante === "logo" ? (
             <>
-              <ImagenDrop value={b.logo ?? ""} onChange={(logo) => set({ logo })} placeholder="URL del logo (https://…)" />
+              {/* 🔑 `aire` acá y no en los otros campos de imagen: un logo de
+                  tienda viene casi siempre con un margen transparente horneado
+                  —los tres que devuelve Tiendanube lo tienen— y ese vacío lo
+                  paga el encabezado de cada mail. */}
+              <ImagenDrop value={b.logo ?? ""} onChange={(logo) => set({ logo })} aire placeholder="URL del logo (https://…)" />
               <Rango label="Ancho del logo" value={b.logoAncho ?? 140} onChange={(logoAncho) => set({ logoAncho })} min={40} max={400} step={10} />
               <p className="text-xs text-subtle">
                 {logoTienda ? "Sin cargar ninguno se usa el logo de tu tienda." : "Sin logo cargado se muestra el nombre."}
