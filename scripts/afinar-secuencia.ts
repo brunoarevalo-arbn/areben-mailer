@@ -96,10 +96,6 @@ async function main() {
   const activas = autos.filter((a) => a.estado === 'ACTIVO');
   if (activas.length) throw new Error(`hay automations ACTIVAS (${activas.map((a) => a.nombre).join(', ')}): no se editan por script`);
 
-  // El encabezado que ya usan los tres carritos, para dárselo a la reseña.
-  const cab = leerContenido(autos.find((a) => a.trigger === 'CARRITO_ABANDONADO')?.contenido as never)
-    ?.bloques.find((b) => b.tipo === 'encabezado');
-
   for (const a of autos) {
     const doc = leerContenido(a.contenido as never);
     if (!doc) { console.log(`· ${a.nombre}: sin contenido`); continue; }
@@ -131,12 +127,20 @@ async function main() {
       cambios.push(`se saca ${vacias.length} bloque de imagen VACÍO (no dibujaba nada)`);
     }
 
-    // 4 · La reseña no tiene encabezado: con las imágenes apagadas ese mail
-    //     llega sin decir de quién es. El `alt` del logo es el nombre de la
-    //     cuenta, así que es lo único que sobrevive apagado.
-    if (a.trigger === 'RESENA' && cab && !bs.some((b) => b.tipo === 'encabezado')) {
-      bs.unshift(structuredClone(cab));
-      cambios.push('bloque `encabezado` al principio (el mail no decía de quién era con las imágenes apagadas)');
+    // 4 · 🔴 **La reseña NO lleva bloque `encabezado`, y es a propósito.**
+    //     Se le puso uno el 26-ago y se sacó el mismo día: su banner ya trae el
+    //     logo BDI dibujado adentro, así que con las imágenes prendidas la marca
+    //     salía DOS VECES —el logo chico arriba y el wordmark grande 200px más
+    //     abajo—. La identidad con las imágenes apagadas la sostiene el `alt`
+    //     («BDI — Queremos tu feedback»), que es justamente para eso.
+    //     ⚠️ Este paso BORRA el encabezado si aparece, no es un no-op: así
+    //     correr el script deshace la vuelta anterior y queda idempotente.
+    if (a.trigger === 'RESENA') {
+      const i = bs.findIndex((b) => b.tipo === 'encabezado');
+      if (i >= 0) {
+        bs.splice(i, 1);
+        cambios.push('se saca el bloque `encabezado`: el banner ya trae el logo adentro y salía dos veces');
+      }
     }
 
     if (!cambios.length) { console.log(`= ${a.nombre}: nada para hacer`); continue; }
