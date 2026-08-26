@@ -59,6 +59,7 @@ node --import tsx scripts/probar-supresion.ts  # una queja no cruza de tienda; u
 node --env-file=.env --import tsx scripts/probar-rebote-tipo.ts # el rebote deja escrito SI FUE DURO (y el reintento de SNS no lo duplica)
 node --env-file=.env --import tsx scripts/probar-cadena-cola.ts # la posta se confirma por el LEASE, y la invocación ENTERA entra en los 60 s
 node --import tsx scripts/probar-carrito.ts    # el carrito de muestra no sale en un envío real
+node --env-file=.env --import tsx scripts/ensayo-secuencia.ts # los CUATRO mails de disparador, con datos reales, a HTML para LEERLOS
 node --import tsx scripts/probar-recuperados.ts # un fallo de TN no se lee como "no compró", y el barrido siempre avanza
 node --import tsx scripts/probar-bienvenida.ts # el cupón del pop-up entra, el placeholder nunca sale, y NUEVO_SUSCRIPTOR no lo alcanza ningún evento de TN
 node --import tsx scripts/probar-productos-dinamicos.ts # la consulta se guarda, los productos no
