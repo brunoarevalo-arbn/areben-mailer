@@ -29,11 +29,19 @@ export const RESORTY_URL = process.env.RESORTY_URL ?? "https://resorty.arebensrl
  * misma acción, y darle ramas distintas al llamador invita a que alguna termine
  * mandando el código del preset. El motivo queda en el log, que es donde se lo
  * busca.
+ *
+ * 🔴 **`dry`** pregunta qué pasaría sin acuñar nada en la tienda ni escribir una
+ * fila. Es lo que usa «Mandar una prueba», que es el ÚNICO camino para mirar el
+ * mail en Gmail y en Outlook: sin esto la prueba del 3er mail llegaba con el
+ * placeholder `CARRITO10` del preset y con el bloque dibujado aunque la perilla
+ * estuviera apagada —o sea el mail al revés del que iba a salir—. En dry no hay
+ * `checkoutId` porque no hay nada que hacer idempotente.
  */
 export async function pedirCuponDeCarrito(
   cuentaId: string,
   email: string,
-  checkoutId: string,
+  checkoutId: string | null,
+  opts: { dry?: boolean } = {},
 ): Promise<CuponEmitido | null> {
   const secret = process.env.CRON_SECRET;
   if (!secret) return null;
@@ -44,7 +52,7 @@ export async function pedirCuponDeCarrito(
     const res = await fetch(`${RESORTY_URL}/api/carrito/cupon`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
-      body: JSON.stringify({ cuentaId, email, checkoutId }),
+      body: JSON.stringify({ cuentaId, email, checkoutId, ...(opts.dry ? { dry: true } : {}) }),
       signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {

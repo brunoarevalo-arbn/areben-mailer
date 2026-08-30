@@ -50,7 +50,7 @@ titulo("🔴 Sin cupón emitido, el bloque DESAPARECE");
   chk("un mail sin bloque `cupon` no se toca", JSON.stringify(intacto) === JSON.stringify(sinCupon()));
 }
 
-titulo("Con cupón emitido, se pisa el CÓDIGO y el PORCENTAJE");
+titulo("Con cupón emitido, se pisa el CÓDIGO y se anuncia el porcentaje EMITIDO");
 {
   const r = aplicarCuponDeCarrito(conCupon(), {
     codigo: "BDI-K7M2QP", valor: 20, vence: "2026-08-28T23:59:00.000Z", minCompra: 0,
@@ -58,11 +58,45 @@ titulo("Con cupón emitido, se pisa el CÓDIGO y el PORCENTAJE");
   const b = r.find((x) => x.tipo === "cupon") as Extract<Bloque, { tipo: "cupon" }>;
   chk("el código es el real", b.codigo === "BDI-K7M2QP", b.codigo);
   chk("y no queda rastro del placeholder", !JSON.stringify(r).includes("CARRITO10"));
-  // 🔴 El texto del preset dice "10% OFF" y el escalado emitió 20%: si el texto
-  // no se pisara, el mail anunciaría la mitad de lo que el cupón descuenta.
+  // 🔴 El texto del preset dice "10% OFF" y el escalado emitió 20%: un titular
+  // que nombra un porcentaje es de OTRO momento y se descarta, o el mail
+  // anunciaría dos números distintos y uno sería falso.
   chk("el porcentaje anunciado es el EMITIDO, no el del preset", b.texto.startsWith("20% OFF"), b.texto);
+  chk("el titular con % del preset no sobrevive", !b.texto.includes("10% OFF"), b.texto);
   chk("los otros bloques no se tocan", r.filter((x) => x.tipo !== "cupon").length === 2);
   chk("y la variante y el botón del bloque se conservan", b.botonTexto === "Usarlo" && b.botonUrl === "${cart.url}");
+}
+
+titulo("🔴 El TITULAR que escribió el comerciante llega a la casilla");
+{
+  // Hasta el 29-ago-2026 se pisaba el texto entero: «Tu cupón por volver» —lo que
+  // el 3er mail de BDI tiene escrito en el editor— no llegaba a ninguna casilla, y
+  // el comentario de la función decía que sí. Un campo del editor que el envío
+  // tira es una superficie que miente.
+  const conTitular = (): Bloque[] => [
+    { tipo: "cupon", texto: "Tu cupón por volver", codigo: "CARRITO10", botonTexto: "Usarlo", botonUrl: "${cart.url}" },
+  ];
+  const emitido = { codigo: "BDI-K7M2QP", valor: 20, vence: "2026-08-28T23:59:00.000Z", minCompra: 15000 };
+  const b = aplicarCuponDeCarrito(conTitular(), emitido)[0] as Extract<Bloque, { tipo: "cupon" }>;
+  chk("el titular sobrevive", b.texto.startsWith("Tu cupón por volver"), b.texto);
+  chk("y sigue estando el porcentaje real", b.texto.includes("20% OFF"), b.texto);
+  chk("y la letra chica", b.texto.includes("No se acumula") && b.texto.includes("15.000"), b.texto);
+  // Un titular vacío no deja un separador colgando adelante.
+  const vacio = aplicarCuponDeCarrito(
+    [{ tipo: "cupon", texto: "   ", codigo: "X", botonTexto: "", botonUrl: "" }],
+    emitido,
+  )[0] as Extract<Bloque, { tipo: "cupon" }>;
+  chk("un titular vacío no deja ' · ' adelante", vacio.texto.startsWith("20% OFF"), vacio.texto);
+  // El default del bloque (`bloqueNuevo`) tampoco habla de plata: tiene que pasar.
+  const preset = aplicarCuponDeCarrito(
+    [{ tipo: "cupon", texto: "Usá este código en el checkout", codigo: "X", botonTexto: "", botonUrl: "" }],
+    emitido,
+  )[0] as Extract<Bloque, { tipo: "cupon" }>;
+  chk(
+    "el texto por defecto del bloque también sobrevive",
+    preset.texto.startsWith("Usá este código en el checkout"),
+    preset.texto,
+  );
 }
 
 titulo("🔴 La letra chica dice que NO SE ACUMULA");

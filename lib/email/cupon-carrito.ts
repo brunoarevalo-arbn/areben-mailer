@@ -74,19 +74,33 @@ export function condicionesDe(c: CuponEmitido): string {
  *    novedad el cupón que ya está en su casilla es peor que no ofrecer nada;
  *  - Tiendanube falló al acuñarlo.
  *
- * El `texto` del autor se conserva y las condiciones se AGREGAN, igual que en
- * `aplicarCuponDelTrigger`: son la letra chica del premio, no su descripción. Lo
- * que sí se pisa es el porcentaje, porque el valor lo decide el escalado y el
- * texto del preset ("10% OFF") puede no tener nada que ver con lo que se emitió.
+ * El `texto` del autor se CONSERVA y el porcentaje y las condiciones se agregan
+ * atrás, igual que en `aplicarCuponDelTrigger`. 🔴 Hasta el 29-ago-2026 acá se
+ * pisaba el texto entero, y el comentario decía que se conservaba: el titular que
+ * el comerciante escribe en el editor —hoy «Tu cupón por volver»— **no llegaba a
+ * ninguna casilla**, y la única forma de enterarse era comparar el HTML enviado
+ * contra el documento. Un editor que ofrece un campo que el envío tira es la
+ * misma clase de mentira que un margen que se dibuja distinto de como se eligió.
+ *
+ * 🔴 **Salvo que el titular nombre un porcentaje**, y ahí se descarta. El valor lo
+ * decide el escalado al ENVIAR, así que cualquier `%` escrito a mano es de otro
+ * momento: el preset trae "10% OFF" y el escalado puede emitir 20%. Conservarlo
+ * dejaría el mail anunciando dos números distintos, uno de ellos falso. La regla
+ * es "el titular sobrevive si no habla de plata"; el número lo pone el emisor,
+ * siempre.
  */
+const NOMBRA_PORCENTAJE = /\d\s*%/;
+
 export function aplicarCuponDeCarrito(bloques: Bloque[], cupon: CuponEmitido | null): Bloque[] {
   if (!cupon) return bloques.filter((b) => b.tipo !== "cupon");
   return bloques.map((b) => {
     if (b.tipo !== "cupon") return b;
+    const propio = b.texto?.trim();
+    const titular = propio && !NOMBRA_PORCENTAJE.test(propio) ? propio : null;
     return {
       ...b,
       codigo: cupon.codigo,
-      texto: `${cupon.valor}% OFF · ${condicionesDe(cupon)}`,
+      texto: [titular, `${cupon.valor}% OFF`, condicionesDe(cupon)].filter(Boolean).join(" · "),
     };
   });
 }

@@ -5,8 +5,9 @@ import { autorizar, chequear, getAuth } from "@/lib/auth";
 import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
 import { conCarrito, muestraDePrueba, urlVueltaDePrueba } from "@/lib/email/prueba";
+import { pideCupon, aplicarCuponDeCarrito } from "@/lib/email/cupon-carrito";
 import { firmarResena, VIDA_MS } from "@/lib/resena-token";
-import { RESORTY_URL } from "@/lib/carrito-cupon";
+import { RESORTY_URL, pedirCuponDeCarrito } from "@/lib/carrito-cupon";
 import { leerContenido } from "@/lib/email/esquema";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { marcaDe, hostDeEnvio } from "@/lib/marca";
@@ -278,7 +279,25 @@ export async function enviarPruebaAutomation(id: string, email: string) {
       : a.trigger === "CARRITO_ABANDONADO"
         ? muestraDePrueba(urlVuelta)
         : [];
-  const bloques = conCarrito(contenido.bloques, items);
+  let bloques = conCarrito(contenido.bloques, items);
+
+  // 🔴 **Y el `cupon` TAMBIÉN, por el mismo camino que el envío.** Hasta el
+  // 29-ago-2026 la prueba del 3er mail de carrito llegaba con el placeholder del
+  // preset —`CARRITO10`, un código que el checkout de Tiendanube rechaza— y con
+  // el bloque DIBUJADO aunque la perilla de Resorty estuviera apagada, que es
+  // como está hoy y es el estado en el que el envío real **borra el bloque
+  // entero**. O sea: la prueba mostraba el mail al revés del que iba a salir,
+  // justo en el mail que se está por prender.
+  //
+  // 🔑 Va en `dry`: pregunta por la perilla, la tienda, el descuento que esta
+  // persona ya tiene vivo y si el escalado lo mejora —los cuatro motivos por los
+  // que el mail sale sin premio— pero NO acuña nada en la tienda ni escribe una
+  // fila. Acuñar de verdad sería emitir descuento real cada vez que alguien mira
+  // su propio mail.
+  if (a.trigger === "CARRITO_ABANDONADO" && pideCupon(bloques)) {
+    const emitido = await pedirCuponDeCarrito(cuenta.id, destino, null, { dry: true });
+    bloques = aplicarCuponDeCarrito(bloques, emitido);
+  }
 
   const destinatario = { nombre: nombre ?? "", email: destino };
   const doc = { ...contenido, bloques };
