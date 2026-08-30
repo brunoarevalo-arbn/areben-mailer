@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { autorizar, chequear, getAuth } from "@/lib/auth";
 import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
-import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
+import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, aplicarMergeTagsAsunto, type ContenidoCampania } from "@/lib/email/render";
 import { conCarrito, muestraDePrueba, urlVueltaDePrueba } from "@/lib/email/prueba";
 import { pideCupon, aplicarCuponDeCarrito } from "@/lib/email/cupon-carrito";
 import { firmarResena, VIDA_MS } from "@/lib/resena-token";
@@ -320,7 +320,9 @@ export async function enviarPruebaAutomation(id: string, email: string) {
   try {
     const res = await sendEmail({
       to: destino,
-      subject: `[PRUEBA] ${a.asunto}`,
+      // El asunto de la prueba se resuelve igual que el del envío: si no, la
+      // prueba mostraría un `${contacto.primerNombre}` crudo que el real sí resuelve.
+      subject: `[PRUEBA] ${aplicarMergeTagsAsunto(a.asunto, destinatario)}`,
       html,
       text: texto,
       unsubscribeUrl,

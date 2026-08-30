@@ -2177,3 +2177,29 @@ export function aplicarMergeTags(
     .replace(/\$\{contacto\.nombre\}/g, contacto.nombre ?? "")
     .replace(/\$\{contacto\.email\}/g, contacto.email);
 }
+
+/**
+ * Los mismos merge tags, pero para el ASUNTO.
+ *
+ * 🔴 **Existe porque el asunto no los resolvía.** Hasta el 29-ago-2026 tanto la
+ * cola de campañas como el procesador de automations mandaban `campania.asunto`
+ * / `automation.asunto` **crudos**, mientras el editor los ofrece en el cuerpo y
+ * los explica en su hint. O sea: escribir `${contacto.primerNombre}` en el
+ * asunto —lo primero que intenta cualquiera que lo vio andar abajo— mandaba el
+ * literal `${contacto.primerNombre}` a **toda la lista**, en la única línea que
+ * se lee antes de abrir, y sin arreglo después de enviado. No falla, no avisa:
+ * simplemente sale mal. Medido el 29-ago: cero asuntos guardados lo usaban, así
+ * que arreglarlo no movió ningún mail existente.
+ *
+ * 🔴 **Y aplana los saltos de línea**, que es la única diferencia real con el
+ * cuerpo. El asunto es una CABECERA del correo: un `\r\n` adentro del nombre la
+ * partiría en dos y lo que siguiera se leería como otra cabecera. Hoy no hay un
+ * solo contacto con un salto en el nombre (medido), pero el nombre lo escribe
+ * quien compra y esto no puede depender de que siga siendo así.
+ */
+export function aplicarMergeTagsAsunto(
+  asunto: string,
+  contacto: { nombre?: string | null; email: string },
+): string {
+  return aplicarMergeTags(asunto, contacto).replace(/[\r\n\t]+/g, " ").trim();
+}

@@ -96,7 +96,8 @@ node --import tsx scripts/probar-negritas.ts   # `**negrita**` se resuelve DESPU
 node --import tsx scripts/probar-texto-rico.ts # un campo de texto rico rinde el MISMO html que el string de siempre
 node --env-file=.env --import tsx scripts/probar-segmentos.ts # el "no abrió/no clickeó" es RECIBIÓ y no lo hizo, nunca "no me consta"
 node --import tsx scripts/probar-automations.ts # el carrito llega a TRES mails, y ninguno sale a la misma hora que otro
-node --import tsx scripts/probar-cupon-carrito.ts # el bloque `cupon` sin código REAL detrás se elimina; el placeholder nunca sale
+node --import tsx scripts/probar-cupon-carrito.ts # el bloque `cupon` sin código REAL detrás se elimina; el placeholder nunca sale, y el DESCUENTO sale más grande y en negrita
+node --import tsx scripts/probar-asunto.ts     # el asunto resuelve los mismos merge tags que el cuerpo, y un salto de línea no parte la cabecera
 RESENA_SECRET=vector-fijo-de-ensayo node --import tsx scripts/probar-resena-token.ts # el link de las estrellas no se puede editar (vector fijo, espejado en areben-popups)
 node --import tsx scripts/probar-guardado.ts    # el veredicto distingue "te lo pisaron" de "lo borraron", y guardar dos veces seguidas no choca contra uno mismo
 node --import tsx scripts/auditar-guardado.ts   # las DOS mitades del conflicto: el servidor se niega, y ningún llamador tira el resultado

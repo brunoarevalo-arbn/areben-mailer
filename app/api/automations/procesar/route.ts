@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ProductoEmail } from "@/lib/email/render";
+import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, aplicarMergeTagsAsunto, type ProductoEmail } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { aplicarCuponDelTrigger, type TriggerPopup } from "@/lib/email/cupon-trigger";
@@ -251,7 +251,9 @@ export async function GET(req: Request) {
     try {
       const res = await sendEmail({
         to: contacto.email,
-        subject: automation.asunto,
+        // 🔴 Ídem la cola de campañas: el asunto pasa por los merge tags. Ver
+        // `aplicarMergeTagsAsunto` — salía crudo hasta el 29-ago-2026.
+        subject: aplicarMergeTagsAsunto(automation.asunto, contacto),
         html,
         text: texto,
         unsubscribeUrl: unsubUrl,

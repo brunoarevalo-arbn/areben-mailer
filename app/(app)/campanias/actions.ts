@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { autorizar, chequear } from "@/lib/auth";
-import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, type ContenidoCampania } from "@/lib/email/render";
+import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, aplicarMergeTagsAsunto, type ContenidoCampania } from "@/lib/email/render";
 import { veredictoGuardado, type ResultadoGuardado } from "@/lib/documentos";
 import { leerContenido } from "@/lib/email/esquema";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
@@ -385,7 +385,8 @@ export async function enviarPrueba(id: string, emailDestino: string) {
   try {
     const res = await sendEmail({
       to: destino,
-      subject: `[PRUEBA] ${campania.asunto}`,
+      // Ídem el cuerpo: el asunto de la prueba se resuelve como el del envío.
+      subject: `[PRUEBA] ${aplicarMergeTagsAsunto(campania.asunto!, destinatario)}`,
       html: htmlFinal,
       text: textoFinal,
       unsubscribeUrl: unsubPrueba,

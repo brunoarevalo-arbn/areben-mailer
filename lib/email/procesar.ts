@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { renderEmailHtml, renderEmailTexto, aplicarMergeTags } from "@/lib/email/render";
+import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, aplicarMergeTagsAsunto } from "@/lib/email/render";
 import { leerContenido } from "./esquema";
 import { resolverProductosDinamicos } from "./productos-dinamicos";
 import { marcaDe, hostDeEnvio } from "@/lib/marca";
@@ -159,8 +159,13 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
     // Parte text/plain: un mail solo-HTML es señal de spam, sobre todo en Outlook.
     const texto = aplicarMergeTags(renderEmailTexto(contenido, opts), envio.contacto);
 
-    const asuntoEnvio =
-      envio.variante === "B" ? campania.asuntoB ?? campania.asunto! : campania.asunto!;
+    // 🔴 El asunto pasa por los merge tags **igual que el cuerpo**. Ver
+    // `aplicarMergeTagsAsunto`: hasta el 29-ago-2026 salía crudo, así que un
+    // `${contacto.primerNombre}` en el asunto se mandaba literal a toda la lista.
+    const asuntoEnvio = aplicarMergeTagsAsunto(
+      envio.variante === "B" ? campania.asuntoB ?? campania.asunto! : campania.asunto!,
+      envio.contacto,
+    );
     try {
       const res = await sendEmail({
         to: envio.contacto.email,

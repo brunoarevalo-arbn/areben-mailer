@@ -140,6 +140,11 @@ export function AutomationEditor({
         <label className="block text-sm sm:col-span-2">
           <span className="text-muted">Asunto</span>
           <input className={`${campoBase} w-full`} value={asunto} onChange={(e) => setAsunto(e.target.value)} />
+          {/* 🔴 El hint no es decorativo: los merge tags del asunto se resolvieron
+              recién el 29-ago-2026, y hasta entonces escribirlos ahí mandaba el
+              literal a toda la lista. Ahora que andan, hay que decir que andan —
+              una capacidad que el panel no nombra es una que nadie usa. */}
+          <p className="mt-1 text-xs text-neutral-500">Podés usar ${'{'}contacto.primerNombre{'}'} o ${'{'}contacto.nombre{'}'}.</p>
         </label>
       </div>
       <label className="block text-sm">
