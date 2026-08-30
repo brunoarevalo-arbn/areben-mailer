@@ -419,6 +419,24 @@ const BASE_POR_TIPO: Partial<Record<TipoBloque, Estilos>> = {
     },
     titulo: { color: "$cuponTexto", tamano: 26, peso: 700, espaciado: 3 },
     cuerpo: { tamano: 16 },
+    // 🔴 El DESCUENTO, y va más grande que el código a propósito: el código es
+    // el instrumento, el premio es el gancho. Hasta el 29-ago-2026 no tenía rol
+    // —vivía adentro del `cuerpo`, a 14 px y sin negrita— y el número más
+    // importante del mail se leía igual que la letra chica.
+    //
+    // ⚠️ El color es `$cuponTexto`, el mismo del código, y NO `$acento`: la
+    // jerarquía la hacen el tamaño y el peso, que se leen en cualquier tema. Un
+    // acento sobre el fondo del cupón depende de qué dos colores eligió la marca
+    // y puede quedar por debajo del contraste justo en el renglón que se quiere
+    // destacar.
+    // 38 y no 32: el código de este mail está en 30 (lo eligió el diseño del 3er
+    // mail de BDI, y un valor elegido no se pisa), así que con 32 el descuento
+    // quedaba a dos píxeles del código y no se despegaba de nada. El premio tiene
+    // que ganarle al instrumento a simple vista, no por poco.
+    precio: { color: "$cuponTexto", tamano: 38, peso: 700 },
+    // La letra chica: un punto menos que el `nota` de fábrica (13) porque acá
+    // convive con dos textos grandes en una caja chica.
+    nota: { tamano: 12 },
   },
   productos: { cuerpo: { tamano: 14 } },
   // La misma grilla, así que las mismas medidas: si divergieran, cambiar un
@@ -614,7 +632,7 @@ export const ROLES_POR_TIPO: Record<TipoBloque, readonly RolEstilo[]> = {
   // clase de bug de UI. Los dos colores que sí manda alguien (el fondo de la
   // casilla y, derivado de él, la tinta) son campos del BLOQUE, no de la cascada.
   regresiva: ["caja"],
-  cupon: ["caja", "titulo", "cuerpo", "boton"],
+  cupon: ["caja", "titulo", "cuerpo", "precio", "boton", "nota"],
   html: ["caja"],
 };
 
@@ -745,6 +763,9 @@ const SIN_EFECTO: Partial<Record<TipoBloque, Partial<Record<RolEstilo, readonly 
   // valor.
   hero: { titulo: ["align"], subtitulo: ["align"] },
   seccion: { titulo: ["align"], subtitulo: ["align"] },
+  // ⚠️ `precio` y `nota` no entran acá: `PROPS_POR_ROL` no les ofrece `align` en
+  // ningún bloque (los dos nacieron dibujándose adentro de un renglón ajeno), así
+  // que listarlos sería una excepción a una regla que no existe.
   cupon: { titulo: ["align", "interlinea"], cuerpo: ["align"] },
   // El "botón" del video es el círculo con el ▶ encima de la miniatura: toma
   // color, fondo y redondeo, y nada de tipografía porque no tiene texto.
@@ -897,9 +918,24 @@ export function resolverEstilo(
 
   let color = resolverColor(mezclado.color, ctx.pal) ?? ctx.pal.cuerpo;
   // Legibilidad contextual: generaliza lo que hoy hacen hero, seccion y cupon.
+  //
+  // 🔴 **`precio` va con el tono FUERTE, igual que `titulo`.** Hasta el
+  // 29-ago-2026 caía en el `else` y se llevaba el tono de cuerpo, que es el
+  // correcto para un precio metido en el renglón de un producto —de ahí nació el
+  // rol— pero no para el único lugar donde `precio` es el TITULAR: el descuento
+  // del bloque `cupon`, que salía `#404040` al lado de un código `#171717` y por
+  // lo tanto se leía como lo menos importante de la caja. Un número que es el
+  // gancho del mail no puede recibir el tono que se le da a la letra de apoyo.
+  //
+  // ⚠️ Alcance real: hoy **sólo el cupón** pasa `sobre` para este rol. Las tres
+  // grillas de productos lo dibujan sin superficie, así que esta rama ni corre
+  // para ellas — el precio de una tarjeta sigue saliendo exactamente igual.
   if (autoColor && sobre) {
     const t = tonosSobre(sobre);
-    color = rol === "titulo" ? t.texto : rol === "nota" ? t.medio : rol === "subtitulo" ? t.medio : t.cuerpo;
+    color =
+      rol === "titulo" || rol === "precio" ? t.texto
+      : rol === "nota" || rol === "subtitulo" ? t.medio
+      : t.cuerpo;
   }
 
   const { color: _c, fondo: _f, bordeColor: _b, fuente: _fu, ...resto } = mezclado;

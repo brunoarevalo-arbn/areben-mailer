@@ -74,20 +74,33 @@ export function condicionesDe(c: CuponEmitido): string {
  *    novedad el cupón que ya está en su casilla es peor que no ofrecer nada;
  *  - Tiendanube falló al acuñarlo.
  *
- * El `texto` del autor se CONSERVA y el porcentaje y las condiciones se agregan
- * atrás, igual que en `aplicarCuponDelTrigger`. 🔴 Hasta el 29-ago-2026 acá se
- * pisaba el texto entero, y el comentario decía que se conservaba: el titular que
- * el comerciante escribe en el editor —hoy «Tu cupón por volver»— **no llegaba a
- * ninguna casilla**, y la única forma de enterarse era comparar el HTML enviado
- * contra el documento. Un editor que ofrece un campo que el envío tira es la
- * misma clase de mentira que un margen que se dibuja distinto de como se eligió.
+ * Cada cosa va a SU campo, y ése es todo el punto:
  *
- * 🔴 **Salvo que el titular nombre un porcentaje**, y ahí se descarta. El valor lo
- * decide el escalado al ENVIAR, así que cualquier `%` escrito a mano es de otro
- * momento: el preset trae "10% OFF" y el escalado puede emitir 20%. Conservarlo
- * dejaría el mail anunciando dos números distintos, uno de ellos falso. La regla
- * es "el titular sobrevive si no habla de plata"; el número lo pone el emisor,
- * siempre.
+ *  - `texto` — el titular que escribió el comerciante («Tu cupón por volver»);
+ *  - `destacado` — el premio («15% OFF»), que el renderer dibuja grande y en
+ *    negrita arriba del código;
+ *  - `condiciones` — la letra chica, al pie de la caja, chica y tenue.
+ *
+ * 🔴 **Los tres vivían en una sola línea hasta el 29-ago-2026**, unidos por
+ * « · », y el resultado se vio recién mirando el mail en Gmail: los tres a 14 px
+ * y sin negrita, o sea **el número más importante del mail leyéndose igual que
+ * el «no se acumula con otros cupones»**. Ningún ensayo lo podía atrapar, porque
+ * los tres textos salían — lo que estaba mal era la jerarquía, y eso no se lee
+ * en un string. Es la misma historia del rol `precio` del 5-ago: la respuesta a
+ * «queda muy chico» no es agrandar el cuerpo, es darle pieza propia a lo que es
+ * una decisión propia.
+ *
+ * 🔴 Y antes de eso, el 29 a la mañana, acá se **pisaba el `texto` entero**
+ * mientras el comentario decía que se conservaba: el titular del editor no
+ * llegaba a ninguna casilla. Un editor que ofrece un campo que el envío tira es
+ * la misma clase de mentira que un margen que se dibuja distinto de como se
+ * eligió.
+ *
+ * 🔴 **El titular se descarta si nombra un porcentaje.** El valor lo decide el
+ * escalado al ENVIAR, así que cualquier `%` escrito a mano es de otro momento: el
+ * preset trae "10% OFF" y el escalado puede emitir 20%. Conservarlo dejaría el
+ * mail anunciando dos números distintos, uno de ellos falso. La regla es "el
+ * titular sobrevive si no habla de plata"; el número lo pone el emisor, siempre.
  */
 const NOMBRA_PORCENTAJE = /\d\s*%/;
 
@@ -96,11 +109,13 @@ export function aplicarCuponDeCarrito(bloques: Bloque[], cupon: CuponEmitido | n
   return bloques.map((b) => {
     if (b.tipo !== "cupon") return b;
     const propio = b.texto?.trim();
-    const titular = propio && !NOMBRA_PORCENTAJE.test(propio) ? propio : null;
+    const titular = propio && !NOMBRA_PORCENTAJE.test(propio) ? propio : "";
     return {
       ...b,
       codigo: cupon.codigo,
-      texto: [titular, `${cupon.valor}% OFF`, condicionesDe(cupon)].filter(Boolean).join(" · "),
+      texto: titular,
+      destacado: `${cupon.valor}% OFF`,
+      condiciones: condicionesDe(cupon),
     };
   });
 }

@@ -1646,14 +1646,29 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // compacta se ocupa sola de sus huecos— y movería el pixel de todos los
       // cupones ya enviados a cambio de nada.
       const compacta = b.variante === "compacta";
-      const sigueAlTexto = !!b.codigo || !!b.botonTexto;
+      const sigueAlTexto = !!b.destacado || !!b.codigo || !!b.botonTexto;
       const huecoTexto = compacta ? (sigueAlTexto ? 4 : 0) : 8;
       const huecoCodigo = compacta ? (b.botonTexto ? 6 : 0) : 14;
       const abajo = compacta ? 10 : 16;
       const t = b.texto ? (() => { const x = e("cuerpo", bg); return `<div style="font-size:${px(x.tamano ?? 16)};color:${x.color}${extra(x, ["tamano", "color", "align"])};margin-bottom:${px(huecoTexto)}">${esc(b.texto)}</div>`; })() : "";
+      // 🔴 **El premio, y va ANTES del código.** El código es el instrumento; el
+      // descuento es el gancho, y hasta el 29-ago-2026 no existía como pieza:
+      // vivía adentro de la línea de `texto`, a 14 px y sin negrita, del mismo
+      // tamaño que el «no se acumula con otros cupones». Lo vio Bruno en Gmail y
+      // ningún ensayo lo podía ver, porque los tres textos salían igual.
+      //
+      // 🔑 Su hueco de abajo es el MISMO que el del texto (`huecoTexto`) y no uno
+      // nuevo: son dos renglones de la misma pila, y darle un tercer número a la
+      // variante compacta la haría depender de qué campos están llenos.
+      const dest = b.destacado ? (() => { const x = e("precio", bg); return `<div style="font-size:${px(x.tamano ?? 38)};font-weight:${x.peso ?? 700};color:${x.color}${extra(x, ["tamano", "peso", "color", "align"])};margin-bottom:${px(huecoTexto)}">${esc(b.destacado)}</div>`; })() : "";
       const cod = b.codigo ? (() => { const x = e("titulo"); return `<div style="font-size:${px(x.tamano ?? 26)};font-weight:${x.peso ?? 700};letter-spacing:${px(x.espaciado ?? 3)};color:${x.color}${extra(x, ["tamano", "peso", "espaciado", "color", "align", "interlinea"])};margin-bottom:${px(huecoCodigo)}">${esc(b.codigo)}</div>`; })() : "";
       const btn = b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "";
-      return pad(`<div style="border:${px(c.bordeAncho ?? 2)} ${c.bordeEstilo ?? "dashed"} ${c.bordeColor ?? pal.acento};border-radius:${px(c.radio ?? 12)};background:${bg};${padCaja(c, 24, 24)};text-align:center;margin:8px 0 ${px(abajo)}">${t}${cod}${btn}</div>`, undefined);
+      // La letra chica va ÚLTIMA, debajo del botón, que es donde se lee una
+      // condición. ⚠️ Su margen es de ARRIBA y no de abajo: el hueco al pie de la
+      // caja ya lo pone el `padCaja`, y sumarle otro dejaría el recuadro con una
+      // franja muerta abajo.
+      const cond = b.condiciones ? (() => { const x = e("nota", bg); return `<div style="font-size:${px(x.tamano ?? 12)};color:${x.color}${extra(x, ["tamano", "color", "align"])};margin-top:${px(compacta ? 6 : 12)}">${esc(b.condiciones)}</div>`; })() : "";
+      return pad(`<div style="border:${px(c.bordeAncho ?? 2)} ${c.bordeEstilo ?? "dashed"} ${c.bordeColor ?? pal.acento};border-radius:${px(c.radio ?? 12)};background:${bg};${padCaja(c, 24, 24)};text-align:center;margin:8px 0 ${px(abajo)}">${t}${dest}${cod}${btn}${cond}</div>`, undefined);
     }
     // ⛔ Gateado por la CUENTA, no por quién lo editó — ver el comentario en
     // `Ctx.permiteHtmlCrudo`. Sin el toggle prendido, el bloque no se dibuja
@@ -2064,8 +2079,19 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       const hasta = instante(b.hasta);
       return hasta ? lineaRegresiva(hasta) : null;
     }
+    // 🔴 `destacado` y `condiciones` van acá también. La parte `text/plain` no es
+    // decorado: es una de las señales que mira el filtro de spam, y es lo único
+    // que ve un lector que la tiene configurada. Un mail cuyo gancho es «15% OFF»
+    // que en su mitad de texto no dice el descuento **ni la condición legal** es
+    // media promesa — y la letra chica es justamente la parte que no puede faltar.
     case "cupon":
-      return [b.texto, b.codigo, b.botonTexto ? link(b.botonTexto, b.botonUrl) : null].filter(Boolean).join("\n") || null;
+      return [
+        b.texto,
+        b.destacado,
+        b.codigo,
+        b.botonTexto ? link(b.botonTexto, b.botonUrl) : null,
+        b.condiciones,
+      ].filter(Boolean).join("\n") || null;
     // Sin conversión razonable a texto plano: es la escotilla de HTML libre.
     case "html":
       return null;

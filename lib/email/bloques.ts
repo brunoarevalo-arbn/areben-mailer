@@ -827,9 +827,40 @@ export type Bloque = BloqueBase &
          */
         variante?: "caja" | "compacta";
         texto: string;
+        /**
+         * El PREMIO: "15% OFF", "Envío gratis". Va grande y en negrita, arriba
+         * del código, en el rol `precio`.
+         *
+         * 🔴 **Nació el 29-ago-2026 porque el descuento no se veía.** Hasta ese
+         * día el bloque tenía una sola línea de texto y ahí adentro convivían el
+         * titular, el porcentaje y la letra chica, los tres a 14 px y sin
+         * negrita: el número más importante del mail quedaba del mismo tamaño
+         * que el «no se acumula con otros cupones». Lo dijo Bruno mirando el
+         * mail en Gmail —«queda muy chico, muy plano, y no está en negrita»— y
+         * ningún ensayo lo podía ver, porque los tres textos SALÍAN.
+         *
+         * 🔑 Es exactamente la misma historia que el rol `precio` (5-ago): la
+         * diseñadora dijo «el precio queda muy chico en relación al botón» y la
+         * respuesta no fue agrandar el cuerpo, fue **darle rol propio a lo que
+         * es una decisión propia**. Un número de plata no es texto de párrafo.
+         *
+         * Opcional: un bloque sin esto se dibuja **idéntico a como se dibujaba**.
+         * Es lo que deja que la Bienvenida —que está ACTIVA— no se mueva.
+         */
+        destacado?: string;
         codigo: string;
         botonTexto: string;
         botonUrl: string;
+        /**
+         * La letra chica del premio: vencimiento, compra mínima, «no se acumula».
+         * Va al pie de la caja, en el rol `nota` (chica y en el tono tenue).
+         *
+         * 🔴 Vive **fuera** de `texto` desde el 29-ago-2026 por lo mismo que
+         * `destacado`: mezclada en la misma línea competía de igual a igual con
+         * el descuento. Una condición legal tiene que estar, y tiene que estar
+         * abajo.
+         */
+        condiciones?: string;
       }
     /**
      * HTML crudo. Escotilla de administrador, no de comerciante: sale desde un
@@ -1002,7 +1033,12 @@ export function nuevoBloque(tipo: TipoBloque): Bloque {
     // La alternativa —nacer con "dentro de tres días"— pondría una fecha que
     // nadie eligió en un mail que se puede mandar sin abrir el bloque.
     case "regresiva": return { id, tipo, hasta: "" };
-    case "cupon": return { id, tipo, texto: "Usá este código en el checkout", codigo: "DESCUENTO10", botonTexto: "Comprar", botonUrl: "" };
+    // 🔑 Nace con letra chica puesta, y no vacía: **los cupones de Tiendanube no
+    // se acumulan** —el checkout toma UNO por orden— así que esa línea es cierta
+    // en toda tienda y es la que evita que alguien llegue esperando sumar dos
+    // descuentos. Un bloque que nace sin ella deja el control «Letra chica» del
+    // panel de estilo sin nada que mover, que es una perilla desconectada.
+    case "cupon": return { id, tipo, texto: "Usá este código en el checkout", destacado: "15% OFF", codigo: "DESCUENTO10", botonTexto: "Comprar", botonUrl: "", condiciones: "No se acumula con otros cupones" };
     case "html": return { id, tipo, contenido: "" };
   }
 }

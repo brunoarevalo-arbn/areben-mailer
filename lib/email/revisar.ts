@@ -165,8 +165,14 @@ export function rolesDibujados(b: Bloque, opts: OpcionesRevision = {}): readonly
     case "cupon": {
       const roles: RolEstilo[] = [];
       if (hay(b.texto)) roles.push("cuerpo");
+      // El descuento y la letra chica: los roles salen de los campos que HAY,
+      // igual que en `foto-encima`. Un cupón sin `destacado` no dibuja nada en
+      // `precio`, y hacer cantar el aviso de contraste por un texto que no
+      // existe es la misma falla que el aviso sobre un título ausente.
+      if (hay(b.destacado)) roles.push("precio");
       if (b.codigo?.trim()) roles.push("titulo");
       if (hay(b.botonTexto)) roles.push("boton");
+      if (hay(b.condiciones)) roles.push("nota");
       return roles;
     }
     /**

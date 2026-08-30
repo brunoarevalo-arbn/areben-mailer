@@ -523,9 +523,15 @@ export function FormBloque({
             <option value="compacta">Compacta</option>
           </Select>
           <Input label="Texto" fullWidth value={b.texto} placeholder="Usá este código en el checkout" onChange={(e) => set({ texto: e.target.value })} />
+          {/* 🔴 El descuento es un campo propio desde el 29-ago-2026. Escrito
+              adentro de "Texto" salía a 14 px y sin negrita, del mismo tamaño que
+              la letra chica: el número más importante del mail se leía como una
+              aclaración. Acá arriba, y con su propio control de estilo. */}
+          <Input label="El descuento" fullWidth value={b.destacado ?? ""} placeholder="15% OFF" hint="Va grande y en negrita, arriba del código." onChange={(e) => set({ destacado: e.target.value })} />
           <Input label="Código" fullWidth value={b.codigo} placeholder="DESCUENTO10" onChange={(e) => set({ codigo: e.target.value })} />
           <Input label="Texto del botón" fullWidth value={b.botonTexto} placeholder="Opcional" onChange={(e) => set({ botonTexto: e.target.value })} />
           <Input label="Link del botón" fullWidth value={b.botonUrl} placeholder="https://…" onChange={(e) => set({ botonUrl: e.target.value })} />
+          <Input label="Letra chica" fullWidth value={b.condiciones ?? ""} placeholder="Válido hasta el 05/09 · No se acumula" hint="Al pie del recuadro, chica y en el tono tenue." onChange={(e) => set({ condiciones: e.target.value })} />
         </div>
       );
     }
