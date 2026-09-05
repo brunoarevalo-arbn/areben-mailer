@@ -7,15 +7,26 @@
 // Hay TRES estados, no dos. El del medio es el que permite probar el motor sin
 // arriesgar la lista real:
 //
-//   bloqueado — no sale nada. Es el default y el estado de hoy.
+//   bloqueado — no sale nada. Es el DEFAULT: si la env falta, está vacía o mal
+//               escrita, se cae acá.
 //   ensayo    — corre el camino real completo (cola, lease, tracking, estados)
 //               pero SOLO contra los destinatarios de `ENVIO_ENSAYO`.
 //   real      — sale todo, a quien corresponda.
 //
+// 🔴 **En qué estado está prod ⛔ NO se escribe acá.** Un comentario que fija el
+// estado del día se vuelve mentira sin que nadie lo toque, y éste ya lo hizo:
+// decía "bloqueado ... es el estado de hoy" mientras los mails salían de verdad,
+// y en septiembre-2026 se usó como diagnóstico y mandó a buscar un bug que no
+// existía. El estado EN VIVO lo muestra la pantalla `/envio`, que lee estas
+// mismas funciones. El comentario explica el mecanismo; la pantalla, el estado.
+//
 // El estado "ensayo" existe porque abrir el gate del todo para probar sería
 // jugar con fuego: con 16.825 contactos de BDI en la misma base, una campaña
-// apuntada al destino equivocado los manda a todos, y en sandbox esas
-// direcciones rebotarían en masa — justo lo que hundiría el caso ante AWS.
+// apuntada al destino equivocado los manda a todos.
+// ⚠️ Antes esta línea seguía con "y en sandbox esas direcciones rebotarían en
+// masa, hundiendo el caso ante AWS". Ese motivo YA NO CORRE —la cuenta salió del
+// sandbox el 29-jul-2026—, pero mandarle de más a 16.825 personas sigue sin
+// tener vuelta atrás. El gate se queda por el segundo motivo, no por el primero.
 
 export type ModoEnvio = 'bloqueado' | 'ensayo' | 'real';
 
@@ -46,9 +57,13 @@ export function envioRealHabilitado(): boolean {
  *   - dirección exacta — `qa@bdiaccesorios.com.ar`
  *   - dominio entero   — `@zattia.com.ar` (todo lo que termine así)
  *
- * El dominio entero sirve porque en el sandbox de SES un dominio verificado
- * habilita todas sus casillas: hoy `@bdiaccesorios.com.ar` y `@zattia.com.ar`
- * ya reciben, sin verificar nada nuevo.
+ * El dominio entero sirve para no tener que enumerar casilla por casilla:
+ * alcanza con que el destinatario termine así.
+ * ⚠️ El motivo que decía acá —"en el sandbox de SES un dominio verificado
+ * habilita todas sus casillas"— ⛔ ya no aplica: la cuenta salió del sandbox el
+ * 29-jul-2026. Y además confundía dos filtros distintos: **este de acá es de
+ * ESTA app**, no de SES. Con la cuenta fuera del sandbox SES ya no filtra a
+ * nadie ⇒ lo único que separa una prueba de un envío masivo real es esta lista.
  */
 export function listaEnsayo(): string[] {
   return (process.env.ENVIO_ENSAYO ?? '')
@@ -77,7 +92,7 @@ export function destinatarioPermitido(email: string): boolean {
   // El mailbox simulator de SES está permitido SIEMPRE, en cualquier modo. Es un
   // agujero negro por construcción: no llega a ninguna persona, no consume la
   // cuota diaria y no toca la reputación. Los scripts de QA dependen de esto
-  // para poder correr con el gate cerrado, que es como está prod hoy.
+  // para poder correr con el gate cerrado, sea cual sea el estado de prod.
   if (dest.endsWith(`@${DOMINIO_SIMULADOR}`)) return true;
 
   const modo = modoEnvio();
