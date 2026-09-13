@@ -55,6 +55,7 @@ node --import tsx scripts/auditar-responsive.ts # el panel no vuelve a nacer sol
 node --import tsx scripts/probar-permisos.ts   # invariantes de la matriz
 node --import tsx scripts/probar-gate.ts       # el gate no se abre solo
 node --import tsx scripts/probar-webhooks.ts   # los webhooks de rebotes fallan CERRADO
+node --import tsx scripts/probar-tn-webhook.ts # la firma de TN es HEX (como la doc), no base64: con base64 rebotaban TODOS con 401
 node --import tsx scripts/probar-supresion.ts  # una queja no cruza de tienda; un rebote duro sí
 node --env-file=.env --import tsx scripts/probar-rebote-tipo.ts # el rebote deja escrito SI FUE DURO (y el reintento de SNS no lo duplica)
 node --env-file=.env --import tsx scripts/probar-cadena-cola.ts # la posta se confirma por el LEASE, y la invocación ENTERA entra en los 60 s

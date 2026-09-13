@@ -10,7 +10,7 @@ import { sendEmail } from "@/lib/email/enviar";
 import { destinatarioPermitido } from "@/lib/email/proveedor";
 import { inyectarTracking } from "@/lib/email/tracking";
 import { getRemitenteEnvio } from "@/lib/remitentes";
-import { tnGet } from "@/lib/tn/client";
+import { estadoDeCheckout } from "@/lib/tn/checkouts";
 import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { tomarRuns, soltarRun } from "@/lib/email/runs";
 
@@ -73,17 +73,28 @@ export async function GET(req: Request) {
     const esCarrito = automation.trigger === "CARRITO_ABANDONADO";
 
     // Carrito abandonado: si ya completó la compra, no enviamos.
+    //
+    // 🔴 **Va por `estadoDeCheckout`, la MISMA regla que el barrido de
+    // recuperados.** Hasta el 12-sep-2026 esto era un `tnGet` propio con un
+    // `catch` que mandaba ante cualquier error — y el error más común no era una
+    // falla: un checkout que se convierte en orden **desaparece de TN y contesta
+    // 404**. El barrido leía ese 404 como «compró» y este procesador como «no se
+    // pudo verificar», así que a quien ya había comprado le llegaban el 2º y el
+    // 3er mail, **el 3º con un cupón acuñado**. Medido: 5 segundos y 7 terceros.
+    // ⚠️ El 404 es seguro de leer como compra acá porque la escalera más larga
+    // es de 72 h y TN conserva los checkouts 30 días (ver `VENTANA_DIAS` en
+    // `app/api/carritos/recuperados/route.ts`).
+    // Sólo `desconocido` (TN caído, token roto) sigue enviando: para un mail es
+    // tolerable, y frenar la secuencia entera por un 500 de TN no lo es.
     if (esCarrito && td.checkoutId && automation.cuenta.tnStoreId && automation.cuenta.tnToken) {
-      try {
-        const { data } = await tnGet<{ completed_at?: string | null }>(
-          automation.cuenta.tnStoreId, automation.cuenta.tnToken, `checkouts/${td.checkoutId}`,
-        );
-        if (data.completed_at) {
-          await prisma.automationRun.update({ where: { id: run.id }, data: { estado: "SALTADO" } });
-          saltados++;
-          continue;
-        }
-      } catch { /* si no se puede verificar, seguimos con el envío */ }
+      const { estado } = await estadoDeCheckout(
+        automation.cuenta.tnStoreId, automation.cuenta.tnToken, td.checkoutId,
+      );
+      if (estado === "completado") {
+        await prisma.automationRun.update({ where: { id: run.id }, data: { estado: "SALTADO" } });
+        saltados++;
+        continue;
+      }
     }
 
     const contenido = leerContenido(automation.contenido);
