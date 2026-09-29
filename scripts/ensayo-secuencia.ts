@@ -33,9 +33,14 @@ import { pideCupon, aplicarCuponDeCarrito, type CuponEmitido } from "../lib/emai
 import { firmarResena, VIDA_MS } from "../lib/resena-token.ts";
 import { RESORTY_URL } from "../lib/carrito-cupon.ts";
 import type { Bloque, ProductoEmail } from "../lib/email/bloques.ts";
+import { resolverTagsCarrito, nombreDelCarrito } from "../lib/email/tags-carrito.ts";
+import { armarSecuencia4, PREFIJO } from "./secuencia-carrito-4.ts";
 
 const soloMarca = process.argv.find((a) => a.startsWith("--marca="))?.split("=")[1] ?? "bdi";
-const SALIDA = join(process.cwd(), ".mirar", "secuencia");
+// `--nueva` dibuja la secuencia de 4 mails del 29-sep-2026 (`secuencia-carrito-4.ts`)
+// armada en memoria a partir de los tres de hoy: se mira ANTES de escribirla.
+const nueva = process.argv.includes("--nueva");
+const SALIDA = join(process.cwd(), ".mirar", nueva ? "secuencia-4" : "secuencia");
 
 /**
  * El cupón de mentira del 3er mail.
@@ -87,10 +92,18 @@ async function main() {
 
   // Los tres de carrito por espera creciente (1º → 2º → 3º) y la reseña al final,
   // que es el orden en el que los recibe una persona.
-  const autos = await prisma.automation.findMany({
+  // `select` explícito: el ensayo es de SOLO LECTURA y así corre también contra
+  // una base que todavía no tiene las columnas de un DDL nuevo (y lo que no lee
+  // no lo puede romper).
+  const enBase = await prisma.automation.findMany({
     where: { cuentaId: cuenta.id, trigger: { in: ["CARRITO_ABANDONADO", "RESENA"] } },
     orderBy: [{ trigger: "asc" }, { esperaHoras: "asc" }],
+    select: { nombre: true, trigger: true, estado: true, esperaHoras: true, asunto: true, preheader: true, contenido: true },
   });
+  const autos = nueva
+    ? armarSecuencia4(enBase.filter((a) => a.trigger === "CARRITO_ABANDONADO" && !a.nombre.startsWith(PREFIJO)))
+        .map((m) => ({ ...m, trigger: "CARRITO_ABANDONADO" as const, estado: "SIN CREAR" }))
+    : enBase;
   if (!autos.length) throw new Error(`${soloMarca}: no hay automations de carrito ni de reseña`);
 
   // El carrito MÁS GRANDE de la tienda: es donde se rompe el diseño si se va a
@@ -155,9 +168,10 @@ async function main() {
 
       const tags = { nombre: c.nombre ?? "", email: c.email ?? "" };
       let html = aplicarMergeTags(renderEmailHtml({ ...contenido, bloques } as never, opts), tags);
-      html = html.replaceAll("${cart.url}", urlVuelta);
+      const carrito = { url: urlVuelta, productos, restantes: c.restantes };
+      html = resolverTagsCarrito(html, carrito, "html");
       let texto = aplicarMergeTags(renderEmailTexto({ ...contenido, bloques } as never, opts), tags);
-      texto = texto.replaceAll("${cart.url}", urlVuelta);
+      texto = resolverTagsCarrito(texto, carrito, "texto");
 
       const nombre = `${a.nombre.replace(/[^\w]+/g, "-").toLowerCase()}${sufijo ? `--${sufijo}` : ""}`;
       const archivo = join(SALIDA, `${nombre}.html`);
@@ -165,19 +179,24 @@ async function main() {
 
       console.log(`${"─".repeat(70)}`);
       console.log(`${a.nombre}${sufijo ? ` · ${sufijo.toUpperCase()}` : ""} · ${a.estado} · espera ${a.esperaHoras}h`);
-      console.log(`  asunto: ${a.asunto}`);
+      console.log(`  asunto: ${a.asunto ? resolverTagsCarrito(a.asunto, carrito, "texto") : "(sin asunto)"}`);
+      if ("remitenteNombre" in a && a.remitenteNombre) console.log(`  de:     ${a.remitenteNombre} · responde a ${a.responderA ?? "(la marca)"}`);
       console.log(`  pre:    ${a.preheader ?? "(sin preheader)"}`);
 
       // Lo que, si falla, se ve recién en la casilla de otra persona.
       const chequeos: [boolean, string][] = [
-        [!html.includes("${cart.url}"), "no quedó ningún `${cart.url}` sin reemplazar"],
+        [!html.includes("${cart.") && !texto.includes("${cart."), "no quedó ningún `${cart.…}` sin reemplazar"],
         [!html.includes("${contacto."), "no quedó ningún merge tag de contacto sin reemplazar"],
         [!html.includes("${tienda."), "no quedó ningún dato de tienda sin resolver"],
         [!/href="(#|)"/.test(html.replace(/href="#"/g, "")), "no quedó ningún `href` vacío"],
         // ⚠️ Contra los productos que entraron a ESTE mail, no contra los del
         // carrito: la reseña sale de un pedido distinto y compararla con el
         // carrito daba rojo por una diferencia que no existe.
-        [productos.every((p) => html.includes(p.nombre.slice(0, 15))),
+        // Un mail PERSONAL no dibuja el carrito: nombra lo que se dejó adentro
+        // del texto, con `${cart.producto}`.
+        [leerContenido(a.contenido).formato === "personal"
+          ? html.includes(nombreDelCarrito(productos, c.restantes).slice(0, 15))
+          : productos.every((p) => html.includes(p.nombre.slice(0, 15))),
          `los ${productos.length} productos salen`],
         [html.length < 100_000, `pesa ${(html.length / 1024).toFixed(0)} KB (Gmail recorta a ~102)`],
         [!texto.includes("${"), "la parte text/plain tampoco tiene tags sueltos"],

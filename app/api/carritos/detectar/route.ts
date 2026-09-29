@@ -16,6 +16,8 @@ import { after } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { listarAbandonados, triggerDeCheckout, type CheckoutNormalizado } from "@/lib/tn/checkouts";
+import { grupoDeCarrito } from "@/lib/carritos";
+import { leerConfigCuenta } from "@/lib/marca";
 
 export const maxDuration = 60;
 
@@ -48,6 +50,8 @@ interface ResumenCuenta {
   sinContacto: number;
   fueraDeVentana: number;
   porCap: number;
+  /** Carritos que cayeron en el grupo de control: se registran y no reciben nada. */
+  control: number;
   truncado?: boolean;
   /** En dry-run: la automation está pausada, así que esto es una simulación. */
   simulado?: boolean;
@@ -81,7 +85,7 @@ export async function GET(req: Request) {
   // activa** se saltea sin tocar la API de TN, que es el ahorro que importaba.
   const cuentas = await prisma.cuenta.findMany({
     where: { tnStoreId: { not: null }, tnToken: { not: null } },
-    select: { id: true, slug: true, tnStoreId: true, tnToken: true },
+    select: { id: true, slug: true, tnStoreId: true, tnToken: true, config: true },
   });
 
   const resumen: ResumenCuenta[] = [];
@@ -101,14 +105,15 @@ export async function GET(req: Request) {
 }
 
 async function procesarCuenta(
-  cuenta: { id: string; slug: string; tnStoreId: string | null; tnToken: string | null },
+  cuenta: { id: string; slug: string; tnStoreId: string | null; tnToken: string | null; config: unknown },
   dry: boolean,
 ): Promise<ResumenCuenta> {
   const r: ResumenCuenta = {
     marca: cuenta.slug,
     leidos: 0, nuevos: 0, sembrados: 0, encolados: 0, runs: 0,
-    sinContacto: 0, fueraDeVentana: 0, porCap: 0,
+    sinContacto: 0, fueraDeVentana: 0, porCap: 0, control: 0,
   };
+  const pctControl = leerConfigCuenta(cuenta.config).carritoControlPct ?? 0;
 
   // 🔴 LA SIEMBRA, la red principal contra el barrido histórico. "Primera
   // corrida" se **deriva** de que la cuenta no tenga filas, sin un flag que
@@ -195,6 +200,7 @@ async function procesarCuenta(
       if (estado === "SEMBRADO") r.sembrados++;
       else if (estado === "DESCARTADO") r.fueraDeVentana++;
       else if (estado === "SIN_CONTACTO") r.sinContacto++;
+      else if (grupoDeCarrito(c.tnCheckoutId, pctControl)) r.control++;
       else r.encolados++;
       continue;
     }
@@ -252,6 +258,18 @@ async function procesarCuenta(
         // El reloj se ancla al ABANDONO, no a la detección. Con el cron cada 15
         // minutos el desfase es chico, pero si el cron se cae dos horas, anclar
         // a la detección mandaría el mail dos horas tarde para todos.
+        // El grupo de control se registra igual que un carrito con mails —queda
+        // `ENCOLADO`, así el barrido de recuperados lo mira y lo marca si
+        // compra— pero no recibe ningún run. Ésa es la comparación.
+        const grupo = grupoDeCarrito(c.tnCheckoutId, pctControl);
+        if (grupo) {
+          await tx.carritoVisto.updateMany({
+            where: { cuentaId: cuenta.id, tnCheckoutId: BigInt(c.tnCheckoutId) },
+            data: { grupo },
+          });
+          return { runs: 0, estado, control: true };
+        }
+
         const base = c.creadoEnTnAt?.getTime() ?? Date.now();
         // El cast es porque `TriggerCarrito` es una interfaz y la columna es
         // Json: Prisma pide un tipo indexable. La forma la fija el tipo, que es
@@ -300,6 +318,7 @@ async function procesarCuenta(
       if (creados.estado === "SEMBRADO") r.sembrados++;
       else if (creados.estado === "DESCARTADO") r.fueraDeVentana++;
       else if (creados.estado === "SIN_CONTACTO") r.sinContacto++;
+      else if ("control" in creados) r.control++;
       else if (creados.runs === 0) r.porCap++;
       else { r.encolados++; r.runs += creados.runs; }
     } catch (e) {

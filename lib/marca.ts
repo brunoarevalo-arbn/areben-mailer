@@ -68,6 +68,13 @@ export interface ConfigCuenta {
   redes?: { red: string; url: string }[];
   /** Cuándo se sincronizaron los contactos por última vez. */
   lastSyncContactos?: string;
+  /**
+   * Qué % de los carritos abandonados va al GRUPO DE CONTROL: no recibe ningún
+   * mail, y es contra lo que se mide si la secuencia vende. Ausente o 0 = nadie,
+   * que es como se portó siempre. Tope 50: más que eso ya no es un control.
+   * Ver `grupoDeCarrito` en `lib/carritos.ts` (29-sep-2026).
+   */
+  carritoControlPct?: number;
   /** Cuándo se trajeron los datos de la tienda por última vez. */
   marcaSync?: string;
   /**
@@ -223,7 +230,14 @@ export function leerConfigCuenta(valor: unknown): ConfigCuenta {
     // también tocan scripts y podría entrar editado a mano.
     dominioEnvio: normalizarDominioEnvio(c.dominioEnvio),
     tienda: leerTienda(c.tienda),
+    carritoControlPct: pctControl(c.carritoControlPct),
   };
+}
+
+/** Un entero de 0 a 50; cualquier otra cosa es 0 (nadie al control). */
+function pctControl(v: unknown): number {
+  const n = typeof v === "number" ? v : NaN;
+  return Number.isFinite(n) ? Math.min(50, Math.max(0, Math.round(n))) : 0;
 }
 
 /**

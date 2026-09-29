@@ -5,7 +5,8 @@ import { autorizar, chequear, getAuth } from "@/lib/auth";
 import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, aplicarMergeTagsAsunto, type ContenidoCampania } from "@/lib/email/render";
 import { conCarrito, muestraDePrueba, urlVueltaDePrueba } from "@/lib/email/prueba";
-import { pideCupon, aplicarCuponDeCarrito } from "@/lib/email/cupon-carrito";
+import { pideCupon, fuenteDeCupon, aplicarCuponDeCarrito } from "@/lib/email/cupon-carrito";
+import { resolverTagsCarrito } from "@/lib/email/tags-carrito";
 import { firmarResena, VIDA_MS } from "@/lib/resena-token";
 import { RESORTY_URL, pedirCuponDeCarrito } from "@/lib/carrito-cupon";
 import { leerContenido } from "@/lib/email/esquema";
@@ -295,16 +296,14 @@ export async function enviarPruebaAutomation(id: string, email: string) {
   // fila. Acuñar de verdad sería emitir descuento real cada vez que alguien mira
   // su propio mail.
   if (a.trigger === "CARRITO_ABANDONADO" && pideCupon(bloques)) {
-    const emitido = await pedirCuponDeCarrito(cuenta.id, destino, null, { dry: true });
+    const emitido = await pedirCuponDeCarrito(cuenta.id, destino, null, { dry: true, fuente: fuenteDeCupon(bloques) });
     bloques = aplicarCuponDeCarrito(bloques, emitido);
   }
 
   const destinatario = { nombre: nombre ?? "", email: destino };
   const doc = { ...contenido, bloques };
-  const html = aplicarMergeTags(renderEmailHtml(doc, opts), destinatario).replaceAll(
-    "${cart.url}",
-    urlVuelta,
-  );
+  const carrito = { url: urlVuelta, productos: items };
+  const html = resolverTagsCarrito(aplicarMergeTags(renderEmailHtml(doc, opts), destinatario), carrito, "html");
   // Ídem la prueba de campañas: la parte text/plain y el header
   // `List-Unsubscribe` no son cosméticos, son dos de las señales que mira el
   // filtro. Sin ellos la prueba salía MEJOR clasificada como spam que el envío
@@ -312,23 +311,22 @@ export async function enviarPruebaAutomation(id: string, email: string) {
   // existe. Lo pagó la primera prueba de la bienvenida de Zattia (31-jul-2026):
   // cayó en "no deseado" mandando desde un dominio con DKIM, SPF alineado y
   // DMARC en orden.
-  const texto = aplicarMergeTags(renderEmailTexto(doc, opts), destinatario).replaceAll(
-    "${cart.url}",
-    urlVuelta,
-  );
+  const texto = resolverTagsCarrito(aplicarMergeTags(renderEmailTexto(doc, opts), destinatario), carrito, "texto");
   const rem = await getRemitenteEnvio(cuenta.id);
   try {
     const res = await sendEmail({
       to: destino,
       // El asunto de la prueba se resuelve igual que el del envío: si no, la
       // prueba mostraría un `${contacto.primerNombre}` crudo que el real sí resuelve.
-      subject: `[PRUEBA] ${aplicarMergeTagsAsunto(a.asunto, destinatario)}`,
+      subject: `[PRUEBA] ${resolverTagsCarrito(aplicarMergeTagsAsunto(a.asunto, destinatario), carrito, "texto")}`,
       html,
       text: texto,
       unsubscribeUrl,
       fromEmail: rem?.email,
-      fromName: rem?.nombre,
-      replyTo: rem?.responderA ?? undefined,
+      // Igual que el envío real: la prueba del mail que firma el dueño tiene
+      // que llegar firmada por él, o no sirve para juzgar si cae en Principal.
+      fromName: a.remitenteNombre || rem?.nombre,
+      replyTo: a.responderA || rem?.responderA || undefined,
     });
     return { ok: true, messageId: res.messageId, destino };
   } catch (e) {

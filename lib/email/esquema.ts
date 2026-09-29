@@ -317,6 +317,10 @@ function esActual(v: unknown): v is ContenidoCampania {
   if (!v || typeof v !== "object" || (v as Bruto).v !== V_ACTUAL) return false;
   const bs = (v as Bruto).bloques;
   if (!Array.isArray(bs)) return false;
+  // Un `formato` que no es uno conocido cae al camino lento, que lo descarta: si
+  // no, el tipo diría `FormatoDoc` con cualquier string adentro.
+  const formato = (v as Bruto).formato;
+  if (formato !== undefined && formato !== "personal") return false;
   // El encabezado acomodado también es parte de "la forma actual", y mirarlo
   // cuesta un recorrido sin trabajo adentro. Si esto no se chequeara, un Json
   // editado a mano con dos encabezados entraría por el camino rápido y el
@@ -402,6 +406,9 @@ export function leerContenido(json: unknown): ContenidoCampania {
 
   const estilos = sanearEstilos(c.estilos);
   if (estilos) out.estilos = estilos;
+
+  // Sólo el valor conocido: cualquier otra cosa es el mail con diseño.
+  if (c.formato === "personal") out.formato = "personal";
 
   return out;
 }

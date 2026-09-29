@@ -3,7 +3,7 @@ import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, aplicarMergeTagsAs
 import { leerContenido } from "@/lib/email/esquema";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { aplicarCuponDelTrigger, type TriggerPopup } from "@/lib/email/cupon-trigger";
-import { pideCupon, aplicarCuponDeCarrito, type CuponEmitido } from "@/lib/email/cupon-carrito";
+import { pideCupon, fuenteDeCupon, aplicarCuponDeCarrito, type CuponEmitido } from "@/lib/email/cupon-carrito";
 import { pedirCuponDeCarrito, RESORTY_URL } from "@/lib/carrito-cupon";
 import { firmarResena, VIDA_MS } from "@/lib/resena-token";
 import { sendEmail } from "@/lib/email/enviar";
@@ -13,6 +13,7 @@ import { getRemitenteEnvio } from "@/lib/remitentes";
 import { estadoDeCheckout } from "@/lib/tn/checkouts";
 import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { tomarRuns, soltarRun } from "@/lib/email/runs";
+import { resolverTagsCarrito } from "@/lib/email/tags-carrito";
 
 export const maxDuration = 60;
 const BATCH = 30;
@@ -185,7 +186,7 @@ export async function GET(req: Request) {
     // llamada.
     if (esCarrito && pideCupon(bloques)) {
       const emitido: CuponEmitido | null = td.checkoutId
-        ? await pedirCuponDeCarrito(automation.cuentaId, contacto.email, td.checkoutId)
+        ? await pedirCuponDeCarrito(automation.cuentaId, contacto.email, td.checkoutId, { fuente: fuenteDeCupon(bloques) })
         : null;
       bloques = aplicarCuponDeCarrito(bloques, emitido);
     }
@@ -251,26 +252,30 @@ export async function GET(req: Request) {
     const urlVuelta = td.abandonedUrl || opts.urlCuenta || "#";
     let html = renderEmailHtml({ ...contenido, bloques }, opts);
     html = aplicarMergeTags(html, contacto);
-    html = html.replaceAll("${cart.url}", urlVuelta);
+    const carrito = { url: urlVuelta, productos: td.productos, restantes: td.restantes };
+    html = resolverTagsCarrito(html, carrito, "html");
     // El tracking va al final: sobre el HTML ya resuelto, para que envuelva
     // también los links que salieron de los merge tags y del carrito.
     if (host) html = inyectarTracking(html, envio.id, host);
     // Parte text/plain: un mail solo-HTML es señal de spam, sobre todo en Outlook.
     let texto = aplicarMergeTags(renderEmailTexto({ ...contenido, bloques }, opts), contacto);
-    texto = texto.replaceAll("${cart.url}", urlVuelta);
+    texto = resolverTagsCarrito(texto, carrito, "texto");
 
     try {
       const res = await sendEmail({
         to: contacto.email,
         // 🔴 Ídem la cola de campañas: el asunto pasa por los merge tags. Ver
         // `aplicarMergeTagsAsunto` — salía crudo hasta el 29-ago-2026.
-        subject: aplicarMergeTagsAsunto(automation.asunto, contacto),
+        subject: resolverTagsCarrito(aplicarMergeTagsAsunto(automation.asunto, contacto), carrito, "texto"),
         html,
         text: texto,
         unsubscribeUrl: unsubUrl,
         fromEmail: rem.email,
-        fromName: rem.nombre,
-        replyTo: rem.responderA ?? undefined,
+        // La firma y las respuestas pueden ser de ESTE mail (el de texto plano
+        // del carrito lo firma el dueño). La dirección que envía, nunca: es la
+        // del dominio verificado de la marca.
+        fromName: automation.remitenteNombre || rem.nombre,
+        replyTo: automation.responderA || rem.responderA || undefined,
       });
       await prisma.$transaction([
         prisma.automationRun.update({ where: { id: run.id }, data: { estado: "ENVIADO", sesMessageId: res.messageId } }),

@@ -1806,6 +1806,79 @@ function marcarBloque(html: string, id: string): string {
 }
 
 /** Renderiza el contenido a un HTML de email completo (shell + bloques + footer). */
+/**
+ * Los bloques que dibuja un documento `personal`. Ver `FormatoDoc`.
+ *
+ * 🔑 Es UNA lista que usan el HTML y el text/plain. Si cada mitad decidiera la
+ * suya, un bloque podría salir en la parte que lee el filtro y no en la que lee
+ * la persona —el `carrito` que el procesador agrega solo sería el primero—.
+ */
+const DIBUJA_PERSONAL = new Set<TipoBloque>(["texto", "titulo", "boton", "cupon"]);
+
+const bloquesPersonales = (c: ContenidoCampania): Bloque[] =>
+  (c.bloques ?? []).filter((b) => DIBUJA_PERSONAL.has(b.tipo) && !ocultoEnTodas(b.estilo, c.estilos));
+
+/**
+ * Los colores de un mail personal. Fijos a propósito, sin tema de marca: el mail
+ * tiene que verse como uno que alguien escribió en Gmail, y ahí nadie elige
+ * colores. El azul es el de los links de Gmail.
+ */
+const PAL_PERSONAL = { texto: "#222222", link: "#1155cc", tenue: "#777777" } as const;
+
+/**
+ * El mail escrito por una persona: párrafos, links comunes y la baja al pie.
+ *
+ * ⚠️ Sin tablas, sin la `cabeza()` de la plantilla, sin ancho de 600: un mail así
+ * no tiene diseño, y cualquier estructura de maquetación es justo la señal que
+ * lo manda a «Promociones». La baja y la dirección van igual —son ley y son
+ * señal de remitente legítimo—, pero chicas y en gris, como una firma.
+ */
+function renderPersonalHtml(contenido: ContenidoCampania, opts: RenderOpts): string {
+  const pal = { ...resolverPaleta(combinarTema(opts.temaMarca, contenido.tema)), link: PAL_PERSONAL.link };
+  const p = (dentro: string) => `<p style="margin:0 0 16px">${dentro}</p>`;
+  const linkComun = (texto: string, url: string) => {
+    const u = sanearUrl(url);
+    return u ? `<a href="${esc(u)}" style="color:${PAL_PERSONAL.link};text-decoration:underline">${esc(texto)}</a>` : esc(texto);
+  };
+  const dibujar = (b: Bloque): string => {
+    switch (b.tipo) {
+      case "texto":
+        return p(cuerpoHtml(b.texto, pal));
+      case "titulo":
+        return p(tituloHtml(b.texto, pal));
+      case "boton":
+        return p(linkComun(b.texto, b.url));
+      case "cupon":
+        return p(
+          [
+            b.texto ? esc(b.texto) : "",
+            `<strong>${b.destacado ? `${esc(b.destacado)} con el código ` : "Código "}${esc(b.codigo)}</strong>`,
+            b.condiciones ? `<span style="font-size:13px;color:${PAL_PERSONAL.tenue}">${esc(b.condiciones)}</span>` : "",
+          ].filter(Boolean).join("<br>"),
+        );
+      default:
+        return "";
+    }
+  };
+  const marca = (b: Bloque) => (opts.marcarBloques ? marcarBloque(dibujar(b), b.id ?? "") : dibujar(b));
+  const preheader = opts.preheader
+    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(opts.preheader)}</div>`
+    : "";
+  return `<!doctype html>
+<html lang="${esc(pal.idioma)}">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:16px;background:#ffffff">
+  ${preheader}
+  <div style="max-width:560px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:${PAL_PERSONAL.texto}">
+${bloquesPersonales(contenido).map(marca).join("\n")}
+  </div>
+  <div style="max-width:560px;margin-top:32px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:${PAL_PERSONAL.tenue}">
+    ${esc(opts.nombreCuenta)}${opts.direccionPostal ? " · " + esc(opts.direccionPostal) : ""}<br>
+    <a href="${esc(opts.unsubscribeUrl)}" style="color:${PAL_PERSONAL.tenue}">Desuscribirme</a>
+  </div>
+</body></html>`;
+}
+
 export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): string {
   // Cinturón y tiradores: los call sites ya normalizan, pero si alguno se olvida
   // el mail sale igual bien. Es barato — un contenido que ya está en la versión
@@ -1815,6 +1888,7 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
   // Es el único lugar por el que pasan los dos formatos (HTML y texto plano) y
   // los ocho call sites que arman un mail, editores incluidos.
   const contenido = resolverTienda(leerContenido(entrada), opts.tienda);
+  if (contenido.formato === "personal") return renderPersonalHtml(contenido, opts);
   // El tema de la campaña pisa al de la marca, campo por campo.
   const pal = resolverPaleta(combinarTema(opts.temaMarca, contenido.tema));
   const ctx: Ctx = {
@@ -2119,7 +2193,7 @@ export function renderEmailTexto(entrada: ContenidoCampania, opts: RenderOpts): 
   const contenido = resolverTienda(leerContenido(entrada), opts.tienda);
   // Mismo criterio que el HTML: el encabezado va primero, esté donde esté en la
   // lista. Si alguien lo borró, el mail arranca directo por el contenido.
-  const bloques = contenido.bloques ?? [];
+  const bloques = contenido.formato === "personal" ? bloquesPersonales(contenido) : (contenido.bloques ?? []);
   const cuerpo = [
     ...bloques.filter((b) => b.tipo === "encabezado").slice(0, 1),
     ...bloques.filter((b) => b.tipo !== "encabezado"),

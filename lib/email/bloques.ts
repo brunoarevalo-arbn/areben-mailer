@@ -861,6 +861,22 @@ export type Bloque = BloqueBase &
          * abajo.
          */
         condiciones?: string;
+        /**
+         * De dónde sale el código en un mail de CARRITO. Ausente = `emitir`:
+         * Resorty acuña el escalado, que es lo que hace el 3er mail desde el
+         * 21-ago-2026 y lo que sigue haciendo.
+         *
+         * - `recordar` — **nunca acuña**: el cupón de pop-up que la persona ya
+         *   tiene vivo. Sin uno, el bloque se borra.
+         * - `recordar-o-emitir` — el suyo si lo tiene; si no, uno nuevo.
+         *
+         * Nació el 29-sep-2026 con la secuencia de 4 mails: el 60% de los
+         * carritos de BDI traía un cupón del pop-up y el escalado le sumaba +5
+         * encima — 403 emitidos, 2 canjeados. Ver `/api/carrito/cupon` de Resorty.
+         * Fuera del carrito no significa nada: la bienvenida resuelve su cupón
+         * por `cupon-trigger.ts`.
+         */
+        fuente?: FuenteCupon;
       }
     /**
      * HTML crudo. Escotilla de administrador, no de comerciante: sale desde un
@@ -875,6 +891,9 @@ export type Bloque = BloqueBase &
   );
 
 export type TipoBloque = Bloque["tipo"];
+
+/** Ver `fuente` en el bloque `cupon`. */
+export type FuenteCupon = "emitir" | "recordar" | "recordar-o-emitir";
 
 /** Todos los tipos que existen. El editor arma su paleta con esto. */
 export const TIPOS_BLOQUE = [
@@ -921,6 +940,22 @@ export const ETIQUETA_BLOQUE = {
   html: "HTML avanzado",
 } as const satisfies Record<TipoBloque, string>;
 
+/**
+ * Cómo se dibuja el documento entero. Ausente = el mail con diseño de siempre.
+ *
+ * `personal` es el mail que parece escrito a mano por una persona: sin logo,
+ * sin imágenes, sin cajas, texto negro sobre blanco y links subrayados comunes.
+ * Nació el 29-sep-2026 para la secuencia de carrito de BDI: un mail así cae en
+ * «Principal» de Gmail y no en «Promociones», y es el que la gente CONTESTA.
+ *
+ * 🔴 En `personal` sólo se dibujan `texto`, `titulo` (como un párrafo más),
+ * `boton` (como un link) y `cupon` (como un párrafo con el código). Todo lo
+ * demás —incluido el `carrito` que el procesador agrega solo— se calla, en el
+ * HTML y en el text/plain por igual: ver `DIBUJA_PERSONAL` en el renderer. El
+ * producto se nombra con `${cart.producto}` adentro del texto.
+ */
+export type FormatoDoc = "personal";
+
 export interface ContenidoCampania {
   /**
    * Versión del esquema de bloques. La escribe `leerContenido`; nadie más.
@@ -945,6 +980,8 @@ export interface ContenidoCampania {
    * y que después no se pueda re-marcar.
    */
   estilos?: Estilos;
+  /** Ver `FormatoDoc`. */
+  formato?: FormatoDoc;
 }
 
 /**

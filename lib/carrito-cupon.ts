@@ -13,6 +13,7 @@
 // ⚠️ Este archivo NO es puro (hace red): lo que decide qué pasa con el bloque
 // vive en `lib/email/cupon-carrito.ts`, que sí lo es y tiene su ensayo.
 import type { CuponEmitido } from "./email/cupon-carrito";
+import type { FuenteCupon } from "./email/bloques";
 
 /**
  * Dónde vive Resorty. Uso servidor-a-servidor, nunca para armar un link que vea
@@ -41,7 +42,7 @@ export async function pedirCuponDeCarrito(
   cuentaId: string,
   email: string,
   checkoutId: string | null,
-  opts: { dry?: boolean } = {},
+  opts: { dry?: boolean; fuente?: FuenteCupon } = {},
 ): Promise<CuponEmitido | null> {
   const secret = process.env.CRON_SECRET;
   if (!secret) return null;
@@ -52,7 +53,12 @@ export async function pedirCuponDeCarrito(
     const res = await fetch(`${RESORTY_URL}/api/carrito/cupon`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
-      body: JSON.stringify({ cuentaId, email, checkoutId, ...(opts.dry ? { dry: true } : {}) }),
+      body: JSON.stringify({
+        cuentaId, email, checkoutId,
+        ...(opts.dry ? { dry: true } : {}),
+        // `emitir` no viaja: es lo que Resorty hace cuando no le dicen nada.
+        ...(opts.fuente && opts.fuente !== "emitir" ? { modo: opts.fuente } : {}),
+      }),
       signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {

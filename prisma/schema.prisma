@@ -105,6 +105,15 @@ model Automation {
 
   @@index([cuentaId, trigger, estado])
 
+  /// Quién firma ESTE mail y adónde van sus respuestas, si no es la marca.
+  /// `null` = lo del remitente de la cuenta, como siempre. La dirección que
+  /// ENVÍA no se toca: es la del dominio verificado de la marca.
+  /// Nació el 29-sep-2026 para el mail en texto plano del carrito, que firma el
+  /// dueño y cuyas respuestas le tienen que llegar a él. Ver
+  /// `scripts/add-remitente-automation.ts`.
+  remitenteNombre String?
+  responderA      String?
+
   /// Marcador de versión del DOCUMENTO, para que dos personas editando no se
   /// pisen. Lo mueve **sólo** el guardado del editor (`+1` por guardado), nunca
   /// las otras escrituras de esta tabla — por eso no se usa `updatedAt`, que lo
@@ -198,6 +207,14 @@ model CarritoVisto {
   /// lo mueve cualquier escritura, incluida la del poller al crear la fila.
   /// Mismo rol —y misma lección— que `syncAt` en los canjes de Resorty.
   revisadoAt DateTime?
+
+  /// `CONTROL` = el carrito cayó en el grupo que NO recibe mails, para poder
+  /// medir si la secuencia vende o sólo acompaña compras que iban a pasar igual.
+  /// `null` = recibe la secuencia. Lo decide `grupoDeCarrito` al detectarlo, con
+  /// el % de `Cuenta.config.carritoControlPct` (0 = nadie). Columna aparte y no
+  /// un `estado`: el barrido de recuperados pisa el estado con RECUPERADO, y el
+  /// grupo se tiene que poder leer justamente en ésos.
+  grupo String?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

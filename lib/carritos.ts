@@ -70,3 +70,31 @@ export const TOLERANCIA_FALLOS = 3;
 export function cuentaViva(fallosSeguidos: number): boolean {
   return fallosSeguidos < TOLERANCIA_FALLOS;
 }
+
+/**
+ * ¿Este carrito va al grupo de CONTROL (sin mails) o recibe la secuencia?
+ *
+ * 🔑 Existe porque, medido el 29-sep-2026 en BDI, de 409 personas con carrito
+ * 53 compraron en 10 días y casi ninguna pasó por un click del mail: sin un
+ * grupo que NO reciba nada no hay forma de saber si la secuencia vende o sólo
+ * acompaña compras que iban a pasar igual.
+ *
+ * Decide por el id del checkout, no con `Math.random()`: la misma corrida
+ * reintentada —o un ensayo— da siempre el mismo grupo, y los ids de TN son
+ * correlativos, así que el resto de dividir por 100 no tiene nada que ver con
+ * quién es la persona ni con qué dejó.
+ *
+ * ⚠️ Es por CARRITO, no por persona: quien abandona dos veces puede caer una vez
+ * en cada grupo. Con ~6 carritos por día es raro y ensucia poco; hacerlo por
+ * persona pediría recordar el grupo de cada contacto.
+ */
+export function grupoDeCarrito(tnCheckoutId: string, pct: number): "CONTROL" | null {
+  if (!(pct > 0)) return null;
+  let id: bigint;
+  try {
+    id = BigInt(tnCheckoutId);
+  } catch {
+    return null; // un id raro recibe la secuencia: el control nunca se come un mail por error
+  }
+  return Number(id % BigInt(100)) < pct ? "CONTROL" : null;
+}

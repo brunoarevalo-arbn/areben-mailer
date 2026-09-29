@@ -10,7 +10,7 @@
 // —`CARRITO10`— es mandarle a un cliente un código que el checkout de Tiendanube
 // rechaza: lo tipea, no anda, y el mail queda peor que si no hubiera traído
 // premio.
-import type { Bloque } from "./bloques";
+import type { Bloque, FuenteCupon } from "./bloques";
 
 /** Lo que devuelve `POST /api/carrito/cupon` de Resorty cuando pudo emitirlo. */
 export interface CuponEmitido {
@@ -36,6 +36,18 @@ export function pideCupon(bloques: Bloque[]): boolean {
 }
 
 /**
+ * CÓMO lo pide: lo que viaja a Resorty como `modo`. Ver `fuente` en el bloque.
+ *
+ * Un mail con dos bloques `cupon` —nadie lo arma, pero el editor no lo impide—
+ * se resuelve por el PRIMERO: los dos van a mostrar el mismo código, porque
+ * `aplicarCuponDeCarrito` los rellena a todos con la única respuesta.
+ */
+export function fuenteDeCupon(bloques: Bloque[]): FuenteCupon {
+  const b = bloques.find((x) => x.tipo === "cupon");
+  return (b?.tipo === "cupon" && b.fuente) || "emitir";
+}
+
+/**
  * La letra chica del premio, armada con lo que el cupón REALMENTE tiene.
  *
  * 🔴 **«No se acumula con otros cupones» no es un formalismo.** El escalado
@@ -48,13 +60,22 @@ export function condicionesDe(c: CuponEmitido): string {
   const minCompra = c.minCompra ?? 0;
   const partes: string[] = [];
   if (c.vence) {
-    const d = new Date(c.vence);
-    if (!isNaN(d.getTime())) {
-      // Día y mes locales, que es como lo lee quien lo recibe. Sin año: un cupón
-      // de 7 días nunca cruza a un año que haga falta aclarar.
-      const dd = String(d.getDate()).padStart(2, "0");
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      partes.push(`Válido hasta el ${dd}/${mm}`);
+    // 🔴 Un `vence` SÓLO FECHA («2026-10-06», como lo guarda el pop-up y como TN
+    // entiende `end_date`: por día) se lee tal cual. Pasado por `new Date` es la
+    // medianoche UTC, y en Argentina eso es el día ANTERIOR a las 21 h: el mail
+    // decía «hasta el 05/10» de un cupón que vale el 06.
+    const soloFecha = /^(\d{4})-(\d{2})-(\d{2})$/.exec(c.vence);
+    if (soloFecha) {
+      partes.push(`Válido hasta el ${soloFecha[3]}/${soloFecha[2]}`);
+    } else {
+      const d = new Date(c.vence);
+      if (!isNaN(d.getTime())) {
+        // Día y mes locales, que es como lo lee quien lo recibe. Sin año: un cupón
+        // de 7 días nunca cruza a un año que haga falta aclarar.
+        const dd = String(d.getDate()).padStart(2, "0");
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        partes.push(`Válido hasta el ${dd}/${mm}`);
+      }
     }
   }
   if (minCompra > 0) partes.push(`Compra mínima $${minCompra.toLocaleString("es-AR")}`);
