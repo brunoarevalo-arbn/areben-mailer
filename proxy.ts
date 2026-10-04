@@ -21,6 +21,7 @@ const PUBLIC_PREFIXES = [
   '/api/campanias/procesar-cola', // worker de la cola de envío (protegido por CRON_SECRET)
   '/api/carritos/detectar', // poller de carritos abandonados (protegido por CRON_SECRET)
   '/api/carritos/recuperados', // barrido: cuáles de esos carritos terminaron en compra (ídem)
+  '/api/externo/', // lo llaman otras apps nuestras (el ticket de la Caja del monitor): llave en header, falla cerrado
   '/baja', // desuscripción: la abren destinatarios sin login
   '/f/', // formularios de captura públicos (single opt-in)
   // 🔴 **Todo directorio de `public/` que se sirva DENTRO de un mail va acá.**

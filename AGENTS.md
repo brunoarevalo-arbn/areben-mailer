@@ -56,6 +56,7 @@ node --import tsx scripts/probar-permisos.ts   # invariantes de la matriz
 node --import tsx scripts/probar-gate.ts       # el gate no se abre solo
 node --import tsx scripts/probar-webhooks.ts   # los webhooks de rebotes fallan CERRADO
 node --import tsx scripts/probar-tn-webhook.ts # la firma de TN es HEX (como la doc), no base64: con base64 rebotaban TODOS con 401
+node --import tsx scripts/probar-ticket.ts      # el ticket de la Caja del local: los números del papel (#30049), ⛔ recalculados
 node --import tsx scripts/probar-supresion.ts  # una queja no cruza de tienda; un rebote duro sí
 node --env-file=.env --import tsx scripts/probar-rebote-tipo.ts # el rebote deja escrito SI FUE DURO (y el reintento de SNS no lo duplica)
 node --env-file=.env --import tsx scripts/probar-cadena-cola.ts # la posta se confirma por el LEASE, y la invocación ENTERA entra en los 60 s
@@ -1315,6 +1316,22 @@ que se anota en un pop-up y el que compra por primera vez.
   el 30-jul). Hasta que se agregue desde `/automations`, ese mail sale sin cupón.
   La forma nueva de resolverlo es crear la de **`NUEVO_SUSCRIPTOR`**, que ya nace
   con el bloque puesto y con un saludo que funciona sin nombre.
+
+### El trigger `TICKET` (el comprobante de la Caja del local)
+
+Séptimo valor de `TriggerTipo` (4-oct-2026, `scripts/add-trigger-ticket.ts`). Lo encola la
+Caja del monitor (POS propio de Zattia) por **`POST /api/externo/ticket`**, con la llave en
+el header `x-ticket-key` (env `TICKET_KEY`; sin ella, todo 401). ⛔ Tiene evento de TN.
+
+- **⛔ Es marketing**: el procesador lo manda aunque el contacto esté en `BAJA` o sin
+  `tnAcceptsMkt`; sólo lo frenan `REBOTADO` y `SPAM`.
+- El endpoint da de alta el contacto (`source: "pos"`, `tnAcceptsMkt: true`) y, si ya
+  existía, **⛔ lo toca** (ni estado ni consentimiento).
+- **Uno por venta**: `triggerData.ticket.ventaId` deduplica (con lock), así que el monitor
+  reintenta sin miedo.
+- El mail va en el bloque `carrito` con `modo: "ticket"`: prendas + `totales` + `pie`, que
+  arma `lib/email/ticket.ts` **sin recalcular** (los montos son los del ticket de papel).
+- `areben-popups` ⛔ lee `TriggerTipo` con Prisma ⇒ este valor sólo pide deployar el mailer.
 
 ## Estado del trabajo
 

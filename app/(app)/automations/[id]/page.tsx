@@ -14,6 +14,8 @@ const TRIGGER_LABEL: Record<string, string> = {
   COMPRA: "Se paga un pedido",
   CARRITO_ABANDONADO: "Carrito abandonado",
   NUEVO_SUSCRIPTOR: "Alguien se anota a la lista",
+  RESENA: "Diez días después de pagar un pedido",
+  TICKET: "Se cobra una venta en la Caja del local",
 };
 
 export default async function AutomationPage({ params }: { params: Promise<{ id: string }> }) {

@@ -79,6 +79,11 @@ enum TriggerTipo {
   // ⚠️ Por eso `EVENT_TRIGGER` es uno-a-MUCHOS: con el mapa inverso uno-a-uno,
   // uno de los dos dejaba de dispararse sin un error.
   RESENA
+  // El ticket de una venta del local, cobrada en la Caja del monitor. ⛔ Es
+  // marketing: el procesador lo manda aunque el contacto esté en BAJA (sólo lo
+  // frenan REBOTADO y SPAM). Lo encola `POST /api/externo/ticket`, ⛔ un evento
+  // de TN. Agregado por scripts/add-trigger-ticket.ts (SQL crudo, nunca db push).
+  TICKET
 }
 
 enum EstadoAutomation {

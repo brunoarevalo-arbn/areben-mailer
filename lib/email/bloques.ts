@@ -32,6 +32,13 @@ import type { TextoRico } from "./texto-rico";
  * un ciclo de módulos de verdad.
  */
 
+/** Un renglón de plata del ticket: «Descuento Efectivo 15%» … «−$748,50». `fuerte` = el TOTAL. */
+export interface FilaTotal {
+  etiqueta: string;
+  monto: string;
+  fuerte?: boolean;
+}
+
 export interface ProductoEmail {
   nombre: string;
   precio: string;
@@ -575,7 +582,17 @@ export type Bloque = BloqueBase &
          * renglón: un bloque aparte sería mantener dos veces la línea de
          * producto, que ya tiene su propia historia de arreglos de Outlook.
          */
-        modo?: "resena";
+        modo?: "resena" | "ticket";
+        /**
+         * Sólo en el modo `"ticket"`: los renglones de plata debajo de las
+         * prendas —subtotal, descuento de la cuenta, redondeo, TOTAL, con qué
+         * pagó y el vuelto—, ya escritos como van («−$748,50»). Igual que
+         * `items`, ⛔ se cargan a mano: los pone el procesador desde
+         * `triggerData.ticket` (ver `lib/email/ticket.ts`).
+         */
+        totales?: FilaTotal[];
+        /** Sólo en el modo `"ticket"`: los renglones chicos del final (número, fecha, política de cambio). */
+        pie?: string[];
       }
     /**
      * La fila: de 2 a 4 celdas, cada una con foto o con texto.

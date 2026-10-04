@@ -11,10 +11,11 @@ export type Trigger =
   | "COMPRA"
   | "CARRITO_ABANDONADO"
   | "NUEVO_SUSCRIPTOR"
-  | "RESENA";
+  | "RESENA"
+  | "TICKET";
 
 /**
- * Los cinco valores del enum `TriggerTipo`, como lista.
+ * Los valores del enum `TriggerTipo`, como lista.
  *
  * Es lo que valida un trigger que llega de un formulario: el enum de la base no
  * viaja al cliente, y un valor inventado lo descubriría Prisma al insertar.
@@ -26,6 +27,7 @@ export const TRIGGERS = [
   "COMPRA",
   "CARRITO_ABANDONADO",
   "RESENA",
+  "TICKET",
 ] as const satisfies readonly Trigger[];
 
 export const esTrigger = (x: string): x is Trigger => (TRIGGERS as readonly string[]).includes(x);
@@ -93,6 +95,8 @@ export const MAX_POR_TRIGGER: Record<Trigger, number> = {
   COMPRA: 1,
   CARRITO_ABANDONADO: 3,
   RESENA: 1,
+  // Un ticket por venta: una segunda automation sería un segundo comprobante.
+  TICKET: 1,
 };
 
 /**
@@ -132,6 +136,7 @@ export const ESPERAS_SIGUIENTES: Record<Trigger, readonly number[]> = {
   // porque es el último toque y el que trae el premio.
   CARRITO_ABANDONADO: [24, 72],
   RESENA: [],
+  TICKET: [],
 };
 
 /**

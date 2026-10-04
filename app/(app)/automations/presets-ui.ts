@@ -44,4 +44,11 @@ export const TRIGGERS_UI: { trigger: Trigger; titulo: string; texto: string }[] 
     titulo: "Pedir una reseña",
     texto: "Se envía días después de la compra, con lo que compró y el link para opinar.",
   },
+  // ⛔ Es marketing: es el comprobante de una compra del local. Lo encola la Caja
+  // del monitor cuando la clienta deja el mail al pagar.
+  {
+    trigger: "TICKET",
+    titulo: "Ticket del local",
+    texto: "Se envía cuando se cobra en la Caja del local y la clienta deja su mail: lo que compró y cuánto pagó.",
+  },
 ];

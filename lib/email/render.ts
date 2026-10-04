@@ -15,7 +15,7 @@ import { claveProductos } from "./bloques";
 import { redConIcono, urlIcono } from "./redes";
 import { iconoDe, urlIconoCelda } from "./iconos";
 import { trozoCss, textoPlano, tieneTamano, tieneLink, fusionar, sanearUrl, type TextoRico, type Trozo } from "./texto-rico";
-import type { Bloque, Columna, ContenidoCampania, ElementoEncima, PorFila, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
+import type { Bloque, Columna, ContenidoCampania, ElementoEncima, FilaTotal, PorFila, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
 import { armarPlano, type CeldaEncima } from "./encima";
 import { armarMosaico, estaCortado, normalizar, type CeldaPlano } from "./mosaico";
 import { etiquetasDe, instante, lineaRegresiva, medidas, tenue, urlRegresiva, FIN_BASE } from "./regresiva";
@@ -24,7 +24,7 @@ import { resolverTienda, type Tienda } from "./tienda";
 // Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
 // sin ciclo) pero se re-exportan desde acá: media app importa `Bloque` y
 // `nuevoBloque` de "@/lib/email/render" y no hay razón para hacerla cambiar.
-export type { Bloque, BloqueBase, TipoBloque, ContenidoCampania, ProductoEmail, Columna, PorFilaMovil, PorFila, ElementoEncima, ClaseEncima } from "./bloques";
+export type { Bloque, BloqueBase, TipoBloque, ContenidoCampania, ProductoEmail, FilaTotal, Columna, PorFilaMovil, PorFila, ElementoEncima, ClaseEncima } from "./bloques";
 export { nuevoBloque, duplicarBloque, nuevoId, TIPOS_BLOQUE, ETIQUETA_BLOQUE } from "./bloques";
 
 // 🔴 **La comilla doble también se escapa, y no es cosmética.** Casi todo lo que
@@ -635,16 +635,20 @@ function renderLineaCarrito(p: ProductoEmail, eNombre: EstiloResuelto, ePrecio: 
   const foto = p.imagen
     ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="${MINIATURA_CARRITO}" height="${MINIATURA_CARRITO}" style="width:${px(MINIATURA_CARRITO)};height:${px(MINIATURA_CARRITO)};object-fit:cover;border-radius:${px(eImg.radio ?? 8)};display:block" />`
     : "";
+  // Sin `url` la línea va sin ancla: las prendas del ticket del local no tienen
+  // a dónde llevar, y un `href=""` recarga la página en algunos clientes.
+  const conLink = (dentro: string, estilo?: string) =>
+    p.url ? `<a href="${esc(p.url)}"${estilo ? ` style="${estilo}"` : ""}>${dentro}</a>` : dentro;
   return `<tr>
     <!-- Sin \`m-col\`: apilar la línea la parte en tres renglones por producto y
          un carrito de 6 se vuelve interminable. Foto | nombre | precio aguanta
          los 375px de un celular. -->
-    <td width="${MINIATURA_CARRITO}" valign="top" style="padding:10px 0;width:${px(MINIATURA_CARRITO)}"><a href="${esc(p.url)}">${foto}</a></td>
+    <td width="${MINIATURA_CARRITO}" valign="top" style="padding:10px 0;width:${px(MINIATURA_CARRITO)}">${conLink(foto)}</td>
     <td valign="top" style="padding:10px 14px">
-      <a href="${esc(p.url)}" style="text-decoration:none;color:inherit">
+      ${conLink(`
         <div style="font-size:${px(eNombre.tamano ?? 15)};line-height:${eNombre.interlinea ?? 1.35};color:${eNombre.color};font-weight:${eNombre.peso ?? 600}${extra(eNombre, ["tamano", "interlinea", "color", "peso", "align"])}">${esc(p.nombre)}</div>
         ${detalleHtml(p, eNota)}
-      </a>
+      `, "text-decoration:none;color:inherit")}
     </td>
     <td width="22%" valign="top" align="right" style="padding:10px 0;font-size:${px(ePrecio.tamano ?? 14)};white-space:nowrap">${precioHtml(p, ePrecio, eNota)}</td>
   </tr>`;
@@ -663,7 +667,8 @@ function renderCarrito(
   e: EstProducto,
   restantes = 0,
   ctx?: Ctx,
-  modo?: "resena",
+  modo?: "resena" | "ticket",
+  ticket?: { totales?: FilaTotal[]; pie?: string[] },
 ): string {
   if (items.length === 0) return "";
   const filas = items
@@ -679,7 +684,35 @@ function renderCarrito(
     restantes > 0
       ? `<div style="margin:4px 0 0;font-size:14px;color:${pal.medio}"><a href="\${cart.url}" style="color:${pal.link}">y ${restantes} producto${restantes === 1 ? "" : "s"} más</a></div>`
       : "";
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(e.caja, 8, 16)}">${filas}</table>${mas}`;
+  const cuentas = modo === "ticket" ? renderTotalesTicket(ticket?.totales ?? [], ticket?.pie ?? [], pal, e) : "";
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(e.caja, 8, 16)}">${filas}${cuentas}</table>${mas}`;
+}
+
+/**
+ * Los renglones de plata del ticket del local y su pie, como filas de la MISMA
+ * tabla que las prendas: así el monto queda alineado a la derecha con el precio
+ * de cada prenda, que es como se lee un ticket.
+ *
+ * ⛔ Calcula nada: los montos llegan escritos (`lib/email/ticket.ts`), los mismos
+ * que imprimió la térmica. Un mail que recalcule puede decir otro total.
+ */
+function renderTotalesTicket(totales: FilaTotal[], pie: string[], pal: Paleta, e: EstProducto): string {
+  if (totales.length === 0 && pie.length === 0) return "";
+  const filas = totales
+    .map((t, i) => {
+      const tam = t.fuerte ? 18 : 14;
+      const peso = t.fuerte ? 700 : 400;
+      const arriba = i === 0 ? `border-top:1px solid ${pal.borde};padding-top:12px;` : t.fuerte ? "padding-top:8px;" : "";
+      return `<tr>
+    <td colspan="2" style="${arriba}padding-bottom:4px;font-size:${px(tam)};font-weight:${peso};color:${e.nombre.color}">${esc(t.etiqueta)}</td>
+    <td align="right" style="${arriba}padding-bottom:4px;font-size:${px(tam)};font-weight:${peso};color:${e.nombre.color};white-space:nowrap">${esc(t.monto)}</td>
+  </tr>`;
+    })
+    .join("");
+  const notas = pie
+    .map((l, i) => `<tr><td colspan="3" style="${i === 0 ? `border-top:1px solid ${pal.borde};padding-top:12px;` : ""}padding-bottom:4px;font-size:${px(e.nota.tamano ?? 13)};color:${e.nota.color};white-space:pre-line">${esc(l)}</td></tr>`)
+    .join("");
+  return filas + notas;
 }
 
 /**
@@ -1014,6 +1047,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
           b.items?.length ? b.restantes ?? 0 : 0,
           ctx,
           b.modo,
+          { totales: b.totales, pie: b.pie },
         ),
         caja(),
       );
@@ -2052,6 +2086,11 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       if (!lineas.length) return null;
       const r = b.restantes ?? 0;
       if (r > 0) lineas.push(`y ${r} producto${r === 1 ? "" : "s"} más: \${cart.url}`);
+      if (b.modo === "ticket") {
+        const cuentas = (b.totales ?? []).map((t) => `${t.etiqueta}: ${t.monto}`);
+        if (cuentas.length) lineas.push("", ...cuentas);
+        if (b.pie?.length) lineas.push("", ...b.pie);
+      }
       return lineas.join("\n");
     }
     case "columnas": {

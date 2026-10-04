@@ -130,4 +130,24 @@ export const AUTOMATION: readonly DefPreset[] = [
       ],
     }),
   },
+  {
+    id: "auto-ticket",
+    nombre: "Ticket del local",
+    descripcion: "Sale apenas se cobra en la Caja del local, si la clienta dejó su mail.",
+    trigger: "TICKET",
+    // 0: la clienta todavía está en el local, con el ticket de papel en la mano.
+    esperaHoras: 0,
+    arma: ({ marca, tienda }) => ({
+      asunto: `Tu compra en ${marca} 🧾`,
+      bloques: [
+        // 🔴 SIN `${contacto.nombre}`: la Caja pide sólo el mail.
+        { tipo: "titulo", texto: "¡Gracias por tu compra!" },
+        { tipo: "texto", texto: "Este es el comprobante de lo que compraste en el local. Guardalo: te lo vamos a pedir si querés hacer un cambio." },
+        // Lo rellena el procesador con `triggerData.ticket`: las prendas, el
+        // subtotal, el descuento, el total, con qué pagaste y el vuelto.
+        { tipo: "carrito", items: [], modo: "ticket" },
+        ...botonSi("Ver la tienda online", tienda),
+      ],
+    }),
+  },
 ];

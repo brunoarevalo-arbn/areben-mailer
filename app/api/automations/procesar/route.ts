@@ -14,6 +14,7 @@ import { estadoDeCheckout } from "@/lib/tn/checkouts";
 import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { tomarRuns, soltarRun } from "@/lib/email/runs";
 import { resolverTagsCarrito } from "@/lib/email/tags-carrito";
+import { bloqueDeTicket, type TicketLocal } from "@/lib/email/ticket";
 
 export const maxDuration = 60;
 const BATCH = 30;
@@ -46,8 +47,18 @@ export async function GET(req: Request) {
 
   for (const run of runs) {
     const { automation, contacto } = run;
-    // Consentimiento + estado
-    if (contacto.estado !== "ACTIVO" || !contacto.tnAcceptsMkt || automation.estado !== "ACTIVO" || !automation.asunto) {
+    // Consentimiento + estado.
+    //
+    // 🔑 El ticket del local ⛔ es marketing: es el comprobante de una compra que
+    // la persona acaba de hacer y para la que dejó el mail. Por eso se saltea el
+    // consentimiento (`tnAcceptsMkt`) y la BAJA —darse de baja de las promos no
+    // es pedir que no te den el ticket—, pero ⛔ un REBOTADO (la casilla no existe:
+    // mandarle hunde la reputación de la marca) ni un SPAM (ya se quejó una vez).
+    const esTicket = automation.trigger === "TICKET";
+    const puedeRecibir = esTicket
+      ? contacto.estado !== "REBOTADO" && contacto.estado !== "SPAM"
+      : contacto.estado === "ACTIVO" && contacto.tnAcceptsMkt;
+    if (!puedeRecibir || automation.estado !== "ACTIVO" || !automation.asunto) {
       await prisma.automationRun.update({ where: { id: run.id }, data: { estado: "SALTADO" } });
       saltados++;
       continue;
@@ -69,8 +80,13 @@ export async function GET(req: Request) {
 
     const td = run.triggerData as TriggerPopup & {
       checkoutId?: string; abandonedUrl?: string; productos?: ProductoEmail[]; restantes?: number;
-      orderId?: string;
+      orderId?: string; ticket?: TicketLocal;
     };
+    // El ticket del local trae sus prendas, sus renglones de plata y su pie: las
+    // prendas entran por el mismo camino que las del carrito (`td.productos`) y
+    // lo demás se le pega al bloque más abajo.
+    const ticket = esTicket && td.ticket ? bloqueDeTicket(td.ticket) : null;
+    if (ticket) td.productos = ticket.items;
     const esCarrito = automation.trigger === "CARRITO_ABANDONADO";
 
     // Carrito abandonado: si ya completó la compra, no enviamos.
@@ -154,13 +170,17 @@ export async function GET(req: Request) {
             })
           : td.productos;
 
+      // El ticket va SIEMPRE en modo `ticket`, aunque el autor haya dejado el
+      // bloque en el modo de carrito: sin los totales, un comprobante no dice
+      // cuánto se pagó.
+      const delTicket = ticket ? { modo: "ticket" as const, totales: ticket.totales, pie: ticket.pie } : {};
       const tieneBloque = bloques.some((b) => b.tipo === "carrito");
       if (tieneBloque) {
         bloques = bloques.map((b) =>
-          b.tipo === "carrito" ? { ...b, items: productos, restantes: td.restantes ?? 0 } : b,
+          b.tipo === "carrito" ? { ...b, items: productos, restantes: td.restantes ?? 0, ...delTicket } : b,
         );
       } else {
-        bloques.push({ tipo: "carrito", items: productos, restantes: td.restantes ?? 0 });
+        bloques.push({ tipo: "carrito", items: productos, restantes: td.restantes ?? 0, ...delTicket });
       }
     }
 

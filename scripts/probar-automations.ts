@@ -56,7 +56,7 @@ const fila = (id: string, trigger: Trigger, dia: number) => ({
 // Los valores del enum. Escritos a mano y no derivados de `TRIGGERS_UI`: si la
 // pantalla perdiera una tarjeta, derivarla haría que este script perdiera la
 // prueba junto con ella.
-const TODOS: Trigger[] = ["NUEVO_CLIENTE", "COMPRA", "CARRITO_ABANDONADO", "NUEVO_SUSCRIPTOR", "RESENA"];
+const TODOS: Trigger[] = ["NUEVO_CLIENTE", "COMPRA", "CARRITO_ABANDONADO", "NUEVO_SUSCRIPTOR", "RESENA", "TICKET"];
 
 titulo("Sin automations previas se crea");
 {

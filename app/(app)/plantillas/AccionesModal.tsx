@@ -35,6 +35,9 @@ const BLOQUE_QUE_PIDE: Partial<Record<Trigger, { bloque: string; falta: string }
   // El procesador llena el bloque `carrito` con lo que quedó adentro. Sin él, el
   // mail de carrito abandonado no muestra ningún producto.
   CARRITO_ABANDONADO: { bloque: "carrito", falta: "saldría sin los productos del carrito" },
+  // El ticket va en el bloque `carrito` (modo `ticket`): sin él, el comprobante
+  // saldría sin lo que compró ni cuánto pagó.
+  TICKET: { bloque: "carrito", falta: "saldría sin lo que compró ni cuánto pagó" },
 };
 
 export function AccionesModal({
