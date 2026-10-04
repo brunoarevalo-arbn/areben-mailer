@@ -48,7 +48,7 @@ if (!l.ok) throw new Error('sin ticket');
 const b = bloqueDeTicket(l.ticket);
 const fila = (e: string) => b.totales.find((t) => t.etiqueta === e)?.monto;
 ok(fila('Subtotal') === '$4.990', 'subtotal $4.990');
-ok(fila('Descuento Efectivo 15%') === '−$748,50', 'descuento Efectivo 15% −$748,50');
+ok(fila('Descuento 15%') === '−$748,50', 'descuento 15% −$748,50, sin el nombre de la cuenta (Bruno, 4-oct)');
 ok(fila('Redondeo') === '−$41,50', 'redondeo −$41,50 (el que baja)');
 ok(fila('TOTAL') === '$4.200' && b.totales.find((t) => t.etiqueta === 'TOTAL')?.fuerte === true, 'TOTAL $4.200, en grande');
 ok(fila('Pagaste con Efectivo') === '$4.200', 'pagó $4.200 en Efectivo');
@@ -62,6 +62,19 @@ ok(!sinVuelto.totales.some((t) => t.etiqueta === 'Vuelto'), 'sin «paga con» no
 
 const rebaja = bloqueDeTicket({ ...l.ticket, renglones: [{ nombre: 'TOP', cantidad: 2, precio: 10000, importe: 17000 }], subtotal: 17000 });
 ok(rebaja.items[0].precio === '10000' && rebaja.items[0].precioPromo === '8500', 'una prenda rebajada tacha el de lista y muestra el unitario rebajado');
+
+// Cascada (Bruno, 4-oct): $10.000 −20 % prenda (tachada) ⇒ −$800 a la venta ⇒ −10 % ⇒ $6.500 por Transferencia.
+const cascada = leerTicket({ ...l.ticket, renglones: [{ nombre: 'TOP', cantidad: 1, precio: 10000, importe: 8000 }], subtotal: 8000,
+  pagos: [{ cuenta: 'Transferencia', rebaja: 800, porcentaje: 10, descuento: 720, redondeo: 20, monto: 6500 }], total: 6500, pagaCon: null, vuelto: null });
+ok(cascada.ok, 'un pago con «rebaja» valida');
+if (cascada.ok) {
+  const bc = bloqueDeTicket(cascada.ticket);
+  const fc = (e: string) => bc.totales.find((t) => t.etiqueta === e)?.monto;
+  ok(fc('Descuento en la venta') === '−$800' && fc('Descuento 10%') === '−$720' && fc('Pagaste con Transferencia') === '$6.500', 'cascada: «Descuento en la venta» −$800, «Descuento 10%» −$720');
+}
+ok(!b.totales.some((t) => t.etiqueta === 'Descuento en la venta'), 'sin descuento a la venta ⛔ sale el renglón');
+const negativa = leerTicket({ ...l.ticket, pagos: [{ ...l.ticket.pagos[0], rebaja: -1 }] });
+ok(!negativa.ok, 'una rebaja negativa se rechaza');
 
 // ─── El mail ─────────────────────────────────────────────────────────────────
 const bloque: Bloque = { tipo: 'carrito', items: b.items, modo: 'ticket', totales: b.totales, pie: b.pie };

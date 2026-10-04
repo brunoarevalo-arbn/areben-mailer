@@ -22,8 +22,11 @@ export interface RenglonTicket {
 }
 
 export interface PagoTicket {
-  /** El nombre de la cuenta como lo muestra GN («Efectivo»). */
+  /** La forma de pago («Tarjeta de crédito»). Desde el 4-oct-2026 la cuenta de GN es interna: el
+   *  monitor manda el medio, ⛔ el nombre de la cuenta. */
   cuenta: string;
+  /** La parte de este pago del descuento a mano a TODA la venta (0 si ⛔ hubo). */
+  rebaja: number;
   porcentaje: number;
   descuento: number;
   /** > 0 = recargo por redondeo; < 0 = redondeo que baja. */
@@ -96,12 +99,14 @@ export function leerTicket(x: unknown): { ok: true; ticket: TicketLocal } | { ok
     const p = (p0 ?? {}) as Record<string, unknown>;
     const pago: PagoTicket = {
       cuenta: texto(p.cuenta, 60),
+      // Opcional: los tickets de antes del 4-oct ⛔ lo traen.
+      rebaja: p.rebaja == null ? 0 : num(p.rebaja),
       porcentaje: num(p.porcentaje),
       descuento: num(p.descuento),
       redondeo: num(p.redondeo),
       monto: num(p.monto),
     };
-    if (!pago.cuenta || [pago.porcentaje, pago.descuento, pago.redondeo, pago.monto].some(Number.isNaN) || !(pago.monto > 0))
+    if (!pago.cuenta || [pago.rebaja, pago.porcentaje, pago.descuento, pago.redondeo, pago.monto].some(Number.isNaN) || !(pago.monto > 0) || pago.rebaja < 0)
       return { ok: false, error: `pago ${i + 1} inválido` };
     pagos.push(pago);
   }
@@ -160,8 +165,12 @@ export function bloqueDeTicket(t: TicketLocal): { items: ProductoEmail[]; totale
   });
 
   const totales: FilaTotal[] = [{ etiqueta: "Subtotal", monto: plata(t.subtotal) }];
+  // 🔑 Cascada (Bruno, 4-oct): prenda (tachada arriba) ⇒ venta ⇒ forma de pago, que dice sólo
+  // «Descuento 15%»: ⛔ «Descuento Transferencia CG».
+  const aVenta = Math.round(t.pagos.reduce((s, p) => s + (p.rebaja || 0), 0) * 100) / 100;
+  if (aVenta > 0) totales.push({ etiqueta: "Descuento en la venta", monto: `−${plata(aVenta)}` });
   for (const p of t.pagos) {
-    if (p.descuento > 0) totales.push({ etiqueta: `Descuento ${p.cuenta} ${p.porcentaje}%`, monto: `−${plata(p.descuento)}` });
+    if (p.descuento > 0) totales.push({ etiqueta: `Descuento ${p.porcentaje}%`, monto: `−${plata(p.descuento)}` });
     if (p.redondeo > 0) totales.push({ etiqueta: "Recargo por redondeo", monto: `+${plata(p.redondeo)}` });
     if (p.redondeo < 0) totales.push({ etiqueta: "Redondeo", monto: `−${plata(p.redondeo)}` });
   }
