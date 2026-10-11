@@ -83,6 +83,8 @@ export interface DatosCarrito {
   subtotal?: number | null;
   /** Unidades de TODAS las líneas. */
   cantidad?: number;
+  /** Eligió retirar en el local: el envío gratis no le aplica (`CheckoutNormalizado.retiroEnLocal`). */
+  retiroEnLocal?: boolean;
   tienda?: Tienda;
 }
 
@@ -110,14 +112,20 @@ export function valoresCarrito(d: DatosCarrito): Record<string, string | undefin
   const cuotas = cantidadCuotas(d.tienda);
   const modelos = [...new Set(productos.map(modeloDe).filter((m): m is string => !!m))];
   const falta = total !== null && umbral !== null ? umbral - total : null;
+  // 🔑 Quien eligió RETIRAR EN EL LOCAL no escucha del envío gratis: se le dice
+  // cuándo lo puede retirar. ⛔ Nunca «ya está listo»: el pedido se arma en el
+  // plazo de despacho (Bruno, 11-oct-2026: «demora un día en armar»).
+  const plazo = d.tienda?.plazoDespacho?.trim();
+  const retiro = d.retiroEnLocal ? `Lo retirás por el local${plazo ? ` en ${plazo}` : ""}` : null;
 
   return {
     total: total !== null ? plata(total) : undefined,
     cantidad: unidades > 0 ? `${unidades} producto${unidades === 1 ? "" : "s"}` : undefined,
     cuotas: total !== null && cuotas ? `${cuotas} cuotas de ${plata(total / cuotas)}` : undefined,
-    envio: falta === null ? undefined
-      : falta <= 0 ? "Tu pedido ya tiene envío gratis" : `Te faltan ${plata(falta)} para el envío gratis`,
-    envioCorto: falta === null ? undefined : falta <= 0 ? "Gratis" : `Te faltan ${plata(falta)}`,
+    envio: retiro ?? (falta === null ? undefined
+      : falta <= 0 ? "Tu pedido ya tiene envío gratis" : `Te faltan ${plata(falta)} para el envío gratis`),
+    envioCorto: d.retiroEnLocal ? `En el local${plazo ? `, en ${plazo}` : ""}`
+      : falta === null ? undefined : falta <= 0 ? "Gratis" : `Te faltan ${plata(falta)}`,
     modelos: modelos.length ? enumerar(modelos) : undefined,
     lineas: productos.length
       ? productos.map((p) => `${legible(p.nombre)}${modeloDe(p) ? ` — ${modeloDe(p)}` : ""}`).join("\n")
@@ -154,7 +162,7 @@ export function filasResumen(d: DatosCarrito): FilaTotal[] {
   const filas: [string, string | undefined, boolean?][] = [
     ["Tu carrito", v.cantidad],
     ["Total", v.total, true],
-    ["Envío", v.envioCorto],
+    [d.retiroEnLocal ? "Retiro" : "Envío", v.envioCorto],
     ["En cuotas", v.cuotas ? `${v.cuotas.replace(" cuotas de ", " × ")} sin interés` : undefined],
   ];
   return filas.filter(([, m]) => !!m).map(([etiqueta, monto, fuerte]) => ({ etiqueta, monto: monto!, ...(fuerte ? { fuerte } : {}) }));

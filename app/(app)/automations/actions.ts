@@ -296,7 +296,7 @@ export async function enviarPruebaAutomation(id: string, email: string) {
       .catch(() => undefined);
     if (real?.productos.length) {
       items = real.productos.map((p) => ({ ...p, url: urlVuelta }));
-      datosCarrito = { productos: items, restantes: real.restantes, subtotal: real.subtotal, cantidad: real.cantidad, tienda: opts.tienda };
+      datosCarrito = { productos: items, restantes: real.restantes, subtotal: real.subtotal, cantidad: real.cantidad, retiroEnLocal: real.retiroEnLocal, tienda: opts.tienda };
     }
   }
   let bloques = conCarrito(contenido.bloques, items);

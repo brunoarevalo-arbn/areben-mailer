@@ -81,7 +81,7 @@ export async function GET(req: Request) {
 
     const td = run.triggerData as TriggerPopup & {
       checkoutId?: string; abandonedUrl?: string; productos?: ProductoEmail[]; restantes?: number;
-      subtotal?: number | null; cantidad?: number;
+      subtotal?: number | null; cantidad?: number; retiroEnLocal?: boolean;
       orderId?: string; ticket?: TicketLocal;
     };
     // El ticket del local trae sus prendas, sus renglones de plata y su pie: las
@@ -124,6 +124,7 @@ export async function GET(req: Request) {
         td.restantes = checkout.restantes;
         td.subtotal = checkout.subtotal;
         td.cantidad = checkout.cantidad;
+        td.retiroEnLocal = checkout.retiroEnLocal;
       }
     }
 
@@ -287,7 +288,7 @@ export async function GET(req: Request) {
     // Los tags calculados (`${cart.total}`, `${cart.envio}`…) y la vista
     // `resumen`, con el carrito de arriba y los datos de la tienda de ESTA marca.
     if (esCarrito) {
-      const datos = { productos: td.productos, restantes: td.restantes, subtotal: td.subtotal, cantidad: td.cantidad, tienda: opts.tienda };
+      const datos = { productos: td.productos, restantes: td.restantes, subtotal: td.subtotal, cantidad: td.cantidad, retiroEnLocal: td.retiroEnLocal, tienda: opts.tienda };
       bloques = prepararCarrito(bloques, datos);
       opts.preheader = resolverCarritoEnTexto(automation.preheader, datos);
     }

@@ -70,7 +70,10 @@ const MAX_PAGINAS = 20;
  */
 const FIELDS =
   "id,contact_email,contact_name,contact_phone,contact_identification," +
-  "completed_at,created_at,total,products,abandoned_checkout_url,customer,contact_accepts_marketing";
+  "completed_at,created_at,total,products,abandoned_checkout_url,customer,contact_accepts_marketing," +
+  // Cómo lo iba a recibir (11-oct-2026). Verificado contra BDI JUNTO con
+  // `contact_accepts_marketing`: el acoplamiento de arriba no los rechaza.
+  "shipping_pickup_type,shipping_option_code";
 
 interface TnProducto {
   name?: string;
@@ -95,6 +98,10 @@ export interface TnCheckout {
   total?: string | number | null;
   products?: TnProducto[] | null;
   abandoned_checkout_url?: string | null;
+  /** `"pickup"` (retira) o `"ship"` (a domicilio). */
+  shipping_pickup_type?: string | null;
+  /** `ne-…` son los de Envío Nube (correo, Andreani); un código propio es de la tienda. */
+  shipping_option_code?: string | null;
 }
 
 /** Un carrito abandonado, ya en los términos del mailer. */
@@ -130,6 +137,15 @@ export interface CheckoutNormalizado {
   subtotal: number | null;
   /** Unidades de TODAS las líneas (una línea con cantidad 2 cuenta 2). */
   cantidad: number;
+  /**
+   * ¿Eligió RETIRAR EN EL LOCAL de la tienda? (11-oct-2026). A esa persona el
+   * envío gratis no le dice nada: el mail le habla del retiro.
+   *
+   * 🔑 `pickup` solo no alcanza: los «Punto de retiro» del correo y de Andreani
+   * también son `pickup`. Medido en BDI: los de Envío Nube traen un código
+   * `ne-…` (`ne-correo-arg-clasico-sucursal`) y el local uno propio de la tienda.
+   */
+  retiroEnLocal: boolean;
 }
 
 /** Lo que se guarda en `AutomationRun.triggerData` para un carrito. */
@@ -141,6 +157,7 @@ export interface TriggerCarrito {
   /** Ver `CheckoutNormalizado.subtotal`. Ausente en los runs anteriores al 11-oct-2026. */
   subtotal?: number | null;
   cantidad?: number;
+  retiroEnLocal?: boolean;
 }
 
 function fecha(v: string | null | undefined): Date | null {
@@ -210,6 +227,7 @@ export function normalizarCheckout(data: TnCheckout): CheckoutNormalizado {
     restantes: Math.max(0, todos.length - productos.length),
     subtotal: todos.length ? subtotal : null,
     cantidad,
+    retiroEnLocal: data.shipping_pickup_type === "pickup" && !!data.shipping_option_code && !data.shipping_option_code.startsWith("ne-"),
   };
 }
 
@@ -222,6 +240,7 @@ export function triggerDeCheckout(c: CheckoutNormalizado): TriggerCarrito {
     restantes: c.restantes,
     subtotal: c.subtotal,
     cantidad: c.cantidad,
+    retiroEnLocal: c.retiroEnLocal,
   };
 }
 

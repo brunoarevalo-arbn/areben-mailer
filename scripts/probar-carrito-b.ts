@@ -60,6 +60,22 @@ console.log("\n3 · Los tags calculados");
     JSON.stringify([{ etiqueta: "Tu carrito", monto: "3 productos" }, { etiqueta: "Total", monto: "$50.000", fuerte: true }, { etiqueta: "Envío", monto: "Gratis" }, { etiqueta: "En cuotas", monto: "3 × $16.666,67 sin interés" }]));
 }
 
+console.log("\n3b · Quien retira en el local no escucha del envío gratis");
+{
+  const base = { id: 1, products: [{ name: "A", price: "50000.00", variant_values: ["iPhone 16"] }] };
+  const local = normalizarCheckout({ ...base, shipping_pickup_type: "pickup", shipping_option_code: "01KS2JJ53SJ8HCFJ2J0QQ4JK1X" });
+  const correo = normalizarCheckout({ ...base, shipping_pickup_type: "pickup", shipping_option_code: "ne-correo-arg-clasico-sucursal" });
+  const casa = normalizarCheckout({ ...base, shipping_pickup_type: "ship", shipping_option_code: "table_5943722" });
+  chk("retiro en el LOCAL (código propio) ⇒ retiroEnLocal", local.retiroEnLocal && triggerDeCheckout(local).retiroEnLocal === true);
+  chk("🔴 «Punto de retiro» del correo (`ne-…`) NO es el local", !correo.retiroEnLocal);
+  chk("a domicilio NO es el local", !casa.retiroEnLocal);
+  const t = { ...TIENDA, plazoDespacho: "24 h hábiles" };
+  const v = valoresCarrito({ productos: local.productos, subtotal: 50000, retiroEnLocal: true, tienda: t });
+  chk("la frase habla del retiro, con el plazo de la tienda", v.envio === "Lo retirás por el local en 24 h hábiles", v.envio);
+  chk("⛔ ni «envío gratis» ni «listo»", !/env[ií]o gratis|listo/i.test(`${v.envio} ${v.envioCorto}`));
+  chk("el resumen dice «Retiro»", filasResumen({ subtotal: 50000, cantidad: 1, retiroEnLocal: true, tienda: t }).some((f) => f.etiqueta === "Retiro" && f.monto === "En el local, en 24 h hábiles"));
+}
+
 console.log("\n4 · Un tag sin dato se lleva su frase, y nunca sale crudo");
 {
   const bloques: Bloque[] = [

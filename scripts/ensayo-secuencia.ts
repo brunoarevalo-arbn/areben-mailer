@@ -124,7 +124,9 @@ async function main() {
   // Con `--b`, también el más chico que NO llega al envío gratis.
   const umbral = montoEnvioGratis(marcaDe(cuenta, appUrl).tienda);
   const chico = versionB ? [...checkouts].filter((k) => k.productos.length && (k.subtotal ?? 0) > 0 && umbral !== null && (k.subtotal ?? 0) < umbral).sort((a, b) => (a.subtotal ?? 0) - (b.subtotal ?? 0))[0] : undefined;
-  const carritos = chico ? [c0, chico] : [c0];
+  // …y uno que eligió RETIRAR EN EL LOCAL: ahí la frase no habla del envío.
+  const retira = versionB ? checkouts.find((k) => k.retiroEnLocal && k.productos.length && k !== c0 && k !== chico) : undefined;
+  const carritos = [c0, chico, retira].filter((k): k is NonNullable<typeof k> => !!k);
   const errores: string[] = [];
   for (const c of carritos) {
 
@@ -177,9 +179,9 @@ async function main() {
         ]
       : [["", conProductos]];
 
-    const datos = { productos, restantes: c.restantes, subtotal: c.subtotal, cantidad: c.cantidad, tienda: marca.tienda };
+    const datos = { productos, restantes: c.restantes, subtotal: c.subtotal, cantidad: c.cantidad, retiroEnLocal: c.retiroEnLocal, tienda: marca.tienda };
     for (const [sufijoBase, bloquesCrudos] of variantes) {
-      const sufijo = [c === c0 ? "" : "chico", sufijoBase].filter(Boolean).join("--");
+      const sufijo = [c === c0 ? "" : c === chico ? "chico" : "retira", sufijoBase].filter(Boolean).join("--");
       // La misma función que el procesador: la vista `resumen` y los `${cart.…}` calculados.
       const bloques = esResena ? bloquesCrudos : prepararCarrito(bloquesCrudos, datos);
       const opts = { preheader: (esResena ? a.preheader : resolverCarritoEnTexto(a.preheader, datos)) ?? undefined, unsubscribeUrl: `${host}/baja?c=ENSAYO`, ...marca };
