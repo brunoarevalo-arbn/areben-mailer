@@ -144,7 +144,7 @@ export interface EstiloBloque {
   fuente?: keyof typeof FUENTES;
   /** px */
   tamano?: number;
-  peso?: 400 | 500 | 600 | 700;
+  peso?: 400 | 500 | 600 | 700 | 800;
   /** múltiplo (1.4 = 140%) */
   interlinea?: number;
   /** px de letter-spacing */
@@ -232,7 +232,8 @@ export const RANGOS = {
 // la cascada. Escribirlos dos veces sería que un `tamano: 999` se acote a 48 en
 // un lado y pase entero en el otro — y el que pasa entero es el que llega al
 // HTML.
-export const PESOS = [400, 500, 600, 700] as const;
+// 800 entró el 11-oct-2026: el bold italic apretado de los títulos de BDI.
+export const PESOS = [400, 500, 600, 700, 800] as const;
 const ALINEACIONES = ["left", "center", "right"] as const;
 const BORDES = ["solid", "dashed"] as const;
 
@@ -559,7 +560,7 @@ export const CLAVES_TAMANO_BOTON = ["tamano", "padX", "padY"] as const;
  * `"titulo" in estilos` diga que sí para un rol que nadie tocó, y de ese "¿lo
  * eligió una persona?" dependen la legibilidad contextual y el modo oscuro.
  */
-export function estiloCupon(actual: Estilos | undefined, variante: "caja" | "compacta"): Estilos | undefined {
+export function estiloCupon(actual: Estilos | undefined, variante: "caja" | "compacta" | "marco"): Estilos | undefined {
   const out: Estilos = { ...actual };
 
   for (const [rol, paquete] of Object.entries(ESTILO_CUPON_COMPACTO) as [RolEstilo, EstiloBloque][]) {
@@ -610,6 +611,9 @@ export const ROLES_POR_TIPO: Record<TipoBloque, readonly RolEstilo[]> = {
   menu: ["caja", "cuerpo"],
   divisor: ["caja"],
   espaciador: [],
+  // La franja sólo decide su fondo (en el formulario) y su aire: los colores de
+  // adentro los pone cada hijo con la paleta de la franja.
+  banda: ["caja"],
   // Ídem: la foto de la portada va a sangre, sin radio.
   hero: ["caja", "titulo", "subtitulo", "boton"],
   seccion: ["caja", "titulo", "subtitulo", "boton"],
@@ -721,6 +725,10 @@ function propsCaja(tipo: TipoBloque): readonly (keyof EstiloBloque)[] {
       return ["fondo", "padX", "padY", "padArriba", "padAbajo", "radio", "bordeAncho", "bordeEstilo", "bordeColor"];
     case "divisor":
       return ["padX", "padY", "padArriba", "padAbajo", "bordeAncho", "bordeEstilo", "bordeColor", "ocultarMovil", "ocultarEscritorio"];
+    // El fondo es un campo del bloque (con su `base` y su `acento`), no del
+    // estilo: van juntos, y separarlos dejaría pintar negro con letra negra.
+    case "banda":
+      return ["padY", "padArriba", "padAbajo"];
     default:
       return CAJA_BASE;
   }

@@ -102,6 +102,8 @@ node --import tsx scripts/probar-cupon-carrito.ts # el bloque `cupon` sin códig
 node --import tsx scripts/probar-asunto.ts     # el asunto resuelve los mismos merge tags que el cuerpo, y un salto de línea no parte la cabecera
 node --import tsx scripts/probar-secuencia-4.ts # carrito de 4 mails: el mail PERSONAL es sólo texto (ni el carrito), `${cart.producto}` escapado, el cupón recuerda o emite, y el grupo de control
 node --env-file=.env --import tsx scripts/ensayo-secuencia.ts --nueva # los 4 mails de «Carrito v2» dibujados con un carrito real ANTES de crearlos
+node --import tsx scripts/probar-carrito-b.ts   # «Carrito v2 · B»: subtotal de TODAS las líneas (no el `total` de TN), los `${cart.…}` calculados que se caen sin dato, la franja con bloques (y su cupón), el botón doble y el cupón con filete
+node --env-file=.env --import tsx scripts/ensayo-secuencia.ts --b # la B dibujada con el carrito real más grande y con uno que NO llega al envío gratis
 RESENA_SECRET=vector-fijo-de-ensayo node --import tsx scripts/probar-resena-token.ts # el link de las estrellas no se puede editar (vector fijo, espejado en areben-popups)
 node --import tsx scripts/probar-guardado.ts    # el veredicto distingue "te lo pisaron" de "lo borraron", y guardar dos veces seguidas no choca contra uno mismo
 node --import tsx scripts/auditar-guardado.ts   # las DOS mitades del conflicto: el servidor se niega, y ningún llamador tira el resultado

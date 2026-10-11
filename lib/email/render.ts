@@ -10,7 +10,7 @@ import {
   type CtxEstilo, type EstiloResuelto, type Estilos, type RolEstilo,
 } from "./estilos";
 import { superficieDe } from "./contraste";
-import { cabeza, apertura, cierre, botonVml, botonVmlCrudo, clase, clasesDe, CLASES } from "./shell";
+import { cabeza, apertura, cierre, botonVml, botonVmlCrudo, clase, clasesDe, CLASES, FUENTES_WEB } from "./shell";
 import { claveProductos } from "./bloques";
 import { redConIcono, urlIcono } from "./redes";
 import { iconoDe, urlIconoCelda } from "./iconos";
@@ -20,6 +20,7 @@ import { armarPlano, type CeldaEncima } from "./encima";
 import { armarMosaico, estaCortado, normalizar, type CeldaPlano } from "./mosaico";
 import { etiquetasDe, instante, lineaRegresiva, medidas, tenue, urlRegresiva, FIN_BASE } from "./regresiva";
 import { resolverTienda, type Tienda } from "./tienda";
+import { legible, modeloDe, nombreDelCarrito } from "./tags-carrito";
 
 // Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
 // sin ciclo) pero se re-exportan desde acá: media app importa `Bloque` y
@@ -193,6 +194,11 @@ function colorCss(color: string | undefined, respaldo: string): string {
  */
 interface Ctx extends CtxEstilo {
   muestraCarrito: boolean;
+  /**
+   * El tema ya combinado (marca + mail). Lo necesita la `banda` para resolver la
+   * paleta de SU fondo con todo lo demás igual (fuente, ancho). Ausente = `{}`.
+   */
+  tema?: Tema;
   /** Productos ya resueltos por consulta. Ver `RenderOpts.productosDinamicos`. */
   productosDinamicos?: Record<string, ProductoEmail[]>;
   /**
@@ -715,6 +721,138 @@ function renderTotalesTicket(totales: FilaTotal[], pie: string[], pal: Paleta, e
   return filas + notas;
 }
 
+// ── Las vistas nuevas del carrito, el botón doble y el cupón con filete ─────
+// (11-oct-2026, «Carrito v2 · B»). Todas toman los colores de la PALETA y no de
+// un hex: así funcionan sobre blanco y adentro de una `banda` negra.
+
+/** El precio que se paga hoy: la promo si la hay. */
+const vigente = (p: ProductoEmail) => p.precioPromo || p.precio;
+
+const fotoChica = (p: ProductoEmail, ancho: number, alto: number, fondo: string) =>
+  p.imagen
+    ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="${ancho}" height="${alto}" style="width:${px(ancho)};height:${px(alto)};object-fit:cover;border-radius:6px;display:block;background:${fondo};border:0" />`
+    : "";
+
+const masProductos = (restantes: number, pal: Paleta) =>
+  restantes > 0
+    ? `<div style="margin:4px 0 0;font-size:13px;color:${pal.medio}"><a href="\${cart.url}" style="color:${pal.link}">+ ${restantes} producto${restantes === 1 ? "" : "s"} más</a></div>`
+    : "";
+
+/**
+ * Agrupado por modelo de teléfono: la pastilla «PARA IPHONE 16», hasta tres
+ * fotos y los nombres con su precio. En fundas, la duda que frena la compra es
+ * si le va a TU teléfono: el modelo tiene que leerse antes que el nombre.
+ * ⚠️ Tres fotos y no más: 3 × 72 px más la columna de nombres entran en los
+ * 335 px útiles de un celular de 375 sin apilar.
+ */
+function renderPorModelo(items: ProductoEmail[], restantes: number, pal: Paleta, e: EstProducto): string {
+  const grupos = new Map<string, ProductoEmail[]>();
+  for (const p of items) {
+    const m = modeloDe(p) ?? "";
+    grupos.set(m, [...(grupos.get(m) ?? []), p]);
+  }
+  const html = [...grupos].map(([m, ps]) => {
+    const pastilla = m
+      ? `<div style="margin:0 0 10px"><span style="display:inline-block;border:2px solid ${pal.texto};border-radius:99px;padding:4px 11px;font-size:11px;font-weight:700;letter-spacing:1px;color:${pal.texto}">PARA ${esc(m.toUpperCase())}</span></div>`
+      : "";
+    const fotos = ps.slice(0, 3)
+      .map((p) => (p.imagen ? `<td width="72" valign="middle" style="width:72px;padding:0 8px 0 0"><a href="${esc(p.url || "#")}" style="text-decoration:none">${fotoChica(p, 64, 80, pal.esOscuro ? "#ffffff" : "#f5f4f4")}</a></td>` : ""))
+      .join("");
+    const nombres = ps
+      .map((p) => `${esc(legible(p.nombre))} <strong style="color:${e.precio.color};white-space:nowrap">${esc(fmtPrecio(vigente(p)))}</strong>`)
+      .join(" · ");
+    return `<div style="margin:0 0 18px">${pastilla}<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>${fotos}<td valign="middle" style="font-size:13px;line-height:1.45;color:${e.nombre.color}">${nombres}</td></tr></table></div>`;
+  }).join("");
+  return `<div style="${margen(e.caja, 8, 16)}">${html}${masProductos(restantes, pal)}</div>`;
+}
+
+/**
+ * Tres miniaturas y «Brownie Case y 6 productos más», en una caja clara (blanca
+ * adentro de una franja oscura). Para cuando el carrito acompaña al mensaje.
+ * 🔴 Toda la caja lleva al carrito: es una superficie grande para tocar.
+ */
+function renderTira(items: ProductoEmail[], restantes: number, pal: Paleta, e: EstProducto): string {
+  // Adentro de una franja oscura la caja va BLANCA, y entonces su letra no sale
+  // de la paleta (que es para el negro de afuera) sino oscura fija.
+  const caja = pal.esOscuro ? "#ffffff" : "#f5f4f4";
+  const tinta = pal.esOscuro ? "#1b1717" : e.nombre.color;
+  const suave = pal.esOscuro ? "#6e6767" : e.nota.color;
+  const fotos = items.slice(0, 3)
+    .map((p) => (p.imagen ? `<td width="60" valign="middle" style="width:60px;padding:0 8px 0 0">${fotoChica(p, 52, 65, "#ffffff")}</td>` : ""))
+    .join("");
+  const [primero, ...resto] = nombreDelCarrito(items, restantes).split(" y ");
+  const nombre = `<strong>${esc(primero)}</strong>${resto.length ? ` y ${esc(resto.join(" y "))}` : ""}`;
+  return `<a href="\${cart.url}" style="display:block;text-decoration:none;${margen(e.caja, 8, 16)}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${caja}"><tr><td bgcolor="${caja}" style="padding:12px 14px;background:${caja}"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${fotos}<td valign="middle" style="padding:0 0 0 6px"><div style="font-size:10px;letter-spacing:2px;color:${suave}">TU CARRITO</div><div style="font-size:14px;line-height:1.4;color:${tinta};margin-top:2px">${nombre}</div></td></tr></table></td></tr></table></a>`;
+}
+
+/** Los renglones de la vista `resumen`: etiqueta a la izquierda, monto a la derecha. */
+function renderResumen(filas: FilaTotal[], pal: Paleta, e: EstProducto): string {
+  const html = filas
+    .map((f, i) => `<tr>
+    <td style="${i ? `border-top:1px solid ${pal.borde};` : ""}padding:11px 0;font-size:12px;letter-spacing:1px;color:${e.nota.color}">${esc(f.etiqueta.toUpperCase())}</td>
+    <td align="right" style="${i ? `border-top:1px solid ${pal.borde};` : ""}padding:11px 0;font-size:${f.fuerte ? 18 : 15}px;font-weight:700;color:${e.nombre.color};white-space:nowrap">${esc(f.monto)}</td>
+  </tr>`)
+    .join("");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${margen(e.caja, 4, 12)}">${html}</table>`;
+}
+
+/** Lo que muestra el editor en la vista `resumen` antes de que haya un carrito. */
+const RESUMEN_MUESTRA: FilaTotal[] = [
+  { etiqueta: "Tu carrito", monto: "3 productos" },
+  { etiqueta: "Total", monto: "$44.970", fuerte: true },
+  { etiqueta: "Envío", monto: "Gratis" },
+  { etiqueta: "En cuotas", monto: "3 × $14.990 sin interés" },
+];
+
+/**
+ * Dos pastillas 50/50: la primera llena y la segunda con borde, del mismo alto.
+ * En el celular se apilan a todo el ancho (`m-btn2`, cuya regla sólo sale en los
+ * mails que la usan). Cada una con su VML: Outlook no lee la clase y las deja
+ * lado a lado, que es su layout de escritorio.
+ */
+function botonDoble(t1: string, u1: string, t2: string, u2: string, e: EstiloResuelto, pal: Paleta, c: EstiloResuelto): string {
+  const mitad = Math.floor((pal.ancho - 64 - 12) / 2);
+  const relleno = e.fondo ?? pal.acento;
+  // El borde va en LOS DOS: si sólo lo llevara el segundo, saldría 4 px más alto.
+  const conBorde = (x: EstiloResuelto, colorBorde: string): EstiloResuelto => ({
+    ...x,
+    bordeAncho: 2,
+    bordeEstilo: "solid",
+    bordeColor: colorBorde,
+    elegidas: new Set([...x.elegidas, "bordeAncho", "bordeEstilo", "bordeColor"]),
+  });
+  const lleno = conBorde(e, relleno);
+  const vacio = conBorde({ ...e, fondo: pal.tarjeta, color: relleno }, relleno);
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${margen(c, 8, 20)}"><tr>
+    <td class="${CLASES.boton2}" width="50%" valign="top" style="width:50%;padding:0 6px 0 0">${botonAnchor(t1, u1, lleno, pal, true, mitad)}</td>
+    <td class="${CLASES.boton2}" width="50%" valign="top" style="width:50%;padding:0 0 0 6px">${botonAnchor(t2, u2, vacio, pal, true, mitad)}</td>
+  </tr></table>`;
+}
+
+/**
+ * El cupón con filete: rótulo, el premio en bold italic y el código, uno abajo
+ * del otro, con la letra chica al pie. Neutro (filete del color del texto, sin
+ * fondo propio): acompaña sin gritar. El premio toma el color ELEGIDO del rol
+ * `precio` —el magenta de BDI— y si nadie eligió, el acento.
+ *
+ * 🔴 **En una sola columna, a propósito.** La primera versión ponía el código y
+ * el premio lado a lado, y medido a 375 px un código real (`BDI-XXXXXX`, 26 px
+ * con letter-spacing) más «20% OFF» no entran en los 335 px útiles: la celda no
+ * baja de su ancho mínimo y **ensanchaba el mail entero**, que quedaba corrido a
+ * la derecha en el celular. Apilado entra a cualquier ancho.
+ */
+function renderCuponMarco(b: Extract<Bloque, { tipo: "cupon" }>, c: EstiloResuelto, ePrecio: EstiloResuelto, pal: Paleta): string {
+  const borde = c.elegidas.has("bordeColor") && c.bordeColor ? c.bordeColor : pal.texto;
+  const premioColor = ePrecio.elegidas.has("color") ? ePrecio.color : pal.acento;
+  const rotulo = b.texto ? `<div style="font-size:10px;letter-spacing:2px;color:${pal.medio}">${esc(b.texto.toUpperCase())}</div>` : "";
+  const premio = b.destacado
+    ? `<div style="font-size:22px;font-weight:800;font-style:italic;color:${premioColor};margin-top:6px">${esc(b.destacado)}</div>`
+    : "";
+  const codigo = `<div style="font-size:24px;font-weight:700;letter-spacing:3px;color:${pal.texto};margin-top:2px">${esc(b.codigo)}</div>`;
+  const letra = b.condiciones ? `<div style="font-size:11px;color:${pal.medio};margin-top:8px">${esc(b.condiciones)}</div>` : "";
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${borde};margin:8px 0 16px"><tr><td style="padding:16px 18px">${rotulo}${premio}${codigo}${letra}</td></tr></table>`;
+}
+
 /**
  * Productos de mentira para el preview del editor y para el mail de PRUEBA.
  * 🔴 **NUNCA salen en un envío real**: lo fija `probar-carrito.ts`, y el único
@@ -905,6 +1043,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     case "boton": {
       const t = e("boton");
       const c = caja();
+      if (b.segundo?.texto) return pad(botonDoble(b.texto, b.url, b.segundo.texto, b.segundo.url, t, pal, c), c);
       return pad(`<div style="text-align:${b.align ?? t.align ?? "left"};${margen(c, 8, 20)}">${botonAnchor(b.texto, b.url, t, pal, b.full)}</div>`, c);
     }
     case "imagen": {
@@ -1039,6 +1178,18 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // Sin items no se inventa nada: si el carrito llegó vacío, el bloque
       // desaparece. La muestra es solo del preview del editor.
       const items = b.items?.length ? b.items : ctx.muestraCarrito ? CARRITO_MUESTRA : [];
+      const ep = estProducto(b.tipo, "titulo", ctx, b.estilo);
+      const rest = b.items?.length ? b.restantes ?? 0 : 0;
+      // La vista `resumen` no dibuja productos: sus renglones los calcula el
+      // procesador (`filasResumen`). Sin renglones, no hay bloque.
+      if (b.vista === "resumen") {
+        const filas = b.totales?.length ? b.totales : ctx.muestraCarrito ? RESUMEN_MUESTRA : [];
+        return filas.length ? pad(renderResumen(filas, pal, ep), caja()) : "";
+      }
+      // ⚠️ Sin items, las vistas nuevas caen al camino de siempre (que dibuja su
+      // `pad` vacío): así un carrito vacío sale byte por byte como salía.
+      if (items.length && b.vista === "por-modelo") return pad(renderPorModelo(items, rest, pal, ep), caja());
+      if (items.length && b.vista === "tira") return pad(renderTira(items, rest, pal, ep), caja());
       return pad(
         renderCarrito(
           items,
@@ -1662,6 +1813,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     }
     case "cupon": {
       const c = caja();
+      if (b.variante === "marco") return pad(renderCuponMarco(b, c, e("precio"), pal), undefined);
       const bg = superficieDe("cupon", c, pal);
       // 🔑 **Los únicos tres números que la variante decide.** Son los huecos
       // entre las tres partes y el que separa la caja de lo que sigue: ninguno
@@ -1710,6 +1862,29 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     // real vive acá.
     case "html":
       return ctx.permiteHtmlCrudo ? pad(b.contenido ?? "", caja()) : "";
+    case "banda": {
+      // Los hijos con la paleta de ESTA franja: el mismo tema, con el fondo, la
+      // base y el acento de la banda. Así un carrito o un texto que heredan su
+      // color quedan legibles sobre negro sin que nadie los toque.
+      const hijos = (b.bloques ?? []).filter((h) => h.tipo !== "banda" && h.tipo !== "encabezado");
+      const fondo = colorCss(b.fondo, pal.tarjeta);
+      const palB = resolverPaleta({
+        ...(ctx.tema ?? {}),
+        base: b.base ?? (esColorOscuro(fondo) ? "oscuro" : "claro"),
+        fondo,
+        fondoContenido: fondo,
+        ...(b.acento ? { acento: colorCss(b.acento, pal.acento) } : {}),
+      });
+      const ctxB: Ctx = { ...ctx, pal: { ...palB, ancho: pal.ancho, fuente: pal.fuente } };
+      const interior = hijos.map((h) => renderBloque(h, ctxB)).filter(Boolean).join("\n");
+      if (!interior) return "";
+      const c = caja();
+      const arriba = c.aireY.arriba ?? c.padY ?? 28;
+      const abajo = c.aireY.abajo ?? c.padY ?? 28;
+      // `bgcolor` además del `background`: Outlook de escritorio pinta la celda
+      // por el atributo.
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${fondo};margin:8px 0 16px"><tr><td bgcolor="${fondo}" style="background:${fondo};padding:${px(arriba)} 0 ${px(abajo)};color:${palB.texto}">${interior}</td></tr></table>`;
+    }
     default:
       return "";
   }
@@ -1882,14 +2057,16 @@ function renderPersonalHtml(contenido: ContenidoCampania, opts: RenderOpts): str
         return p(tituloHtml(b.texto, pal));
       case "boton":
         return p(linkComun(b.texto, b.url));
-      case "cupon":
-        return p(
-          [
-            b.texto ? esc(b.texto) : "",
-            `<strong>${b.destacado ? `${esc(b.destacado)} con el código ` : "Código "}${esc(b.codigo)}</strong>`,
-            b.condiciones ? `<span style="font-size:13px;color:${PAL_PERSONAL.tenue}">${esc(b.condiciones)}</span>` : "",
-          ].filter(Boolean).join("<br>"),
-        );
+      // Una FRASE, como la escribiría una persona: «Y acordate que tenés tu
+      // código ENSAYO20 con 20% OFF. Válido hasta el 18/10 · No se acumula…».
+      // Hasta el 11-oct-2026 eran tres renglones —texto, negrita, letra chica
+      // gris— y esa forma delataba la plantilla en el único mail que no la tiene.
+      case "cupon": {
+        const arranque = b.texto?.trim() ? `${esc(b.texto.trim())} ` : "Tu código es ";
+        const premio = b.destacado ? ` con ${esc(b.destacado)}` : "";
+        const letra = b.condiciones ? ` ${esc(b.condiciones)}.` : "";
+        return p(`${arranque}<strong>${esc(b.codigo)}</strong>${premio}.${letra}`);
+      }
       default:
         return "";
     }
@@ -1924,9 +2101,11 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
   const contenido = resolverTienda(leerContenido(entrada), opts.tienda);
   if (contenido.formato === "personal") return renderPersonalHtml(contenido, opts);
   // El tema de la campaña pisa al de la marca, campo por campo.
-  const pal = resolverPaleta(combinarTema(opts.temaMarca, contenido.tema));
+  const tema = combinarTema(opts.temaMarca, contenido.tema);
+  const pal = resolverPaleta(tema);
   const ctx: Ctx = {
     pal,
+    tema,
     doc: contenido.estilos,
     muestraCarrito: !!opts.muestraCarrito,
     productosDinamicos: opts.productosDinamicos,
@@ -1986,7 +2165,10 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
   // El namespace de VML va en el <html> o Outlook no dibuja los botones.
   return `<!doctype html>
 <html lang="${esc(pal.idioma)}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
-${cabeza(pal)}
+${cabeza(pal, {
+  fuenteWeb: tema.fuente ? FUENTES_WEB[tema.fuente] : undefined,
+  boton2: cuerpo.includes(`class="${CLASES.boton2}"`),
+})}
 <body style="margin:0;padding:0;background:${pal.fondo};font-family:${pal.fuente}">
   ${preheader}
 ${apertura(pal, { x: aireDoc?.padX, arriba: lados.arriba, abajo: lados.abajo })}
@@ -2057,8 +2239,14 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
     // "**Solo hasta el domingo**" se lee como marcado de spam, no como énfasis.
     case "texto":
       return campoATexto(b.texto);
-    case "boton":
-      return b.url ? link(b.texto, b.url) : b.texto;
+    case "boton": {
+      const uno = b.url ? link(b.texto, b.url) : b.texto;
+      return b.segundo?.texto ? `${uno}\n${b.segundo.url ? link(b.segundo.texto, b.segundo.url) : b.segundo.texto}` : uno;
+    }
+    case "banda": {
+      const partes = (b.bloques ?? []).map((h) => bloqueATexto(h, opts)).filter((x): x is string => !!x);
+      return partes.length ? partes.join("\n\n") : null;
+    }
     // 🔴 Una foto clickeable tiene que dejar su destino en el texto plano, o
     // quien lee el mail así se queda sin el CTA más grande que tiene. Sin `alt`
     // igual sale el link solo: perder el destino por no haber escrito un texto
@@ -2082,6 +2270,10 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
         .map((p) => link(`· ${lineaTexto(p, b.precioOculto)}`, p.url))
         .join("\n") || null;
     case "carrito": {
+      if (b.vista === "resumen") {
+        const filas = (b.totales ?? []).map((t) => `${t.etiqueta}: ${t.monto}`);
+        return filas.length ? filas.join("\n") : null;
+      }
       const lineas = (b.items ?? []).map((p) => link(`· ${lineaTexto(p)}`, p.url));
       if (!lineas.length) return null;
       const r = b.restantes ?? 0;
@@ -2287,6 +2479,10 @@ export function aplicarMergeTags(
     // así que hoy el orden da igual; queda declarado porque el día que entre un
     // `${contacto.nombreCompleto}` sí importaría, y ese bug sale a una casilla.
     .replace(/\$\{contacto\.primerNombre\}/g, primerNombre(contacto.nombre))
+    // «Hola Julieta,» o «Hola,» — el saludo que funciona VACÍO. Con
+    // `Hola ${contacto.primerNombre},` el 37% de los contactos de BDI sin nombre
+    // recibía «Hola ,» (11-oct-2026).
+    .replace(/\$\{contacto\.saludo\}/g, primerNombre(contacto.nombre) ? `Hola ${primerNombre(contacto.nombre)},` : "Hola,")
     .replace(/\$\{contacto\.nombre\}/g, contacto.nombre ?? "")
     .replace(/\$\{contacto\.email\}/g, contacto.email);
 }

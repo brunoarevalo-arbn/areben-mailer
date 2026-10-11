@@ -7,7 +7,7 @@
 // El mecanismo es el mismo que ya usa `carrito`: el run trae el dato del evento
 // y se pisa el bloque justo antes de renderizar. La diferencia es que acá hay un
 // caso que ELIMINA el bloque, y esa es la razón de fondo del archivo.
-import type { Bloque } from "./bloques";
+import { mapearBloques, type Bloque } from "./bloques";
 
 /** Lo que `areben-popups` deja en `AutomationRun.triggerData` (ver `lib/mailer.ts` de ese repo). */
 export interface TriggerPopup {
@@ -53,10 +53,10 @@ export interface TriggerPopup {
  */
 export function aplicarCuponDelTrigger(bloques: Bloque[], td: TriggerPopup): Bloque[] {
   if (!td.origen) return bloques;
-  if (!td.cupon) return bloques.filter((b) => b.tipo !== "cupon");
+  if (!td.cupon) return mapearBloques(bloques, (b) => (b.tipo === "cupon" ? null : b));
 
   const codigo = td.cupon;
-  return bloques.map((b) => {
+  return mapearBloques(bloques, (b) => {
     if (b.tipo !== "cupon") return b;
     // Las condiciones se agregan, no reemplazan: son la letra chica del premio
     // ("Válido 24 h", "Compra mínima $20.000"), no su descripción.

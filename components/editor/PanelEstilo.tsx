@@ -49,6 +49,7 @@ const PESOS = [
   { valor: 500, label: "Medio" },
   { valor: 600, label: "Semi negrita" },
   { valor: 700, label: "Negrita" },
+  { valor: 800, label: "Extra negrita" },
 ] as const;
 
 const BORDES = [

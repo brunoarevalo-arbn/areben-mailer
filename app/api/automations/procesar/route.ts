@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, aplicarMergeTagsAsunto, type ProductoEmail } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
+import { cadaBloque, mapearBloques } from "@/lib/email/bloques";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { aplicarCuponDelTrigger, type TriggerPopup } from "@/lib/email/cupon-trigger";
 import { pideCupon, fuenteDeCupon, aplicarCuponDeCarrito, type CuponEmitido } from "@/lib/email/cupon-carrito";
@@ -13,7 +14,7 @@ import { getRemitenteEnvio } from "@/lib/remitentes";
 import { estadoDeCheckout } from "@/lib/tn/checkouts";
 import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { tomarRuns, soltarRun } from "@/lib/email/runs";
-import { resolverTagsCarrito } from "@/lib/email/tags-carrito";
+import { prepararCarrito, resolverCarritoEnTexto, resolverTagsCarrito } from "@/lib/email/tags-carrito";
 import { bloqueDeTicket, type TicketLocal } from "@/lib/email/ticket";
 
 export const maxDuration = 60;
@@ -80,6 +81,7 @@ export async function GET(req: Request) {
 
     const td = run.triggerData as TriggerPopup & {
       checkoutId?: string; abandonedUrl?: string; productos?: ProductoEmail[]; restantes?: number;
+      subtotal?: number | null; cantidad?: number;
       orderId?: string; ticket?: TicketLocal;
     };
     // El ticket del local trae sus prendas, sus renglones de plata y su pie: las
@@ -104,13 +106,24 @@ export async function GET(req: Request) {
     // Sólo `desconocido` (TN caído, token roto) sigue enviando: para un mail es
     // tolerable, y frenar la secuencia entera por un 500 de TN no lo es.
     if (esCarrito && td.checkoutId && automation.cuenta.tnStoreId && automation.cuenta.tnToken) {
-      const { estado } = await estadoDeCheckout(
+      const { estado, checkout } = await estadoDeCheckout(
         automation.cuenta.tnStoreId, automation.cuenta.tnToken, td.checkoutId,
       );
       if (estado === "completado") {
         await prisma.automationRun.update({ where: { id: run.id }, data: { estado: "SALTADO" } });
         saltados++;
         continue;
+      }
+      // 🔑 El carrito COMO ESTÁ HOY, no como estaba cuando lo vio el poller: entre
+      // una cosa y la otra pasan hasta 72 h, y la persona pudo sacar o sumar
+      // productos. El mail que dice «son $X» tiene que decir el X de ahora. Si TN
+      // no contestó, queda la foto del run (y en los runs anteriores al
+      // 11-oct-2026, sin subtotal: las frases que lo usan se caen solas).
+      if (checkout?.productos.length) {
+        td.productos = checkout.productos;
+        td.restantes = checkout.restantes;
+        td.subtotal = checkout.subtotal;
+        td.cantidad = checkout.cantidad;
       }
     }
 
@@ -174,9 +187,10 @@ export async function GET(req: Request) {
       // bloque en el modo de carrito: sin los totales, un comprobante no dice
       // cuánto se pagó.
       const delTicket = ticket ? { modo: "ticket" as const, totales: ticket.totales, pie: ticket.pie } : {};
-      const tieneBloque = bloques.some((b) => b.tipo === "carrito");
+      // `cadaBloque`/`mapearBloques`: el carrito puede ir adentro de una `banda`.
+      const tieneBloque = cadaBloque(bloques).some((b) => b.tipo === "carrito");
       if (tieneBloque) {
-        bloques = bloques.map((b) =>
+        bloques = mapearBloques(bloques, (b) =>
           b.tipo === "carrito" ? { ...b, items: productos, restantes: td.restantes ?? 0, ...delTicket } : b,
         );
       } else {
@@ -270,6 +284,13 @@ export async function GET(req: Request) {
     // tienda: un link que lleva a algún lado. ⚠️ `"#"` como último recurso — una
     // marca sin sitio cargado— porque un `href` vacío recarga la misma página.
     const urlVuelta = td.abandonedUrl || opts.urlCuenta || "#";
+    // Los tags calculados (`${cart.total}`, `${cart.envio}`…) y la vista
+    // `resumen`, con el carrito de arriba y los datos de la tienda de ESTA marca.
+    if (esCarrito) {
+      const datos = { productos: td.productos, restantes: td.restantes, subtotal: td.subtotal, cantidad: td.cantidad, tienda: opts.tienda };
+      bloques = prepararCarrito(bloques, datos);
+      opts.preheader = resolverCarritoEnTexto(automation.preheader, datos);
+    }
     let html = renderEmailHtml({ ...contenido, bloques }, opts);
     html = aplicarMergeTags(html, contacto);
     const carrito = { url: urlVuelta, productos: td.productos, restantes: td.restantes };

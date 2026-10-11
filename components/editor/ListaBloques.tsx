@@ -7,7 +7,7 @@ import { ETIQUETA_FUENTE } from "@/lib/email/bloques";
 import { cuantosPedazos, estaCortado, normalizar } from "@/lib/email/mosaico";
 import { horaLocal } from "@/lib/fechas";
 import {
-  AlignLeft, ChevronDown, ChevronUp, Code2, Columns2, Copy, GripVertical, ImageIcon,
+  AlignLeft, ChevronDown, ChevronUp, Code2, Rows3, Columns2, Copy, GripVertical, ImageIcon,
   LayoutTemplate, Menu as MenuIcon, Minus, MousePointerClick, MoveVertical, PanelTop, Play, Plus,
   Share2, ShoppingBag, ShoppingCart, Sparkles, Grid2x2, Ticket, Timer, Trash2, Type, TypeOutline,
 } from "lucide-react";
@@ -64,6 +64,7 @@ const ICONO: Record<TipoBloque, typeof Type> = {
   menu: MenuIcon,
   divisor: Minus,
   espaciador: MoveVertical,
+  banda: Rows3,
   html: Code2,
 };
 
@@ -149,6 +150,10 @@ function resumen(b: Bloque): string {
       return `${b.alto ?? 24}px`;
     case "html":
       return b.contenido.trim() ? "HTML propio" : "Vacío";
+    case "banda": {
+      const n = b.bloques?.length ?? 0;
+      return n ? `${n} bloque${n === 1 ? "" : "s"} adentro` : "Vacía";
+    }
   }
 }
 

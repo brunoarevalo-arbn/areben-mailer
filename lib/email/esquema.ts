@@ -142,11 +142,14 @@ function acomodarEncabezado(bs: Bloque[]): Bloque[] {
  * abre en una versión vieja del panel una plantilla guardada con un bloque nuevo.
  * Perder un bloque es feo; que no cargue la campaña entera es peor.
  */
-function sanearBloque(v: unknown, usados: Set<string>): Bloque | null {
+function sanearBloque(v: unknown, usados: Set<string>, adentroDeBanda = false): Bloque | null {
   if (!v || typeof v !== "object" || Array.isArray(v)) return null;
   const b = { ...(v as Bruto) };
 
   if (typeof b.tipo !== "string" || !CONOCIDOS.has(b.tipo)) return null;
+  // ⛔ Un solo nivel: ni una franja adentro de otra, ni el encabezado (que se
+  // dibuja fuera de la tarjeta) adentro de una franja.
+  if (adentroDeBanda && (b.tipo === "banda" || b.tipo === "encabezado")) return null;
 
   // Id propio y sin repetir. El duplicado importa tanto como el faltante: dos
   // bloques con el mismo id hacen que React colapse las dos tarjetas en una y
@@ -309,6 +312,14 @@ function sanearBloque(v: unknown, usados: Set<string>): Bloque | null {
     });
   }
 
+  // Los hijos pasan por el MISMO saneo, con ids únicos en todo el documento: el
+  // editor los distingue por id igual que a los de afuera.
+  if (b.tipo === "banda") {
+    b.bloques = (Array.isArray(b.bloques) ? b.bloques : [])
+      .map((h) => sanearBloque(h, usados, true))
+      .filter((h): h is Bloque => !!h);
+  }
+
   return b as unknown as Bloque;
 }
 
@@ -331,6 +342,9 @@ function esActual(v: unknown): v is ContenidoCampania {
   if (bs.some((b) => (b as Bruto | null)?.tipo === "productos-dinamicos" && (b as Bruto).items !== undefined)) {
     return false;
   }
+  // Una franja va siempre por el camino lento: sus hijos tienen que pasar por el
+  // saneo (estilos, un solo nivel), y el camino rápido no mira adentro.
+  if (bs.some((b) => (b as Bruto | null)?.tipo === "banda")) return false;
   // Lo mismo del otro lado: un `columnas` que todavía trae `izq`/`der`, o que no
   // trae `celdas` usables, NO está en la forma actual por más que el `v` diga 4.
   // Si entrara por el camino rápido, el render se quedaría sin celdas y el

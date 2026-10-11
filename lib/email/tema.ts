@@ -51,7 +51,7 @@ export interface Tema {
  * iPhone, y las cuatro que se sumaron el 4-ago-2026 (Garamond, Century Gothic,
  * Impact y la mitad de Palatino) son de escritorio. No se rompen: caen.
  *
- * ⛔ **No se pasa de once.** Todo nombre de más cae al mismo `serif`/`sans-serif`
+ * ⛔ **No se pasa de once** (doce desde el 11-oct-2026: Montserrat, la única que se descarga). Todo nombre de más cae al mismo `serif`/`sans-serif`
  * en iPhone y Android: sería un desplegable largo prometiendo diferencias que la
  * mitad de la audiencia no puede ver.
  */
@@ -67,6 +67,13 @@ export const FUENTES = {
   gothic: "'Century Gothic', AppleGothic, 'URW Gothic', Verdana, sans-serif",
   impact: "Impact, Haettenschweiler, 'Arial Narrow Bold', 'Arial Black', sans-serif",
   mono: "'Courier New', Courier, monospace",
+  // 🔑 La única que SÍ se descarga (11-oct-2026, la de la tienda de BDI): el
+  // `<link>` lo emite `cabeza()` sólo en los mails que la usan, adentro de un
+  // condicional que Outlook no lee. Apple Mail e iOS la bajan; Gmail la descarta
+  // y cae a Helvetica/Arial — se diseña para que la caída también se vea bien.
+  // ⚠️ La URL vive en `shell.ts` (`FUENTES_WEB`), nunca acá: `probar-tema.ts`
+  // exige que ningún stack traiga una dirección.
+  montserrat: "Montserrat, 'Helvetica Neue', Helvetica, Arial, sans-serif",
 } as const;
 
 /**
@@ -87,6 +94,7 @@ export const FUENTE_LABEL: Record<keyof typeof FUENTES, string> = {
   gothic: "Century Gothic (redonda · solo computadora)",
   impact: "Impact (solo para títulos · solo computadora)",
   mono: "Monoespaciada",
+  montserrat: "Montserrat (se descarga · en Gmail cae a Arial)",
 };
 
 /** Todo resuelto: ningún campo opcional. Es lo que consume el renderer. */

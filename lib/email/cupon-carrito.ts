@@ -10,7 +10,7 @@
 // —`CARRITO10`— es mandarle a un cliente un código que el checkout de Tiendanube
 // rechaza: lo tipea, no anda, y el mail queda peor que si no hubiera traído
 // premio.
-import type { Bloque, FuenteCupon } from "./bloques";
+import { cadaBloque, mapearBloques, type Bloque, type FuenteCupon } from "./bloques";
 
 /** Lo que devuelve `POST /api/carrito/cupon` de Resorty cuando pudo emitirlo. */
 export interface CuponEmitido {
@@ -32,7 +32,8 @@ export interface CuponEmitido {
  * declaran el bloque y no tienen que pagar nada de esto.
  */
 export function pideCupon(bloques: Bloque[]): boolean {
-  return bloques.some((b) => b.tipo === "cupon");
+  // `cadaBloque`: un cupón adentro de una `banda` también cuenta.
+  return cadaBloque(bloques).some((b) => b.tipo === "cupon");
 }
 
 /**
@@ -43,7 +44,7 @@ export function pideCupon(bloques: Bloque[]): boolean {
  * `aplicarCuponDeCarrito` los rellena a todos con la única respuesta.
  */
 export function fuenteDeCupon(bloques: Bloque[]): FuenteCupon {
-  const b = bloques.find((x) => x.tipo === "cupon");
+  const b = cadaBloque(bloques).find((x) => x.tipo === "cupon");
   return (b?.tipo === "cupon" && b.fuente) || "emitir";
 }
 
@@ -126,8 +127,10 @@ export function condicionesDe(c: CuponEmitido): string {
 const NOMBRA_PORCENTAJE = /\d\s*%/;
 
 export function aplicarCuponDeCarrito(bloques: Bloque[], cupon: CuponEmitido | null): Bloque[] {
-  if (!cupon) return bloques.filter((b) => b.tipo !== "cupon");
-  return bloques.map((b) => {
+  // 🔴 `mapearBloques` y no un `.map`/`.filter`: un cupón adentro de una `banda`
+  // tiene que reemplazarse o borrarse igual, o saldría el placeholder.
+  if (!cupon) return mapearBloques(bloques, (b) => (b.tipo === "cupon" ? null : b));
+  return mapearBloques(bloques, (b) => {
     if (b.tipo !== "cupon") return b;
     const propio = b.texto?.trim();
     const titular = propio && !NOMBRA_PORCENTAJE.test(propio) ? propio : "";

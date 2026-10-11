@@ -87,7 +87,30 @@ export const CLASES = {
   ocultarEscritorio: "d-hide",
   /** La tabla del cuerpo, para que no se pase del ancho de la pantalla. */
   full: "m-full",
+  /**
+   * Cada celda del botón doble (11-oct-2026): en el celular se apila a todo el
+   * ancho, con 10px entre uno y otro. Su regla sale en `cabeza()` SÓLO si el
+   * mail la usa: así los mails que no tienen botón doble no cambian un byte.
+   */
+  boton2: "m-btn2",
 } as const;
+
+/**
+ * Las fuentes que se DESCARGAN, por clave de `FUENTES`. Ver `montserrat` en
+ * `tema.ts`. Va en un condicional que Outlook no lee: Word no sabe qué hacer
+ * con un `<link>` y se quedaría con la caída igual.
+ */
+export const FUENTES_WEB: Record<string, string> = {
+  montserrat: "https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,600;0,700;0,800;1,700;1,800&display=swap",
+};
+
+/** Lo que `cabeza()` agrega sólo si el mail lo usa. Ausente = el `<head>` de siempre. */
+export interface ExtrasCabeza {
+  /** La URL de la fuente que se descarga (`FUENTES_WEB`). */
+  fuenteWeb?: string;
+  /** ¿Hay un botón doble? Prende la regla de `m-btn2`. */
+  boton2?: boolean;
+}
 
 /** `class="a b"` o `""`. Para pegarlo dentro de un tag sin pensar. */
 export function clase(...cs: (string | false | undefined)[]): string {
@@ -110,7 +133,7 @@ export function clasesDe(e: EstiloResuelto): string[] {
  * mayor efecto de todo esto: sin eso Outlook renderiza a 120 DPI y **el mail
  * entero sale 25% más grande** que como se diseñó.
  */
-export function cabeza(pal: Paleta): string {
+export function cabeza(pal: Paleta, extras: ExtrasCabeza = {}): string {
   // El corte se hace al ancho del mail y no en 600px fijos: con un mail de 700
   // una ventana de 650 mostraría scroll horizontal en vez de apilar.
   const corte = pal.ancho;
@@ -122,7 +145,8 @@ export function cabeza(pal: Paleta): string {
 <xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
 <![endif]-->
 <meta name="color-scheme" content="light dark">
-<meta name="supported-color-schemes" content="light dark">
+<meta name="supported-color-schemes" content="light dark">${extras.fuenteWeb ? `
+<!--[if !mso]><!--><link href="${extras.fuenteWeb}" rel="stylesheet"><!--<![endif]-->` : ""}
 <style>
   body{margin:0;padding:0;width:100%!important;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
   table{border-collapse:collapse}
@@ -138,7 +162,8 @@ export function cabeza(pal: Paleta): string {
     .${CLASES.titulo}{font-size:22px!important}
     .${CLASES.subtitulo}{font-size:19px!important}
     .${CLASES.colTitulo}{font-size:13px!important}
-    .${CLASES.colTexto}{font-size:12px!important}
+    .${CLASES.colTexto}{font-size:12px!important}${extras.boton2 ? `
+    .${CLASES.boton2}{display:block!important;width:100%!important;padding:0 0 10px 0!important}` : ""}
     .${CLASES.ocultarEscritorio}{display:block!important;mso-hide:none}
     /* El orden importa: con ambas clases gana la última, o sea ocultar. */
     .${CLASES.ocultarMovil}{display:none!important;max-height:0!important;overflow:hidden!important;mso-hide:all}

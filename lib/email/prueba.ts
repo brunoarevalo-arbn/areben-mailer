@@ -17,7 +17,7 @@
 // un cliente.
 //
 // ⚠️ Puro: sin prisma, sin red. Lo que sí necesita firma vive afuera.
-import type { Bloque, ProductoEmail } from "./bloques";
+import { cadaBloque, mapearBloques, type Bloque, type ProductoEmail } from "./bloques";
 import { CARRITO_MUESTRA } from "./render";
 
 /**
@@ -30,8 +30,9 @@ import { CARRITO_MUESTRA } from "./render";
  */
 export function conCarrito(bloques: Bloque[], items: ProductoEmail[]): Bloque[] {
   if (!items.length) return bloques;
-  if (bloques.some((b) => b.tipo === "carrito")) {
-    return bloques.map((b) => (b.tipo === "carrito" ? { ...b, items, restantes: 0 } : b));
+  // `cadaBloque`/`mapearBloques`: el carrito puede ir adentro de una `banda`.
+  if (cadaBloque(bloques).some((b) => b.tipo === "carrito")) {
+    return mapearBloques(bloques, (b) => (b.tipo === "carrito" ? { ...b, items, restantes: 0 } : b));
   }
   return [...bloques, { tipo: "carrito", items, restantes: 0 }];
 }
@@ -80,3 +81,15 @@ export function muestraDePrueba(
  * cuando el carrito no existe.
  */
 export const urlVueltaDePrueba = (urlCuenta: string | undefined) => urlCuenta || "#";
+
+/** Σ precio vigente de la muestra (una unidad por línea, como la dibuja la prueba). */
+export function subtotalDe(items: ProductoEmail[]): number | null {
+  if (!items.length) return null;
+  let t = 0;
+  for (const p of items) {
+    const n = Number(p.precioPromo || p.precio);
+    if (!Number.isFinite(n)) return null;
+    t += n * (p.cantidad ?? 1);
+  }
+  return t;
+}

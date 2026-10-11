@@ -68,7 +68,7 @@ export interface Trozo {
   fuente?: keyof typeof FUENTES;
   /** px, dentro de `RANGOS.tamano`. */
   tamano?: number;
-  peso?: 400 | 500 | 600 | 700;
+  peso?: 400 | 500 | 600 | 700 | 800;
   italica?: boolean;
   subrayado?: boolean;
   /**

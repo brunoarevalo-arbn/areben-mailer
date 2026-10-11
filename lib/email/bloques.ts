@@ -396,7 +396,21 @@ export type Bloque = BloqueBase &
       }
     | { tipo: "titulo"; texto: TextoRico; align?: "left" | "center" }
     | { tipo: "texto"; texto: TextoRico; align?: "left" | "center" }
-    | { tipo: "boton"; texto: string; url: string; align?: "left" | "center"; full?: boolean }
+    | {
+        tipo: "boton";
+        texto: string;
+        url: string;
+        align?: "left" | "center";
+        full?: boolean;
+        /**
+         * Un segundo botón AL LADO, con borde y sin relleno (11-oct-2026, «Carrito
+         * v2 · B»: «Completar mi pedido» + «Consultar por WhatsApp»). En compu van
+         * 50/50; en el celular se apilan a todo el ancho. Sin texto, no existe.
+         * Es un campo del mismo bloque —y no una celda de `columnas`— porque ahí
+         * las celdas comparten el estilo, y estos dos son distintos a propósito.
+         */
+        segundo?: { texto: string; url: string };
+      }
     | {
         tipo: "imagen";
         url: string;
@@ -583,6 +597,17 @@ export type Bloque = BloqueBase &
          * producto, que ya tiene su propia historia de arreglos de Outlook.
          */
         modo?: "resena" | "ticket";
+        /**
+         * CÓMO se dibuja (el `modo` dice qué agrega: estrellas o totales).
+         * Ausente = `lista`, la de siempre. Nació el 11-oct-2026 con «Carrito v2 · B»:
+         *  - `por-modelo`: agrupado por teléfono («PARA IPHONE 16»), porque la duda
+         *    de una funda es si le va a TU teléfono;
+         *  - `tira`: tres miniaturas y «X y n productos más», cuando el carrito
+         *    acompaña y no es el protagonista;
+         *  - `resumen`: sin fotos, los renglones de `totales` (los arma el
+         *    procesador con `filasResumen`: cantidad, total, envío, cuotas).
+         */
+        vista?: "lista" | "por-modelo" | "tira" | "resumen";
         /**
          * Sólo en el modo `"ticket"`: los renglones de plata debajo de las
          * prendas —subtotal, descuento de la cuenta, redondeo, TOTAL, con qué
@@ -842,7 +867,12 @@ export type Bloque = BloqueBase &
          * defaults propios, el panel diría "Automático (24)" al lado de un mail
          * que dibuja 14.
          */
-        variante?: "caja" | "compacta";
+        /**
+         * `marco` (11-oct-2026): filete fino, rótulo y código a la izquierda y el
+         * premio a la derecha. Es el cupón que acompaña sin gritar: el del mail de
+         * marca, no el de la liquidación.
+         */
+        variante?: "caja" | "compacta" | "marco";
         texto: string;
         /**
          * El PREMIO: "15% OFF", "Envío gratis". Va grande y en negrita, arriba
@@ -905,7 +935,47 @@ export type Bloque = BloqueBase &
      * toggle de ADMIN en Remitentes). Al enviar no hay usuario, solo cuenta.
      */
     | { tipo: "html"; contenido: string }
+    /**
+     * Una franja de color que CONTIENE otros bloques (11-oct-2026). Es lo que el
+     * motor no podía: una banda negra con el título, el carrito, el cupón y el
+     * botón adentro. Los hijos se dibujan con la paleta resuelta para ESE fondo
+     * (`base` y `acento`), así un carrito o un texto que heredan sus colores
+     * quedan legibles sobre negro sin tocarlos.
+     *
+     * ⛔ Un solo nivel: sin bandas adentro de bandas, ni encabezado adentro.
+     * ⚠️ Todo lo que recorre bloques buscando uno —el cupón, el carrito— tiene
+     * que entrar acá (`cadaBloque`/`mapearBloques`): si no, un cupón de la banda
+     * saldría con el placeholder.
+     */
+    | {
+        tipo: "banda";
+        /** Hex. Ausente = la tarjeta. */
+        fondo?: string;
+        base?: "claro" | "oscuro";
+        /** El acento de ADENTRO (el botón sobre negro va blanco). Ausente = el del mail. */
+        acento?: string;
+        bloques: Bloque[];
+      }
   );
+
+/**
+ * `fn` sobre cada bloque, también los de adentro de una `banda`. La ÚNICA forma
+ * de recorrer el documento buscando algo: con un `.map` pelado, lo que va en una
+ * banda no existe.
+ */
+export function mapearBloques(bloques: Bloque[], fn: (b: Bloque) => Bloque | null): Bloque[] {
+  const out: Bloque[] = [];
+  for (const b of bloques) {
+    const r = fn(b.tipo === "banda" ? { ...b, bloques: mapearBloques(b.bloques ?? [], fn) } : b);
+    if (r) out.push(r);
+  }
+  return out;
+}
+
+/** Todos los bloques en orden, con los de adentro de las bandas. */
+export function cadaBloque(bloques: Bloque[]): Bloque[] {
+  return bloques.flatMap((b) => (b.tipo === "banda" ? [b, ...(b.bloques ?? [])] : [b]));
+}
 
 export type TipoBloque = Bloque["tipo"];
 
@@ -917,7 +987,7 @@ export const TIPOS_BLOQUE = [
   "encabezado",
   "hero", "seccion", "foto-encima", "mosaico", "regresiva", "cupon", "titulo", "texto", "boton", "imagen",
   "productos", "productos-dinamicos", "carrito", "columnas", "video", "redes", "menu",
-  "divisor", "espaciador", "html",
+  "divisor", "espaciador", "banda", "html",
 ] as const satisfies readonly TipoBloque[];
 
 /**
@@ -954,6 +1024,7 @@ export const ETIQUETA_BLOQUE = {
   menu: "Menú",
   divisor: "Línea divisoria",
   espaciador: "Espacio en blanco",
+  banda: "Franja con bloques",
   html: "HTML avanzado",
 } as const satisfies Record<TipoBloque, string>;
 
@@ -1094,6 +1165,9 @@ export function nuevoBloque(tipo: TipoBloque): Bloque {
     // panel de estilo sin nada que mover, que es una perilla desconectada.
     case "cupon": return { id, tipo, texto: "Usá este código en el checkout", destacado: "15% OFF", codigo: "DESCUENTO10", botonTexto: "Comprar", botonUrl: "", condiciones: "No se acumula con otros cupones" };
     case "html": return { id, tipo, contenido: "" };
+    // Nace con un texto adentro, como todo bloque nace con algo que mostrar: una
+    // franja vacía no se dibuja y en el editor parecería que no pasó nada.
+    case "banda": return { id, tipo, fondo: "#1b1717", base: "oscuro", acento: "#ffffff", bloques: [{ id: nuevoId(), tipo: "texto", texto: "Escribí acá adentro." }] };
   }
 }
 

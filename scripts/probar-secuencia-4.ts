@@ -55,7 +55,9 @@ titulo("1 · El mail personal es texto y nada más");
   chk("sin el carrito (ni en el HTML ni en el texto)", !html.includes("BROWNIE") && !texto.includes("BROWNIE"));
   chk("el texto sí sale", html.includes("Hola ${contacto.primerNombre},"));
   chk("el link al carrito sale como link común", /<a href="\$\{cart\.url\}"[^>]*>mi carrito<\/a>/.test(html), html.slice(0, 600));
-  chk("el cupón sale como párrafo con el código", html.includes("10% OFF con el código BDI-ABC123") && texto.includes("BDI-ABC123"));
+  // Desde el 11-oct-2026 es UNA frase («… <strong>BDI-ABC123</strong> con 10% OFF.»):
+  // los tres renglones de antes delataban la plantilla en el mail escrito a mano.
+  chk("el cupón sale como una frase con el código", html.includes("<strong>BDI-ABC123</strong> con 10% OFF.") && !/BDI-ABC123<\/strong><br>/.test(html) && texto.includes("BDI-ABC123"));
   chk("la baja sale en el HTML", html.includes(opts.unsubscribeUrl));
   chk("y en el texto", texto.includes(opts.unsubscribeUrl));
   chk("el domicilio sale", html.includes("Santa Fe 1671"));

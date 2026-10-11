@@ -32,15 +32,22 @@ import { productosDeOrden, type ProductoDeTn } from "../lib/tn/ordenes.ts";
 import { pideCupon, aplicarCuponDeCarrito, type CuponEmitido } from "../lib/email/cupon-carrito.ts";
 import { firmarResena, VIDA_MS } from "../lib/resena-token.ts";
 import { RESORTY_URL } from "../lib/carrito-cupon.ts";
-import type { Bloque, ProductoEmail } from "../lib/email/bloques.ts";
+import { cadaBloque, mapearBloques, type Bloque, type ProductoEmail } from "../lib/email/bloques.ts";
 import { resolverTagsCarrito, nombreDelCarrito } from "../lib/email/tags-carrito.ts";
 import { armarSecuencia4, PREFIJO } from "./secuencia-carrito-4.ts";
+import { armarSecuenciaB } from "./secuencia-carrito-b.ts";
+import { prepararCarrito, resolverCarritoEnTexto, valoresCarrito } from "../lib/email/tags-carrito.ts";
+import { montoEnvioGratis } from "../lib/email/tienda.ts";
 
 const soloMarca = process.argv.find((a) => a.startsWith("--marca="))?.split("=")[1] ?? "bdi";
 // `--nueva` dibuja la secuencia de 4 mails del 29-sep-2026 (`secuencia-carrito-4.ts`)
 // armada en memoria a partir de los tres de hoy: se mira ANTES de escribirla.
-const nueva = process.argv.includes("--nueva");
-const SALIDA = join(process.cwd(), ".mirar", nueva ? "secuencia-4" : "secuencia");
+// `--b` dibuja «Carrito v2 · B» (`secuencia-carrito-b.ts`, 11-oct-2026) con el
+// carrito real más grande Y con el más chico: el más chico es el que cae del
+// lado de «te faltan $X para el envío gratis», que es la otra mitad de la frase.
+const versionB = process.argv.includes("--b");
+const nueva = process.argv.includes("--nueva") || versionB;
+const SALIDA = join(process.cwd(), ".mirar", versionB ? "secuencia-b" : nueva ? "secuencia-4" : "secuencia");
 
 /**
  * El cupón de mentira del 3er mail.
@@ -100,8 +107,9 @@ async function main() {
     orderBy: [{ trigger: "asc" }, { esperaHoras: "asc" }],
     select: { nombre: true, trigger: true, estado: true, esperaHoras: true, asunto: true, preheader: true, contenido: true },
   });
+  const viejas = enBase.filter((a) => a.trigger === "CARRITO_ABANDONADO" && !a.nombre.startsWith(PREFIJO));
   const autos = nueva
-    ? armarSecuencia4(enBase.filter((a) => a.trigger === "CARRITO_ABANDONADO" && !a.nombre.startsWith(PREFIJO)))
+    ? (versionB ? armarSecuenciaB(viejas) : armarSecuencia4(viejas))
         .map((m) => ({ ...m, trigger: "CARRITO_ABANDONADO" as const, estado: "SIN CREAR" }))
     : enBase;
   if (!autos.length) throw new Error(`${soloMarca}: no hay automations de carrito ni de reseña`);
@@ -110,8 +118,15 @@ async function main() {
   // romper. El mismo para los cuatro, así lo único que cambia entre piezas es la
   // pieza.
   const { checkouts } = await listarAbandonados(cuenta.tnStoreId, cuenta.tnToken);
-  const c = [...checkouts].sort((a, b) => b.productos.length - a.productos.length)[0];
-  if (!c) throw new Error(`${soloMarca}: sin carritos abandonados para ensayar`);
+  const porTamano = [...checkouts].sort((a, b) => b.productos.length - a.productos.length);
+  const c0 = porTamano[0];
+  if (!c0) throw new Error(`${soloMarca}: sin carritos abandonados para ensayar`);
+  // Con `--b`, también el más chico que NO llega al envío gratis.
+  const umbral = montoEnvioGratis(marcaDe(cuenta, appUrl).tienda);
+  const chico = versionB ? [...checkouts].filter((k) => k.productos.length && (k.subtotal ?? 0) > 0 && umbral !== null && (k.subtotal ?? 0) < umbral).sort((a, b) => (a.subtotal ?? 0) - (b.subtotal ?? 0))[0] : undefined;
+  const carritos = chico ? [c0, chico] : [c0];
+  const errores: string[] = [];
+  for (const c of carritos) {
 
   // Una orden PAGADA de verdad, para el mail de reseña. La más nueva: es la que
   // un run de `RESENA` habría tomado.
@@ -128,10 +143,9 @@ async function main() {
 
   const host = hostDeEnvio(cuenta, appUrl);
   const marca = marcaDe(cuenta, appUrl);
-  const errores: string[] = [];
 
   console.log(`\n${soloMarca} · carrito de ${c.nombre ?? "(sin nombre)"} · ${c.productos.length} productos` +
-    `${c.restantes ? ` (+${c.restantes} más)` : ""} · $${c.total?.toLocaleString("es-AR")}`);
+    `${c.restantes ? ` (+${c.restantes} más)` : ""} · subtotal $${c.subtotal?.toLocaleString("es-AR")} (TN total, con envío y cupón: $${c.total?.toLocaleString("es-AR")})`);
   console.log(`productos: ${c.productos.map((p) => p.nombre).join(" · ")}\n`);
 
   for (const a of autos) {
@@ -150,8 +164,9 @@ async function main() {
 
     const contenido = leerContenido(a.contenido);
     const base: Bloque[] = [...(contenido?.bloques ?? [])];
-    const conProductos = base.some((b) => b.tipo === "carrito")
-      ? base.map((b) => (b.tipo === "carrito" ? { ...b, items: productos, restantes: c.restantes } : b))
+    // `cadaBloque`/`mapearBloques`: el carrito puede ir adentro de una `banda`.
+    const conProductos = cadaBloque(base).some((b) => b.tipo === "carrito")
+      ? mapearBloques(base, (b) => (b.tipo === "carrito" ? { ...b, items: productos, restantes: c.restantes } : b))
       : [...base, { tipo: "carrito", items: productos, restantes: c.restantes } as Bloque];
 
     // El 3º sale dos veces: con premio y sin premio. Los otros, una.
@@ -162,8 +177,12 @@ async function main() {
         ]
       : [["", conProductos]];
 
-    for (const [sufijo, bloques] of variantes) {
-      const opts = { preheader: a.preheader ?? undefined, unsubscribeUrl: `${host}/baja?c=ENSAYO`, ...marca };
+    const datos = { productos, restantes: c.restantes, subtotal: c.subtotal, cantidad: c.cantidad, tienda: marca.tienda };
+    for (const [sufijoBase, bloquesCrudos] of variantes) {
+      const sufijo = [c === c0 ? "" : "chico", sufijoBase].filter(Boolean).join("--");
+      // La misma función que el procesador: la vista `resumen` y los `${cart.…}` calculados.
+      const bloques = esResena ? bloquesCrudos : prepararCarrito(bloquesCrudos, datos);
+      const opts = { preheader: (esResena ? a.preheader : resolverCarritoEnTexto(a.preheader, datos)) ?? undefined, unsubscribeUrl: `${host}/baja?c=ENSAYO`, ...marca };
       const urlVuelta = esResena ? (marca.urlCuenta || "#") : (c.abandonedUrl || marca.urlCuenta || "#");
 
       const tags = { nombre: c.nombre ?? "", email: c.email ?? "" };
@@ -181,7 +200,11 @@ async function main() {
       console.log(`${a.nombre}${sufijo ? ` · ${sufijo.toUpperCase()}` : ""} · ${a.estado} · espera ${a.esperaHoras}h`);
       console.log(`  asunto: ${a.asunto ? resolverTagsCarrito(a.asunto, carrito, "texto") : "(sin asunto)"}`);
       if ("remitenteNombre" in a && a.remitenteNombre) console.log(`  de:     ${a.remitenteNombre} · responde a ${a.responderA ?? "(la marca)"}`);
-      console.log(`  pre:    ${a.preheader ?? "(sin preheader)"}`);
+      console.log(`  pre:    ${opts.preheader ?? "(sin preheader)"}`);
+      if (versionB && !esResena) {
+        const v = valoresCarrito(datos);
+        console.log(`  datos:  ${v.cantidad} · ${v.total} · ${v.envio} · ${v.cuotas} · ${v.modelos}`);
+      }
 
       // Lo que, si falla, se ve recién en la casilla de otra persona.
       const chequeos: [boolean, string][] = [
@@ -195,8 +218,14 @@ async function main() {
         // Un mail PERSONAL no dibuja el carrito: nombra lo que se dejó adentro
         // del texto, con `${cart.producto}`.
         [leerContenido(a.contenido).formato === "personal"
-          ? html.includes(nombreDelCarrito(productos, c.restantes).slice(0, 15))
-          : productos.every((p) => html.includes(p.nombre.slice(0, 15))),
+          ? (versionB
+              // La B nombra cada producto en su línea, en Tipo Título.
+              ? productos.every((p) => html.toLowerCase().includes(p.nombre.toLowerCase().slice(0, 15)))
+              : html.includes(nombreDelCarrito(productos, c.restantes).slice(0, 15)))
+          : cadaBloque(bloques).some((b) => b.tipo === "carrito" && b.vista === "tira") && !cadaBloque(bloques).some((b) => b.tipo === "carrito" && b.vista !== "tira" && b.vista !== "resumen")
+            // La tira muestra tres a propósito: el resto va en «y n productos más».
+            ? productos.slice(0, 3).every((p) => html.includes(p.nombre.slice(0, 15)))
+            : productos.every((p) => html.toLowerCase().includes(p.nombre.toLowerCase().slice(0, 15))),
          `los ${productos.length} productos salen`],
         [html.length < 100_000, `pesa ${(html.length / 1024).toFixed(0)} KB (Gmail recorta a ~102)`],
         [!texto.includes("${"), "la parte text/plain tampoco tiene tags sueltos"],
@@ -226,6 +255,7 @@ async function main() {
     }
   }
 
+  }
   console.log(`\n${errores.length ? `🔴 ${errores.length} para mirar` : "✅ los cuatro pasan lo que un script puede ver"}`);
   console.log(`\nAbrilos:  open ${SALIDA}/*.html\n`);
 }

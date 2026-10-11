@@ -138,11 +138,18 @@ export function leerTienda(valor: unknown): Tienda | undefined {
 /** Marca interna: "este texto tenía un tag y NO había dato para llenarlo". */
 const SIN_DATO = Symbol("tienda-sin-dato");
 
-function reemplazar(s: string, datos: Tienda, faltan: Set<string>): string | typeof SIN_DATO {
-  if (!s.includes(PREFIJO)) return s;
+/**
+ * Cambia los tags de UN string. `valor(clave)` devuelve el texto o `undefined`
+ * si no hay dato; cualquier tag sin dato hace que el string entero valga
+ * `SIN_DATO` (nunca sale la frase mutilada).
+ */
+function reemplazarCon(
+  s: string, prefijo: string, re: RegExp, valor: (clave: string) => string | undefined, faltan: Set<string>,
+): string | typeof SIN_DATO {
+  if (!s.includes(prefijo)) return s;
   let falto = false;
-  const out = s.replace(RE_TAG, (_, clave: string) => {
-    const v = (datos as Record<string, string | undefined>)[clave];
+  const out = s.replace(re, (_, clave: string) => {
+    const v = valor(clave);
     if (v) return v;
     // Una clave que no existe cae por el mismo lado que una sin dato. Es a
     // propósito: `${tienda.pepe}` escrito con un dedo torcido no puede salir a
@@ -172,13 +179,13 @@ function reemplazar(s: string, datos: Tienda, faltan: Set<string>): string | typ
  * Devuelve el MISMO objeto si no cambió nada, así un documento sin tags no
  * paga ni una asignación por render.
  */
-function caminar(v: unknown, datos: Tienda, faltan: Set<string>): unknown | typeof SIN_DATO {
-  if (typeof v === "string") return reemplazar(v, datos, faltan);
+function caminar(v: unknown, r1: (s: string) => string | typeof SIN_DATO): unknown | typeof SIN_DATO {
+  if (typeof v === "string") return r1(v);
   if (Array.isArray(v)) {
     let cambio = false;
     const out: unknown[] = [];
     for (const el of v) {
-      const r = caminar(el, datos, faltan);
+      const r = caminar(el, r1);
       // Un trozo que se quedó sin dato no se dibuja vacío: se va de la lista.
       // Un `<span>` vacío no molesta, pero un trozo CON LINK y sin texto es un
       // `<a></a>` en la casilla de otra persona, y eso no se arregla.
@@ -192,7 +199,7 @@ function caminar(v: unknown, datos: Tienda, faltan: Set<string>): unknown | type
     let cambio = false;
     const out: Record<string, unknown> = {};
     for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
-      const r = caminar(val, datos, faltan);
+      const r = caminar(val, r1);
       if (r === SIN_DATO) {
         // El texto de un trozo se lleva el trozo entero (lo dropea el `for` de
         // arriba). Cualquier otro campo se vacía y el bloque sobrevive.
@@ -209,9 +216,12 @@ function caminar(v: unknown, datos: Tienda, faltan: Set<string>): unknown | type
   return v;
 }
 
+const deTienda = (datos: Tienda | undefined, faltan: Set<string>) => (s: string) =>
+  reemplazarCon(s, PREFIJO, RE_TAG, (k) => (datos as Record<string, string | undefined> | undefined)?.[k], faltan);
+
 /** El documento con los `${tienda.…}` ya resueltos. */
 export function resolverTienda<T>(contenido: T, datos?: Tienda): T {
-  const r = caminar(contenido, datos ?? {}, new Set());
+  const r = caminar(contenido, deTienda(datos, new Set()));
   return (r === SIN_DATO ? contenido : r) as T;
 }
 
@@ -224,6 +234,52 @@ export function resolverTienda<T>(contenido: T, datos?: Tienda): T {
  */
 export function tagsSinDato(contenido: unknown, datos?: Tienda): string[] {
   const faltan = new Set<string>();
-  caminar(contenido, datos ?? {}, faltan);
+  caminar(contenido, deTienda(datos, faltan));
   return [...faltan].sort();
+}
+
+/**
+ * El MISMO recorrido para otra familia de tags (`${cart.total}`…), con la misma
+ * regla: un tag sin dato vacía su string y se lleva su trozo. Existe para no
+ * escribir dos veces la caminata —una copia es un bloque nuevo que una de las
+ * dos no conoce—. Lo usa `resolverCarritoEnDoc` de `tags-carrito.ts`.
+ */
+export function resolverTagsEnDoc<T>(
+  contenido: T, prefijo: string, re: RegExp, valor: (clave: string) => string | undefined, faltan = new Set<string>(),
+): T {
+  const r = caminar(contenido, (s) => reemplazarCon(s, prefijo, re, valor, faltan));
+  return (r === SIN_DATO ? contenido : r) as T;
+}
+
+/** Ídem para un string suelto (el preheader). `null` si le faltó un dato. */
+export function resolverTagsEnTexto(
+  s: string, prefijo: string, re: RegExp, valor: (clave: string) => string | undefined,
+): string | null {
+  const r = reemplazarCon(s, prefijo, re, valor, new Set());
+  return r === SIN_DATO ? null : r;
+}
+
+/**
+ * El umbral de envío gratis como NÚMERO, leído del texto que escribió la tienda
+ * («$44.000» → 44000). Estricto: sólo un monto en pesos con puntos de miles y,
+ * si acaso, coma decimal. Cualquier otra cosa («$44.000 en CABA», «gratis») da
+ * `null` y la frase que lo usa se cae — adivinar un umbral es prometer un envío
+ * gratis que la tienda no dio.
+ */
+export function montoEnvioGratis(t?: Tienda): number | null {
+  const m = /^\$?\s*(\d{1,3}(?:\.\d{3})*|\d+)(?:,(\d{1,2}))?$/.exec((t?.envioGratis ?? "").trim());
+  if (!m) return null;
+  const n = Number(m[1].replace(/\./g, "") + (m[2] ? "." + m[2] : ""));
+  return n > 0 ? n : null;
+}
+
+/**
+ * Cuántas cuotas SIN INTERÉS ofrece la tienda, leído de «3 cuotas sin interés».
+ * Sin el «sin interés» escrito da `null`: dividir el total en cuotas con interés
+ * sería anunciar una cuota más baja que la real.
+ */
+export function cantidadCuotas(t?: Tienda): number | null {
+  const m = /^(\d{1,2})\s+cuotas?\s+sin\s+inter[eé]s\b/i.exec((t?.cuotas ?? "").trim());
+  const n = m ? Number(m[1]) : 0;
+  return n >= 2 ? n : null;
 }

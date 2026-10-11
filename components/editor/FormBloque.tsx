@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import type { Marca } from "@/lib/marca";
 import { REDES, redConIcono, type EstiloIconos } from "@/lib/email/redes";
 import { estiloCupon } from "@/lib/email/estilos";
+import { ETIQUETA_BLOQUE } from "@/lib/email/bloques";
 import { etiquetasDe, FIN_BASE, MAX_ETIQUETA, MAX_FIN } from "@/lib/email/regresiva";
 import { diaLocal, horaDelDia, instanteLocal } from "@/lib/fechas";
 import { campoBase } from "@/lib/ui";
@@ -293,6 +294,11 @@ export function FormBloque({
           <Input label="Link" fullWidth value={b.url} placeholder="https://…" onChange={(e) => set({ url: e.target.value })} />
           <Alineacion value={b.align ?? "left"} onChange={(align) => set({ align })} />
           <Check label="Ancho completo" checked={!!b.full} onChange={(full) => set({ full })} />
+          {/* El segundo va al lado, con borde y sin relleno. Vacío = no hay. */}
+          <Input label="Segundo botón (opcional)" fullWidth value={b.segundo?.texto ?? ""} placeholder="Consultar por WhatsApp" hint="Va al lado, con borde. En el celular, uno abajo del otro." onChange={(e) => set({ segundo: e.target.value ? { texto: e.target.value, url: b.segundo?.url ?? "" } : undefined })} />
+          {b.segundo?.texto ? (
+            <Input label="Link del segundo" fullWidth value={b.segundo.url} placeholder="https://…" onChange={(e) => set({ segundo: { texto: b.segundo!.texto, url: e.target.value } })} />
+          ) : null}
         </div>
       );
 
@@ -513,14 +519,16 @@ export function FormBloque({
             hint={{
               caja: "Un recuadro con borde cortado. El cupón es lo importante del mail.",
               compacta: "Más baja y sin tanto recuadro, para cuando el cupón acompaña.",
+              marco: "Un filete fino: el código a la izquierda y el descuento a la derecha.",
             }[variante]}
             onChange={(e) => {
-              const v = e.target.value as "caja" | "compacta";
+              const v = e.target.value as "caja" | "compacta" | "marco";
               set({ variante: v === "caja" ? undefined : v, estilo: estiloCupon(b.estilo, v) });
             }}
           >
             <option value="caja">Recuadro</option>
             <option value="compacta">Compacta</option>
+            <option value="marco">Con filete</option>
           </Select>
           <Input label="Texto" fullWidth value={b.texto} placeholder="Usá este código en el checkout" onChange={(e) => set({ texto: e.target.value })} />
           {/* 🔴 El descuento es un campo propio desde el 29-ago-2026. Escrito
@@ -669,6 +677,27 @@ export function FormBloque({
 
     case "carrito":
       return (
+        <div className="space-y-3">
+        <Select
+          label="Cómo se dibuja"
+          fullWidth
+          value={b.vista ?? "lista"}
+          hint={{
+            lista: "Una línea por producto: foto, nombre, variante y precio.",
+            "por-modelo": "Agrupado por modelo de teléfono, con el modelo bien visible.",
+            tira: "Tres fotos chicas y «X y n productos más». Acompaña sin ocupar.",
+            resumen: "Sin fotos: cantidad, total, envío y cuotas, calculados con su carrito.",
+          }[b.vista ?? "lista"]}
+          onChange={(e) => {
+            const v = e.target.value as "lista" | "por-modelo" | "tira" | "resumen";
+            set({ vista: v === "lista" ? undefined : v });
+          }}
+        >
+          <option value="lista">Lista</option>
+          <option value="por-modelo">Por modelo</option>
+          <option value="tira">Tira</option>
+          <option value="resumen">Resumen</option>
+        </Select>
         <p className="text-sm leading-relaxed text-muted">
           Se completa solo con lo que la persona dejó en el carrito: foto, nombre, variante,
           cantidad y precio. Movelo para elegir en qué parte del mail aparece.
@@ -677,6 +706,7 @@ export function FormBloque({
           Solo tiene efecto en la automation de <strong>carrito abandonado</strong>. En una
           campaña común no hay carrito, así que el bloque no se dibuja.
         </p>
+        </div>
       );
 
     case "columnas": {
@@ -989,6 +1019,23 @@ export function FormBloque({
 
     case "divisor":
       return <p className="text-sm text-muted">Una línea horizontal para separar secciones. El color y el grosor van acá abajo, en «Caja del bloque».</p>;
+
+    case "banda":
+      return (
+        <div className="space-y-3">
+          <Input label="Color de fondo" fullWidth value={b.fondo ?? ""} placeholder="#1b1717" onChange={(e) => set({ fondo: e.target.value })} />
+          <Select label="Letra de adentro" fullWidth value={b.base ?? "oscuro"} onChange={(e) => set({ base: e.target.value as "claro" | "oscuro" })}>
+            <option value="oscuro">Clara (para un fondo oscuro)</option>
+            <option value="claro">Oscura (para un fondo claro)</option>
+          </Select>
+          <Input label="Color de los botones de adentro" fullWidth value={b.acento ?? ""} placeholder="#ffffff" onChange={(e) => set({ acento: e.target.value || undefined })} />
+          <p className="text-sm leading-relaxed text-muted">
+            Adentro {b.bloques?.length === 1 ? "va 1 bloque" : `van ${b.bloques?.length ?? 0} bloques`}
+            {b.bloques?.length ? `: ${b.bloques.map((h) => ETIQUETA_BLOQUE[h.tipo]).join(", ")}` : ""}.
+            Por ahora se arman desde un script; editarlos acá adentro viene después.
+          </p>
+        </div>
+      );
 
     case "html":
       return (

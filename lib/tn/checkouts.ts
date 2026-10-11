@@ -115,6 +115,21 @@ export interface CheckoutNormalizado {
   productos: ProductoEmail[];
   /** Cuántos quedaron afuera del tope. */
   restantes: number;
+  /**
+   * Σ precio vigente × cantidad de TODAS las líneas, no sólo de las dibujadas.
+   * `null` si alguna línea no trae un precio que se pueda leer.
+   *
+   * 🔴 **No es el `total` de TN.** Medido el 11-oct-2026 en 12 checkouts de BDI:
+   * el `total` ya trae restado el cupón y sumado el envío ($8.444,96 en varios),
+   * así que comparar ESE número contra el umbral de envío gratis decía «ya tenés
+   * envío gratis» a quien lo estaba pagando. Esta suma coincidió en los 12 con el
+   * `subtotal` de TN, que es contra lo que la tienda mide el umbral (antes del
+   * cupón, confirmado por Bruno). Se calcula acá y no se pide `subtotal` a TN
+   * porque `FIELDS` es frágil (ver arriba): un campo de más tira la lectura entera.
+   */
+  subtotal: number | null;
+  /** Unidades de TODAS las líneas (una línea con cantidad 2 cuenta 2). */
+  cantidad: number;
 }
 
 /** Lo que se guarda en `AutomationRun.triggerData` para un carrito. */
@@ -123,6 +138,9 @@ export interface TriggerCarrito {
   abandonedUrl: string;
   productos: ProductoEmail[];
   restantes: number;
+  /** Ver `CheckoutNormalizado.subtotal`. Ausente en los runs anteriores al 11-oct-2026. */
+  subtotal?: number | null;
+  cantidad?: number;
 }
 
 function fecha(v: string | null | undefined): Date | null {
@@ -164,6 +182,17 @@ export function normalizarCheckout(data: TnCheckout): CheckoutNormalizado {
 
   const tel = data.contact_phone?.trim();
 
+  // Sobre `todos`, antes del corte: el carrito de 7 se dibuja con 6, pero cuesta
+  // lo que cuestan los 7.
+  let subtotal: number | null = 0;
+  let cantidad = 0;
+  for (const p of todos) {
+    const q = typeof p.quantity === "number" && p.quantity > 0 ? p.quantity : 1;
+    const precio = num(p.price);
+    cantidad += q;
+    if (subtotal !== null) subtotal = precio === null ? null : subtotal + precio * q;
+  }
+
   return {
     tnCheckoutId: String(data.id ?? ""),
     email: data.contact_email?.trim().toLowerCase() || null,
@@ -179,6 +208,8 @@ export function normalizarCheckout(data: TnCheckout): CheckoutNormalizado {
     // Se dice cuántos quedaron afuera: esconderlo hace creer que el carrito era
     // más chico de lo que fue.
     restantes: Math.max(0, todos.length - productos.length),
+    subtotal: todos.length ? subtotal : null,
+    cantidad,
   };
 }
 
@@ -189,6 +220,8 @@ export function triggerDeCheckout(c: CheckoutNormalizado): TriggerCarrito {
     abandonedUrl: c.abandonedUrl,
     productos: c.productos,
     restantes: c.restantes,
+    subtotal: c.subtotal,
+    cantidad: c.cantidad,
   };
 }
 

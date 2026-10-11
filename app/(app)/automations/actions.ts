@@ -6,7 +6,9 @@ import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, aplicarMergeTagsAsunto, type ContenidoCampania } from "@/lib/email/render";
 import { conCarrito, muestraDePrueba, urlVueltaDePrueba } from "@/lib/email/prueba";
 import { pideCupon, fuenteDeCupon, aplicarCuponDeCarrito } from "@/lib/email/cupon-carrito";
-import { resolverTagsCarrito } from "@/lib/email/tags-carrito";
+import { prepararCarrito, resolverCarritoEnTexto, resolverTagsCarrito, type DatosCarrito } from "@/lib/email/tags-carrito";
+import { listarAbandonados } from "@/lib/tn/checkouts";
+import { subtotalDe } from "@/lib/email/prueba";
 import { firmarResena, VIDA_MS } from "@/lib/resena-token";
 import { RESORTY_URL, pedirCuponDeCarrito } from "@/lib/carrito-cupon";
 import { leerContenido } from "@/lib/email/esquema";
@@ -259,7 +261,7 @@ export async function enviarPruebaAutomation(id: string, email: string) {
   // tiene que recorrer el MISMO camino que el envío real (el procesador también
   // le mete los items al bloque). Con la opción del renderer, la prueba probaría
   // una rama que ningún envío usa.
-  const items =
+  let items =
     a.trigger === "RESENA"
       ? muestraDePrueba(urlVuelta, (productoId, producto, rating) => {
           const t = firmarResena({
@@ -280,6 +282,23 @@ export async function enviarPruebaAutomation(id: string, email: string) {
       : a.trigger === "CARRITO_ABANDONADO"
         ? muestraDePrueba(urlVuelta)
         : [];
+
+  // 🔑 La prueba de carrito va con un carrito REAL de la tienda, si hay alguno
+  // (11-oct-2026). Los mails de «Carrito v2 · B» calculan con el carrito —el
+  // total, si ya tiene envío gratis, la cuota, los modelos— y con los dos
+  // productos de mentira de la muestra la prueba no dice nada de eso. ⚠️ Los
+  // links van a la TIENDA y no al checkout de esa persona: la prueba no puede
+  // abrirle a nadie el carrito de un cliente.
+  let datosCarrito: DatosCarrito = { productos: items, subtotal: subtotalDe(items), cantidad: items.length, tienda: opts.tienda };
+  if (a.trigger === "CARRITO_ABANDONADO" && cuenta.tnStoreId && cuenta.tnToken) {
+    const real = await listarAbandonados(cuenta.tnStoreId, cuenta.tnToken)
+      .then(({ checkouts }) => [...checkouts].sort((x, y) => y.productos.length - x.productos.length)[0])
+      .catch(() => undefined);
+    if (real?.productos.length) {
+      items = real.productos.map((p) => ({ ...p, url: urlVuelta }));
+      datosCarrito = { productos: items, restantes: real.restantes, subtotal: real.subtotal, cantidad: real.cantidad, tienda: opts.tienda };
+    }
+  }
   let bloques = conCarrito(contenido.bloques, items);
 
   // 🔴 **Y el `cupon` TAMBIÉN, por el mismo camino que el envío.** Hasta el
@@ -298,6 +317,11 @@ export async function enviarPruebaAutomation(id: string, email: string) {
   if (a.trigger === "CARRITO_ABANDONADO" && pideCupon(bloques)) {
     const emitido = await pedirCuponDeCarrito(cuenta.id, destino, null, { dry: true, fuente: fuenteDeCupon(bloques) });
     bloques = aplicarCuponDeCarrito(bloques, emitido);
+  }
+
+  if (a.trigger === "CARRITO_ABANDONADO") {
+    bloques = prepararCarrito(bloques, datosCarrito);
+    opts.preheader = resolverCarritoEnTexto(a.preheader, datosCarrito);
   }
 
   const destinatario = { nombre: nombre ?? "", email: destino };
