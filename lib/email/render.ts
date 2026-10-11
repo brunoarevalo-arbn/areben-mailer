@@ -2131,8 +2131,12 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
     .filter((b) => b.tipo !== "encabezado")
     .map(marca)
     .join("\n");
+  // 🔑 El relleno de después (`&#847;&zwnj;&nbsp;` × 60, caracteres invisibles):
+  // sin él, Gmail y Apple Mail completan la línea de la bandeja con el comienzo
+  // del CUERPO —«BDI · TU PEDIDO ESTÁ LISTO…»—, que repite el asunto y le come el
+  // lugar al preheader que se escribió para eso (11-oct-2026).
   const preheader = opts.preheader
-    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(opts.preheader)}</div>`
+    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(opts.preheader)}${"&#847;&zwnj;&nbsp;".repeat(60)}</div>`
     : "";
 
   // Sin borde cuando la tarjeta y el fondo son el mismo color: dibujar un
