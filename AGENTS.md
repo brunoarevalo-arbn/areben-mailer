@@ -818,11 +818,15 @@ desincronizar.
   antes de dibujar: un solo lugar para los dos formatos y para los ocho call
   sites. Viaja en `RenderOpts.tienda`, que llega por `marcaDe()` — o sea, un call
   site que hace `{...marcaDe(cuenta, appUrl)}` no tiene que acordarse de nada.
-- 🔴 **Un tag sin dato NUNCA sale crudo a una casilla.** El string que lo lleva se
-  vacía, y si estaba en un trozo de texto rico **se cae el trozo** (un `<a></a>`
+- 🔴 **Un tag sin dato NUNCA sale crudo a una casilla.** Se cae **la oración que lo
+  lleva** (`oraciones()` corta en cada renglón y en `.`/`!`/`?` + espacio +
+  mayúscula, ⛔ después de «Av.», «Sr.»…); si no queda ninguna, el string se
+  vacía y si estaba en un trozo de texto rico **se cae el trozo** (un `<a></a>`
   sin texto es peor que nada). La **celda sobrevive con su título**: una barra de
   tres celdas con una vacía queda coja. Tampoco sale la frase mutilada
   ("En compras mayores a "). Una clave inventada cae por el mismo lado.
+  ⚠️ Hasta el 12-oct-2026 se vaciaba el string ENTERO, y como `canonizar` fusiona
+  los trozos que se ven igual, un párrafo con una frase sin dato se iba completo.
 - 🔑 **El recorrido es genérico sobre el Json**, no una lista de campos por tipo
   de bloque: enumerarlos es cómo se pierde un campo **sólo en el envío** (regla 6).
 - ⚠️ **El asunto y el preheader NO pasan por el resolvedor**: no son parte del

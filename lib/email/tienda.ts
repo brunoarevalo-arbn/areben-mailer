@@ -139,26 +139,66 @@ export function leerTienda(valor: unknown): Tienda | undefined {
 const SIN_DATO = Symbol("tienda-sin-dato");
 
 /**
+ * Parte un texto en ORACIONES, cada una con el separador que la sigue (así
+ * `partes.join("")` devuelve el texto exacto). Se corta en cada salto de línea y
+ * después de `.`, `!`, `?` o `…` seguidos de espacio y de una mayúscula, `¿`,
+ * `¡` o un dígito.
+ *
+ * ⛔ No se corta después de una abreviatura corta con mayúscula («Av.», «Sr.»,
+ * «Nro.»): «Retirá en Av. ${tienda.local}» sin dato dejaría «Retirá en Av.»,
+ * que es justo la frase mutilada que esto existe para evitar.
+ */
+export function oraciones(s: string): string[] {
+  const out: string[] = [];
+  const re = /(\n+|(?<=[.!?…])[ \t]+(?=[A-ZÁÉÍÓÚÑ¿¡0-9]))/g;
+  let desde = 0;
+  for (const m of s.matchAll(re)) {
+    const fin = m.index! + m[0].length;
+    if (m[0][0] !== "\n" && /(?:^|[\s(])[A-ZÁÉÍÓÚÑ][a-záéíóúñ]{0,3}\.$/.test(s.slice(desde, m.index))) continue;
+    out.push(s.slice(desde, fin));
+    desde = fin;
+  }
+  if (desde < s.length) out.push(s.slice(desde));
+  return out;
+}
+
+/**
  * Cambia los tags de UN string. `valor(clave)` devuelve el texto o `undefined`
- * si no hay dato; cualquier tag sin dato hace que el string entero valga
- * `SIN_DATO` (nunca sale la frase mutilada).
+ * si no hay dato.
+ *
+ * 🔴 **Un tag sin dato se lleva SU ORACIÓN, no el string entero** (12-oct-2026).
+ * Hasta entonces se vaciaba el string, y eso borraba párrafos enteros: un texto
+ * rico guarda «Envío gratis desde ${tienda.envioGratis}. Cambios sin costo.»
+ * como UN string (`canonizar` fusiona los trozos que se ven igual), así que sin
+ * el monto se iba también lo de los cambios, que no dependía de nada. Nunca sale
+ * la frase mutilada ni el tag crudo; si no queda ninguna oración, el string vale
+ * `SIN_DATO` y se comporta como antes (la celda se vacía, el trozo se cae).
  */
 function reemplazarCon(
   s: string, prefijo: string, re: RegExp, valor: (clave: string) => string | undefined, faltan: Set<string>,
 ): string | typeof SIN_DATO {
   if (!s.includes(prefijo)) return s;
   let falto = false;
-  const out = s.replace(re, (_, clave: string) => {
-    const v = valor(clave);
-    if (v) return v;
-    // Una clave que no existe cae por el mismo lado que una sin dato. Es a
-    // propósito: `${tienda.pepe}` escrito con un dedo torcido no puede salir a
-    // una casilla como texto crudo, que es el modo de falla obvio de todo esto.
-    falto = true;
-    faltan.add(clave);
-    return "";
-  });
-  return falto ? SIN_DATO : out;
+  const partes: string[] = [];
+  for (const o of oraciones(s)) {
+    let sinDato = false;
+    const r = o.replace(re, (_, clave: string) => {
+      const v = valor(clave);
+      if (v) return v;
+      // Una clave que no existe cae por el mismo lado que una sin dato. Es a
+      // propósito: `${tienda.pepe}` escrito con un dedo torcido no puede salir a
+      // una casilla como texto crudo, que es el modo de falla obvio de todo esto.
+      sinDato = true;
+      faltan.add(clave);
+      return "";
+    });
+    if (sinDato) falto = true;
+    else partes.push(r);
+  }
+  if (!falto) return partes.join("");
+  // Se cayó la última: lo que quedó no termina con el espacio que la separaba.
+  const out = partes.join("").replace(/\s+$/, "");
+  return out.trim() ? out : SIN_DATO;
 }
 
 /**

@@ -139,6 +139,37 @@ titulo("En un texto con formato se cae el TROZO");
   ok(!/<a\b[^>]*>\s*<\/a>/.test(sin), "no queda ningún <a> vacío");
 }
 
+// ─── Se cae la ORACIÓN, no el párrafo (12-oct-2026) ──────────────────────────
+// 🔴 Hasta el 12-oct un tag sin dato vaciaba el string ENTERO. Y un texto rico
+// con dos trozos que se ven igual es UN string (`canonizar` los fusiona al leer
+// el documento), así que sin el monto del envío se iba también la frase de los
+// cambios, que no dependía de nada. Lo encontró el rediseño del ticket de Zattia.
+titulo("Un tag sin dato se lleva SU oración, no el párrafo");
+{
+  const bloque = (texto: unknown) => doc([{ id: "o", tipo: "texto", align: "left", texto } as unknown as Bloque]);
+
+  const dosTrozos = bloque([{ t: "Envío gratis desde ${tienda.envioGratis}." }, { t: " Cambios sin costo en el local." }]);
+  const sin = render(dosTrozos, {});
+  ok(sin.includes("Cambios sin costo en el local."), "🔴 dos trozos fusionados: la oración sin dato no se lleva a la otra");
+  ok(!sin.includes("Envío gratis desde"), "…y la del tag se cae entera, sin mutilar");
+  ok(render(dosTrozos, BDI).includes("Envío gratis desde $44.000. Cambios sin costo en el local."), "con dato, el párrafo sale entero");
+
+  const alFinal = render(bloque("Cambios sin costo. Envío gratis desde ${tienda.envioGratis}."), {});
+  ok(alFinal.includes("Cambios sin costo.") && !alFinal.includes("Envío gratis"), "la oración del final también se cae sola");
+  ok(texto(bloque("Cambios sin costo. Envío gratis desde ${tienda.envioGratis}."), {}).includes("Cambios sin costo."), "…y el text/plain resuelve igual");
+
+  const renglones = render(bloque("Uno\nEnvío desde ${tienda.envioGratis}\nTres"), {});
+  ok(renglones.includes("Uno") && renglones.includes("Tres") && !renglones.includes("Envío desde"), "un renglón sin dato se cae y los de al lado quedan");
+
+  // ⛔ Una abreviatura no corta la oración: «Av.» suelto es la frase mutilada.
+  const abrev = render(bloque("Retirá en Av. Pellegrini ${tienda.local}. Te esperamos."), {});
+  ok(!abrev.includes("Retirá en Av.") && abrev.includes("Te esperamos."), "«Av.» no parte la oración: se cae entera");
+
+  // Un precio con punto de miles no es fin de oración.
+  const precio = render(bloque("Desde $44.000 con ${tienda.cuotas}. Te esperamos."), {});
+  ok(!precio.includes("$44.000") && precio.includes("Te esperamos."), "«$44.000» no parte la oración");
+}
+
 // ─── El text/plain resuelve lo mismo que el HTML ─────────────────────────────
 titulo("Las dos partes del mail dicen lo mismo");
 {
