@@ -117,6 +117,7 @@ const MIGRACIONES: Record<number, Migracion> = {
 };
 
 const CONOCIDOS = new Set<string>(TIPOS_BLOQUE);
+const MAX_ITEMS_LISTA = 6;
 
 /**
  * Un solo `encabezado`, y en la posición 0.
@@ -187,6 +188,23 @@ function sanearBloque(v: unknown, usados: Set<string>, adentroDeBanda = false): 
     b.celdas = celdas;
     delete b.izq;
     delete b.der;
+  }
+
+  // Los renglones de una `lista`: de 1 a 6, cada campo un string. Uno sin título
+  // se descarta — un renglón es «qué» y después «cómo»; sin el «qué» es un hueco.
+  if (b.tipo === "lista") {
+    const str = (x: unknown) => (typeof x === "string" ? x : undefined);
+    b.items = (Array.isArray(b.items) ? (b.items as unknown[]) : [])
+      .filter((it): it is Bruto => !!it && typeof it === "object" && !Array.isArray(it))
+      .map((it) => {
+        const out: Bruto = { titulo: str(it.titulo) ?? "" };
+        for (const k of ["texto", "numero", "sello", "imagen", "url"] as const) if (str(it[k])) out[k] = str(it[k]);
+        return out;
+      })
+      .filter((it) => (it.titulo as string).trim())
+      .slice(0, MAX_ITEMS_LISTA);
+    if (!["pasos", "escalones", "categorias"].includes(b.variante as string)) delete b.variante;
+    if (typeof b.rotulo !== "string") delete b.rotulo;
   }
 
   // Lo que va encima de una foto: clase conocida, texto string, coordenadas en
@@ -332,6 +350,9 @@ function esActual(v: unknown): v is ContenidoCampania {
   // no, el tipo diría `FormatoDoc` con cualquier string adentro.
   const formato = (v as Bruto).formato;
   if (formato !== undefined && formato !== "personal") return false;
+  // Ídem `saleHasta`: una fecha ilegible va al camino lento, que la borra.
+  const hasta = (v as Bruto).saleHasta;
+  if (hasta !== undefined && !(typeof hasta === "string" && /^\d{4}-\d{2}-\d{2}$/.test(hasta))) return false;
   // El encabezado acomodado también es parte de "la forma actual", y mirarlo
   // cuesta un recorrido sin trabajo adentro. Si esto no se chequeara, un Json
   // editado a mano con dos encabezados entraría por el camino rápido y el
@@ -423,6 +444,10 @@ export function leerContenido(json: unknown): ContenidoCampania {
 
   // Sólo el valor conocido: cualquier otra cosa es el mail con diseño.
   if (c.formato === "personal") out.formato = "personal";
+
+  // Una fecha que no se lee se BORRA (el mail sale siempre): inventarle un
+  // vencimiento apagaría un mail que nadie pidió apagar.
+  if (typeof c.saleHasta === "string" && /^\d{4}-\d{2}-\d{2}$/.test(c.saleHasta)) out.saleHasta = c.saleHasta;
 
   return out;
 }

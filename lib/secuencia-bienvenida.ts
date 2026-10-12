@@ -36,6 +36,9 @@ export interface Compra {
 
 export type MotivoCorte = "canjeo" | "compro";
 
+/** Los motivos por los que un mail de automation NO sale aunque le toque. */
+export type MotivoNoSale = MotivoCorte | "control" | "vencido" | "sin-cupon";
+
 /**
  * ¿Esta persona ya compró desde que se anotó? Devuelve POR QUÉ, o `null`.
  *
@@ -69,4 +72,29 @@ export function yaCompro(
   )
     return "compro";
   return null;
+}
+
+/**
+ * El mail ya no puede salir: su `saleHasta` (día de Argentina, inclusive) quedó
+ * atrás. Comparar strings `AAAA-MM-DD` es comparar fechas.
+ *
+ * 🔑 Se pregunta por el día de HOY en Argentina, no por el instante: «hasta el
+ * 31/10» incluye el 31 entero, y en UTC el 31 a las 21 h ya es 1/11.
+ */
+export const mailVencido = (saleHasta: string | undefined, hoyLocal: string): boolean =>
+  !!saleHasta && hoyLocal > saleHasta;
+
+/**
+ * ¿El mail perdió un cupón que no podía perder? `antes` son los bloques del
+ * documento, `despues` los mismos con el cupón del run ya aplicado
+ * (`aplicarCuponDelTrigger` BORRA el bloque cuando el lead no trae código).
+ *
+ * Sin el bloque, «tu código vence mañana» es un mail sin código: se salta.
+ */
+export function faltaCuponObligatorio(
+  antes: { tipo: string; obligatorio?: boolean }[],
+  despues: { tipo: string; codigo?: string }[],
+): boolean {
+  if (!antes.some((b) => b.tipo === "cupon" && b.obligatorio)) return false;
+  return !despues.some((b) => b.tipo === "cupon" && !!b.codigo?.trim());
 }

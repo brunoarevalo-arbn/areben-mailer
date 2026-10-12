@@ -8,6 +8,7 @@
 // y se pisa el bloque justo antes de renderizar. La diferencia es que acá hay un
 // caso que ELIMINA el bloque, y esa es la razón de fondo del archivo.
 import { mapearBloques, type Bloque } from "./bloques";
+import { resolverTagsEnDoc } from "./tienda";
 
 /** Lo que `areben-popups` deja en `AutomationRun.triggerData` (ver `lib/mailer.ts` de ese repo). */
 export interface TriggerPopup {
@@ -52,15 +53,52 @@ export interface TriggerPopup {
  * compra") puede no tener nada que ver con el premio que salió.
  */
 export function aplicarCuponDelTrigger(bloques: Bloque[], td: TriggerPopup): Bloque[] {
+  // Los `${cupon.…}` se resuelven SIEMPRE, también en un run del webhook de TN:
+  // sin `vence` la oración que los lleva se cae, nunca sale el tag crudo.
+  bloques = resolverCuponEnDoc(bloques, td.vence);
   if (!td.origen) return bloques;
   if (!td.cupon) return mapearBloques(bloques, (b) => (b.tipo === "cupon" ? null : b));
 
   const codigo = td.cupon;
   return mapearBloques(bloques, (b) => {
     if (b.tipo !== "cupon") return b;
+    const premio = td.prizeLabel?.trim();
+    // 🔑 Un bloque que DECLARA `destacado` (la clave, aunque esté vacía) tiene un
+    // lugar propio para el premio: ahí va, y el `texto` queda como rótulo. Sin
+    // esto el mail personal salía «15% OFF BDI-…» (11-oct-2026). Un bloque sin la
+    // clave —la bienvenida ACTIVA— sigue como siempre: el premio pisa el texto.
+    if ("destacado" in b) {
+      const condiciones = [b.condiciones?.trim(), td.condiciones?.trim()].filter(Boolean).join(" · ");
+      return { ...b, codigo, destacado: premio || b.destacado, ...(condiciones ? { condiciones } : {}) };
+    }
     // Las condiciones se agregan, no reemplazan: son la letra chica del premio
     // ("Válido 24 h", "Compra mínima $20.000"), no su descripción.
-    const texto = [td.prizeLabel?.trim() || b.texto, td.condiciones?.trim()].filter(Boolean).join(" · ");
+    const texto = [premio || b.texto, td.condiciones?.trim()].filter(Boolean).join(" · ");
     return { ...b, codigo, texto };
   });
+}
+
+const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+
+/**
+ * Los tags del vencimiento: `${cupon.vence}` → «18/10» y `${cupon.venceLargo}` →
+ * «el domingo 18/10». `vence` viene SÓLO FECHA («2026-10-18», como lo guarda el
+ * pop-up y como TN entiende `end_date`): se lee tal cual, sin pasar por `Date`
+ * local — la medianoche UTC en Argentina es el día ANTERIOR (ver `condicionesDe`).
+ * Cualquier otra forma da `{}` y la oración que lo usa se cae.
+ */
+export function valoresCupon(vence?: string | null): { vence?: string; venceLargo?: string } {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(vence?.trim() ?? "");
+  if (!m) return {};
+  const corto = `${m[3]}/${m[2]}`;
+  const dia = DIAS[new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()];
+  return { vence: corto, venceLargo: `el ${dia} ${corto}` };
+}
+
+const RE_CUPON = /\$\{cupon\.([a-zA-Z]+)\}/g;
+
+/** El documento (o la lista de bloques) con los `${cupon.…}` resueltos. */
+export function resolverCuponEnDoc<T>(contenido: T, vence?: string | null): T {
+  const v = valoresCupon(vence) as Record<string, string | undefined>;
+  return resolverTagsEnDoc(contenido, "${cupon.", RE_CUPON, (k) => v[k]);
 }

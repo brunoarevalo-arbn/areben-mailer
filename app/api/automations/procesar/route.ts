@@ -17,7 +17,8 @@ import { tomarRuns, soltarRun } from "@/lib/email/runs";
 import { prepararCarrito, resolverCarritoEnTexto, resolverTagsCarrito } from "@/lib/email/tags-carrito";
 import { bloqueDeTicket, type TicketLocal } from "@/lib/email/ticket";
 import { prepararNacidos, comprasRecientes } from "@/lib/email/secuencia";
-import { esMailQueSigue, yaCompro, type Compra } from "@/lib/secuencia-bienvenida";
+import { esMailQueSigue, yaCompro, mailVencido, faltaCuponObligatorio, type Compra, type MotivoNoSale } from "@/lib/secuencia-bienvenida";
+import { diaLocal } from "@/lib/fechas";
 
 export const maxDuration = 60;
 const BATCH = 30;
@@ -101,6 +102,27 @@ export async function GET(req: Request) {
       orderId?: string; ticket?: TicketLocal; grupo?: string;
     };
 
+    // Un run que no sale por una regla del MAIL queda SALTADO con su motivo
+    // escrito (`corte`), igual que el corte de la secuencia: un SALTADO a secas no
+    // distingue «compró» de «se venció» de «no tenía código».
+    const saltar = async (corte: MotivoNoSale) => {
+      await prisma.automationRun.update({
+        where: { id: run.id },
+        data: { estado: "SALTADO", triggerData: { ...(run.triggerData as object), corte } },
+      });
+      saltados++;
+      cortados++;
+    };
+
+    // El mail tiene fecha de vencimiento (`saleHasta`, ver `ContenidoCampania`):
+    // el 3/5 de la bienvenida cuenta la escalera «hasta el 31/10». Va antes del
+    // corte por compras: no tiene sentido leer las órdenes de TN para un mail
+    // que igual no va a salir.
+    if (mailVencido(leerContenido(automation.contenido).saleHasta, diaLocal(new Date()))) {
+      await saltar("vencido");
+      continue;
+    }
+
     // Los mails que SIGUEN al primero de la bienvenida (D1 · D2 · D4 · D6): al grupo
     // de control no le llegan, y al que ya compró tampoco. El 1º, el del código, sale
     // siempre. Ver `lib/secuencia-bienvenida.ts`.
@@ -108,7 +130,7 @@ export async function GET(req: Request) {
     // El motivo queda escrito en el run (`corte`): un SALTADO a secas no distingue
     // «compró» de «estaba pausada», y es justo lo que se va a querer contar.
     if (esMailQueSigue(automation.trigger, automation.esperaHoras)) {
-      let corte: string | null = td.grupo === "CONTROL" ? "control" : null;
+      let corte: MotivoNoSale | null = td.grupo === "CONTROL" ? "control" : null;
       if (!corte) {
         const { tnStoreId, tnToken } = automation.cuenta;
         if (tnStoreId && tnToken && !compras.has(automation.cuentaId)) {
@@ -118,12 +140,7 @@ export async function GET(req: Request) {
         corte = yaCompro(lista, contacto.email, run.createdAt, td.cupon);
       }
       if (corte) {
-        await prisma.automationRun.update({
-          where: { id: run.id },
-          data: { estado: "SALTADO", triggerData: { ...(run.triggerData as object), corte } },
-        });
-        saltados++;
-        cortados++;
+        await saltar(corte);
         continue;
       }
     }
@@ -248,7 +265,15 @@ export async function GET(req: Request) {
     // Va antes de resolver los productos dinámicos porque puede SACAR un bloque,
     // y no tiene sentido resolverle una consulta a TN a un bloque que no va a
     // salir. Ver el porqué de cada camino en lib/email/cupon-trigger.ts.
+    const antesDelCupon = cadaBloque(bloques);
     bloques = aplicarCuponDelTrigger(bloques, td);
+    // «Tu código vence mañana» sin código no es un mail: el bloque `obligatorio`
+    // que el lead no pudo llenar (sin cupón, se borra) frena el envío entero.
+    // `cadaBloque`: el cupón puede ir adentro de una `banda`.
+    if (faltaCuponObligatorio(antesDelCupon, cadaBloque(bloques))) {
+      await saltar("sin-cupon");
+      continue;
+    }
 
     // El cupón del ÚLTIMO mail de la secuencia de carrito. Lo acuña Resorty en
     // Tiendanube y lo escala contra el que la persona ya ganó en la ruleta.

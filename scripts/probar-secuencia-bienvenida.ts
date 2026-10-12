@@ -8,7 +8,12 @@
 // misma cuenta, un error en la cuenta da verde en las dos.
 import { cuandoSale, esperaEnPalabras, grupoDeContacto, vaAHoraFija, ESPERAS_SIGUIENTES } from "../lib/automations";
 import { diaALaHora } from "../lib/fechas";
-import { esMailQueSigue, yaCompro, type Compra } from "../lib/secuencia-bienvenida";
+import { esMailQueSigue, yaCompro, mailVencido, faltaCuponObligatorio, type Compra } from "../lib/secuencia-bienvenida";
+import { aplicarCuponDelTrigger, valoresCupon } from "../lib/email/cupon-trigger";
+import { cadaBloque, type Bloque } from "../lib/email/bloques";
+import { renderEmailHtml, renderEmailTexto } from "../lib/email/render";
+import { leerContenido } from "../lib/email/esquema";
+import { V_ACTUAL } from "../lib/email/esquema";
 
 let fallas = 0;
 const ok = (cond: boolean, que: string, detalle = "") => {
@@ -108,6 +113,81 @@ titulo("Grupo de control: por persona, estable, y del tamaño pedido");
   ok(pct > 8.5 && pct < 11.5, "con 10% cae ~10% de 10.000 ids", `${pct.toFixed(2)}%`);
   const todos = ids.every((x) => grupoDeContacto(x, 10) !== "CONTROL" || grupoDeContacto(x, 20) === "CONTROL");
   ok(todos, "subir el % sólo SUMA gente al control: nadie del 10% sale con el 20%");
+}
+
+titulo("Un mail que no sale: vencido (3/5) o sin el código que es su razón de ser (5/5)");
+{
+  ok(!mailVencido("2026-10-31", "2026-10-31"), "el 31/10 todavía sale: «hasta el 31/10» incluye el 31");
+  ok(mailVencido("2026-10-31", "2026-11-01"), "el 1/11 ya no sale");
+  ok(!mailVencido(undefined, "2099-01-01"), "sin `saleHasta` sale siempre");
+  ok(leerContenido({ v: V_ACTUAL, bloques: [], saleHasta: "31/10" }).saleHasta === undefined, "una fecha ilegible se borra (el mail sale): no se inventa un vencimiento");
+  ok(leerContenido({ v: 1, bloques: [], saleHasta: "2026-10-31" }).saleHasta === "2026-10-31", "la fecha sobrevive al camino lento del esquema");
+
+  const cupon = (extra: Partial<Bloque> = {}) => ({ id: "c", tipo: "cupon", texto: "", destacado: "", codigo: "TUCUPON", botonTexto: "", botonUrl: "", ...extra }) as unknown as Bloque;
+  // El 5/5 lleva el cupón ADENTRO de una banda: el chequeo tiene que mirar adentro.
+  const doc5 = [{ id: "b", tipo: "banda", bloques: [cupon({ obligatorio: true } as Partial<Bloque>)] } as unknown as Bloque];
+  const sinCodigo = aplicarCuponDelTrigger(doc5, { origen: "popup", cupon: null });
+  ok(faltaCuponObligatorio(cadaBloque(doc5), cadaBloque(sinCodigo)), "lead sin código + cupón obligatorio (dentro de una banda) ⇒ no sale");
+  const conCodigo = aplicarCuponDelTrigger(doc5, { origen: "popup", cupon: "BDI-1" });
+  ok(!faltaCuponObligatorio(cadaBloque(doc5), cadaBloque(conCodigo)), "con código, sale");
+  const comun = [cupon()];
+  ok(!faltaCuponObligatorio(cadaBloque(comun), cadaBloque(aplicarCuponDelTrigger(comun, { origen: "popup", cupon: null }))),
+    "un cupón NO obligatorio se cae solo y el mail sale (la bienvenida de hoy)");
+}
+
+titulo("Los tags del vencimiento y el premio en su lugar");
+{
+  const v = valoresCupon("2026-10-18");
+  ok(v.vence === "18/10" && v.venceLargo === "el domingo 18/10", "2026-10-18 → «18/10» y «el domingo 18/10»", JSON.stringify(v));
+  ok(valoresCupon("2026-11-01").venceLargo === "el domingo 01/11", "el día de semana sale del calendario, no del reloj del proceso");
+  ok(!valoresCupon(null).vence && !valoresCupon("pronto").vence, "sin fecha legible no hay valor");
+
+  const base = [
+    { id: "t", tipo: "texto", texto: "Gracias por sumarte. Vale hasta el ${cupon.vence}." },
+    { id: "c", tipo: "cupon", variante: "renglon", texto: "Tu código de bienvenida sigue vigente hasta el ${cupon.vence}:", destacado: "", codigo: "TUCUPON", botonTexto: "", botonUrl: "" },
+  ] as unknown as Bloque[];
+  const conFecha = aplicarCuponDelTrigger(base, { origen: "popup", cupon: "BDI-2C8XZG", prizeLabel: "15% OFF", vence: "2026-10-18" });
+  const c = cadaBloque(conFecha).find((b) => b.tipo === "cupon") as Extract<Bloque, { tipo: "cupon" }>;
+  ok(c.destacado === "15% OFF" && c.texto.startsWith("Tu código de bienvenida"), "con la clave `destacado` el premio va ahí y la frase NO se pisa", JSON.stringify(c));
+  const sinFecha = aplicarCuponDelTrigger(base, { origen: "popup", cupon: "BDI-2C8XZG", prizeLabel: "15% OFF" });
+  const todo = JSON.stringify(sinFecha);
+  ok(!todo.includes("${cupon."), "sin vencimiento no queda ni un tag crudo");
+  ok(todo.includes("Gracias por sumarte."), "sin vencimiento se cae SÓLO la oración que lo usaba");
+
+  // El mail personal: el código SOLO en su renglón (pedido de Darío).
+  const opts = { unsubscribeUrl: "https://x/baja", nombreCuenta: "BDI" };
+  const html = renderEmailHtml({ v: V_ACTUAL, formato: "personal", bloques: conFecha }, opts);
+  ok(/<p[^>]*><strong>BDI-2C8XZG<\/strong><\/p>/.test(html.replace(/<p style="margin:0 0 4px;font-size:18px;letter-spacing:1px">/, "<p>")),
+    "personal `renglon`: el código va SOLO en su párrafo", html.match(/BDI-2C8XZG.{0,80}/)?.[0]);
+  ok(!/15% OFF <strong>/.test(html), "ya no sale «15% OFF BDI-…» en una misma frase");
+  ok(html.includes("sigue vigente hasta el 18/10:"), "la frase queda entera, con la fecha");
+  const texto = renderEmailTexto({ v: V_ACTUAL, formato: "personal", bloques: conFecha }, opts);
+  ok(/\nBDI-2C8XZG\n/.test(texto), "en el text/plain el código también va en su renglón");
+
+  // Lo que nunca llega crudo: un `${cupon.…}` que no pasó por el trigger (la prueba, el editor).
+  const crudo = { v: V_ACTUAL, bloques: base } as never;
+  ok(!renderEmailHtml(crudo, opts).includes("${cupon."), "sin trigger, el renderer tampoco deja el tag crudo");
+  ok(renderEmailHtml(crudo, { ...opts, muestraCarrito: true }).includes("Vale hasta el "), "en la muestra del editor se ve la frase con una fecha de ejemplo");
+}
+
+titulo("Bloque `lista`: pasos, escalones y categorías");
+{
+  const opts = { unsubscribeUrl: "https://x/baja", nombreCuenta: "BDI" };
+  const lista = (extra: object) => ({ v: V_ACTUAL, bloques: [{ id: "l", tipo: "lista", items: [
+    { titulo: "Despachamos en 24 h", texto: "A todo el país." },
+    { titulo: "Pagás como te quede cómodo" },
+  ], ...extra }] }) as never;
+  const pasos = renderEmailHtml(lista({}), opts);
+  ok(pasos.includes(">01<") && pasos.includes(">02<"), "pasos: el número lo pone el motor (01, 02)");
+  const esc = renderEmailHtml(lista({ variante: "escalones", rotulo: "Llevando", items: [{ titulo: "Fundas", numero: "2", texto: "la segunda, −20%", sello: "más elegido" }] }), opts);
+  ok(esc.includes(">LLEVANDO<") && esc.includes(">2<") && esc.includes("MÁS ELEGIDO"), "escalones: rótulo, número gigante y sello");
+  const cats = renderEmailHtml(lista({ variante: "categorias", items: Array.from({ length: 6 }, (_, i) => ({ titulo: `Cat ${i}`, imagen: `https://x/${i}.jpg`, url: `https://x/c${i}` })) }), opts);
+  ok((cats.match(/<tr><td width="50%"/g) ?? []).length === 3, "categorías: 6 ítems = 3 filas de a dos");
+  ok(!/display:(flex|grid)/.test(pasos + esc + cats), "nada de flex ni grid (Outlook)");
+  const t = renderEmailTexto(lista({}), opts);
+  ok(t.includes("01 · Despachamos en 24 h — A todo el país."), "el text/plain lleva cada renglón con su número", t.split("\n")[0]);
+  const siete = leerContenido({ v: 1, bloques: [{ tipo: "lista", items: Array.from({ length: 9 }, (_, i) => ({ titulo: `x${i}` })).concat([{ titulo: " " }]) }] });
+  ok((siete.bloques.find((b) => b.tipo === "lista") as Extract<Bloque, { tipo: "lista" }>).items.length === 6, "el esquema la deja en 6 renglones y tira los vacíos");
 }
 
 console.log(fallas ? `\n❌ ${fallas} falla(s)\n` : "\n✅ todo bien\n");

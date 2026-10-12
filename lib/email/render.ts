@@ -14,8 +14,9 @@ import { cabeza, apertura, cierre, botonVml, botonVmlCrudo, clase, clasesDe, CLA
 import { claveProductos } from "./bloques";
 import { redConIcono, urlIcono } from "./redes";
 import { iconoDe, urlIconoCelda } from "./iconos";
+import { resolverCuponEnDoc } from "./cupon-trigger";
 import { trozoCss, textoPlano, tieneTamano, tieneLink, fusionar, sanearUrl, type TextoRico, type Trozo } from "./texto-rico";
-import type { Bloque, Columna, ContenidoCampania, ElementoEncima, FilaTotal, PorFila, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
+import type { Bloque, Columna, ContenidoCampania, ItemLista, ElementoEncima, FilaTotal, PorFila, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
 import { armarPlano, type CeldaEncima } from "./encima";
 import { armarMosaico, estaCortado, normalizar, type CeldaPlano } from "./mosaico";
 import { etiquetasDe, instante, lineaRegresiva, medidas, tenue, urlRegresiva, FIN_BASE } from "./regresiva";
@@ -25,7 +26,7 @@ import { legible, modeloDe, nombreDelCarrito } from "./tags-carrito";
 // Los tipos de bloque viven en bloques.ts (para que esquema.ts los pueda usar
 // sin ciclo) pero se re-exportan desde acá: media app importa `Bloque` y
 // `nuevoBloque` de "@/lib/email/render" y no hay razón para hacerla cambiar.
-export type { Bloque, BloqueBase, TipoBloque, ContenidoCampania, ProductoEmail, FilaTotal, Columna, PorFilaMovil, PorFila, ElementoEncima, ClaseEncima } from "./bloques";
+export type { Bloque, BloqueBase, TipoBloque, ContenidoCampania, ProductoEmail, FilaTotal, Columna, ItemLista, PorFilaMovil, PorFila, ElementoEncima, ClaseEncima } from "./bloques";
 export { nuevoBloque, duplicarBloque, nuevoId, TIPOS_BLOQUE, ETIQUETA_BLOQUE } from "./bloques";
 
 // 🔴 **La comilla doble también se escapa, y no es cosmética.** Casi todo lo que
@@ -854,6 +855,111 @@ function renderCuponMarco(b: Extract<Bloque, { tipo: "cupon" }>, c: EstiloResuel
 }
 
 /**
+ * El bloque `lista` (12-oct-2026): renglones con una marca a la izquierda. Ver los
+ * tres disfraces en `bloques.ts`.
+ *
+ * 🔑 Todo en tablas y con anchos en ATRIBUTO (la columna del número, la miniatura):
+ * Outlook no conoce `flex` ni `grid`, y el número gigante de los escalones tiene
+ * que quedar al lado de su texto en cualquier cliente, también en el teléfono —
+ * por eso ninguna celda lleva la clase que apila.
+ *
+ * Los colores salen de la paleta que recibe, así que adentro de una `banda` toman
+ * los de la franja. El número va en el ACENTO en `pasos` (es una marca) y en la
+ * tinta en `escalones` (es el dato), con el beneficio en el acento.
+ */
+function renderLista(b: Extract<Bloque, { tipo: "lista" }>, pal: Paleta): string {
+  const items = (b.items ?? []).filter((it) => it.titulo?.trim());
+  if (!items.length) return "";
+  const linea = `1px solid ${pal.borde}`;
+  const cuerpo = (t?: string) => (t ? nl(t) : "");
+
+  if (b.variante === "categorias") {
+    const celda = (it: ItemLista, i: number) => {
+      const img = it.imagen
+        ? `<td width="56" valign="middle" style="padding:0 12px 0 0"><img src="${esc(it.imagen)}" width="56" height="56" alt="${esc(it.titulo)}" style="width:56px;height:56px;display:block;border:1px solid ${pal.borde};border-radius:4px;object-fit:cover" /></td>`
+        : "";
+      const txt = `<td valign="middle"><div style="font-size:12px;font-weight:800;letter-spacing:1px;color:${pal.texto}">${esc(it.titulo.toUpperCase())}</div>${it.texto ? `<div style="font-size:12px;line-height:1.4;color:${pal.medio};margin-top:2px">${cuerpo(it.texto)}</div>` : ""}</td>`;
+      const fila = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${img}${txt}</tr></table>`;
+      const dentro = it.url ? `<a href="${esc(sanearUrl(it.url) || "#")}" style="display:block;text-decoration:none;color:inherit">${fila}</a>` : fila;
+      // La línea del medio va en la celda de la IZQUIERDA: así una fila con una
+      // sola celda (impar) no deja un filete colgando a la derecha.
+      return `<td width="50%" valign="middle" style="padding:${i % 2 ? "12px 0 12px 12px" : "12px 12px 12px 0"};border-bottom:${linea}${i % 2 === 0 ? `;border-right:${linea}` : ""}">${dentro}</td>`;
+    };
+    const filas: string[] = [];
+    for (let i = 0; i < items.length; i += 2) {
+      const par = items.slice(i, i + 2);
+      filas.push(`<tr>${par.map((it, j) => celda(it, j)).join("")}${par.length === 1 ? `<td width="50%" style="border-bottom:${linea}"></td>` : ""}</tr>`);
+    }
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:${linea}">${filas.join("")}</table>`;
+  }
+
+  const escalones = b.variante === "escalones";
+  const filas = items.map((it, i) => {
+    const ultima = i === items.length - 1;
+    const borde = ultima ? "" : `;border-bottom:${linea}`;
+    if (escalones) {
+      const rot = b.rotulo?.trim() ? `<div style="font-size:9px;font-weight:700;letter-spacing:2px;color:${pal.medio}">${esc(b.rotulo.trim().toUpperCase())}</div>` : "";
+      const num = `<div style="font-size:64px;font-weight:800;font-style:italic;line-height:1;color:${pal.texto}">${esc(it.numero?.trim() || String(i + 1))}</div>`;
+      const sello = it.sello?.trim() ? ` <span style="display:inline-block;margin-left:6px;padding:2px 7px;border-radius:9px;background:${pal.texto};color:${pal.tarjeta};font-size:9px;letter-spacing:1px;vertical-align:middle">${esc(it.sello.trim().toUpperCase())}</span>` : "";
+      const tit = `<div style="font-size:12px;font-weight:800;letter-spacing:1px;color:${pal.texto}">${esc(it.titulo.toUpperCase())}${sello}</div>`;
+      const ben = it.texto ? `<div style="font-size:19px;font-weight:800;font-style:italic;line-height:1.25;color:${pal.acento};margin-top:4px">${cuerpo(it.texto)}</div>` : "";
+      return `<tr><td width="76" valign="bottom" style="padding:14px 0${borde}">${rot}${num}</td><td valign="bottom" style="padding:14px 0 18px${borde}">${tit}${ben}</td></tr>`;
+    }
+    const n = it.numero?.trim() || String(i + 1).padStart(2, "0");
+    const num = `<div style="font-size:22px;font-weight:800;font-style:italic;line-height:1.1;color:${pal.acento}">${esc(n)}</div>`;
+    const tit = `<div style="font-size:15px;font-weight:700;line-height:1.3;color:${pal.texto}">${esc(it.titulo)}</div>`;
+    const txt = it.texto ? `<div style="font-size:13px;line-height:1.45;color:${pal.medio};margin-top:3px">${cuerpo(it.texto)}</div>` : "";
+    return `<tr><td width="48" valign="top" style="padding:12px 0${borde}">${num}</td><td valign="top" style="padding:12px 0 14px${borde}">${tit}${txt}</td></tr>`;
+  });
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${filas.join("")}</table>`;
+}
+
+/** El rótulo de los cupones de una línea: «TU CÓDIGO DE BIENVENIDA · 10% OFF». */
+const rotuloCupon = (b: Extract<Bloque, { tipo: "cupon" }>) =>
+  [b.texto?.trim(), b.destacado?.trim()].filter(Boolean).join(" · ").toUpperCase();
+
+/**
+ * `barra` (12-oct-2026): la franja fina en la tinta de la marca que va arriba de
+ * todo en la bienvenida de BDI. Arriba el rótulo con el premio, chico; abajo el
+ * código y, pegada, la letra chica («hasta el 18/10»).
+ *
+ * 🔑 La franja va dentro del `pad()` de siempre, o sea con los MISMOS márgenes
+ * laterales que el texto: el borde de la barra y el del párrafo quedan alineados.
+ * Los colores salen de la paleta invertida (tinta de fondo, fondo de tinta), así
+ * que la misma barra sirve en un mail claro y en uno oscuro.
+ */
+function renderCuponBarra(b: Extract<Bloque, { tipo: "cupon" }>, pal: Paleta): string {
+  const tinta = pal.texto;
+  const papel = pal.tarjeta;
+  const rotulo = rotuloCupon(b);
+  const arriba = rotulo ? `<div style="font-size:10px;letter-spacing:2px;color:${papel};opacity:.7">${esc(rotulo)}</div>` : "";
+  const letra = b.condiciones ? `<span style="font-size:11px;font-weight:400;letter-spacing:0;color:${papel};opacity:.7">&nbsp; ${esc(b.condiciones)}</span>` : "";
+  const codigo = `<div style="font-size:20px;font-weight:800;letter-spacing:3px;color:${papel};margin-top:4px">${esc(b.codigo)}${letra}</div>`;
+  const boton = b.botonTexto
+    ? `<div style="margin-top:10px"><a href="${esc(sanearUrl(b.botonUrl) || "#")}" style="font-size:12px;font-weight:700;letter-spacing:1px;color:${papel};text-decoration:underline">${esc(b.botonTexto)}</a></div>`
+    : "";
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px"><tr><td bgcolor="${tinta}" style="background:${tinta};padding:12px 16px;text-align:center">${arriba}${codigo}${boton}</td></tr></table>`;
+}
+
+/**
+ * `grande` (12-oct-2026): el código enorme dentro de un filete centrado, para el
+ * último mail («tu código vence mañana»). Toma todos los colores de la paleta que
+ * recibe, así que adentro de una `banda` negra sale blanco sobre negro sin que
+ * nadie elija nada.
+ *
+ * ⚠️ 30 px y no más: «BDI-2C8XZG» con su espaciado tiene que entrar en los ~295 px
+ * útiles de un teléfono de 375 sin partir el código en dos renglones.
+ */
+function renderCuponGrande(b: Extract<Bloque, { tipo: "cupon" }>, pal: Paleta, boton: string): string {
+  const rotulo = rotuloCupon(b);
+  const arriba = rotulo ? `<div style="font-size:11px;letter-spacing:2px;color:${pal.medio}">${esc(rotulo)}</div>` : "";
+  const codigo = `<div style="font-size:30px;font-weight:800;letter-spacing:4px;line-height:1.2;color:${pal.texto};margin-top:8px">${esc(b.codigo)}</div>`;
+  const letra = b.condiciones ? `<div style="font-size:12px;color:${pal.medio};margin-top:8px">${esc(b.condiciones)}</div>` : "";
+  const caja = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${pal.medio}"><tr><td style="padding:18px 16px;text-align:center">${arriba}${codigo}${letra}</td></tr></table>`;
+  return `<div style="margin:8px 0 16px">${caja}${boton ? `<div style="text-align:center;margin-top:20px">${boton}</div>` : ""}</div>`;
+}
+
+/**
  * Productos de mentira para el preview del editor y para el mail de PRUEBA.
  * 🔴 **NUNCA salen en un envío real**: lo fija `probar-carrito.ts`, y el único
  * que los enciende en el renderer es la opción `muestraCarrito`.
@@ -1203,6 +1309,11 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         caja(),
       );
     }
+    case "lista": {
+      const c = caja();
+      const html = renderLista(b, pal);
+      return html ? pad(`<div style="${margen(c, 8, 16)}">${html}</div>`, c) : "";
+    }
     case "columnas": {
       // Cuatro variantes, dos formas de celda. `variante` decide, celda por
       // celda, si va imagen o texto — no hay un quinto caso "mixto libre" a
@@ -1251,6 +1362,16 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // Acá la regla juega a favor: el cliente que descarta el `<style>`
       // —Outlook, o Gmail cuando recorta arriba de ~102 KB— ve la fila, que es
       // justo lo que se pidió.
+      // `pegadas`: al ras del margen del texto por fuera y la mitad de la junta de
+      // cada lado por dentro. Sin elegirlo, los 6 px de siempre (byte por byte).
+      const pegadas = typeof b.pegadas === "number" && Number.isFinite(b.pegadas) ? Math.max(0, Math.min(24, Math.round(b.pegadas))) : null;
+      const relleno = (i: number) => {
+        if (pegadas === null) return "6px";
+        const media = pegadas / 2;
+        const izq = i === 0 ? 0 : media;
+        const der = i === celdas.length - 1 ? 0 : media;
+        return `0 ${px(der)} 0 ${px(izq)}`;
+      };
       const enFila = b.movil === "fila";
       const claseCelda = enFila ? CLASES.col2 : CLASES.col;
       // El texto se achica solo cuando la celda se angosta de verdad: con tres
@@ -1300,7 +1421,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // celda queda literalmente vacía y el mail se lee partido. Si la columna no
       // tiene título se deja vacío a propósito — ahí la imagen sí es decorativa y
       // un alt inventado sería ruido para un lector de pantalla.
-      const celdaImagen = (c: Columna, pct: number) => {
+      const celdaImagen = (c: Columna, pct: number, i: number) => {
         // Sin foto y sin botón la celda ya quedó afuera del filtro; acá se llega
         // solo cuando hay botón y todavía no hay imagen.
         if (!c.imagen && !c.botonTexto) return `<td width="${pct}%"></td>`;
@@ -1326,7 +1447,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         // termina yendo a cualquier lado. Mismo criterio y misma salida que
         // `botonTexto`.
         const interior = c.botonTexto || tieneLink(c.titulo) ? foto : `<a href="${esc(c.url || "#")}" style="text-decoration:none;color:inherit">${foto}</a>`;
-        return `<td width="${pct}%" valign="top"${clase(claseCelda)} style="padding:6px">${interior}${botonCelda(c, pct, alineacion(tTitulo, "center"))}</td>`;
+        return `<td width="${pct}%" valign="top"${pegadas === null ? clase(claseCelda) : ""} style="padding:${relleno(i)}">${interior}${botonCelda(c, pct, alineacion(tTitulo, "center"))}</td>`;
       };
 
       // El ícono de la celda: chico, arriba del título, alineado como él.
@@ -1349,7 +1470,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         return `<div style="margin:0 0 10px;text-align:${align}"><img src="${esc(src)}" width="${lado}" height="${lado}" alt="${esc(ico.nombre)}" style="width:${px(lado)};height:${px(lado)};display:inline-block;border:0" /></div>`;
       };
 
-      const celdaTexto = (c: Columna, pct: number) => {
+      const celdaTexto = (c: Columna, pct: number, i: number) => {
         const titulo = c.titulo
           ? `<div${clase(claseTitulo(c.titulo))} style="margin:0 0 6px;font-size:${px(tTitulo.tamano ?? 18)};font-weight:${tTitulo.peso ?? 700};line-height:${tTitulo.interlinea ?? 1.3};color:${tTitulo.color};text-align:${tTitulo.align ?? "left"}${extra(tTitulo, ["tamano", "peso", "interlinea", "color", "align"])}">${tituloHtml(c.titulo, ctx.pal)}</div>`
           : "";
@@ -1358,10 +1479,10 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
           : "";
         const contenido = `${iconoCelda(c, tTitulo.align ?? "left")}${titulo}${texto}`;
         const interior = c.url && !c.botonTexto && !tieneLink(c.titulo) && !tieneLink(c.texto) ? `<a href="${esc(c.url)}" style="text-decoration:none;color:inherit">${contenido}</a>` : contenido;
-        return `<td width="${pct}%" valign="top"${clase(claseCelda)} style="padding:6px">${interior}${botonCelda(c, pct, tTitulo.align ?? "left")}</td>`;
+        return `<td width="${pct}%" valign="top"${pegadas === null ? clase(claseCelda) : ""} style="padding:${relleno(i)}">${interior}${botonCelda(c, pct, tTitulo.align ?? "left")}</td>`;
       };
 
-      const html = celdas.map(({ c, img }, i) => (img ? celdaImagen(c, pcts[i]) : celdaTexto(c, pcts[i]))).join("");
+      const html = celdas.map(({ c, img }, i) => (img ? celdaImagen(c, pcts[i], i) : celdaTexto(c, pcts[i], i))).join("");
 
       const cCaja = caja();
       return pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(cCaja, 8, 16)}"><tr>${html}</tr></table>`, cCaja);
@@ -1814,6 +1935,10 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     case "cupon": {
       const c = caja();
       if (b.variante === "marco") return pad(renderCuponMarco(b, c, e("precio"), pal), undefined);
+      if (b.variante === "barra") return pad(renderCuponBarra(b, pal), undefined);
+      if (b.variante === "grande") {
+        return pad(renderCuponGrande(b, pal, b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : ""), undefined);
+      }
       const bg = superficieDe("cupon", c, pal);
       // 🔑 **Los únicos tres números que la variante decide.** Son los huecos
       // entre las tres partes y el que separa la caja de lo que sigue: ninguno
@@ -2061,7 +2186,21 @@ function renderPersonalHtml(contenido: ContenidoCampania, opts: RenderOpts): str
       // código ENSAYO20 con 20% OFF. Válido hasta el 18/10 · No se acumula…».
       // Hasta el 11-oct-2026 eran tres renglones —texto, negrita, letra chica
       // gris— y esa forma delataba la plantilla en el único mail que no la tiene.
+      // `renglon` (12-oct-2026, pedido de Darío): la frase en su párrafo y el
+      // código SOLO en el de abajo, para copiarlo con un toque. La letra chica, si
+      // viene, en un renglón gris debajo.
+      // ⚠️ El PREMIO (`destacado`) no se dibuja acá, a propósito: es el mail que
+      // escribe una persona —el texto lo aprobaron Bruno y Darío en una prueba
+      // real— y alguien que escribe no repite «15% OFF» abajo de su código. El
+      // bloque lo declara igual para que `aplicarCuponDelTrigger` ponga el premio
+      // ahí y no encima de la frase.
       case "cupon": {
+        if (b.variante === "renglon") {
+          const frase = b.texto?.trim() ? p(esc(b.texto.trim())) : "";
+          const letra = b.condiciones?.trim() ?? "";
+          const codigo = `<p style="margin:0 0 ${letra ? 4 : 16}px;font-size:18px;letter-spacing:1px"><strong>${esc(b.codigo)}</strong></p>`;
+          return `${frase}${codigo}${letra ? `<p style="margin:0 0 16px;font-size:13px;color:${PAL_PERSONAL.tenue}">${esc(letra)}</p>` : ""}`;
+        }
         const arranque = b.texto?.trim() ? `${esc(b.texto.trim())} ` : "Tu código es ";
         const premio = b.destacado ? ` con ${esc(b.destacado)}` : "";
         const letra = b.condiciones ? ` ${esc(b.condiciones)}.` : "";
@@ -2090,6 +2229,22 @@ ${bloquesPersonales(contenido).map(marca).join("\n")}
 </body></html>`;
 }
 
+/**
+ * Los `${cupon.vence}` que llegaron hasta acá sin resolver. En un envío real los
+ * resuelve `aplicarCuponDelTrigger` con el vencimiento del run; lo que queda es el
+ * editor, la prueba o un mail de otro disparador.
+ *
+ * 🔴 **Nunca salen crudos**: sin dato, la oración que los lleva se cae (la misma
+ * regla que `${tienda.…}`). En la muestra del editor y de la prueba
+ * (`muestraCarrito`) se dibujan con una fecha a 7 días, que es lo que vale un
+ * cupón del pop-up: así quien arma el mail ve la frase entera.
+ */
+function resolverCuponSobrante(c: ContenidoCampania, opts: RenderOpts): ContenidoCampania {
+  if (!JSON.stringify(c.bloques).includes("${cupon.")) return c;
+  const muestra = opts.muestraCarrito ? new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10) : null;
+  return resolverCuponEnDoc(c, muestra);
+}
+
 export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): string {
   // Cinturón y tiradores: los call sites ya normalizan, pero si alguno se olvida
   // el mail sale igual bien. Es barato — un contenido que ya está en la versión
@@ -2098,7 +2253,7 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
   // nada: el número no está adentro del Json, lo pone la cuenta al renderizar.
   // Es el único lugar por el que pasan los dos formatos (HTML y texto plano) y
   // los ocho call sites que arman un mail, editores incluidos.
-  const contenido = resolverTienda(leerContenido(entrada), opts.tienda);
+  const contenido = resolverCuponSobrante(resolverTienda(leerContenido(entrada), opts.tienda), opts);
   if (contenido.formato === "personal") return renderPersonalHtml(contenido, opts);
   // El tema de la campaña pisa al de la marca, campo por campo.
   const tema = combinarTema(opts.temaMarca, contenido.tema);
@@ -2289,6 +2444,17 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       }
       return lineas.join("\n");
     }
+    // Un renglón por ítem, con su marca: «01 · Despachamos en 24 h hábiles — A
+    // todo el país». En categorías, el link de la celda al lado.
+    case "lista": {
+      const lineas = (b.items ?? []).filter((it) => it.titulo?.trim()).map((it, i) => {
+        const marca = b.variante === "categorias" ? "" : `${it.numero?.trim() || (b.variante === "escalones" ? String(i + 1) : String(i + 1).padStart(2, "0"))} · `;
+        const rot = b.variante === "escalones" && b.rotulo?.trim() ? `${b.rotulo.trim()} ` : "";
+        const cuerpo = `${rot}${marca}${it.titulo}${it.texto ? ` — ${sinNegritas(it.texto)}` : ""}`;
+        return it.url && b.variante === "categorias" ? link(cuerpo, it.url) : cuerpo;
+      });
+      return lineas.join("\n") || null;
+    }
     case "columnas": {
       // Sirve tanto para la variante de fotos (etiqueta + link) como para la de
       // texto (título + texto + link) — cada celda aporta lo que tenga.
@@ -2396,7 +2562,8 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
     case "cupon":
       return [
         b.texto,
-        b.destacado,
+        // Ídem el HTML del mail personal: `renglon` no repite el premio.
+        b.variante === "renglon" ? null : b.destacado,
         b.codigo,
         b.botonTexto ? link(b.botonTexto, b.botonUrl) : null,
         b.condiciones,
@@ -2425,7 +2592,7 @@ export function renderEmailTexto(entrada: ContenidoCampania, opts: RenderOpts): 
   // Igual que el HTML: si el text/plain no resolviera los tags, el mail saldría
   // con el número en una mitad y con `${tienda.envioGratis}` en la otra — y la
   // que lee el filtro de spam es justamente ésta.
-  const contenido = resolverTienda(leerContenido(entrada), opts.tienda);
+  const contenido = resolverCuponSobrante(resolverTienda(leerContenido(entrada), opts.tienda), opts);
   // Mismo criterio que el HTML: el encabezado va primero, esté donde esté en la
   // lista. Si alguien lo borró, el mail arranca directo por el contenido.
   const bloques = contenido.formato === "personal" ? bloquesPersonales(contenido) : (contenido.bloques ?? []);

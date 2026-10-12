@@ -44,6 +44,22 @@ primera versión con los bloques de hoy) · prender: `cambiar-bienvenida.ts` · 
   cancelada, o una orden pagada con su mail desde el alta. TN caído ⇒ el mail sale.
   El motivo queda en `triggerData.corte` (`control` · `canjeo` · `compro`).
 
+**✅ 5 a 7 y las piezas de diseño CONSTRUIDOS (12-oct-2026)** — y los 5 mails rearmados con ellas
+(`scripts/secuencia-bienvenida-5.ts`; se escriben sobre los 5 PAUSADOS con
+`crear-bienvenida-5.ts --escribir --reescribir`, **después del deploy**). Cómo quedó:
+- **Mail que no sale**: el cupón `obligatorio` (5/5) ⇒ sin código, `SALTADO` con `corte: sin-cupon`;
+  `contenido.saleHasta` (3/5 = `2026-10-31`, día de Argentina, inclusive) ⇒ `corte: vencido`.
+  Se eligió la fecha en el mail y no leer la escalera de Resorty al enviar: si Bruno la extiende,
+  hay que correr la fecha (y el «Hasta el 31/10» del texto) a mano.
+- **Tags**: `${cupon.vence}` / `${cupon.venceLargo}` (`lib/email/cupon-trigger.ts`); sin vencimiento
+  se cae su oración, ⛔ nunca salen crudos (tampoco en la prueba o el editor).
+- **El premio va a `destacado`** si el bloque declara la clave: era lo que pisaba la frase del 2/5.
+- **Personal**: cupón `variante: "renglon"` = la frase y el código SOLO en el renglón de abajo.
+- **Piezas**: cupón `barra` y `grande` · `columnas.pegadas` (fotos al ras del texto) · bloque nuevo
+  `lista` (`pasos` · `escalones` · `categorias`) · el pie de marca se arma con bloques de siempre.
+- Lo fijan `probar-secuencia-bienvenida.ts` y el golden (`piezas.html`/`piezas.texto`).
+- ⚠️ El formulario de `lista` en el editor **no se abrió en un navegador**.
+
 **Para que exista la secuencia (sin esto no sale):**
 1. `MAX_POR_TRIGGER.NUEVO_SUSCRIPTOR` 1 → 5 y su escalera en `ESPERAS_SIGUIENTES` (`lib/automations.ts`),
    con el `triggerData` (el código) viajando a los 5 runs.

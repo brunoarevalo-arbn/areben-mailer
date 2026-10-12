@@ -10,6 +10,7 @@ import {
   AlignLeft, ChevronDown, ChevronUp, Code2, Rows3, Columns2, Copy, GripVertical, ImageIcon,
   LayoutTemplate, Menu as MenuIcon, Minus, MousePointerClick, MoveVertical, PanelTop, Play, Plus,
   Share2, ShoppingBag, ShoppingCart, Sparkles, Grid2x2, Ticket, Timer, Trash2, Type, TypeOutline,
+  ListOrdered,
 } from "lucide-react";
 
 /**
@@ -59,6 +60,7 @@ const ICONO: Record<TipoBloque, typeof Type> = {
   "productos-dinamicos": Sparkles,
   carrito: ShoppingCart,
   columnas: Columns2,
+  lista: ListOrdered,
   video: Play,
   redes: Share2,
   menu: MenuIcon,
@@ -129,6 +131,10 @@ function resumen(b: Bloque): string {
       return `${ETIQUETA_FUENTE[b.fuente]} · ${b.n ?? 4}`;
     case "carrito":
       return "Se completa al enviar";
+    case "lista": {
+      const que = { pasos: "pasos", escalones: "escalones", categorias: "categorías" }[b.variante ?? "pasos"];
+      return `${b.items.length} ${que}`;
+    }
     case "columnas": {
       const ETIQUETA_VARIANTE = {
         imagenes: "Dos imágenes",

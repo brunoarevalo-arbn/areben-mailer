@@ -67,6 +67,22 @@ const CUPONES = {
 } as unknown as ContenidoCampania;
 
 /**
+ * Las piezas de la bienvenida de 5 de BDI (12-oct-2026): los dos cupones nuevos y
+ * las tres formas de `lista`. Enteras, por lo mismo que `CUPONES`: son anchos y
+ * márgenes de un dígito, y un hash no dice cuál se movió.
+ */
+const PIEZAS = {
+  bloques: [
+    { tipo: "cupon", variante: "barra", texto: "Tu código de bienvenida", destacado: "10% OFF", codigo: "BDI-2C8XZG", condiciones: "hasta el 18/10", botonTexto: "", botonUrl: "" },
+    { tipo: "cupon", variante: "grande", texto: "Tu código", destacado: "10% OFF", codigo: "BDI-2C8XZG", condiciones: "Válido hasta el domingo 18/10", botonTexto: "Usar mi código", botonUrl: "https://ejemplo.com" },
+    { tipo: "lista", items: [{ titulo: "Despachamos en 24 h hábiles", texto: "A todo el país." }, { titulo: "¿Y si no te gusta? La cambiás" }] },
+    { tipo: "lista", variante: "escalones", rotulo: "Llevando", items: [{ numero: "2", titulo: "Fundas", texto: "la segunda, −20%" }, { numero: "3", titulo: "Fundas", texto: "la tercera, −30%", sello: "Más elegido" }] },
+    { tipo: "columnas", variante: "imagenes", movil: "fila", pegadas: 8, celdas: [{ imagen: "https://ejemplo.com/1.jpg", url: "https://ejemplo.com" }, { imagen: "https://ejemplo.com/2.jpg", url: "https://ejemplo.com" }] },
+    { tipo: "lista", variante: "categorias", items: [{ titulo: "New in", texto: "Lo último", imagen: "https://ejemplo.com/1.jpg", url: "https://ejemplo.com/a" }, { titulo: "Fundas", imagen: "https://ejemplo.com/2.jpg", url: "https://ejemplo.com/b" }, { titulo: "Ofertas", url: "https://ejemplo.com/c" }] },
+  ],
+} as unknown as ContenidoCampania;
+
+/**
  * Dos productos de mentira para llenar TODA grilla dinámica del documento.
  *
  * 🔴 Sin esto el golden no ve la grilla, que es el bloque más grande de la
@@ -98,6 +114,8 @@ function capturarTodo(): Record<string, string> {
   out["simple.html"] = renderEmailHtml(SIMPLE, OPTS);
   out["simple.texto"] = renderEmailTexto(SIMPLE, OPTS);
   out["cupones.html"] = renderEmailHtml(CUPONES, OPTS);
+  out["piezas.html"] = renderEmailHtml(PIEZAS, OPTS);
+  out["piezas.texto"] = renderEmailTexto(PIEZAS, OPTS);
 
   for (const p of presetsPara(CUENTA)) {
     const c = p.contenido;
@@ -140,7 +158,7 @@ if (!existsSync(GOLDEN)) {
 const esperado: Record<string, string> = JSON.parse(readFileSync(GOLDEN, "utf8"));
 
 /** Los que se guardan enteros: cuando se mueven, el diff tiene que decir dónde. */
-const ENTEROS = ["simple.html", "simple.texto", "cupones.html"] as const;
+const ENTEROS = ["simple.html", "simple.texto", "cupones.html", "piezas.html", "piezas.texto"] as const;
 
 for (const clave of Object.keys(esperado)) {
   if ((ENTEROS as readonly string[]).includes(clave)) continue;

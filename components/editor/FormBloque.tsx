@@ -1,6 +1,6 @@
 "use client";
 
-import type { Bloque, Columna } from "@/lib/email/render";
+import type { Bloque, Columna, ItemLista } from "@/lib/email/render";
 import { ProductosBlock } from "@/components/ProductosBlock";
 import { ProductosDinamicosBlock } from "@/components/editor/ProductosDinamicosBlock";
 import { ColorFijo } from "@/components/editor/ColorFijo";
@@ -520,15 +520,21 @@ export function FormBloque({
               caja: "Un recuadro con borde cortado. El cupón es lo importante del mail.",
               compacta: "Más baja y sin tanto recuadro, para cuando el cupón acompaña.",
               marco: "Un filete fino: el código a la izquierda y el descuento a la derecha.",
+              barra: "Una franja fina arriba de todo: el código acompaña al resto del mail.",
+              grande: "El código enorme en un filete centrado. Va bien adentro de una franja oscura.",
+              renglon: "En el mail de texto plano, el código solo en su renglón, para copiarlo.",
             }[variante]}
             onChange={(e) => {
-              const v = e.target.value as "caja" | "compacta" | "marco";
+              const v = e.target.value as NonNullable<typeof b.variante>;
               set({ variante: v === "caja" ? undefined : v, estilo: estiloCupon(b.estilo, v) });
             }}
           >
             <option value="caja">Recuadro</option>
             <option value="compacta">Compacta</option>
             <option value="marco">Con filete</option>
+            <option value="barra">Barra</option>
+            <option value="grande">Grande</option>
+            <option value="renglon">Código en su renglón (texto plano)</option>
           </Select>
           <Input label="Texto" fullWidth value={b.texto} placeholder="Usá este código en el checkout" onChange={(e) => set({ texto: e.target.value })} />
           {/* 🔴 El descuento es un campo propio desde el 29-ago-2026. Escrito
@@ -539,6 +545,10 @@ export function FormBloque({
           <Input label="Código" fullWidth value={b.codigo} placeholder="DESCUENTO10" onChange={(e) => set({ codigo: e.target.value })} />
           <Input label="Texto del botón" fullWidth value={b.botonTexto} placeholder="Opcional" onChange={(e) => set({ botonTexto: e.target.value })} />
           <Input label="Link del botón" fullWidth value={b.botonUrl} placeholder="https://…" onChange={(e) => set({ botonUrl: e.target.value })} />
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={!!b.obligatorio} onChange={(e) => set({ obligatorio: e.target.checked || undefined })} />
+            Sin código, este mail no sale
+          </label>
           <Input label="Letra chica" fullWidth value={b.condiciones ?? ""} placeholder="Válido hasta el 05/09 · No se acumula" hint="Al pie del recuadro, chica y en el tono tenue." onChange={(e) => set({ condiciones: e.target.value })} />
         </div>
       );
@@ -709,6 +719,70 @@ export function FormBloque({
         </div>
       );
 
+    case "lista": {
+      const variante = b.variante ?? "pasos";
+      const items = b.items ?? [];
+      // La lista entera, no el ítem suelto: `set` hace un merge superficial (ver
+      // `setCelda` en `columnas`).
+      const setItem = (i: number, campos: Partial<ItemLista>) =>
+        set({ items: items.map((it, j) => (j === i ? { ...it, ...campos } : it)) } as Partial<Bloque>);
+      return (
+        <div className="space-y-4">
+          <Select
+            label="Forma"
+            fullWidth
+            value={variante}
+            hint={{
+              pasos: "Renglones numerados 01, 02, 03: el número lo pone el mail.",
+              escalones: "Un número gigante por renglón, con el beneficio en el color de la marca.",
+              categorias: "Una tabla de a dos con miniatura; cada celda es un link.",
+            }[variante]}
+            onChange={(e) => {
+              const v = e.target.value as "pasos" | "escalones" | "categorias";
+              set({ variante: v === "pasos" ? undefined : v } as Partial<Bloque>);
+            }}
+          >
+            <option value="pasos">Pasos numerados</option>
+            <option value="escalones">Escalones</option>
+            <option value="categorias">Categorías con foto</option>
+          </Select>
+          {variante === "escalones" && (
+            <Input label="Palabra arriba del número" fullWidth value={b.rotulo ?? ""} placeholder="LLEVANDO" onChange={(e) => set({ rotulo: e.target.value || undefined } as Partial<Bloque>)} />
+          )}
+          {items.map((it, i) => (
+            <Desplegable key={i} tono="rol" titulo={`Renglón ${i + 1}`} abiertoDeFabrica={i === 0} resumen={it.titulo || "vacío"}>
+              <div className="space-y-2">
+                {variante === "categorias" && (
+                  <ImagenDrop value={it.imagen ?? ""} onChange={(imagen) => setItem(i, { imagen })} placeholder="URL de la miniatura" />
+                )}
+                {variante !== "categorias" && (
+                  <Input fullWidth value={it.numero ?? ""} placeholder={variante === "escalones" ? "Número (2, 3…)" : `Número (vacío = ${String(i + 1).padStart(2, "0")})`} onChange={(e) => setItem(i, { numero: e.target.value || undefined })} />
+                )}
+                <Input fullWidth value={it.titulo} placeholder="Título" onChange={(e) => setItem(i, { titulo: e.target.value })} />
+                <Input fullWidth value={it.texto ?? ""} placeholder={variante === "escalones" ? "El beneficio (la segunda, −20%)" : "Texto"} onChange={(e) => setItem(i, { texto: e.target.value || undefined })} />
+                {variante === "escalones" && (
+                  <Input fullWidth value={it.sello ?? ""} placeholder="Pastilla (opcional): MÁS ELEGIDO" onChange={(e) => setItem(i, { sello: e.target.value || undefined })} />
+                )}
+                {variante === "categorias" && (
+                  <Input fullWidth value={it.url ?? ""} placeholder="Link" onChange={(e) => setItem(i, { url: e.target.value || undefined })} />
+                )}
+                {items.length > 1 && (
+                  <button type="button" className="text-xs text-red-600 underline" onClick={() => set({ items: items.filter((_, j) => j !== i) } as Partial<Bloque>)}>
+                    Sacar este renglón
+                  </button>
+                )}
+              </div>
+            </Desplegable>
+          ))}
+          {items.length < 6 && (
+            <button type="button" className="text-sm underline" onClick={() => set({ items: [...items, { titulo: "" }] } as Partial<Bloque>)}>
+              + Agregar un renglón
+            </button>
+          )}
+        </div>
+      );
+    }
+
     case "columnas": {
       const variante = b.variante ?? "imagenes";
       const celdas = b.celdas ?? [];
@@ -791,6 +865,14 @@ export function FormBloque({
             <option value="apilar">Una debajo de otra</option>
             <option value="fila">Todas en fila</option>
           </Select>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={b.pegadas !== undefined}
+              onChange={(e) => set({ pegadas: e.target.checked ? 8 : undefined, ...(e.target.checked ? { movil: "fila" } : {}) } as Partial<Bloque>)}
+            />
+            Al ras de los márgenes del texto (8 px entre celdas, en fila también en el celular)
+          </label>
           {celdas.length === 2 && (
             <Select
               label="Proporción"

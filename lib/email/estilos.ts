@@ -12,7 +12,7 @@
 // filtrar un `estilo` que venga de la base antes de que exista quien lo dibuje.
 
 import { FUENTES, esColorOscuro, luminancia, type Paleta } from "./tema";
-import type { TipoBloque } from "./bloques";
+import type { Bloque, TipoBloque } from "./bloques";
 
 /**
  * Colores de la marca que un bloque puede nombrar.
@@ -560,7 +560,7 @@ export const CLAVES_TAMANO_BOTON = ["tamano", "padX", "padY"] as const;
  * `"titulo" in estilos` diga que sí para un rol que nadie tocó, y de ese "¿lo
  * eligió una persona?" dependen la legibilidad contextual y el modo oscuro.
  */
-export function estiloCupon(actual: Estilos | undefined, variante: "caja" | "compacta" | "marco"): Estilos | undefined {
+export function estiloCupon(actual: Estilos | undefined, variante: NonNullable<Extract<Bloque, { tipo: "cupon" }>["variante"]>): Estilos | undefined {
   const out: Estilos = { ...actual };
 
   for (const [rol, paquete] of Object.entries(ESTILO_CUPON_COMPACTO) as [RolEstilo, EstiloBloque][]) {
@@ -610,6 +610,7 @@ export const ROLES_POR_TIPO: Record<TipoBloque, readonly RolEstilo[]> = {
   redes: ["caja", "cuerpo"],
   menu: ["caja", "cuerpo"],
   divisor: ["caja"],
+  lista: ["caja"],
   espaciador: [],
   // La franja sólo decide su fondo (en el formulario) y su aire: los colores de
   // adentro los pone cada hijo con la paleta de la franja.

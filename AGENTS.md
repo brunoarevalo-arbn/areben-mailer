@@ -98,7 +98,7 @@ node --import tsx scripts/probar-negritas.ts   # `**negrita**` se resuelve DESPU
 node --import tsx scripts/probar-texto-rico.ts # un campo de texto rico rinde el MISMO html que el string de siempre
 node --env-file=.env --import tsx scripts/probar-segmentos.ts # el "no abrió/no clickeó" es RECIBIÓ y no lo hizo, nunca "no me consta"
 node --import tsx scripts/probar-automations.ts # el carrito llega a TRES mails, y ninguno sale a la misma hora que otro
-node --import tsx scripts/probar-secuencia-bienvenida.ts # bienvenida de 5: día N a las 11 de Argentina (no N×24 h), el corte por canje/compra (TN caído ⇒ sale) y el control POR PERSONA
+node --import tsx scripts/probar-secuencia-bienvenida.ts # bienvenida de 5: día N a las 11 de Argentina (no N×24 h), el corte por canje/compra (TN caído ⇒ sale), el control POR PERSONA, el mail vencido o sin su código obligatorio, `${cupon.vence}`, el código en su renglón y el bloque `lista`
 node --import tsx scripts/probar-cupon-carrito.ts # el bloque `cupon` sin código REAL detrás se elimina; el placeholder nunca sale, y el DESCUENTO sale más grande y en negrita
 node --import tsx scripts/probar-asunto.ts     # el asunto resuelve los mismos merge tags que el cuerpo, y un salto de línea no parte la cabecera
 node --import tsx scripts/probar-secuencia-4.ts # carrito de 4 mails: el mail PERSONAL es sólo texto (ni el carrito), `${cart.producto}` escapado, el cupón recuerda o emite, y el grupo de control

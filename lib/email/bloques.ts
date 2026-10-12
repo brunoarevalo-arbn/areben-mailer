@@ -90,6 +90,20 @@ export interface ProductoEmail {
   estrellas?: string[];
 }
 
+/** Un renglón del bloque `lista`. Strings planos: `**negrita**` vale en `texto`. */
+export interface ItemLista {
+  titulo: string;
+  texto?: string;
+  /** `escalones`: el número gigante. `pasos`: pisa el 01/02 automático. */
+  numero?: string;
+  /** `escalones`: la pastilla al lado del título («MÁS ELEGIDO»). */
+  sello?: string;
+  /** `categorias`: la miniatura. */
+  imagen?: string;
+  /** `categorias`: a dónde lleva la celda. */
+  url?: string;
+}
+
 export interface Columna {
   imagen: string;
   url: string;
@@ -672,6 +686,17 @@ export type Bloque = BloqueBase &
          * con CSS, ver `PorFila`—.
          */
         movil?: "apilar" | "fila";
+        /**
+         * Las celdas AL RAS de los márgenes del texto, con `pegadas` px entre una y
+         * otra (12-oct-2026). Ausente = los 6 px de relleno de siempre por celda,
+         * que meten la primera y la última foto 6 px adentro del borde del párrafo:
+         * es lo que Bruno vio «desparejo» en las fotos de a dos de la bienvenida.
+         *
+         * ⚠️ Implica quedarse en fila también en el celular (sin `m-col`/`m-col2`,
+         * que pisan el relleno con `!important`): dos fotos al ras apiladas serían
+         * dos fotos de ancho completo, otra pieza.
+         */
+        pegadas?: number;
         /** De 2 a 4. Lo garantiza `leerContenido`, no el tipo. */
         celdas: Columna[];
       }
@@ -684,6 +709,25 @@ export type Bloque = BloqueBase &
       }
     /** Barra de navegación: un puñado de links de texto en fila. */
     | { tipo: "menu"; links: { texto: string; url: string }[] }
+    /**
+     * Renglones con una marca a la izquierda (12-oct-2026, bienvenida de BDI).
+     * Tres disfraces del mismo bloque, que las `columnas` no pueden expresar
+     * porque van hacia ABAJO y pasan de cuatro:
+     * - `pasos` (ausente) — «01 · Despachamos en 24 h hábiles / A todo el país…»:
+     *   el número lo pone el motor (01, 02…) salvo que el ítem traiga `numero`.
+     * - `escalones` — la escalera de descuentos: el `numero` gigante («2»), con el
+     *   `rotulo` chico arriba («LLEVANDO»), el título y el beneficio en el acento.
+     * - `categorias` — la tabla de a dos con miniatura, título y bajada; cada
+     *   celda es un link.
+     */
+    | {
+        tipo: "lista";
+        variante?: "pasos" | "escalones" | "categorias";
+        /** Sólo `escalones`: la palabra chica arriba de cada número. */
+        rotulo?: string;
+        /** De 1 a 6. Lo garantiza `leerContenido`, no el tipo. */
+        items: ItemLista[];
+      }
     | { tipo: "divisor" }
     // Aire vertical y nada más. Parece de más hasta que se arma un diseño en serio:
     // la plantilla que motivó esto usa 12 espaciadores, de 5 a 75px, y sin ellos
@@ -872,7 +916,26 @@ export type Bloque = BloqueBase &
          * premio a la derecha. Es el cupón que acompaña sin gritar: el del mail de
          * marca, no el de la liquidación.
          */
-        variante?: "caja" | "compacta" | "marco";
+        /**
+         * Las tres del 12-oct-2026 (bienvenida de 5 de BDI):
+         * - `barra` — una franja fina en la tinta de la marca: rótulo y premio
+         *   chicos arriba, el código grande con su letra chica al lado. Es el
+         *   cupón que va ARRIBA de todo y acompaña al resto del mail.
+         * - `grande` — filete fino centrado: rótulo · premio, el código enorme y la
+         *   letra chica abajo. Pensado para ir adentro de una `banda` oscura (toma
+         *   los colores de la paleta de la franja).
+         * - `renglon` — sólo cambia el mail `personal`: la frase en su párrafo y el
+         *   código SOLO en el renglón de abajo, para copiarlo (pedido de Darío). En
+         *   el mail con diseño se dibuja como `caja`.
+         */
+        variante?: "caja" | "compacta" | "marco" | "barra" | "grande" | "renglon";
+        /**
+         * Sin código, el mail entero NO SALE (el run queda `SALTADO`, motivo
+         * `sin-cupon`). Para el mail cuya única razón de ser es el código —«tu
+         * código vence mañana»—: sin el bloque, lo que queda es un mail que miente.
+         * Ausente = el bloque se cae solo y el resto del mail sale, como siempre.
+         */
+        obligatorio?: boolean;
         texto: string;
         /**
          * El PREMIO: "15% OFF", "Envío gratis". Va grande y en negrita, arriba
@@ -986,7 +1049,7 @@ export type FuenteCupon = "emitir" | "recordar" | "recordar-o-emitir";
 export const TIPOS_BLOQUE = [
   "encabezado",
   "hero", "seccion", "foto-encima", "mosaico", "regresiva", "cupon", "titulo", "texto", "boton", "imagen",
-  "productos", "productos-dinamicos", "carrito", "columnas", "video", "redes", "menu",
+  "productos", "productos-dinamicos", "carrito", "columnas", "lista", "video", "redes", "menu",
   "divisor", "espaciador", "banda", "html",
 ] as const satisfies readonly TipoBloque[];
 
@@ -1019,6 +1082,7 @@ export const ETIQUETA_BLOQUE = {
   "productos-dinamicos": "Productos automáticos",
   carrito: "Carrito abandonado",
   columnas: "Dos columnas",
+  lista: "Lista numerada",
   video: "Video",
   redes: "Redes sociales",
   menu: "Menú",
@@ -1070,6 +1134,14 @@ export interface ContenidoCampania {
   estilos?: Estilos;
   /** Ver `FormatoDoc`. */
   formato?: FormatoDoc;
+  /**
+   * Último día (calendario de Argentina, `AAAA-MM-DD`, inclusive) en que este mail
+   * puede SALIR de una automation. Pasado, el run queda `SALTADO` con motivo
+   * `vencido`. Nació para el 3/5 de la bienvenida de BDI, que cuenta la escalera
+   * de Resorty «hasta el 31/10»: un mail que promete un descuento que ya terminó
+   * es peor que no mandarlo. Ausente = sale siempre. ⚠️ Las campañas no lo miran.
+   */
+  saleHasta?: string;
 }
 
 /**
@@ -1121,6 +1193,13 @@ export function nuevoBloque(tipo: TipoBloque): Bloque {
     case "video": return { id, tipo, imagen: "", url: "" };
     case "redes": return { id, tipo, links: [{ red: "Instagram", url: "" }] };
     case "menu": return { id, tipo, links: [{ texto: "Inicio", url: "" }, { texto: "Tienda", url: "" }] };
+    case "lista": return {
+      id, tipo, items: [
+        { titulo: "Primer paso", texto: "Una línea que lo explica." },
+        { titulo: "Segundo paso", texto: "Otra línea." },
+        { titulo: "Tercer paso", texto: "Y la última." },
+      ],
+    };
     case "divisor": return { id, tipo };
     case "espaciador": return { id, tipo, alto: 24 };
     // `bg` vacío y no "#ffffff": el renderer cae a `pal.tarjeta`, que en un mail
