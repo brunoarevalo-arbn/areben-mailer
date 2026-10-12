@@ -354,7 +354,7 @@ m3 = open_body("Combinás diseños y modelos. Se aplica solo en el carrito, hast
 m3 += logo() + barra_codigo()
 m3 += row(kicker("Cuantas más llevás") + titulo("", "Una funda para cada outfit.") +
           lead("Hasta el 31/10 las fundas tienen descuento por cantidad: la segunda y la tercera salen más baratas. "
-               "Para cambiarla como cambiás de look, o para regalarle una a tu hermana."), "30px 32px 26px")
+               "Para cambiarla como cambiás de look, o para regalarle una a una amiga."), "30px 32px 26px")
 m3 += foto2(STRIPE3, DUSK3, u("fundas/moods-collection/", "foto"))
 m3 += row(esc, "0")
 m3 += row(button("ARMAR MI COMBO", u("fundas/", "boton")), "26px 32px 0", "text-align:center")

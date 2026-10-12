@@ -235,7 +235,7 @@ export function armarBienvenida5(vieja: { contenido: unknown }): MailNuevo[] {
     barra(),
     volanta('CUANTAS MÁS LLEVÁS'),
     titular('Una funda para cada outfit.'),
-    parrafo('Hasta el 31/10 las fundas tienen descuento por cantidad: la segunda y la tercera salen más baratas. Para cambiarla como cambiás de look, o para regalarle una a tu hermana.'),
+    parrafo('Hasta el 31/10 las fundas tienen descuento por cantidad: la segunda y la tercera salen más baratas. Para cambiarla como cambiás de look, o para regalarle una a una amiga.'),
     dosFotos(STRIPE3, DUSK3, utm('fundas/', 2, 'fotos')),
     banda(CLARITO, MAGENTA, [
       lista('escalones', [
