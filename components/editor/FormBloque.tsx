@@ -697,9 +697,11 @@ export function FormBloque({
             "por-modelo": "Agrupado por modelo de teléfono, con el modelo bien visible.",
             tira: "Tres fotos chicas y «X y n productos más». Acompaña sin ocupar.",
             resumen: "Sin fotos: cantidad, total, envío y cuotas, calculados con su carrito.",
+            tienda: "Como la tienda: foto alta, nombre, variante y precio, y abajo cantidad y total.",
+            galeria: "Hasta tres fotos altas en fila, con nombre, variante y precio debajo.",
           }[b.vista ?? "lista"]}
           onChange={(e) => {
-            const v = e.target.value as "lista" | "por-modelo" | "tira" | "resumen";
+            const v = e.target.value as "lista" | "por-modelo" | "tira" | "resumen" | "tienda" | "galeria";
             set({ vista: v === "lista" ? undefined : v });
           }}
         >
@@ -707,6 +709,8 @@ export function FormBloque({
           <option value="por-modelo">Por modelo</option>
           <option value="tira">Tira</option>
           <option value="resumen">Resumen</option>
+          <option value="tienda">De tienda</option>
+          <option value="galeria">Galería</option>
         </Select>
         <p className="text-sm leading-relaxed text-muted">
           Se completa solo con lo que la persona dejó en el carrito: foto, nombre, variante,

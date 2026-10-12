@@ -105,6 +105,8 @@ node --import tsx scripts/probar-secuencia-4.ts # carrito de 4 mails: el mail PE
 node --env-file=.env --import tsx scripts/ensayo-secuencia.ts --nueva # los 4 mails de «Carrito v2» dibujados con un carrito real ANTES de crearlos
 node --import tsx scripts/probar-carrito-b.ts   # «Carrito v2 · B»: subtotal de TODAS las líneas (no el `total` de TN), los `${cart.…}` calculados que se caen sin dato, la franja con bloques (y su cupón), el botón doble y el cupón con filete
 node --env-file=.env --import tsx scripts/ensayo-secuencia.ts --b # la B dibujada con el carrito real más grande y con uno que NO llega al envío gratis
+node --import tsx scripts/probar-carrito-zattia.ts # carrito de Zattia: `${cart.retiro}` sólo para quien retira (⛔ nunca «te faltan»), la garantía que cambia a RETIRO, y las vistas `tienda` y `galeria` (foto 4:5, no se apilan)
+node --env-file=.env --import tsx scripts/ensayo-carrito-zattia.ts # los 2 mails del carrito de Zattia con carritos REALES (una prenda a domicilio, tres que retiran)
 RESENA_SECRET=vector-fijo-de-ensayo node --import tsx scripts/probar-resena-token.ts # el link de las estrellas no se puede editar (vector fijo, espejado en areben-popups)
 node --import tsx scripts/probar-guardado.ts    # el veredicto distingue "te lo pisaron" de "lo borraron", y guardar dos veces seguidas no choca contra uno mismo
 node --import tsx scripts/auditar-guardado.ts   # las DOS mitades del conflicto: el servidor se niega, y ningún llamador tira el resultado

@@ -63,7 +63,8 @@ export function resolverTagsCarrito(
 // ── Los tags CALCULADOS del carrito (11-oct-2026, «Carrito v2 · B») ─────────
 //
 // `${cart.total}` · `${cart.cantidad}` · `${cart.cuotas}` · `${cart.envio}` ·
-// `${cart.envioCorto}` · `${cart.modelos}` · `${cart.lineas}`.
+// `${cart.envioCorto}` · `${cart.modelos}` · `${cart.lineas}` ·
+// `${cart.retiro}` · `${cart.entrega}` · `${cart.entregaDetalle}` (Zattia, 12-oct).
 //
 // 🔑 **Se resuelven en el DOCUMENTO, antes de dibujar**, con el mismo recorrido
 // que `${tienda.…}` (`resolverTagsEnDoc`), y no sobre el HTML como `${cart.url}`.
@@ -126,6 +127,16 @@ export function valoresCarrito(d: DatosCarrito): Record<string, string | undefin
       : falta <= 0 ? "Tu pedido ya tiene envío gratis" : `Te faltan ${plata(falta)} para el envío gratis`),
     envioCorto: d.retiroEnLocal ? `En el local${plazo ? `, en ${plazo}` : ""}`
       : falta === null ? undefined : falta <= 0 ? "Gratis" : `Te faltan ${plata(falta)}`,
+    // 🔑 Los tres de Zattia (12-oct-2026). Ahí el envío ⛔ se nombra por el
+    // carrito —con un carrito mediano de $26.990 contra un umbral de $150.000,
+    // «te faltan $X» le diría a casi todos que le falta mucho (Bruno: nunca)—:
+    // `retiro` sólo habla para quien eligió retirar, y `entrega`/`entregaDetalle`
+    // son la tercera celda de las garantías, que cambia de «ENVÍO GRATIS» a «RETIRO».
+    retiro: retiro ?? undefined,
+    entrega: d.retiroEnLocal ? "Retiro" : umbral !== null ? "Envío gratis" : undefined,
+    entregaDetalle: d.retiroEnLocal
+      ? `en el local${d.tienda?.local?.trim() ? `, ${d.tienda.local.trim()}` : ""}`
+      : umbral !== null && d.tienda?.envioGratis?.trim() ? `desde ${d.tienda.envioGratis.trim()}` : undefined,
     modelos: modelos.length ? enumerar(modelos) : undefined,
     lineas: productos.length
       ? productos.map((p) => `${legible(p.nombre)}${modeloDe(p) ? ` — ${modeloDe(p)}` : ""}`).join("\n")
@@ -169,6 +180,15 @@ export function filasResumen(d: DatosCarrito): FilaTotal[] {
 }
 
 /**
+ * El renglón de abajo de la vista `tienda` (Zattia, 12-oct-2026): «3 PRODUCTOS ·
+ * $26.670». Sólo eso: el envío, si corresponde, lo dice el mail con `${cart.retiro}`.
+ */
+export function filasTienda(d: DatosCarrito): FilaTotal[] {
+  const v = valoresCarrito(d);
+  return v.cantidad ? [{ etiqueta: v.cantidad, monto: v.total ?? "", fuerte: true }] : [];
+}
+
+/**
  * Lo último que se le hace al documento de un mail de carrito antes de dibujarlo:
  * los renglones de la vista `resumen` y los tags calculados. 🔑 Una sola función
  * para las tres puertas —el procesador, «Mandar una prueba» y el ensayo— porque
@@ -177,7 +197,9 @@ export function filasResumen(d: DatosCarrito): FilaTotal[] {
  */
 export function prepararCarrito(bloques: Bloque[], d: DatosCarrito): Bloque[] {
   const filas = filasResumen(d);
+  const pie = filasTienda(d);
   const conResumen = mapearBloques(bloques, (b) =>
-    b.tipo === "carrito" && b.vista === "resumen" ? { ...b, totales: filas } : b);
+    b.tipo === "carrito" && b.vista === "resumen" ? { ...b, totales: filas }
+      : b.tipo === "carrito" && b.vista === "tienda" ? { ...b, totales: pie } : b);
   return resolverCarritoEnDoc(conResumen, d);
 }

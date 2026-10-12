@@ -786,6 +786,62 @@ function renderTira(items: ProductoEmail[], restantes: number, pal: Paleta, e: E
   return `<a href="\${cart.url}" style="display:block;text-decoration:none;${margen(e.caja, 8, 16)}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${caja}"><tr><td bgcolor="${caja}" style="padding:12px 14px;background:${caja}"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${fotos}<td valign="middle" style="padding:0 0 0 6px"><div style="font-size:10px;letter-spacing:2px;color:${suave}">TU CARRITO</div><div style="font-size:14px;line-height:1.4;color:${tinta};margin-top:2px">${nombre}</div></td></tr></table></td></tr></table></a>`;
 }
 
+// ── El carrito «de tienda» (12-oct-2026, Zattia) ──────────────────────────
+// La foto ALTA (4:5, como la ficha de la tienda) y sin esquinas de fábrica: en
+// ropa la prenda se mira puesta. ⛔ Sin `m-col` en ninguna de las dos: apilar
+// una fila de carrito la parte en tres renglones por prenda.
+
+// ⚠️ Medidas FIJAS, nunca `height:auto`: con alto automático cada foto trae su
+// proporción de TN y la fila sale despareja (medido en el ensayo del 12-oct).
+const fotoAlta = (p: ProductoEmail, ancho: number, alto: number, radio: number) =>
+  p.imagen
+    ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="${ancho}" height="${alto}" style="width:${px(ancho)};height:${px(alto)};object-fit:cover;border-radius:${px(radio)};display:block;background:#f3f3f3;border:0" />`
+    : "";
+
+/** Nombre, variante y precio, uno debajo del otro. */
+const fichaApilada = (p: ProductoEmail, e: EstProducto, tamano: number) =>
+  `<div style="font-size:${px(e.nombre.tamano ?? tamano)};line-height:1.35;color:${e.nombre.color};font-weight:${e.nombre.peso ?? 400}${extra(e.nombre, ["tamano", "interlinea", "color", "peso", "align"])}">${esc(p.nombre)}</div>` +
+  detalleHtml(p, e.nota) +
+  `<div style="margin-top:6px;font-size:${px(e.precio.tamano ?? tamano)}">${precioHtml(p, e.precio, e.nota)}</div>`;
+
+const conLinkA = (p: ProductoEmail, dentro: string) =>
+  p.url ? `<a href="${esc(p.url)}" style="text-decoration:none;color:inherit">${dentro}</a>` : dentro;
+
+/**
+ * Una fila por prenda y, abajo, «3 PRODUCTOS ····· $26.670» con un filete del
+ * color del TEXTO (no del borde: es el cierre, como el total de un ticket). El
+ * renglón lo arma `filasTienda` en el procesador; sin él, el carrito sale sin pie.
+ */
+function renderCarritoTienda(items: ProductoEmail[], restantes: number, pie: FilaTotal[], pal: Paleta, e: EstProducto): string {
+  const radio = e.img.radio ?? 0;
+  const filas = items.map((p, i) => `<tr>
+    <td width="96" valign="top" style="${i ? `border-top:1px solid ${pal.borde};` : ""}padding:14px 0;width:96px">${conLinkA(p, fotoAlta(p, 96, 120, radio))}</td>
+    <td valign="middle" style="${i ? `border-top:1px solid ${pal.borde};` : ""}padding:14px 0 14px 16px">${conLinkA(p, fichaApilada(p, e, 13))}</td>
+  </tr>`).join("");
+  const cierre = pie.map((f) => `<tr><td colspan="2" style="border-top:1px solid ${pal.texto};padding:12px 0 0">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="font-size:11px;font-weight:700;letter-spacing:2px;color:${e.nombre.color}">${esc(f.etiqueta.toUpperCase())}</td>
+      <td align="right" style="font-size:15px;font-weight:700;color:${e.nombre.color};white-space:nowrap">${esc(f.monto)}</td>
+    </tr></table>
+  </td></tr>`).join("");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${margen(e.caja, 8, 16)}">${filas}${cierre}</table>${masProductos(restantes, pal)}`;
+}
+
+/**
+ * Hasta tres fotos altas en fila, cada una con su ficha debajo. 100 × 125 (4:5):
+ * 3 × 100 + 2 × 12 de aire = 324 px, que entran en los ~343 útiles de un celular
+ * de 375 sin apilarse.
+ */
+function renderGaleria(items: ProductoEmail[], restantes: number, pal: Paleta, e: EstProducto): string {
+  const radio = e.img.radio ?? 0;
+  const vistos = items.slice(0, 3);
+  const celdas = vistos.map((p, i) =>
+    `<td width="33%" valign="top" style="width:33%;padding:0 ${i < 2 ? 12 : 0}px 0 0">${conLinkA(p, `${fotoAlta(p, 100, 125, radio)}<div style="margin-top:10px">${fichaApilada(p, e, 11)}</div>`)}</td>`);
+  while (celdas.length < 3) celdas.push(`<td width="33%" style="width:33%">&nbsp;</td>`);
+  const mas = items.length - vistos.length + Math.max(0, restantes);
+  return `<div style="${margen(e.caja, 8, 16)}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${celdas.join("")}</tr></table>${masProductos(mas, pal)}</div>`;
+}
+
 /** Los renglones de la vista `resumen`: etiqueta a la izquierda, monto a la derecha. */
 function renderResumen(filas: FilaTotal[], pal: Paleta, e: EstProducto): string {
   const html = filas
@@ -1351,6 +1407,8 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // `pad` vacío): así un carrito vacío sale byte por byte como salía.
       if (items.length && b.vista === "por-modelo") return pad(renderPorModelo(items, rest, pal, ep), caja());
       if (items.length && b.vista === "tira") return pad(renderTira(items, rest, pal, ep), caja());
+      if (items.length && b.vista === "tienda") return pad(renderCarritoTienda(items, rest, b.totales ?? [], pal, ep), caja());
+      if (items.length && b.vista === "galeria") return pad(renderGaleria(items, rest, pal, ep), caja());
       return pad(
         renderCarrito(
           items,
@@ -2543,8 +2601,8 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       if (!lineas.length) return null;
       const r = b.restantes ?? 0;
       if (r > 0) lineas.push(`y ${r} producto${r === 1 ? "" : "s"} más: \${cart.url}`);
-      if (b.modo === "ticket") {
-        const cuentas = (b.totales ?? []).map((t) => `${t.etiqueta}: ${t.monto}`);
+      if (b.modo === "ticket" || b.vista === "tienda") {
+        const cuentas = (b.totales ?? []).map((t) => `${t.etiqueta}${t.monto ? `: ${t.monto}` : ""}`);
         if (cuentas.length) lineas.push("", ...cuentas);
         if (b.pie?.length) lineas.push("", ...b.pie);
       }

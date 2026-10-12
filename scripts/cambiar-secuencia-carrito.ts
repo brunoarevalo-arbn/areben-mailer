@@ -5,6 +5,12 @@
 //   node --env-file=.env --import tsx scripts/cambiar-secuencia-carrito.ts --escribir
 //   node --env-file=.env --import tsx scripts/cambiar-secuencia-carrito.ts --volver --escribir   # deshace
 //
+// ZATTIA (12-oct-2026): `--cuenta=zattia` prende los DOS de «Carrito Z»
+// (`crear-carrito-zattia.ts`). Ahí la vieja ya estaba PAUSADA y nunca mandó nada,
+// así que `--volver` sólo pausa los dos nuevos: ⛔ no revive la vieja.
+// 🔴 Antes de prender: apagar el mail de carrito de Tienda Nube en el admin de
+// Zattia, o cada carrito recibe dos mails de dos remitentes.
+//
 // ⚠️ Lo que pasa con los carritos que están A MITAD de la secuencia vieja: sus
 // runs pendientes salen SALTADOS (el procesador saltea todo run de una
 // automation pausada) y la secuencia nueva no los toma — los runs nacen cuando
@@ -15,11 +21,18 @@
 // registrar (el detector es un poller que mira el `estado`).
 import { prisma } from '../lib/prisma.ts';
 import { PREFIJO } from './secuencia-carrito-4.ts';
+import { PREFIJO_CARRITO_ZATTIA } from './secuencia-carrito-zattia.ts';
 
 const slug = process.argv.find((a) => a.startsWith('--cuenta='))?.split('=')[1] ?? 'bdi';
 const escribir = process.argv.includes('--escribir');
 const volver = process.argv.includes('--volver');
 const PCT_CONTROL = 10;
+const SERIES: Record<string, { prefijo: string; cuantas: number; crear: string; reviveVieja: boolean }> = {
+  bdi: { prefijo: PREFIJO, cuantas: 4, crear: 'crear-secuencia-carrito-4.ts', reviveVieja: true },
+  zattia: { prefijo: PREFIJO_CARRITO_ZATTIA, cuantas: 2, crear: 'crear-carrito-zattia.ts', reviveVieja: false },
+};
+const serie = SERIES[slug];
+if (!serie) throw new Error(`no hay secuencia de carrito para «${slug}»`);
 
 async function main() {
   const cuenta = await prisma.cuenta.findFirst({ where: { slug } });
@@ -28,18 +41,18 @@ async function main() {
     where: { cuentaId: cuenta.id, trigger: 'CARRITO_ABANDONADO' },
     orderBy: { esperaHoras: 'asc' },
   });
-  const nuevas = todas.filter((a) => a.nombre.startsWith(PREFIJO));
-  const viejas = todas.filter((a) => !a.nombre.startsWith(PREFIJO));
-  if (nuevas.length !== 4) throw new Error(`hay ${nuevas.length} de «${PREFIJO}», se esperan 4: corré crear-secuencia-carrito-4.ts`);
+  const nuevas = todas.filter((a) => a.nombre.startsWith(serie.prefijo));
+  const viejas = todas.filter((a) => !a.nombre.startsWith(serie.prefijo));
+  if (nuevas.length !== serie.cuantas) throw new Error(`hay ${nuevas.length} de «${serie.prefijo}», se esperan ${serie.cuantas}: corré ${serie.crear}`);
 
-  const [prender, pausar] = volver ? [viejas, nuevas] : [nuevas, viejas];
+  const [prender, pausar] = volver ? [serie.reviveVieja ? viejas : [], nuevas] : [nuevas, viejas];
   const pendientes = await prisma.automationRun.count({
     where: { estado: 'PENDIENTE', automationId: { in: pausar.map((a) => a.id) } },
   });
   const config = (cuenta.config ?? {}) as Record<string, unknown>;
   const pct = volver ? 0 : PCT_CONTROL;
 
-  console.log(`▶ ${cuenta.nombre}${volver ? ' — VOLVER a la secuencia de 3' : ''}`);
+  console.log(`▶ ${cuenta.nombre}${volver ? (serie.reviveVieja ? ' — VOLVER a la secuencia de 3' : ' — APAGAR el carrito') : ''}`);
   for (const a of prender) console.log(`   ▶ prender  ${a.nombre} (${a.esperaHoras} h) [hoy ${a.estado}]`);
   for (const a of pausar) console.log(`   ⏸ pausar   ${a.nombre} (${a.esperaHoras} h) [hoy ${a.estado}]`);
   console.log(`   grupo de control: ${config.carritoControlPct ?? 0}% → ${pct}%`);

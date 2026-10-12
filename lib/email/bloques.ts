@@ -690,8 +690,14 @@ export type Bloque = BloqueBase &
          *    acompaña y no es el protagonista;
          *  - `resumen`: sin fotos, los renglones de `totales` (los arma el
          *    procesador con `filasResumen`: cantidad, total, envío, cuotas).
+         * Y el 12-oct-2026, con el carrito de Zattia («de tienda», como la ficha de TN):
+         *  - `tienda`: una fila por prenda —foto 4:5, nombre, variante y precio
+         *    apilados— y abajo «3 PRODUCTOS · $26.670» con su filete (`filasTienda`);
+         *  - `galeria`: hasta tres fotos 4:5 en fila con nombre, variante y precio
+         *    debajo de cada una, y «+ n productos más».
+         * ⛔ Ninguna de las dos se apila en el celular.
          */
-        vista?: "lista" | "por-modelo" | "tira" | "resumen";
+        vista?: "lista" | "por-modelo" | "tira" | "resumen" | "tienda" | "galeria";
         /**
          * Sólo en el modo `"ticket"`: los renglones de plata debajo de las
          * prendas —subtotal, descuento de la cuenta, redondeo, TOTAL, con qué

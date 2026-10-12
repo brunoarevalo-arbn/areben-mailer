@@ -39,21 +39,22 @@ import type { MailNuevo } from './secuencia-bienvenida-5.ts';
 
 export const PREFIJO_ZATTIA = 'Bienvenida Z';
 
-const NEGRO = '#000000';
-const BLANCO = '#ffffff';
-const GRIS = '#f3f3f3';
-const FILETE = '#e5e5e5';
+// Exportadas: el carrito de Zattia (`secuencia-carrito-zattia.ts`) es de la MISMA familia.
+export const NEGRO = '#000000';
+export const BLANCO = '#ffffff';
+export const GRIS = '#f3f3f3';
+export const FILETE = '#e5e5e5';
 
 /** Blanco y negro, Arial (Public Sans no está en los teléfonos: la regla es el PESO). */
-const TEMA: Tema = { base: 'claro', fondo: BLANCO, fondoContenido: BLANCO, acento: NEGRO, fuente: 'sistema' };
+export const TEMA: Tema = { base: 'claro', fondo: BLANCO, fondoContenido: BLANCO, acento: NEGRO, fuente: 'sistema' };
 
-const TIENDA = 'https://zattia.com.ar';
-const WHATSAPP = 'https://wa.me/5493416135024';
+export const TIENDA = 'https://zattia.com.ar';
+export const WHATSAPP = 'https://wa.me/5493416135024';
 const utm = (ruta: string, dia: number, donde = 'cuerpo') =>
   `${TIENDA}/${ruta}?utm_source=mailer&utm_medium=email&utm_campaign=bienvenida-zattia-d${dia}&utm_content=${donde}`;
 
 /** Las categorías de TN (IDs y rutas medidos el 12-oct-2026, después del reordenamiento del 23-sep). */
-const CAT = {
+export const CAT = {
   newIn: { id: '26928851', ruta: 'new-in/' },
   tops: { id: '29904416', ruta: 'top-y-bodies/' },
   blusas: { id: '39694912', ruta: 'blusas/' },
@@ -65,18 +66,18 @@ const CAT = {
 // ── Las piezas ────────────────────────────────────────────────────────────────
 
 /** Rótulo chico en mayúsculas, a 700 y separado: «ZATTIA SQUAD». */
-const volanta = (texto: string, color = '$medio', padX?: number): Bloque => ({
+export const volanta = (texto: string, color = '$medio', padX?: number): Bloque => ({
   id: nuevoId(), tipo: 'titulo', align: 'left', texto,
   estilo: { titulo: { tamano: 10, peso: 700, espaciado: 2, color }, caja: { padArriba: 20, padAbajo: 0, ...(padX === undefined ? {} : { padX }) } },
 } as Bloque);
 
 /** El título: MAYÚSCULAS a peso REGULAR, a 20 px (con el tamaño elegido, el celular no lo agranda). */
-const titular = (texto: string | Trozo[]): Bloque => ({
+export const titular = (texto: string | Trozo[]): Bloque => ({
   id: nuevoId(), tipo: 'titulo', align: 'left', texto,
   estilo: { titulo: { tamano: 20, peso: 400, espaciado: 2, interlinea: 1.2, mayusculas: true }, caja: { padArriba: 6, padAbajo: 0 } },
 } as Bloque);
 
-const parrafo = (texto: string | Trozo[], extra: { align?: 'left' | 'center'; tamano?: number; color?: string; padX?: number } = {}): Bloque => ({
+export const parrafo = (texto: string | Trozo[], extra: { align?: 'left' | 'center'; tamano?: number; color?: string; padX?: number } = {}): Bloque => ({
   id: nuevoId(), tipo: 'texto', align: extra.align ?? 'left', texto,
   estilo: {
     cuerpo: { tamano: extra.tamano ?? 15, interlinea: 1.5, ...(extra.color ? { color: extra.color } : {}) },
@@ -85,25 +86,25 @@ const parrafo = (texto: string | Trozo[], extra: { align?: 'left' | 'center'; ta
 } as Bloque);
 
 /** El botón de la tienda: negro, radio 4, en mayúsculas. */
-const boton = (texto: string, url: string): Bloque => ({
+export const boton = (texto: string, url: string): Bloque => ({
   id: nuevoId(), tipo: 'boton', texto, url, align: 'center', full: false,
   estilo: { boton: { tamano: 13, peso: 700, espaciado: 2, radio: 4, padY: 15, padX: 30 }, caja: { padArriba: 18, padAbajo: 6 } },
 } as Bloque);
 
 /** El rótulo de sección con su link a la derecha: «PARA EMPEZAR ······ TODO NEW IN →». */
-const rotulo = (texto: string, link: string, url: string): Bloque => ({
+export const rotulo = (texto: string, link: string, url: string): Bloque => ({
   id: nuevoId(), tipo: 'titulo', align: 'left', texto, link: { texto: link, url },
   estilo: { titulo: { tamano: 13, peso: 400, espaciado: 2, mayusculas: true }, caja: { padArriba: 26, padAbajo: 4 } },
 } as Bloque);
 
 /** Un filete gris de 1 px (el del menú, a 16 px del borde, y el de la fila de servicio). */
-const filete = (padX = 16): Bloque => ({
+export const filete = (padX = 16): Bloque => ({
   id: nuevoId(), tipo: 'divisor',
   estilo: { caja: { bordeColor: FILETE, padArriba: 0, padAbajo: 0, padX } },
 } as Bloque);
 
 /** La tarjeta de producto de la tienda: nombre en MAYÚSCULAS a 400, precio en negrita, foto sin esquinas. */
-const ESTILO_GRILLA: Estilos = {
+export const ESTILO_GRILLA: Estilos = {
   cuerpo: { tamano: 11, espaciado: 1, mayusculas: true, peso: 400 },
   precio: { tamano: 12, peso: 700 },
   imagen: { radio: 0 },
@@ -111,7 +112,7 @@ const ESTILO_GRILLA: Estilos = {
 };
 
 /** Cuatro prendas: en fila en la compu, 2×2 en el celular. Siempre cruzadas con NEW IN. */
-const grilla = (fuente: 'destacados' | 'categoria', extra: { categoriaId?: string; saltear?: number } = {}): Bloque => ({
+export const grilla = (fuente: 'destacados' | 'categoria', extra: { categoriaId?: string; saltear?: number } = {}): Bloque => ({
   id: nuevoId(), tipo: 'productos-dinamicos', fuente, n: 4, porFila: 4, dosPorDos: true,
   ...(fuente === 'categoria' ? { categoriaId: CAT.newIn.id, tambienEn: extra.categoriaId } : { tambienEn: CAT.newIn.id }),
   ...(extra.saltear ? { saltear: extra.saltear } : {}),
@@ -133,46 +134,53 @@ const cuponGris = (): Bloque => ({
   estilo: { caja: { fondo: GRIS, padArriba: 4 } },
 } as Bloque);
 
-const banda = (fondo: string, acento: string, margen: number, bloques: Bloque[]): Bloque => ({
+export const banda = (fondo: string, acento: string, margen: number, bloques: Bloque[]): Bloque => ({
   id: nuevoId(), tipo: 'banda', fondo, acento, margen, bloques,
 } as unknown as Bloque);
+
+/**
+ * La cabecera «de tienda»: la franja de datos, el logo chico y el menú entre dos
+ * filetes. `enc` es el encabezado clonado de un mail de Zattia (el logo de la
+ * tienda); `link` arma la URL de cada categoría del menú con SU utm.
+ */
+export const cabeceraZattia = (enc: Bloque, link: (ruta: string) => string): Bloque[] => [
+  {
+    ...structuredClone(enc), id: nuevoId(), linea: false, logoAncho: 44,
+    barra: 'Envío gratis desde ${tienda.envioGratis} · Despacho en ${tienda.plazoDespacho}',
+    estilo: { caja: { padArriba: 0, padAbajo: 14 } },
+  } as Bloque,
+  filete(),
+  {
+    id: nuevoId(), tipo: 'menu',
+    links: [['NEW IN', CAT.newIn.ruta], ['TOPS', CAT.tops.ruta], ['BLUSAS', CAT.blusas.ruta], ['VESTIDOS', CAT.vestidos.ruta], ['DENIM', CAT.denim.ruta]]
+      .map(([texto, ruta]) => ({ texto, url: link(ruta) })),
+    estilo: { cuerpo: { tamano: 11, peso: 700, espaciado: 2 }, caja: { padArriba: 8, padAbajo: 8 } },
+  } as Bloque,
+  filete(),
+];
+
+/** El pie de marca: 🤍 y las redes en TEXTO (los iconos eran lo único con color de la marca). */
+export const pieZattia = (): Bloque[] => [
+  { id: nuevoId(), tipo: 'espaciador', alto: 16 } as Bloque,
+  parrafo('🤍', { align: 'center', tamano: 18 }),
+  {
+    id: nuevoId(), tipo: 'redes', iconos: 'texto',
+    links: [
+      { red: 'Instagram', url: 'https://instagram.com/zattia_co' },
+      { red: 'TikTok', url: 'https://www.tiktok.com/@zattia' },
+      { red: 'WhatsApp', url: WHATSAPP },
+    ],
+    estilo: { cuerpo: { tamano: 10, peso: 700, espaciado: 2, mayusculas: true, color: NEGRO }, caja: { padArriba: 0, padAbajo: 4 } },
+  } as unknown as Bloque,
+];
 
 export function armarBienvenidaZattia(vieja: { contenido: unknown }): MailNuevo[] {
   const base = leerContenido(vieja.contenido);
   const enc = base.bloques.find((x) => x.tipo === 'encabezado');
   if (!enc) throw new Error('falta el encabezado en la bienvenida vieja de Zattia');
 
-  /** La cabecera «de tienda»: la franja de datos, el logo chico y el menú entre dos filetes. */
-  const cabecera = (dia: number): Bloque[] => [
-    {
-      ...structuredClone(enc), id: nuevoId(), linea: false, logoAncho: 44,
-      barra: 'Envío gratis desde ${tienda.envioGratis} · Despacho en ${tienda.plazoDespacho}',
-      estilo: { caja: { padArriba: 0, padAbajo: 14 } },
-    } as Bloque,
-    filete(),
-    {
-      id: nuevoId(), tipo: 'menu',
-      links: [['NEW IN', CAT.newIn.ruta], ['TOPS', CAT.tops.ruta], ['BLUSAS', CAT.blusas.ruta], ['VESTIDOS', CAT.vestidos.ruta], ['DENIM', CAT.denim.ruta]]
-        .map(([texto, ruta]) => ({ texto, url: utm(ruta, dia, 'menu') })),
-      estilo: { cuerpo: { tamano: 11, peso: 700, espaciado: 2 }, caja: { padArriba: 8, padAbajo: 8 } },
-    } as Bloque,
-    filete(),
-  ];
-
-  /** El pie de marca: 🤍 y las redes en TEXTO (los iconos eran lo único con color de la marca). */
-  const pie = (): Bloque[] => [
-    { id: nuevoId(), tipo: 'espaciador', alto: 16 } as Bloque,
-    parrafo('🤍', { align: 'center', tamano: 18 }),
-    {
-      id: nuevoId(), tipo: 'redes', iconos: 'texto',
-      links: [
-        { red: 'Instagram', url: 'https://instagram.com/zattia_co' },
-        { red: 'TikTok', url: 'https://www.tiktok.com/@zattia' },
-        { red: 'WhatsApp', url: WHATSAPP },
-      ],
-      estilo: { cuerpo: { tamano: 10, peso: 700, espaciado: 2, mayusculas: true, color: NEGRO }, caja: { padArriba: 0, padAbajo: 4 } },
-    } as unknown as Bloque,
-  ];
+  const cabecera = (dia: number): Bloque[] => cabeceraZattia(enc, (ruta) => utm(ruta, dia, 'menu'));
+  const pie = pieZattia;
 
   const doc = (bloques: Bloque[]): ContenidoCampania => leerContenido({ v: V_ACTUAL, bloques, tema: TEMA });
 
