@@ -79,4 +79,5 @@ primera versión con los bloques de hoy) · prender: `cambiar-bienvenida.ts` · 
   pasos numerados · título con dos tipografías · baldosa para recortes sobre blanco · pie de marca compartido
 
 **Fuera del motor (manos de Bruno):** dos opiniones de Google más (hoy hay 2 textuales: Tiara B. y
-Thiago A.) · la foto del local sin el texto metido en la imagen · el horario del local como dato de la tienda.
+Thiago A.) · el horario del local como dato de la tienda (hoy va escrito a mano en el 4/5).
+✅ La foto del local sin el texto: recortada de la captura vieja el 12-oct (`local-bdi-rosario-….jpg` en Blob).

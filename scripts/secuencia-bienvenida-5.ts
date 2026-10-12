@@ -72,6 +72,9 @@ const AQUA: Foto = [FOTO('aqua-gem-d7b139db888b12329e17895837341091'), 'Aqua Cas
 const NIGHT: Foto = [FOTO('gemini_generated_image_rc5bo2rc5bo2rc5b-592a4145ce2db0a49f17895828328401'), 'Night y Mocca Heart Case bajo una campana de plata'];
 const STRIPECUP: Foto = [FOTO('stripe-gem-3018b5123ec1f2255817895842372115'), 'Stripe Case apoyada en una taza naranja'];
 
+/** El local de Rosario, recortado SIN el texto que traía adentro (12-oct-2026). */
+const LOCAL = 'https://80wkelaj24ephh6z.public.blob.vercel-storage.com/mail/cmrw7cxd70000fowas0vhhssy/local-bdi-rosario-g05rqKSDhifOrJcK8Xd8ord8gyMCJs.jpg';
+
 /** La categoría de la Moods Collection en TN (de ahí salen los productos del 3/5). */
 const CAT_MOODS = '40994831';
 
@@ -282,7 +285,25 @@ export function armarBienvenida5(vieja: { contenido: unknown }): MailNuevo[] {
       ]),
     ]),
     boton('VER LOS MÁS VENDIDOS', utm('', 4, 'boton')),
-    parrafo([{ t: 'Y si estás en Rosario, venite. ', peso: 700 }, { t: 'Estamos en ${tienda.local}: ves todas las fundas en la mano antes de elegir.' }], { tamano: 14 }),
+    // El local: la foto al lado del texto, como en el diseño. 🔑 La foto es un
+    // RECORTE de la que ya se usaba (`Captura-de-pantalla-2026-08-24…png`), que
+    // traía el título, la dirección y los horarios DIBUJADOS adentro del PNG: con
+    // las imágenes apagadas no decía nada. Acá va sólo el local y el texto es texto.
+    // ⚠️ El horario va escrito a mano (no es un dato de la tienda todavía, ver el
+    // LEEME): si cambia, cambiarlo acá.
+    {
+      id: nuevoId(), tipo: 'columnas', variante: 'imagen-texto', proporcion: 40, movil: 'fila', pegadas: 20,
+      celdas: [
+        { imagen: LOCAL, url: 'https://maps.google.com/?q=Santa+Fe+1671,+Rosario', titulo: '', texto: '' },
+        { imagen: '', url: '', titulo: 'Venite al local.', texto: '**${tienda.local}**, Rosario.\nLunes a viernes de 10 a 19 h, sábados de 10 a 13 h. Ves todas las fundas en la mano antes de elegir.' },
+      ],
+      estilo: {
+        imagen: { radio: 0 },
+        titulo: { tamano: 22, peso: 800, italica: true, espaciado: -1 },
+        cuerpo: { tamano: 14, interlinea: 1.5 },
+        caja: { padArriba: 28 },
+      },
+    } as unknown as Bloque,
     ...pie(4),
   ];
 
