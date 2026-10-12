@@ -1,4 +1,5 @@
 import { leerConfigCuenta } from "./marca";
+import { diaALaHora } from "./fechas";
 
 // ⚠️ `NUEVO_SUSCRIPTOR` es el único que NO tiene evento de Tiendanube detrás
 // (ver `TRIGGER_EVENT` en `lib/tn/eventos.ts`): lo encola quien captura el lead
@@ -91,7 +92,13 @@ export function automationDelTrigger<T extends { id: string; trigger: string; cr
  */
 export const MAX_POR_TRIGGER: Record<Trigger, number> = {
   NUEVO_CLIENTE: 1,
-  NUEVO_SUSCRIPTOR: 1,
+  // 🔑 Desde el 11-oct-2026 la bienvenida del pop-up es una SECUENCIA de cinco
+  // (D0 · D1 · D2 · D4 · D6, el molde de Burga: `docs/disenio/bienvenida-bdi`).
+  // Sigue siendo una sola vez en la vida del contacto — lo que se repite son
+  // cinco mails distintos, cada uno con su run, no el mismo dos veces. Lo que
+  // la hace tolerable es el corte (`cortaSiCompro`): al que compra no le llega
+  // el resto.
+  NUEVO_SUSCRIPTOR: 5,
   COMPRA: 1,
   CARRITO_ABANDONADO: 3,
   RESENA: 1,
@@ -130,7 +137,9 @@ export function puedeCrearOtra(existentes: { trigger: string }[], trigger: Trigg
  */
 export const ESPERAS_SIGUIENTES: Record<Trigger, readonly number[]> = {
   NUEVO_CLIENTE: [],
-  NUEVO_SUSCRIPTOR: [],
+  // Día 1 · 2 · 4 · 6. ⚠️ Con `HORA_FIJA` estas horas se leen como DÍAS
+  // (24 = «al día siguiente»), no como horas exactas: ver `cuandoSale`.
+  NUEVO_SUSCRIPTOR: [24, 48, 96, 144],
   COMPRA: [],
   // 3 h (el preset) → 24 h → 72 h. El 3º es el del cupón: se espera tres días
   // porque es el último toque y el que trae el premio.
@@ -138,6 +147,88 @@ export const ESPERAS_SIGUIENTES: Record<Trigger, readonly number[]> = {
   RESENA: [],
   TICKET: [],
 };
+
+/**
+ * A qué hora del negocio salen los mails de secuencia de cada trigger.
+ * `null` = salen a las `esperaHoras` exactas desde el disparo, como siempre.
+ *
+ * 🔑 Con hora, un mail cuya espera es de 24 h o más sale el día
+ * `round(esperaHoras / 24)` después del alta, **a esa hora** (`cuandoSale`).
+ * La bienvenida de BDI va a las 11: medido el 11-oct-2026, el 94% de los
+ * canjes del raspa pasa en 72 h, y un mail que llega a las 3 de la mañana
+ * porque el lead se anotó a esa hora es uno que se lee al fondo de la bandeja.
+ *
+ * ⚠️ Las esperas de menos de 24 h no se tocan: el mail del instante (el del
+ * código) tiene que salir al instante, y es el único de la secuencia que no es
+ * «de un día». Por eso las bienvenidas de hoy (espera 0) siguen igual.
+ *
+ * 📌 Los runs de la bienvenida los inserta Resorty (`areben-popups`,
+ * `dispararBienvenida`) con `alta + esperaHoras`, y no sabe nada de esto: los
+ * corrige el procesador al verlos nacer (`lib/email/secuencia.ts`). Así la regla
+ * vive en un solo repo.
+ */
+export const HORA_FIJA: Record<Trigger, string | null> = {
+  NUEVO_CLIENTE: null,
+  NUEVO_SUSCRIPTOR: "11:00",
+  COMPRA: null,
+  CARRITO_ABANDONADO: null,
+  RESENA: null,
+  TICKET: null,
+};
+
+/**
+ * ¿Este mail se programa por día y hora en vez de por horas?
+ * Es lo que decide si `cuandoSale` corre el `proximoAt` que trae el run.
+ */
+export const vaAHoraFija = (trigger: Trigger, esperaHoras: number): boolean =>
+  HORA_FIJA[trigger] != null && esperaHoras >= 24;
+
+/**
+ * Cuándo sale un mail: `esperaHoras` desde el disparo, o —si el trigger tiene
+ * hora fija y la espera es de un día o más— ese día a esa hora.
+ * `(alta lunes 23:50, 24 h, NUEVO_SUSCRIPTOR)` → martes 11:00.
+ */
+export function cuandoSale(trigger: Trigger, esperaHoras: number, desde: Date): Date {
+  const hora = HORA_FIJA[trigger];
+  if (hora == null || esperaHoras < 24) return new Date(desde.getTime() + esperaHoras * 3_600_000);
+  return diaALaHora(desde, Math.round(esperaHoras / 24), hora);
+}
+
+/**
+ * La espera como la tiene que leer quien mira `/automations`.
+ *
+ * 🔴 Con hora fija, «espera 24h» MENTIRÍA: el mail sale al día siguiente a las
+ * 11, que para un lead de las 23 h son 12 horas. Una pantalla que no pregunta
+ * igual afirma.
+ */
+export function esperaEnPalabras(trigger: Trigger, esperaHoras: number): string {
+  if (!vaAHoraFija(trigger, esperaHoras)) return `espera ${esperaHoras}h`;
+  const dias = Math.round(esperaHoras / 24);
+  return `día ${dias} a las ${HORA_FIJA[trigger]}`;
+}
+
+/**
+ * ¿Este contacto cae en el GRUPO DE CONTROL de la bienvenida?
+ *
+ * El mismo mecanismo que `grupoDeCarrito` (`lib/carritos.ts`) con una
+ * diferencia que importa: acá es por PERSONA, no por evento. Una bienvenida es
+ * una sola vez en la vida del contacto, así que el id del contacto ES la unidad,
+ * y los cuatro mails de la secuencia de una misma persona tienen que caer
+ * juntos: medio grupo de control no mide nada.
+ *
+ * Los ids de contacto no son números (cuid del mailer, UUID de Resorty) ⇒ se
+ * reparten con un hash FNV-1a, estable y sin `node:crypto` (este archivo lo
+ * importa también el navegador). La misma persona da siempre el mismo grupo.
+ */
+export function grupoDeContacto(contactoId: string, pct: number): "CONTROL" | null {
+  if (!(pct > 0) || !contactoId) return null;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < contactoId.length; i++) {
+    h ^= contactoId.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h % 100 < pct ? "CONTROL" : null;
+}
 
 /**
  * La espera de un mail de secuencia cuya escalera se quedó corta.

@@ -32,6 +32,7 @@ export default async function AutomationPage({ params }: { params: Promise<{ id:
         id={a.id}
         marca={marcaDe(cuenta, process.env.APP_URL ?? "")}
         triggerLabel={TRIGGER_LABEL[a.trigger] ?? a.trigger}
+        trigger={a.trigger}
         estadoInicial={a.estado}
         emailPrueba={email}
         initial={{

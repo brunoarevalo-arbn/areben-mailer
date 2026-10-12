@@ -75,6 +75,13 @@ export interface ConfigCuenta {
    * Ver `grupoDeCarrito` en `lib/carritos.ts` (29-sep-2026).
    */
   carritoControlPct?: number;
+  /**
+   * Lo mismo para la SECUENCIA de bienvenida: qué % de los leads recibe sólo
+   * el 1º mail (el del código) y ninguno de los que siguen. Es por persona, no
+   * por evento: `grupoDeContacto` en `lib/automations.ts` (11-oct-2026). Clave
+   * aparte de la del carrito a propósito: prender un control no prende el otro.
+   */
+  bienvenidaControlPct?: number;
   /** Cuándo se trajeron los datos de la tienda por última vez. */
   marcaSync?: string;
   /**
@@ -231,6 +238,7 @@ export function leerConfigCuenta(valor: unknown): ConfigCuenta {
     dominioEnvio: normalizarDominioEnvio(c.dominioEnvio),
     tienda: leerTienda(c.tienda),
     carritoControlPct: pctControl(c.carritoControlPct),
+    bienvenidaControlPct: pctControl(c.bienvenidaControlPct),
   };
 }
 

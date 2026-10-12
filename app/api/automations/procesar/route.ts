@@ -16,6 +16,8 @@ import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { tomarRuns, soltarRun } from "@/lib/email/runs";
 import { prepararCarrito, resolverCarritoEnTexto, resolverTagsCarrito } from "@/lib/email/tags-carrito";
 import { bloqueDeTicket, type TicketLocal } from "@/lib/email/ticket";
+import { prepararNacidos, comprasRecientes } from "@/lib/email/secuencia";
+import { esMailQueSigue, yaCompro, type Compra } from "@/lib/secuencia-bienvenida";
 
 export const maxDuration = 60;
 const BATCH = 30;
@@ -35,6 +37,17 @@ export async function GET(req: Request) {
   // cron como único llamador nunca se vio —corre solo—, pero Resorty ahora
   // pincha este endpoint en cada lead para que la bienvenida no espere al cron,
   // y dos leads en el mismo segundo alcanzan. Ver `lib/email/runs.ts`.
+  // La secuencia de bienvenida: hora fija y grupo de control de los runs que
+  // Resorty acaba de insertar. Va ANTES de tomar el lote (ver `prepararNacidos`).
+  // ⚠️ Un error acá no frena el envío: la bienvenida de un solo mail no depende de
+  // esto, y un run sin preparar sólo sale a la hora que le puso Resorty.
+  let nacidos = 0;
+  try {
+    nacidos = await prepararNacidos();
+  } catch (e) {
+    console.error("prepararNacidos falló", e);
+  }
+
   const ids = await tomarRuns(BATCH);
   const runs = ids.length
     ? await prisma.automationRun.findMany({
@@ -44,7 +57,10 @@ export async function GET(req: Request) {
       })
     : [];
 
-  let enviados = 0, saltados = 0, fallidos = 0;
+  let enviados = 0, saltados = 0, fallidos = 0, cortados = 0;
+  // Las órdenes de cada tienda, UNA lectura por corrida: el lote de las 11 trae los
+  // mails del día de todos los leads juntos, y son todos de la misma tienda.
+  const compras = new Map<string, Promise<Compra[] | null>>();
 
   for (const run of runs) {
     const { automation, contacto } = run;
@@ -82,8 +98,35 @@ export async function GET(req: Request) {
     const td = run.triggerData as TriggerPopup & {
       checkoutId?: string; abandonedUrl?: string; productos?: ProductoEmail[]; restantes?: number;
       subtotal?: number | null; cantidad?: number; retiroEnLocal?: boolean;
-      orderId?: string; ticket?: TicketLocal;
+      orderId?: string; ticket?: TicketLocal; grupo?: string;
     };
+
+    // Los mails que SIGUEN al primero de la bienvenida (D1 · D2 · D4 · D6): al grupo
+    // de control no le llegan, y al que ya compró tampoco. El 1º, el del código, sale
+    // siempre. Ver `lib/secuencia-bienvenida.ts`.
+    //
+    // El motivo queda escrito en el run (`corte`): un SALTADO a secas no distingue
+    // «compró» de «estaba pausada», y es justo lo que se va a querer contar.
+    if (esMailQueSigue(automation.trigger, automation.esperaHoras)) {
+      let corte: string | null = td.grupo === "CONTROL" ? "control" : null;
+      if (!corte) {
+        const { tnStoreId, tnToken } = automation.cuenta;
+        if (tnStoreId && tnToken && !compras.has(automation.cuentaId)) {
+          compras.set(automation.cuentaId, comprasRecientes(tnStoreId, tnToken));
+        }
+        const lista = (await compras.get(automation.cuentaId)) ?? null;
+        corte = yaCompro(lista, contacto.email, run.createdAt, td.cupon);
+      }
+      if (corte) {
+        await prisma.automationRun.update({
+          where: { id: run.id },
+          data: { estado: "SALTADO", triggerData: { ...(run.triggerData as object), corte } },
+        });
+        saltados++;
+        cortados++;
+        continue;
+      }
+    }
     // El ticket del local trae sus prendas, sus renglones de plata y su pie: las
     // prendas entran por el mismo camino que las del carrito (`td.productos`) y
     // lo demás se le pega al bloque más abajo.
@@ -337,5 +380,5 @@ export async function GET(req: Request) {
   }
 
   const pendientes = await prisma.automationRun.count({ where: { estado: "PENDIENTE", proximoAt: { lte: new Date() } } });
-  return Response.json({ procesados: runs.length, enviados, saltados, fallidos, pendientes });
+  return Response.json({ procesados: runs.length, enviados, saltados, fallidos, pendientes, nacidos, cortados });
 }

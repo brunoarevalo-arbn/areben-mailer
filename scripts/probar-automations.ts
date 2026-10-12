@@ -96,8 +96,10 @@ const simulador = () => {
 titulo("Dos llamadas seguidas dejan UNA fila (los triggers de tope 1)");
 {
   const { base, crear } = simulador();
-  const uno = crear("NUEVO_SUSCRIPTOR");
-  const dos = crear("NUEVO_SUSCRIPTOR");
+  // NUEVO_CLIENTE y no NUEVO_SUSCRIPTOR: desde el 11-oct-2026 la bienvenida del
+  // pop-up es una secuencia de cinco (ver el caso de abajo).
+  const uno = crear("NUEVO_CLIENTE");
+  const dos = crear("NUEVO_CLIENTE");
   ok(uno.creo && !dos.creo, "la segunda no inserta");
   ok(dos.redirigioA === uno.redirigioA, "y lleva a la misma automation");
   ok(base.length === 1, "queda una sola fila", `quedaron ${base.length}`);
@@ -127,7 +129,8 @@ titulo("Cada trigger declara su tope, y ninguno queda en cero");
   for (const t of TODOS) {
     ok(MAX_POR_TRIGGER[t] >= 1, `${t}: admite al menos una`, `declara ${MAX_POR_TRIGGER[t]}`);
   }
-  ok(MAX_POR_TRIGGER.CARRITO_ABANDONADO > 1, "el carrito es el único con secuencia");
+  ok(MAX_POR_TRIGGER.CARRITO_ABANDONADO > 1, "el carrito tiene secuencia");
+  ok(MAX_POR_TRIGGER.NUEVO_SUSCRIPTOR === 5, "la bienvenida del pop-up también: cinco (11-oct-2026)");
   // 🔴 El invariante que hace inalcanzable el fallback de `nacimientoDelMail`:
   // la escalera tiene que tener un escalón por cada mail MENOS el 1º (que trae
   // el suyo del preset). Sin esto, subir el tope y olvidar la escalera saca dos
@@ -139,11 +142,16 @@ titulo("Cada trigger declara su tope, y ninguno queda en cero");
       `tope ${MAX_POR_TRIGGER[t]} · escalones ${ESPERAS_SIGUIENTES[t].length}`,
     );
   }
+  const conSecuencia = TODOS.filter((t) => MAX_POR_TRIGGER[t] > 1).sort().join(",");
   ok(
-    TODOS.filter((t) => MAX_POR_TRIGGER[t] > 1).length === 1,
-    "y es el ÚNICO",
-    "un segundo trigger con tope >1 es un segundo mail a la misma persona: tiene que ser una decisión, no un arrastre",
+    conSecuencia === "CARRITO_ABANDONADO,NUEVO_SUSCRIPTOR",
+    "y son SÓLO esos dos",
+    `con tope >1: ${conSecuencia} — un trigger más con secuencia es un segundo mail a la misma persona: tiene que ser una decisión, no un arrastre`,
   );
+  // La escalera de la bienvenida: cada mail después del anterior, y en días enteros
+  // (con hora fija, 24 h se lee «día 1»: una espera de 30 h sería «día 1» igual).
+  const b = ESPERAS_SIGUIENTES.NUEVO_SUSCRIPTOR;
+  ok(b.every((h, i) => h % 24 === 0 && (i === 0 || h > b[i - 1])), "la escalera de la bienvenida va en días enteros y crece", b.join(" < "));
 }
 
 titulo("Los tres mails nacen distintos, y NINGUNO a la misma hora que otro");

@@ -180,3 +180,20 @@ export function horaLocal(instante: Date): string {
   const { weekday = "", day = "", month = "" } = partes;
   return `${weekday} ${day} de ${month}, ${FMT_HORA.format(instante)}`;
 }
+
+/**
+ * El día `dias` del calendario local contado desde `desde`, a la `hora` del
+ * negocio. `(alta del lunes 23:50, 1, "11:00")` → el martes a las 11:00, que
+ * son 11 horas después y no 24.
+ *
+ * 🔑 Es «día N a las 11», no «N×24 horas después»: la secuencia de bienvenida
+ * de BDI (11-oct-2026) manda cada mail a la misma hora del día, y contado en
+ * horas, un lead de las 23 h recibiría el día 1 a las 23 h. Se cuenta sobre el
+ * día LOCAL de `desde`, no el UTC: el alta de las 22:00 de Argentina ya es el
+ * día siguiente en UTC y adelantaría la serie entera un día.
+ */
+export function diaALaHora(desde: Date, dias: number, hora: string): Date {
+  const [y, m, d] = diaLocal(desde).split("-").map(Number);
+  const dia = new Date(Date.UTC(y, m - 1, d + dias)).toISOString().slice(0, 10);
+  return instanteLocal(dia, hora);
+}

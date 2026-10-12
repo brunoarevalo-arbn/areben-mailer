@@ -30,6 +30,20 @@ y `generar.py` (el que los arma). Vitrina: https://claude.ai/artifact/N4yM4V2aAV
 
 ## Lo que falta construir
 
+**✅ 1 a 4 CONSTRUIDOS (11-oct-2026)** — `lib/secuencia-bienvenida.ts` (las reglas, puras),
+`lib/email/secuencia.ts` (preparar los runs al nacer + órdenes de TN), el procesador, y
+`scripts/probar-secuencia-bienvenida.ts`. Los 5 mails: `crear-bienvenida-5.ts` (en PAUSADO,
+primera versión con los bloques de hoy) · prender: `cambiar-bienvenida.ts` · medir:
+`medir-control-bienvenida.ts`. Cómo quedó:
+- Los runs los sigue insertando Resorty (`alta + esperaHoras`); el procesador los corrige al
+  nacer (`prepararNacidos`, marca `triggerData.nacio`): **día N a las 11** y el **grupo**.
+- El **control** (10%, `Cuenta.config.bienvenidaControlPct`, clave aparte de la del carrito)
+  es **por persona** y recibe **sólo el 1º** —el del código, que se le prometió en el pop-up—:
+  se mide si los mails 2-5 venden por encima del de hoy.
+- El **corte** mira las órdenes de TN de 8 días (una página): código canjeado en una orden no
+  cancelada, o una orden pagada con su mail desde el alta. TN caído ⇒ el mail sale.
+  El motivo queda en `triggerData.corte` (`control` · `canjeo` · `compro`).
+
 **Para que exista la secuencia (sin esto no sale):**
 1. `MAX_POR_TRIGGER.NUEVO_SUSCRIPTOR` 1 → 5 y su escalera en `ESPERAS_SIGUIENTES` (`lib/automations.ts`),
    con el `triggerData` (el código) viajando a los 5 runs.

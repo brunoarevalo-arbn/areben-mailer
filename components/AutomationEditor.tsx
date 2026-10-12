@@ -15,12 +15,14 @@ import { Pause, Play } from "lucide-react";
 import { campoBase } from "@/lib/ui";
 import { useGuardadoDoc } from "@/components/useGuardadoDoc";
 import { AvisoConflicto } from "@/components/AvisoConflicto";
+import { HORA_FIJA, vaAHoraFija, type Trigger } from "@/lib/automations";
 
 
 export function AutomationEditor({
   id,
   marca,
   triggerLabel,
+  trigger,
   estadoInicial,
   emailPrueba,
   initial,
@@ -30,6 +32,8 @@ export function AutomationEditor({
   /** Nombre, logo, sitio, pie y tema de la marca (`marcaDe(cuenta)`). */
   marca: Marca;
   triggerLabel: string;
+  /** Para decir CUÁNDO sale de verdad: con hora fija, «24 horas» es «mañana a las 11». */
+  trigger: Trigger;
   estadoInicial: string;
   /** Mail de quien está mirando: la prueba sale a su casilla, no a una fija. */
   emailPrueba: string;
@@ -106,6 +110,13 @@ export function AutomationEditor({
           <span className="text-muted">esperar</span>
           <input type="number" className={`${campoBase} w-16`} value={esperaHoras} onChange={(e) => setEsperaHoras(Number(e.target.value))} />
           <span className="text-muted">horas</span>
+          {/* 🔴 Con hora fija el número se lee en DÍAS: sin esto, «24 horas» le
+              diría a quien mira algo que el motor no hace (ver `cuandoSale`). */}
+          {vaAHoraFija(trigger, esperaHoras) && (
+            <span className="text-muted">
+              → sale el día {Math.round(esperaHoras / 24)} a las {HORA_FIJA[trigger]} (hora de Argentina)
+            </span>
+          )}
         </label>
         <label className="flex items-center gap-1 text-sm text-foreground">
           <span className="text-muted">no repetir por</span>

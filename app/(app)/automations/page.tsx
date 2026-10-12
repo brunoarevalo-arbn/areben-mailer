@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getCuentaActiva } from "@/lib/cuenta";
 import {
   automationDelTrigger,
+  esperaEnPalabras,
   motivoNoBorrable,
   puedeCrearOtra,
   type Trigger,
@@ -133,7 +134,7 @@ export default async function AutomationsPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <Link href={`/automations/${a.id}`} className="min-w-0 flex-1">
                   <div className="truncate font-medium text-foreground">{a.nombre}</div>
-                  <div className="text-sm text-muted">{TRIGGER_LABEL[a.trigger]} · espera {a.esperaHoras}h</div>
+                  <div className="text-sm text-muted">{TRIGGER_LABEL[a.trigger]} · {esperaEnPalabras(a.trigger, a.esperaHoras)}</div>
                 </Link>
                 <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                   <span className="text-sm text-subtle tabular-nums">{a.runs.length} enviados</span>
