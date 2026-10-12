@@ -15,7 +15,7 @@
 //
 // Correr:  node --import tsx scripts/probar-marcado.ts
 import { renderEmailHtml, nuevoBloque, type Bloque } from '../lib/email/render.ts';
-import { TIPOS_BLOQUE } from '../lib/email/bloques.ts';
+import { TIPOS_BLOQUE, claveProductos } from '../lib/email/bloques.ts';
 import { V_ACTUAL } from '../lib/email/esquema.ts';
 
 const OPTS = {
@@ -28,6 +28,11 @@ const OPTS = {
   muestraCarrito: true,
   permiteHtmlCrudo: true,
   redesMarca: [{ red: 'instagram', url: 'https://instagram.com/bdi_accesorios' }],
+  // La grilla automática sin prendas no se dibuja (12-oct-2026: ni siquiera el
+  // relleno vacío, que es lo que dejaba su rótulo colgando).
+  productosDinamicos: {
+    [claveProductos(nuevoBloque('productos-dinamicos') as Parameters<typeof claveProductos>[0])]: [{ nombre: 'Funda', precio: '1000', imagen: 'x.jpg', url: '#' }],
+  },
 };
 
 const errores: string[] = [];

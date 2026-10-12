@@ -1326,6 +1326,10 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // ⚠️ `movil` NO entra en `claveProductos`: es cómo se dibuja la grilla, no
       // qué se le pide a Tiendanube. Si entrara, dos bloques con la misma
       // consulta y distinto layout costarían dos llamadas a TN.
+      // Sin prendas, "" y no `pad("")`: el `<div>` vacío del relleno también es
+      // salida, y con él el rótulo de arriba no se enteraba de que la grilla no
+      // salió (ver `sinRotulosHuerfanos`).
+      if (!items.length) return "";
       return pad(
         renderProductos(items, pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil, b.porFila, b.botonTexto, b.precioOculto, b.dosPorDos),
         caja(),
@@ -2059,7 +2063,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
         ...(b.acento ? { acento: colorCss(b.acento, pal.acento) } : {}),
       });
       const ctxB: Ctx = { ...ctx, pal: { ...palB, ancho: pal.ancho, fuente: pal.fuente } };
-      const interior = hijos.map((h) => renderBloque(h, ctxB)).filter(Boolean).join("\n");
+      const interior = sinRotulosHuerfanos(hijos, hijos.map((h) => renderBloque(h, ctxB))).filter(Boolean).join("\n");
       if (!interior) return "";
       const c = caja();
       const arriba = c.aireY.arriba ?? c.padY ?? 28;
@@ -2190,6 +2194,28 @@ export interface RenderOpts {
  * grilla sin productos, un `html` sin permiso— se devuelve tal cual: no hay
  * dónde ponerlo, y tampoco a qué apuntar.
  */
+/**
+ * El rótulo de una grilla se va con ella (12-oct-2026). «MINIS ······ VER MÁS →»
+ * es el título de la grilla que le sigue: si esa grilla sale vacía —la categoría
+ * no tiene nada en NEW IN ese día—, el rótulo queda colgando y promete prendas
+ * que no están. Pasó en el 2/4 de la bienvenida de Zattia.
+ *
+ * Sólo el `titulo` CON `link` y sólo pegado a un `productos-dinamicos`: un título
+ * sin link es prosa del mail y se queda aunque lo que siga no salga.
+ *
+ * Opera sobre las salidas ya dibujadas (HTML o texto) para juzgar «vacía» con el
+ * mismo criterio con que el bloque decidió no dibujarse.
+ */
+function sinRotulosHuerfanos<T extends string | null>(bloques: Bloque[], salidas: T[]): (T | "")[] {
+  return salidas.map((s, i) => {
+    const b = bloques[i];
+    const sig = bloques[i + 1];
+    const huerfano = b.tipo === "titulo" && !!b.link?.texto && !!b.link?.url
+      && sig?.tipo === "productos-dinamicos" && !salidas[i + 1]?.trim();
+    return huerfano ? "" : s;
+  });
+}
+
 function marcarBloque(html: string, id: string): string {
   // El id es un cuid generado por `nuevoBloque`, pero esto termina adentro de un
   // atributo: se filtra igual, como todo lo que sale del Json.
@@ -2344,9 +2370,9 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
   // todos), pero el tipo lo permite y un `undefined` en un atributo sería peor.
   const marca = (b: Bloque) =>
     opts.marcarBloques ? marcarBloque(renderBloque(b, ctx), b.id ?? "") : renderBloque(b, ctx);
-  const cuerpo = bloques
-    .filter((b) => b.tipo !== "encabezado")
-    .map(marca)
+  const sinCabecera = bloques.filter((b) => b.tipo !== "encabezado");
+  const cuerpo = sinRotulosHuerfanos(sinCabecera, sinCabecera.map((b) => renderBloque(b, ctx)))
+    .map((html, i) => (opts.marcarBloques ? marcarBloque(html, sinCabecera[i].id ?? "") : html))
     .join("\n");
   // 🔑 El relleno de después (`&#847;&zwnj;&nbsp;` × 60, caracteres invisibles):
   // sin él, Gmail y Apple Mail completan la línea de la bandeja con el comienzo
@@ -2475,7 +2501,8 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       return b.segundo?.texto ? `${uno}\n${b.segundo.url ? link(b.segundo.texto, b.segundo.url) : b.segundo.texto}` : uno;
     }
     case "banda": {
-      const partes = (b.bloques ?? []).map((h) => bloqueATexto(h, opts)).filter((x): x is string => !!x);
+      const hijos = b.bloques ?? [];
+      const partes = sinRotulosHuerfanos(hijos, hijos.map((h) => bloqueATexto(h, opts))).filter((x): x is string => !!x);
       return partes.length ? partes.join("\n\n") : null;
     }
     // 🔴 Una foto clickeable tiene que dejar su destino en el texto plano, o
@@ -2675,7 +2702,7 @@ export function renderEmailTexto(entrada: ContenidoCampania, opts: RenderOpts): 
   // Mismo criterio que el HTML: el encabezado va primero, esté donde esté en la
   // lista. Si alguien lo borró, el mail arranca directo por el contenido.
   const bloques = contenido.formato === "personal" ? bloquesPersonales(contenido) : (contenido.bloques ?? []);
-  const cuerpo = [
+  const visibles = [
     ...bloques.filter((b) => b.tipo === "encabezado").slice(0, 1),
     ...bloques.filter((b) => b.tipo !== "encabezado"),
   ]
@@ -2683,8 +2710,8 @@ export function renderEmailTexto(entrada: ContenidoCampania, opts: RenderOpts): 
     // hasta el 8-ago-2026 salía igual en el `text/plain` — y de ahí saca el
     // buzón el texto de preview, así que ensuciaba el preheader. Ver
     // `ocultoEnTodas`.
-    .filter((b) => !ocultoEnTodas(b.estilo, contenido.estilos))
-    .map((b) => bloqueATexto(b, opts))
+    .filter((b) => !ocultoEnTodas(b.estilo, contenido.estilos));
+  const cuerpo = sinRotulosHuerfanos(visibles, visibles.map((b) => bloqueATexto(b, opts)))
     .filter((t): t is string => !!t && t.trim() !== "")
     .join("\n\n");
 
