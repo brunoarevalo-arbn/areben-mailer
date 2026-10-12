@@ -186,6 +186,19 @@ export interface ConsultaProductos {
   fuente: FuenteProductos;
   categoriaId?: string;
   n?: number;
+  /**
+   * Además de lo que pide la fuente, el producto tiene que estar en ESTA
+   * categoría (12-oct-2026, bienvenida de Zattia: «los tops de NEW IN», «las más
+   * vendidas de NEW IN»). La API de TN filtra por UNA categoría, así que la
+   * segunda se mira en el servidor sobre lo que devuelve la primera.
+   */
+  tambienEn?: string;
+  /**
+   * Cuántos de la consulta se saltean antes de tomar los `n` (12-oct-2026). Es
+   * lo que hace que dos mails de una secuencia que piden lo mismo no muestren
+   * las mismas prendas: el 1º toma 0-3, el 4º saltea 4.
+   */
+  saltear?: number;
 }
 
 /**
@@ -251,7 +264,22 @@ export type PorFila = 2 | 3 | 4;
  * Dos definiciones de "la misma consulta" serían dos respuestas distintas.
  */
 export const claveProductos = (c: ConsultaProductos): string =>
-  [c.fuente, c.categoriaId ?? "", c.n ?? ""].join("|");
+  // ⚠️ `tambienEn` y `saltear` se agregan SÓLO si están: así la llave de todo
+  // bloque guardado antes del 12-oct-2026 queda idéntica.
+  [c.fuente, c.categoriaId ?? "", c.n ?? "", ...(c.tambienEn || c.saltear ? [c.tambienEn ?? "", c.saltear ?? ""] : [])].join("|");
+
+/**
+ * La consulta de un bloque dinámico. 🔑 La ÚNICA forma de armarla: la usan el
+ * envío, el preview y `/api/productos`. Tres copias a mano son las que hacían
+ * que un campo nuevo de la consulta se perdiera en una sola de ellas.
+ */
+export const consultaDe = (b: ConsultaProductos): ConsultaProductos => ({
+  fuente: b.fuente,
+  categoriaId: b.categoriaId,
+  n: b.n,
+  ...(b.tambienEn ? { tambienEn: b.tambienEn } : {}),
+  ...(b.saltear ? { saltear: b.saltear } : {}),
+});
 
 /** Cómo se llama cada fuente para quien arma el mail. */
 export const ETIQUETA_FUENTE = {
@@ -402,13 +430,31 @@ export type Bloque = BloqueBase &
         /** La barrita de acento debajo. Ausente = sí, que es lo que había. */
         linea?: boolean;
         /**
+         * El renglón de datos ARRIBA del logo, en una franja de la tinta
+         * (12-oct-2026, Zattia: «ENVÍO GRATIS DESDE $150.000 · DESPACHO EN 24 H»).
+         * Va acá y no como bloque suelto porque el encabezado se dibuja primero y
+         * FUERA de la tarjeta: un bloque no puede ir arriba de él. Admite
+         * `${tienda.…}`; sin el dato se cae la oración y, vacía, la franja.
+         */
+        barra?: string;
+        /**
          * Ausente = sí. Va acá y no en `estilo.titulo.mayusculas` a propósito:
          * esto se aplica en JS sobre el string, y `text-transform` lo aplica el
          * cliente de mail —que en Outlook no es confiable.
          */
         mayusculas?: boolean;
       }
-    | { tipo: "titulo"; texto: TextoRico; align?: "left" | "center" }
+    | {
+        tipo: "titulo";
+        texto: TextoRico;
+        align?: "left" | "center";
+        /**
+         * Un link chico a la DERECHA, en el mismo renglón (12-oct-2026): el rótulo
+         * de sección «PARA EMPEZAR ······ TODO NEW IN →» que va arriba de cada
+         * grilla. Sin texto o sin url, no existe y el título sale como siempre.
+         */
+        link?: { texto: string; url: string };
+      }
     | { tipo: "texto"; texto: TextoRico; align?: "left" | "center" }
     | {
         tipo: "boton";
@@ -514,6 +560,8 @@ export type Bloque = BloqueBase &
         items: ProductoEmail[];
         movil?: PorFilaMovil;
         porFila?: PorFila;
+        /** Ver `dosPorDos` de `productos-dinamicos`: es el mismo campo. */
+        dosPorDos?: boolean;
         /** Ver `botonTexto` de `productos-dinamicos`: es el mismo campo. */
         botonTexto?: string;
         /** Ver `precioOculto` de `productos-dinamicos`: es el mismo campo. */
@@ -536,12 +584,34 @@ export type Bloque = BloqueBase &
         fuente: FuenteProductos;
         /** Solo con `fuente:"categoria"`. Sin esto el bloque no se dibuja. */
         categoriaId?: string;
-        /** Cuántos mostrar (2 a 6). La grilla es de a dos: un par se ve mejor. */
+        /** Cuántos mostrar (2 a 6; 1 con `ficha`). La grilla es de a dos: un par se ve mejor. */
         n?: number;
+        /** Ver `ConsultaProductos.tambienEn`. */
+        tambienEn?: string;
+        /** Ver `ConsultaProductos.saltear`. */
+        saltear?: number;
+        /**
+         * La FICHA ANOTADA (12-oct-2026, bienvenida de Zattia, «cómo es comprar»):
+         * en vez de la grilla, el PRIMER producto de la consulta a la izquierda
+         * (44%) y estos renglones numerados a la derecha —«01 · TALLE»—. 🔑 En el
+         * celular NO se apila: una prenda con su lista al costado es la pieza; la
+         * lista abajo de una foto de ancho completo es otra.
+         * `titulo` es el rótulo y `texto` admite `**negrita**` y `[texto](url)`
+         * no — los links van en el `url` del ítem, que linkea el texto entero.
+         */
+        ficha?: ItemLista[];
         /** Cuántos por fila en el celular. Ausente = 1. Ver `PorFilaMovil`. */
         movil?: PorFilaMovil;
         /** Cuántos por fila en escritorio. Ausente = 2. Ver `PorFila`. */
         porFila?: PorFila;
+        /**
+         * Con `porFila: 4`: en el celular la fila de cuatro va 2×2 en vez de
+         * apilarse (12-oct-2026, bienvenida de Zattia). Las celdas pasan a
+         * `inline-block` al 50% (clase `m-g2`); lo que no lea el `<style>` ve la
+         * fila de cuatro de escritorio. ⚠️ Es un campo y no lo que hace `movil: 2`
+         * con cuatro: eso le cambiaría el teléfono a toda grilla ya guardada.
+         */
+        dosPorDos?: boolean;
         /**
          * Esconder el precio (5-ago-2026).
          *
@@ -1014,6 +1084,12 @@ export type Bloque = BloqueBase &
         tipo: "banda";
         /** Hex. Ausente = la tarjeta. */
         fondo?: string;
+        /**
+         * Px a cada lado de la franja (12-oct-2026). Ausente = 0, de borde a borde
+         * de la tarjeta como siempre. Con margen, la franja queda alineada con el
+         * texto y los hijos llevan su propio relleno de 24 px.
+         */
+        margen?: number;
         base?: "claro" | "oscuro";
         /** El acento de ADENTRO (el botón sobre negro va blanco). Ausente = el del mail. */
         acento?: string;

@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { renderEmailHtml, type ContenidoCampania } from "@/lib/email/render";
-import { claveProductos, type ConsultaProductos, type ProductoEmail } from "@/lib/email/bloques";
+import { claveProductos, consultaDe, type ConsultaProductos, type ProductoEmail } from "@/lib/email/bloques";
 import type { Marca } from "@/lib/marca";
 import { VistaPreviaMail } from "@/components/VistaPreviaMail";
 import { AbrirEnPestana } from "@/components/editor/AbrirEnPestana";
@@ -58,7 +58,7 @@ export function PreviewMail({
     const m = new Map<string, ConsultaProductos>();
     for (const b of contenidoDif.bloques) {
       if (b.tipo === "productos-dinamicos") {
-        m.set(claveProductos(b), { fuente: b.fuente, categoriaId: b.categoriaId, n: b.n });
+        m.set(claveProductos(b), consultaDe(b));
       }
     }
     return m;
@@ -75,6 +75,8 @@ export function PreviewMail({
       faltan.map(async ([k, c]) => {
         const sp = new URLSearchParams({ fuente: c.fuente, n: String(c.n ?? 4) });
         if (c.categoriaId) sp.set("categoriaId", c.categoriaId);
+        if (c.tambienEn) sp.set("tambienEn", c.tambienEn);
+        if (c.saltear) sp.set("saltear", String(c.saltear));
         const d = await fetch(`/api/productos?${sp}`)
           .then((r) => r.json())
           .catch(() => ({}));

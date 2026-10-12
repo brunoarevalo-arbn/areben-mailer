@@ -1049,6 +1049,7 @@ export function FormBloque({
                 marca: "Cada red en su color, sobre un cuadrado.",
                 simple: "El símbolo solo, en su color, sin cuadrado.",
                 pleno: "En un color solo, elegido según el fondo del mail.",
+                texto: "Sin iconos: el nombre de cada red, en mayúsculas.",
               }[b.iconos ?? "marca"]
             }
             onChange={(e) => set({ iconos: e.target.value as EstiloIconos })}
@@ -1056,6 +1057,7 @@ export function FormBloque({
             <option value="marca">Con fondo de color</option>
             <option value="simple">Sólo el símbolo</option>
             <option value="pleno">De un solo color</option>
+            <option value="texto">Sólo texto</option>
           </Select>
         </div>
       );

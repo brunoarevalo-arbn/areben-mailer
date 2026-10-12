@@ -510,7 +510,7 @@ function renderCard(
   p: ProductoEmail,
   pal: Paleta,
   e: EstProducto,
-  dosEnMovil: boolean,
+  dosEnMovil: boolean | "grilla2",
   pct = 50,
   botonTexto?: string,
   anchoGrilla?: number,
@@ -552,7 +552,7 @@ function renderCard(
   // clases lleva la celda: `m-col` la apila y `m-col2` la deja en la mitad. El
   // `width` inline —el layout de escritorio— es el mismo en los dos casos, que
   // es la regla del shell: la clase solo puede ser un override.
-  return `<td width="${pct}%" valign="top"${clase(dosEnMovil ? CLASES.col2 : CLASES.col)} style="padding:8px${al}">
+  return `<td width="${pct}%" valign="top"${clase(dosEnMovil === "grilla2" ? CLASES.grilla2 : dosEnMovil ? CLASES.col2 : CLASES.col)} style="padding:8px${al}">
     ${cuerpo}
   </td>`;
 }
@@ -914,6 +914,31 @@ function renderLista(b: Extract<Bloque, { tipo: "lista" }>, pal: Paleta): string
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${filas.join("")}</table>`;
 }
 
+/**
+ * La FICHA ANOTADA de `productos-dinamicos` (12-oct-2026): una prenda a la
+ * izquierda al 44% y los renglones numerados a la derecha («01 · TALLE»).
+ * ⛔ Sin `m-col`: en el celular se queda lado a lado, que es la pieza.
+ */
+function renderFicha(p: ProductoEmail, items: ItemLista[], pal: Paleta, e: EstProducto, precioOculto?: boolean): string {
+  const filas = items.filter((it) => it.titulo?.trim());
+  if (!filas.length) return "";
+  const { nombre: eTexto, precio: ePrecio, nota: eNota, img: eImg } = e;
+  const foto = `<a href="${esc(p.url)}" style="text-decoration:none;color:inherit"><img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="100%" style="max-width:100%;border-radius:${px(eImg.radio ?? 8)};display:block" />
+      <div style="margin-top:8px;font-size:${px(eTexto.tamano ?? 14)};color:${eTexto.color}${extra(eTexto, ["tamano", "color", "align"])}">${esc(p.nombre)}</div>
+      ${precioOculto ? "" : `<div style="margin-top:2px;font-size:${px(ePrecio.tamano ?? eTexto.tamano ?? 14)}">${precioHtml(p, ePrecio, eNota)}</div>`}</a>`;
+  const notas = filas
+    .map((it, i) => {
+      const n = it.numero?.trim() || String(i + 1).padStart(2, "0");
+      const tit = `<div style="font-size:10px;font-weight:700;letter-spacing:2px;color:${pal.texto}">${esc(`${n} · ${it.titulo.trim()}`.toUpperCase())}</div>`;
+      const url = it.url ? sanearUrl(it.url) : "";
+      const cuerpo = it.texto ? (url ? `<a href="${esc(url)}" style="color:${pal.texto};text-decoration:underline">${nl(it.texto)}</a>` : nl(it.texto)) : "";
+      const txt = cuerpo ? `<div style="font-size:14px;line-height:1.45;color:${pal.texto};margin-top:3px">${cuerpo}</div>` : "";
+      return `<div style="margin:${i ? "14px" : "0"} 0 0">${tit}${txt}</div>`;
+    })
+    .join("");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${margen(e.caja, 8, 16)}"><tr><td width="44%" valign="top">${foto}</td><td width="4%"></td><td width="52%" valign="top" style="padding-top:4px">${notas}</td></tr></table>`;
+}
+
 /** El rótulo de los cupones de una línea: «TU CÓDIGO DE BIENVENIDA · 10% OFF». */
 const rotuloCupon = (b: Extract<Bloque, { tipo: "cupon" }>) =>
   [b.texto?.trim(), b.destacado?.trim()].filter(Boolean).join(" · ").toUpperCase();
@@ -927,10 +952,14 @@ const rotuloCupon = (b: Extract<Bloque, { tipo: "cupon" }>) =>
  * laterales que el texto: el borde de la barra y el del párrafo quedan alineados.
  * Los colores salen de la paleta invertida (tinta de fondo, fondo de tinta), así
  * que la misma barra sirve en un mail claro y en uno oscuro.
+ *
+ * Con un FONDO elegido (12-oct-2026, Zattia: el «renglón gris» de los mails del
+ * medio) la franja es de ese color y la letra, la tinta: un cupón que acompaña sin
+ * ser una franja negra arriba de todo.
  */
-function renderCuponBarra(b: Extract<Bloque, { tipo: "cupon" }>, pal: Paleta): string {
-  const tinta = pal.texto;
-  const papel = pal.tarjeta;
+function renderCuponBarra(b: Extract<Bloque, { tipo: "cupon" }>, pal: Paleta, fondo?: string): string {
+  const tinta = fondo ?? pal.texto;
+  const papel = fondo ? pal.texto : pal.tarjeta;
   const rotulo = rotuloCupon(b);
   const arriba = rotulo ? `<div style="font-size:10px;letter-spacing:2px;color:${papel};opacity:.7">${esc(rotulo)}</div>` : "";
   const letra = b.condiciones ? `<span style="font-size:11px;font-weight:400;letter-spacing:0;color:${papel};opacity:.7">&nbsp; ${esc(b.condiciones)}</span>` : "";
@@ -950,12 +979,12 @@ function renderCuponBarra(b: Extract<Bloque, { tipo: "cupon" }>, pal: Paleta): s
  * ⚠️ 30 px y no más: «BDI-2C8XZG» con su espaciado tiene que entrar en los ~295 px
  * útiles de un teléfono de 375 sin partir el código en dos renglones.
  */
-function renderCuponGrande(b: Extract<Bloque, { tipo: "cupon" }>, pal: Paleta, boton: string): string {
+function renderCuponGrande(b: Extract<Bloque, { tipo: "cupon" }>, pal: Paleta, boton: string, filete?: string): string {
   const rotulo = rotuloCupon(b);
   const arriba = rotulo ? `<div style="font-size:11px;letter-spacing:2px;color:${pal.medio}">${esc(rotulo)}</div>` : "";
   const codigo = `<div style="font-size:30px;font-weight:800;letter-spacing:4px;line-height:1.2;color:${pal.texto};margin-top:8px">${esc(b.codigo)}</div>`;
   const letra = b.condiciones ? `<div style="font-size:12px;color:${pal.medio};margin-top:8px">${esc(b.condiciones)}</div>` : "";
-  const caja = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${pal.medio}"><tr><td style="padding:18px 16px;text-align:center">${arriba}${codigo}${letra}</td></tr></table>`;
+  const caja = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${filete ?? pal.medio}"><tr><td style="padding:18px 16px;text-align:center">${arriba}${codigo}${letra}</td></tr></table>`;
   return `<div style="margin:8px 0 16px">${caja}${boton ? `<div style="text-align:center;margin-top:20px">${boton}</div>` : ""}</div>`;
 }
 
@@ -1043,10 +1072,15 @@ function renderProductos(
   porFila?: PorFila,
   botonTexto?: string,
   precioOculto?: boolean,
+  dosPorDos?: boolean,
 ): string {
   if (items.length === 0) return "";
   const n = porFila === 3 || porFila === 4 ? porFila : 2;
-  const dos = movil === 2 && n === 2;
+  // 🔑 Cuatro por fila con `dosPorDos` (12-oct-2026): en el celular las celdas
+  // pasan a `inline-block` al 50% (`m-g2`) y la fila de cuatro se dibuja 2×2. Lo
+  // que no lea el `<style>` —Outlook, un Gmail recortado— ve la fila de cuatro de
+  // escritorio, nunca una rota. Con tres sigue apilando: 2 + 1 no es una grilla.
+  const dos: boolean | "grilla2" = dosPorDos && n === 4 ? "grilla2" : movil === 2 && n === 2;
   // Con cuatro por fila el botón por tarjeta no se dibuja (ver `PorFila`). Se
   // filtra ACÁ y no en el editor: el `botonTexto` guardado no se toca, así que
   // volver a 3 o a 2 lo devuelve solo. Un bloque no puede perder un dato porque
@@ -1063,7 +1097,7 @@ function renderProductos(
     const celdas = Array.from({ length: n }, (_, j) =>
       items[i + j]
         ? renderCard(items[i + j], pal, e, dos, pct, boton, anchoCelda, precioOculto)
-        : `<td width="${pct}%"></td>`,
+        : `<td width="${pct}%"${clase(dos === "grilla2" && CLASES.grilla2)}></td>`,
     );
     filas.push(`<tr>${celdas.join("")}</tr>`);
   }
@@ -1134,11 +1168,24 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
           ? ""
           : `<div style="width:40px;height:3px;background:${c.bordeColor ?? pal.acento};margin:${m("10px")};border-radius:2px"></div>`;
 
-      return `<div${clase(...clasesDe(c))} style="text-align:${al};${padCaja(c, 12, 0)}${extra(c, ["align", "padX", "padY", "bordeAncho", "bordeColor", "bordeEstilo"])}">${conLink}${barra}</div>`;
+      // La franja de datos de arriba del logo (`barra`): tinta de fondo, letra
+      // del color de la página. Vacía —sin el dato de la tienda— no se dibuja.
+      const datos = b.barra?.trim()
+        ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px"><tr><td bgcolor="${pal.texto}" style="background:${pal.texto};padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:2px;line-height:1.5;color:${pal.fondo}">${esc(b.barra.trim().toUpperCase())}</td></tr></table>`
+        : "";
+      return `<div${clase(...clasesDe(c))} style="text-align:${al};${padCaja(c, 12, 0)}${extra(c, ["align", "padX", "padY", "bordeAncho", "bordeColor", "bordeEstilo"])}">${datos}${conLink}${barra}</div>`;
     }
     case "titulo": {
       const t = e("titulo");
       const c = caja();
+      // El rótulo con link a la derecha: la tabla lleva el margen y el título va
+      // a 0, así el link se apoya en la MISMA base que el título.
+      const destino = b.link?.texto?.trim() ? sanearUrl(b.link.url) : "";
+      if (destino) {
+        const h1 = `<h1${clase(...clasesTitulo(t, b.texto))} style="margin:0;font-size:${px(t.tamano ?? 26)};line-height:${t.interlinea ?? 1.25};color:${t.color};text-align:left${extra(t, ["tamano", "interlinea", "color", "align"])}">${tituloHtml(b.texto, ctx.pal)}</h1>`;
+        const a = `<a href="${esc(destino)}" style="font-size:11px;font-weight:700;letter-spacing:1.5px;color:${t.color};text-decoration:none;border-bottom:1px solid ${t.color};padding-bottom:2px">${esc(b.link!.texto.trim().toUpperCase())}</a>`;
+        return pad(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${margen(c, 16, 16)}"><tr><td valign="bottom">${h1}</td><td align="right" valign="bottom" style="padding:0 0 3px 12px;white-space:nowrap">${a}</td></tr></table>`, c);
+      }
       return pad(`<h1${clase(...clasesTitulo(t, b.texto))} style="${margen(c, 16, 16)};font-size:${px(t.tamano ?? 26)};line-height:${t.interlinea ?? 1.25};color:${t.color};text-align:${b.align ?? t.align ?? "left"}${extra(t, ["tamano", "interlinea", "color", "align"])}">${tituloHtml(b.texto, ctx.pal)}</h1>`, caja());
     }
     case "texto": {
@@ -1260,7 +1307,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     }
     case "productos":
       return pad(
-        renderProductos(b.items ?? [], pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil, b.porFila, b.botonTexto, b.precioOculto),
+        renderProductos(b.items ?? [], pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil, b.porFila, b.botonTexto, b.precioOculto, b.dosPorDos),
         caja(),
       );
     // Se dibuja igual que `productos` —es la misma grilla— y la diferencia entera
@@ -1272,11 +1319,15 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     // vez de con un hueco. Mismo criterio que el carrito vacío.
     case "productos-dinamicos": {
       const items = ctx.productosDinamicos?.[claveProductos(b)] ?? [];
+      if (b.ficha?.length) {
+        const html = items[0] ? renderFicha(items[0], b.ficha, pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.precioOculto) : "";
+        return html ? pad(html, caja()) : "";
+      }
       // ⚠️ `movil` NO entra en `claveProductos`: es cómo se dibuja la grilla, no
       // qué se le pide a Tiendanube. Si entrara, dos bloques con la misma
       // consulta y distinto layout costarían dos llamadas a TN.
       return pad(
-        renderProductos(items, pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil, b.porFila, b.botonTexto, b.precioOculto),
+        renderProductos(items, pal, estProducto(b.tipo, "cuerpo", ctx, b.estilo), b.movil, b.porFila, b.botonTexto, b.precioOculto, b.dosPorDos),
         caja(),
       );
     }
@@ -1519,6 +1570,13 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       // px de aire adentro de un mail que no muestra nada ahí.
       if (!lista.length) return "";
       const cRedes = caja();
+      // `texto`: los nombres en el rol `cuerpo`, separados por « · ».
+      if (b.iconos === "texto") {
+        const sep = `<span style="color:${t.color};font-size:${px(t.tamano ?? 14)}">&nbsp;·&nbsp;</span>`;
+        return pad(`<div style="text-align:center;${margen(cRedes, 16, 16)}">${lista
+          .map((l) => `<a href="${esc(l.url)}" style="color:${t.color};font-size:${px(t.tamano ?? 14)};text-decoration:none${extra(t, ["color", "tamano", "align", "subrayado"])}">${esc(l.red)}</a>`)
+          .join(sep)}</div>`, cRedes);
+      }
       return pad(`<div style="text-align:center;${margen(cRedes, 16, 16)}">${lista
         .map((l) => {
           const red = redConIcono(l.red);
@@ -1935,9 +1993,9 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
     case "cupon": {
       const c = caja();
       if (b.variante === "marco") return pad(renderCuponMarco(b, c, e("precio"), pal), undefined);
-      if (b.variante === "barra") return pad(renderCuponBarra(b, pal), undefined);
+      if (b.variante === "barra") return pad(renderCuponBarra(b, pal, c.elegidas.has("fondo") ? c.fondo : undefined), undefined);
       if (b.variante === "grande") {
-        return pad(renderCuponGrande(b, pal, b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : ""), undefined);
+        return pad(renderCuponGrande(b, pal, b.botonTexto ? botonAnchor(b.botonTexto, b.botonUrl, e("boton"), pal) : "", c.elegidas.has("bordeColor") ? c.bordeColor : undefined), undefined);
       }
       const bg = superficieDe("cupon", c, pal);
       // 🔑 **Los únicos tres números que la variante decide.** Son los huecos
@@ -2008,7 +2066,11 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const abajo = c.aireY.abajo ?? c.padY ?? 28;
       // `bgcolor` además del `background`: Outlook de escritorio pinta la celda
       // por el atributo.
-      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${fondo};margin:8px 0 16px"><tr><td bgcolor="${fondo}" style="background:${fondo};padding:${px(arriba)} 0 ${px(abajo)};color:${palB.texto}">${interior}</td></tr></table>`;
+      const franja = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${fondo};margin:8px 0 16px"><tr><td bgcolor="${fondo}" style="background:${fondo};padding:${px(arriba)} 0 ${px(abajo)};color:${palB.texto}">${interior}</td></tr></table>`;
+      // Con `margen`, la franja va adentro de un relleno lateral: un `margin` en
+      // una tabla al 100% la haría pasarse del ancho.
+      const m = Math.min(48, Math.max(0, Math.round(b.margen ?? 0)));
+      return m ? `<div style="padding:0 ${px(m)}">${franja}</div>` : franja;
     }
     default:
       return "";
@@ -2290,8 +2352,14 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
   // sin él, Gmail y Apple Mail completan la línea de la bandeja con el comienzo
   // del CUERPO —«BDI · TU PEDIDO ESTÁ LISTO…»—, que repite el asunto y le come el
   // lugar al preheader que se escribió para eso (11-oct-2026).
-  const preheader = opts.preheader
-    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(opts.preheader)}${"&#847;&zwnj;&nbsp;".repeat(60)}</div>`
+  // El preheader también resuelve `${cupon.vence}` (12-oct-2026): «Vale hasta el
+  // 19/10». En un envío real ya llega resuelto por el procesador; acá queda el
+  // editor y la prueba (fecha de muestra) o, sin dato, se cae la oración.
+  const textoPre = opts.preheader?.includes("${cupon.")
+    ? resolverCuponEnDoc({ t: opts.preheader }, opts.muestraCarrito ? new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10) : null).t
+    : opts.preheader;
+  const preheader = textoPre
+    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(textoPre)}${"&#847;&zwnj;&nbsp;".repeat(60)}</div>`
     : "";
 
   // Sin borde cuando la tarjeta y el fondo son el mismo color: dibujar un
@@ -2327,6 +2395,7 @@ export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): s
 ${cabeza(pal, {
   fuenteWeb: tema.fuente ? FUENTES_WEB[tema.fuente] : undefined,
   boton2: cuerpo.includes(`class="${CLASES.boton2}"`),
+  grilla2: cuerpo.includes(`class="${CLASES.grilla2}"`),
 })}
 <body style="margin:0;padding:0;background:${pal.fondo};font-family:${pal.fuente}">
   ${preheader}
@@ -2388,10 +2457,13 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       // El logo no aporta nada en texto plano, pero el nombre de la marca sí:
       // es el primer renglón, igual que cuando lo escribía el shell.
       const nombre = b.texto?.trim() || opts.nombreCuenta;
-      return b.mayusculas === false ? nombre : nombre.toUpperCase();
+      const rotulo = b.mayusculas === false ? nombre : nombre.toUpperCase();
+      return b.barra?.trim() ? `${rotulo}\n${b.barra.trim()}` : rotulo;
     }
-    case "titulo":
-      return campoATexto(b.texto);
+    case "titulo": {
+      const destino = b.link?.texto?.trim() ? sanearUrl(b.link.url) : "";
+      return destino ? `${campoATexto(b.texto)}\n${link(b.link!.texto.trim(), destino)}` : campoATexto(b.texto);
+    }
     // 🔴 Los mismos campos que en el HTML admiten `**negrita**` tienen que
     // salir acá SIN los asteriscos. La parte text/plain va en cada envío y es
     // una de las señales que mira el filtro: un mail cuyo cuerpo dice
@@ -2424,10 +2496,17 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       return (b.items ?? []).map((p) => link(`· ${lineaTexto(p, b.precioOculto)}`, p.url)).join("\n") || null;
     // Los productos salen de `opts`, igual que en el HTML: la parte de texto no
     // puede quedarse corta o el mail se vuelve vacío para quien lo lea así.
-    case "productos-dinamicos":
-      return (opts.productosDinamicos?.[claveProductos(b)] ?? [])
-        .map((p) => link(`· ${lineaTexto(p, b.precioOculto)}`, p.url))
-        .join("\n") || null;
+    case "productos-dinamicos": {
+      const ps = opts.productosDinamicos?.[claveProductos(b)] ?? [];
+      // La ficha: la prenda y sus renglones numerados, como en el HTML.
+      if (b.ficha?.length) {
+        if (!ps[0]) return null;
+        const notas = b.ficha.filter((it) => it.titulo?.trim()).map((it, i) =>
+          `${it.numero?.trim() || String(i + 1).padStart(2, "0")} · ${it.titulo}${it.texto ? ` — ${sinNegritas(it.texto)}` : ""}${it.url ? ` (${it.url})` : ""}`);
+        return [link(`· ${lineaTexto(ps[0], b.precioOculto)}`, ps[0].url), ...notas].join("\n");
+      }
+      return ps.map((p) => link(`· ${lineaTexto(p, b.precioOculto)}`, p.url)).join("\n") || null;
+    }
     case "carrito": {
       if (b.vista === "resumen") {
         const filas = (b.totales ?? []).map((t) => `${t.etiqueta}: ${t.monto}`);

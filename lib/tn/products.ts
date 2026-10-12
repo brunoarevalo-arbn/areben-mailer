@@ -41,6 +41,7 @@ interface TnProductRaw {
   published?: boolean;
   images?: { src: string }[];
   variants?: TnVariantRaw[];
+  categories?: { id: number }[];
 }
 
 function nombreDe(name: TnProductRaw["name"]): string {
@@ -147,12 +148,20 @@ export async function traerProductos(
   token: string,
   consulta: ConsultaProductos,
 ): Promise<ProductoTN[]> {
-  const n = Math.min(6, Math.max(2, Math.round(consulta.n ?? 4)));
+  // 1 sólo para la ficha anotada; la grilla nunca pide menos de 2.
+  const n = Math.min(6, Math.max(1, Math.round(consulta.n ?? 4)));
   const fuente = consulta.fuente;
+  const saltear = Math.min(30, Math.max(0, Math.round(consulta.saltear ?? 0)));
+  // 🔑 Con `tambienEn` el cruce se hace acá: TN filtra por UNA categoría, así que
+  // se pide la primera ENTERA (200, el tope de TN) y se mira la segunda en cada
+  // producto. Con 24 quedaban afuera los tops que estaban más abajo en NEW IN.
+  // Con `destacados` es «las más vendidas DE NEW IN»: mezcla tipos de prenda,
+  // que la categoría sola —ordenada a mano— no hace.
+  const tambienEn = consulta.tambienEn ? Number(consulta.tambienEn) : 0;
 
   const params: Record<string, string | number> = {
     published: "true",
-    per_page: A_PEDIR[fuente],
+    per_page: tambienEn ? 200 : saltear ? Math.max(A_PEDIR[fuente], 50) : A_PEDIR[fuente],
   };
   const orden = ORDEN[fuente];
   if (orden) params.sort_by = orden;
@@ -175,11 +184,12 @@ export async function traerProductos(
   return crudos
     .filter(hayStock)
     .filter((p) => (fuente === "oferta" ? enOferta(p) : true))
+    .filter((p) => !tambienEn || (p.categories ?? []).some((c) => c.id === tambienEn))
     .map(normalizar)
     // Sin foto no entra: la grilla es de tarjetas con imagen y una tarjeta sin
     // imagen deja un agujero blanco al lado de las que sí la tienen.
     .filter((p) => p.imagen)
-    .slice(0, n);
+    .slice(saltear, saltear + n);
 }
 
 export interface CategoriaTN {

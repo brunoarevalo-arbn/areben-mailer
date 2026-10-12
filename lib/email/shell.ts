@@ -93,6 +93,11 @@ export const CLASES = {
    * mail la usa: así los mails que no tienen botón doble no cambian un byte.
    */
   boton2: "m-btn2",
+  /**
+   * La celda de una grilla de CUATRO que en el celular va 2×2 (12-oct-2026): pasa
+   * a `inline-block` al 50%. Su regla sale SÓLO si el mail la usa, como `m-btn2`.
+   */
+  grilla2: "m-g2",
 } as const;
 
 /**
@@ -110,6 +115,8 @@ export interface ExtrasCabeza {
   fuenteWeb?: string;
   /** ¿Hay un botón doble? Prende la regla de `m-btn2`. */
   boton2?: boolean;
+  /** ¿Hay una grilla de cuatro que va 2×2 en el celular? Prende `m-g2`. */
+  grilla2?: boolean;
 }
 
 /** `class="a b"` o `""`. Para pegarlo dentro de un tag sin pensar. */
@@ -163,7 +170,8 @@ export function cabeza(pal: Paleta, extras: ExtrasCabeza = {}): string {
     .${CLASES.subtitulo}{font-size:19px!important}
     .${CLASES.colTitulo}{font-size:13px!important}
     .${CLASES.colTexto}{font-size:12px!important}${extras.boton2 ? `
-    .${CLASES.boton2}{display:block!important;width:100%!important;padding:0 0 10px 0!important}` : ""}
+    .${CLASES.boton2}{display:block!important;width:100%!important;padding:0 0 10px 0!important}` : ""}${extras.grilla2 ? `
+    .${CLASES.grilla2}{display:inline-block!important;width:50%!important;box-sizing:border-box!important;padding:6px!important}` : ""}
     .${CLASES.ocultarEscritorio}{display:block!important;mso-hide:none}
     /* El orden importa: con ambas clases gana la última, o sea ocultar. */
     .${CLASES.ocultarMovil}{display:none!important;max-height:0!important;overflow:hidden!important;mso-hide:all}

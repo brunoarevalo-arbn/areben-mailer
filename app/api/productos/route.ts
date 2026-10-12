@@ -58,6 +58,8 @@ export async function GET(req: Request) {
         fuente: fuente as FuenteProductos,
         categoriaId: sp.get("categoriaId") ?? undefined,
         n: Number(sp.get("n")) || undefined,
+        tambienEn: sp.get("tambienEn") ?? undefined,
+        saltear: Number(sp.get("saltear")) || undefined,
       });
       return Response.json({ productos });
     }

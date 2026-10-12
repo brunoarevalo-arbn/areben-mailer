@@ -13,7 +13,7 @@
 // guardando solo la consulta. Nada de esto se persiste.
 
 import { traerProductos } from "@/lib/tn/products";
-import { claveProductos, type Bloque, type ConsultaProductos, type ProductoEmail } from "./bloques";
+import { claveProductos, consultaDe, type Bloque, type ConsultaProductos, type ProductoEmail } from "./bloques";
 
 /**
  * Cuánto vale una respuesta de TN antes de volver a preguntar.
@@ -88,7 +88,7 @@ export async function resolverProductosDinamicos(
 
   for (const b of bloques) {
     if (b.tipo !== "productos-dinamicos") continue;
-    const consulta: ConsultaProductos = { fuente: b.fuente, categoriaId: b.categoriaId, n: b.n };
+    const consulta: ConsultaProductos = consultaDe(b);
     // Dos bloques con la misma consulta comparten entrada: una sola llamada.
     consultas.set(claveProductos(consulta), consulta);
     const k = clave(cuenta.id, consulta);

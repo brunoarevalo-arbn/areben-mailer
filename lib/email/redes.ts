@@ -49,6 +49,9 @@ export const REDES: Red[] = [
  *   Cuatro los dibujó la diseñadora (5-ago-2026); los otros cuatro salieron de
  *   sacarle el cuadrado a los de `marca`.
  * - `pleno` — un solo color.
+ * - `texto` — sin iconos: «INSTAGRAM · TIKTOK · WHATSAPP» en el rol `cuerpo`
+ *   (12-oct-2026, Zattia: los iconos de color eran lo único con color de toda
+ *   la marca).
  *
  * 🔑 En `pleno`, **cuál color lo decide el renderer** según el fondo
  * (`Paleta.esOscuro`), nunca quien arma el mail. Mismo criterio que los iconos
@@ -56,7 +59,7 @@ export const REDES: Red[] = [
  * "blanco o negro" a mano es ofrecer la forma de dejar un icono blanco sobre
  * fondo blanco.
  */
-export type EstiloIconos = "marca" | "simple" | "pleno";
+export type EstiloIconos = "marca" | "simple" | "pleno" | "texto";
 
 /**
  * Las del set `simple` que además necesitan versión para fondo oscuro.
@@ -107,7 +110,7 @@ export function urlIcono(
   oscuro = false,
 ): string | undefined {
   const b = (base ?? "").replace(/\/+$/, "");
-  if (!b) return undefined;
+  if (!b || estilo === "texto") return undefined;
   const suf =
     estilo === "pleno"
       ? oscuro

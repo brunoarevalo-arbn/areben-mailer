@@ -35,6 +35,9 @@ import { cadaBloque } from '../lib/email/bloques.ts';
 import { faltaCuponObligatorio, mailVencido } from '../lib/secuencia-bienvenida.ts';
 import { diaLocal } from '../lib/fechas.ts';
 
+/** «Bienvenida Z 3/4 — x» y «Bienvenida Z 3/4 — y» son el mismo lugar de la serie. */
+const mismoLugar = (a: string, b: string) => a.split(' — ')[0] === b.split(' — ')[0];
+
 const slug = process.argv.find((a) => a.startsWith('--cuenta='))?.split('=')[1] ?? 'bdi';
 const escribir = process.argv.includes('--escribir');
 const reescribir = process.argv.includes('--reescribir');
@@ -98,7 +101,7 @@ async function main() {
     // Lo que nunca puede llegar a una casilla.
     const crudo = [/\$\{[a-z]+\.[a-zA-Z]+\}/.exec(html)?.[0], html.includes('TUCUPON') ? 'TUCUPON' : null, /href=""/.test(html) ? 'href vacío' : null].filter(Boolean);
     const conCodigo = td.cupon ? html.includes(td.cupon) : null;
-    const marcaYa = ya.has(m.nombre) ? '=' : '+';
+    const marcaYa = ya.has(m.nombre) ? '=' : existentes.some((a) => mismoLugar(a.nombre, m.nombre)) ? '✎ (renombra)' : '+';
     console.log(`   ${marcaYa} ${m.nombre} · ${m.esperaHoras} h · «${m.asunto}»${m.remitenteNombre ? ` · de ${m.remitenteNombre} → ${m.responderA}` : ''}`);
     console.log(`       ${Math.round(html.length / 1024)} KB · código ${conCodigo ? 'adentro' : conCodigo === false ? '⚠️ NO está' : '(sin lead)'}${crudo.length ? ` · 🔴 ${crudo.join(', ')}` : ''}`
       + `${m.contenido.saleHasta ? ` · sale hasta el ${m.contenido.saleHasta}${vencido ? ' (🔴 YA VENCIÓ)' : ''}` : ''}`
@@ -112,7 +115,10 @@ async function main() {
   }
   mkdirSync(DIR, { recursive: true });
   for (const m of mails) {
-    const previa = existentes.find((a) => a.nombre === m.nombre);
+    // Por el NÚMERO de la serie («Bienvenida Z 3/4 — …») y no por el nombre entero: un
+    // mail que cambió de tema (v3 de Zattia: «por qué Zattia» → «cómo es comprar") se
+    // reescribe y se renombra, en vez de nacer al lado del viejo.
+    const previa = existentes.find((a) => a.nombre === m.nombre) ?? existentes.find((a) => mismoLugar(a.nombre, m.nombre));
     if (previa) {
       if (!reescribir) continue;
       if (previa.estado !== 'PAUSADO') {
@@ -122,7 +128,7 @@ async function main() {
       writeFileSync(`${DIR}/respaldo-${previa.id}.json`, JSON.stringify(previa.contenido, null, 2));
       const { count } = await prisma.automation.updateMany({
         where: { id: previa.id, estado: 'PAUSADO', docVersion: previa.docVersion },
-        data: { contenido: m.contenido as object, asunto: m.asunto, preheader: m.preheader, docVersion: { increment: 1 } },
+        data: { nombre: m.nombre, contenido: m.contenido as object, asunto: m.asunto, preheader: m.preheader, docVersion: { increment: 1 } },
       });
       console.log(`   ${count ? '✎ reescrita' : '⚠️ NO se escribió (alguien la guardó en el medio)'}: ${m.nombre}`);
       continue;

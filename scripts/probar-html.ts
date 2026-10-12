@@ -212,6 +212,15 @@ titulo("Responsive");
   ok(!grilla4.includes("COMPRAR"), "con cuatro por fila el botón de la tarjeta NO se dibuja");
   ok(tresConBoton.includes("COMPRAR"), "y con tres el mismo bloque sí lo dibuja (la guarda es de la forma, no del texto)");
 
+  // `dosPorDos` (12-oct-2026): la fila de cuatro va 2×2 en el celular. La regla
+  // de `m-g2` sale SÓLO si el mail la usa, y sin el campo nada cambia (arriba).
+  const g22 = render({ bloques: [{ tipo: "productos", items: ITEMS, porFila: 4, dosPorDos: true }] });
+  ok(g22.includes(`class="${CLASES.grilla2}"`) && !g22.includes(`class="${CLASES.col}"`), "con `dosPorDos` las celdas de cuatro llevan `m-g2` y no apilan");
+  ok(g22.includes(`width="25%"`), "y en escritorio siguen siendo cuatro al 25% (el inline es el de escritorio)");
+  ok(g22.includes(`.${CLASES.grilla2}{`) && !grilla4.includes(`.${CLASES.grilla2}{`), "la regla de `m-g2` sale sólo en el mail que la usa");
+  const g23 = render({ bloques: [{ tipo: "productos", items: ITEMS, porFila: 3, dosPorDos: true }] });
+  ok(!g23.includes(`class="${CLASES.grilla2}"`), "con tres, `dosPorDos` no hace nada (2 + 1 no es una grilla)");
+
   // La imagen a sangre sale del contenedor con padding, y no de otra forma: lo
   // que se está fijando es que NO la envuelva `pad()`.
   const sangre = render({ bloques: [{ tipo: "imagen", url: "https://x/hero.jpg", alt: "Portada", sangre: true }] });

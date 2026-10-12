@@ -4,7 +4,7 @@ import { leerContenido } from "@/lib/email/esquema";
 import { cadaBloque } from "@/lib/email/bloques";
 import { conCarrito } from "@/lib/email/prueba";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
-import { aplicarCuponDelTrigger, type TriggerPopup } from "@/lib/email/cupon-trigger";
+import { aplicarCuponDelTrigger, resolverCuponEnDoc, type TriggerPopup } from "@/lib/email/cupon-trigger";
 import { pideCupon, fuenteDeCupon, aplicarCuponDeCarrito, type CuponEmitido } from "@/lib/email/cupon-carrito";
 import { pedirCuponDeCarrito, RESORTY_URL } from "@/lib/carrito-cupon";
 import { firmarResena, VIDA_MS } from "@/lib/resena-token";
@@ -330,6 +330,8 @@ export async function GET(req: Request) {
       // host de ESTA marca — el mismo `hostDeEnvio` que arma `host`.
       ...marcaDe(automation.cuenta, appUrl),
     };
+    // `${cupon.vence}` en el preheader, con el vencimiento de ESTE run.
+    if (opts.preheader?.includes("${cupon.")) opts.preheader = resolverCuponEnDoc({ t: opts.preheader }, td.vence).t || undefined;
     // Se pasa el contenido ENTERO con los bloques pisados, no `{ bloques, tema }`.
     //
     // Enumerar los campos a mano hacía que cada cosa nueva del contenido —el tema
