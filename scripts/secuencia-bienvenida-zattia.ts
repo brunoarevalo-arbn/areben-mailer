@@ -35,6 +35,8 @@ const GRIS = '#f2f2f2';
 const TEMA: Tema = { base: 'claro', fondo: '#ffffff', fondoContenido: '#ffffff', acento: NEGRO, fuente: 'sistema' };
 
 const TIENDA = 'https://zattia.com.ar';
+/** La categoría NEW IN de TN: donde vale el código (decisión de Bruno, 12-oct) y de donde salen los productos del 2/4. */
+const CAT_NEW_IN = '26928851';
 const WHATSAPP = 'https://wa.me/5493416135024';
 const utm = (ruta: string, dia: number, donde = 'cuerpo') =>
   `${TIENDA}/${ruta}?utm_source=mailer&utm_medium=email&utm_campaign=bienvenida-zattia-d${dia}&utm_content=${donde}`;
@@ -44,14 +46,18 @@ const FOTO = (archivo: string, ancho = 640) => `https://acdn-us.mitiendanube.com
 // gris, que es la promesa de la marca («la ves puesta en una persona real»).
 // ⛔ Ninguna se repite entre mails.
 type Foto = [url: string, alt: string];
-const STELLA: Foto = [FOTO('top-stella-marron-2-bc27d89265e79f197717901912034345'), 'Top Stella marrón, puesto'];
-const CIARA: Foto = [FOTO('vestido-ciara-negro-1-2-252d23bcb4ebd9286b17900120771779'), 'Vestido Ciara negro, puesto'];
-const ZOEY: Foto = [FOTO('top-zoey-marron-1-2-e0a4cf494b8a014ab117900133318603'), 'Top Zoey marrón, puesto'];
-const AZURI: Foto = [FOTO('top-azuri-negro-2-8f9cfeb64df1fbee2a17900137933400'), 'Top Azuri negro, puesto'];
 const VERA: Foto = [FOTO('top-vera-negro-1-2-4df2f1fb41ef901d8117901870330998'), 'Top Vera negro, puesto'];
 const DAISY: Foto = [FOTO('blusa-daisy-1-2-ddeefe4cc5e1272e8a17900920230153'), 'Blusa Daisy, puesta'];
-const ICONIC: Foto = [FOTO('baby-tee-iconic-negro-2-5a90f979b5f170721817907748946744'), 'Baby tee Iconic negra, puesta'];
-const KITTY: Foto = [FOTO('baby-tee-kitty-2-9191a99ddb00ca841117907727128476'), 'Baby tee Kitty, puesta'];
+const ENYA: Foto = [FOTO('top-enya-blanco-2-f8b7333416cb52f8ca17900164929733'), 'Top Enya blanco, puesto'];
+const TANGER: Foto = [FOTO('vestido-tanger-negro-1-2-59f9a24045ce23232f17900124988291'), 'Vestido Tanger negro, puesto'];
+
+// Fotos de CAMPAÑA (chicas en la calle, luz natural): las 3 del slider de la home SIN
+// texto encima, pasadas a JPG y subidas al Blob del mailer (12-oct-2026). Bruno: los
+// mails con sólo fotos de producto sobre gris no lo convencieron. 1024×1280 (4:5).
+const BLOB = 'https://80wkelaj24ephh6z.public.blob.vercel-storage.com/mail/zattia-campania';
+const CAMPERA: Foto = [`${BLOB}/campera-blanca-6akxLXoBtg7Oy42H5H7ByYLVDDSwB7.jpg`, 'Chica con campera blanca de piel y pollera cebra, en la calle'];
+const GORRO: Foto = [`${BLOB}/gorro-calle-iKryNXdAfdauJWKG8avV0pFk8TfjnO.jpg`, 'Chica con gorro de piel y remera marrón, en la calle'];
+const ESCOCESA: Foto = [`${BLOB}/escocesa-vidriera-C1JSGX1bsFbIfSaPZHHtFeg12gVFsM.jpg`, 'Chica con sweater negro y pollera escocesa frente a una vidriera'];
 
 // ── Las piezas ────────────────────────────────────────────────────────────────
 
@@ -93,6 +99,12 @@ const dosFotos = (a: Foto, b: Foto, url: string): Bloque => ({
   ],
   estilo: { imagen: { radio: 0 }, caja: { padArriba: 20, padAbajo: 4 } },
 } as unknown as Bloque);
+
+/** La foto de campaña de portada: de borde a borde y clickeable. */
+const portada = (f: Foto, url: string): Bloque => ({
+  id: nuevoId(), tipo: 'imagen', url: f[0], alt: f[1], enlace: url, sangre: true,
+  estilo: { caja: { padArriba: 0, padAbajo: 0 } },
+} as Bloque);
 
 const banda = (fondo: string, acento: string, bloques: Bloque[]): Bloque => ({
   id: nuevoId(), tipo: 'banda', fondo, acento, bloques,
@@ -138,10 +150,10 @@ export function armarBienvenidaZattia(vieja: { contenido: unknown }): MailNuevo[
   const mail1: Bloque[] = [
     encabezado(),
     barra(),
+    portada(CAMPERA, utm('new-in/', 0, 'portada')),
     volanta('ZATTIA SQUAD'),
     titular('Bienvenida a Zattia 🤍'),
     parrafo('Lo nuevo de la temporada, siempre antes que nadie. Tu código está arriba de todo: usalo en tu primera compra, en las prendas nuevas.'),
-    dosFotos(STELLA, CIARA, utm('new-in/', 0, 'fotos')),
     boton('VER NEW IN', utm('new-in/', 0, 'boton')),
     titular('Elegí por dónde empezar', 20),
     lista('categorias', [
@@ -168,12 +180,14 @@ export function armarBienvenidaZattia(vieja: { contenido: unknown }): MailNuevo[
   const mail2: Bloque[] = [
     encabezado(),
     barra(),
+    portada(GORRO, utm('new-in/', 2, 'portada')),
     volanta('NEW IN'),
     titular('Recién llegado'),
-    parrafo('Entraron tops, vestidos y baby tees. Te dejamos algunos para que veas cómo quedan puestos.'),
-    dosFotos(ZOEY, AZURI, utm('new-in/', 2, 'fotos')),
+    parrafo('Tops, blusas y vestidos de la temporada. Te dejamos algunos para que veas cómo quedan puestos.'),
     {
-      id: nuevoId(), tipo: 'productos-dinamicos', fuente: 'recientes', n: 6, porFila: 3, movil: 2,
+      // La categoría NEW IN y ⛔ «recientes»: lo último que se carga suele ser UNA tanda
+      // (el 12-oct, 11 remeras seguidas). Y es justo donde vale el código (12-oct-2026).
+      id: nuevoId(), tipo: 'productos-dinamicos', fuente: 'categoria', categoriaId: CAT_NEW_IN, n: 6, porFila: 3, movil: 2,
       estilo: { cuerpo: { align: 'center' }, caja: { padArriba: 20 } },
     } as unknown as Bloque,
     boton('VER TODO LO NUEVO', utm('new-in/', 2, 'boton')),
@@ -186,6 +200,7 @@ export function armarBienvenidaZattia(vieja: { contenido: unknown }): MailNuevo[
   const mail3: Bloque[] = [
     encabezado(),
     barra(),
+    portada(ESCOCESA, utm('', 4, 'portada')),
     volanta('POR QUÉ ZATTIA'),
     titular('La ves puesta antes de elegirla'),
     parrafo('Cada prenda la fotografiamos puesta en una persona real, para que sepas cómo queda antes de comprarla.'),
@@ -220,7 +235,7 @@ export function armarBienvenidaZattia(vieja: { contenido: unknown }): MailNuevo[
         estilo: { boton: { tamano: 13, peso: 700, espaciado: 2, radio: 4, padY: 16, padX: 40 } },
       } as Bloque,
     ]),
-    dosFotos(ICONIC, KITTY, utm('new-in/', 6, 'fotos')),
+    dosFotos(ENYA, TANGER, utm('new-in/', 6, 'fotos')),
     parrafo('¿Dudas con el talle? Escribinos por WhatsApp y te ayudamos 🤍', { align: 'center' }),
     ...pie(6),
   ];
@@ -231,7 +246,7 @@ export function armarBienvenidaZattia(vieja: { contenido: unknown }): MailNuevo[
 
   return [
     m(1, 'el código', 0, 'Bienvenida a Zattia: tu código está adentro', 'Usalo en tu primera compra, en las prendas nuevas. Vale 7 días.', doc(mail1)),
-    m(2, 'new in', 48, 'Recién llegado', 'Tops, vestidos y baby tees nuevos, puestos.', doc(mail2)),
+    m(2, 'new in', 48, 'Recién llegado', 'Tops, blusas y vestidos de la temporada, puestos.', doc(mail2)),
     m(3, 'por qué Zattia', 96, 'Cómo es comprar en Zattia', 'La ves puesta antes de elegirla, y si no te quedó, la cambiás.', doc(mail3)),
     m(4, 'tu código vence mañana', 144, 'Tu código vence mañana', 'Es el mismo código de la bienvenida. Después de mañana deja de andar.', doc(mail4)),
   ];
