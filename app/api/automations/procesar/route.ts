@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, aplicarMergeTagsAsunto, type ProductoEmail } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
-import { cadaBloque, mapearBloques } from "@/lib/email/bloques";
+import { cadaBloque } from "@/lib/email/bloques";
+import { conCarrito } from "@/lib/email/prueba";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { aplicarCuponDelTrigger, type TriggerPopup } from "@/lib/email/cupon-trigger";
 import { pideCupon, fuenteDeCupon, aplicarCuponDeCarrito, type CuponEmitido } from "@/lib/email/cupon-carrito";
@@ -248,15 +249,8 @@ export async function GET(req: Request) {
       // bloque en el modo de carrito: sin los totales, un comprobante no dice
       // cuánto se pagó.
       const delTicket = ticket ? { modo: "ticket" as const, totales: ticket.totales, pie: ticket.pie } : {};
-      // `cadaBloque`/`mapearBloques`: el carrito puede ir adentro de una `banda`.
-      const tieneBloque = cadaBloque(bloques).some((b) => b.tipo === "carrito");
-      if (tieneBloque) {
-        bloques = mapearBloques(bloques, (b) =>
-          b.tipo === "carrito" ? { ...b, items: productos, restantes: td.restantes ?? 0, ...delTicket } : b,
-        );
-      } else {
-        bloques.push({ tipo: "carrito", items: productos, restantes: td.restantes ?? 0, ...delTicket });
-      }
+      // `conCarrito`: el MISMO relleno que usa «Mandar una prueba».
+      bloques = conCarrito(bloques, productos, { restantes: td.restantes ?? 0, ...delTicket });
     }
 
     // Bienvenida de pop-up: el código real que el visitante acabó de sacar en

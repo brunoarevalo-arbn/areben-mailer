@@ -8,6 +8,7 @@
 // Correr:  node --import tsx scripts/probar-ticket.ts
 import { renderEmailHtml, renderEmailTexto, type Bloque } from '../lib/email/render.ts';
 import { bloqueDeTicket, leerTicket, plata, fechaAR } from '../lib/email/ticket.ts';
+import { conTicketDePrueba } from '../lib/email/prueba.ts';
 
 const errores: string[] = [];
 const ok = (cond: boolean, msg: string) => {
@@ -88,6 +89,19 @@ ok(txt.includes('TOTAL: $4.200') && txt.includes('Vuelto: $800') && txt.includes
 // El modo carrito de siempre ⛔ dibuja totales aunque vengan.
 const carrito = renderEmailHtml({ bloques: [{ ...bloque, modo: undefined }] }, { unsubscribeUrl: '#', nombreCuenta: 'ZATTIA' });
 ok(!carrito.includes('Vuelto'), 'fuera del modo ticket, los totales ⛔ se dibujan');
+
+// «Mandar una prueba» de TICKET: con el ticket de un run real, por `conCarrito`
+// —el mismo relleno que el procesador—, y ⛔ sin ticket ⇒ no hay prueba.
+const doc: Bloque[] = [
+  { tipo: 'texto', texto: 'Gracias' } as Bloque,
+  { tipo: 'banda', bloques: [{ tipo: 'carrito' } as Bloque] } as Bloque,
+];
+const conT = conTicketDePrueba(doc, { ticket: T30049 });
+const prueba = conT && renderEmailHtml({ bloques: conT }, { unsubscribeUrl: '#', nombreCuenta: 'ZATTIA' });
+ok(!!prueba && ['ACCESORIO NRO 1', '$4.200', 'Vuelto', 'Comprobante #30049'].every((n) => prueba.includes(n)), 'prueba: el ticket del run real entra al carrito de adentro de la banda');
+ok(!!conT && JSON.stringify(conT).split('"tipo":"carrito"').length === 2, 'prueba: ⛔ appendea un segundo carrito si ya hay uno');
+ok(conTicketDePrueba(doc, {}) === null && conTicketDePrueba(doc, null) === null, 'prueba: sin ticket en el run ⇒ null (⛔ prueba vacía)');
+ok(conTicketDePrueba(doc, { ticket: { ...T30049, total: 1 } }) === null, 'prueba: un ticket que no cierra ⇒ null');
 
 if (errores.length) {
   console.log(`\n❌ ${errores.length} falla(s)`);

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { autorizar, chequear, getAuth } from "@/lib/auth";
 import { ensureEventoWebhook, TRIGGER_EVENT } from "@/lib/tn/eventos";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, aplicarMergeTagsAsunto, type ContenidoCampania } from "@/lib/email/render";
-import { conCarrito, muestraDePrueba, urlVueltaDePrueba } from "@/lib/email/prueba";
+import { conCarrito, conTicketDePrueba, muestraDePrueba, urlVueltaDePrueba } from "@/lib/email/prueba";
 import { pideCupon, fuenteDeCupon, aplicarCuponDeCarrito } from "@/lib/email/cupon-carrito";
 import { prepararCarrito, resolverCarritoEnTexto, resolverTagsCarrito, type DatosCarrito } from "@/lib/email/tags-carrito";
 import { listarAbandonados } from "@/lib/tn/checkouts";
@@ -300,6 +300,20 @@ export async function enviarPruebaAutomation(id: string, email: string) {
     }
   }
   let bloques = conCarrito(contenido.bloques, items);
+
+  // 🔑 La prueba del ticket del local va con el ÚLTIMO ticket real que salió de
+  // esta automation (12-oct-2026): sin él llegaba sin prendas ni totales.
+  if (a.trigger === "TICKET") {
+    const runs = await prisma.automationRun.findMany({
+      where: { automationId: a.id },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: { triggerData: true },
+    });
+    const conTicket = runs.map((r) => conTicketDePrueba(bloques, r.triggerData)).find(Boolean);
+    if (!conTicket) return { ok: false, error: "Todavía no salió ningún ticket real: la prueba no tendría qué mostrar." };
+    bloques = conTicket;
+  }
 
   // 🔴 **Y el `cupon` TAMBIÉN, por el mismo camino que el envío.** Hasta el
   // 29-ago-2026 la prueba del 3er mail de carrito llegaba con el placeholder del

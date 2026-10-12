@@ -17,8 +17,12 @@
 // un cliente.
 //
 // ⚠️ Puro: sin prisma, sin red. Lo que sí necesita firma vive afuera.
-import { cadaBloque, mapearBloques, type Bloque, type ProductoEmail } from "./bloques";
+import { cadaBloque, mapearBloques, type Bloque, type FilaTotal, type ProductoEmail } from "./bloques";
 import { CARRITO_MUESTRA } from "./render";
+import { bloqueDeTicket, leerTicket } from "./ticket";
+
+/** Lo que el procesador le pega al bloque `carrito` además de los items. */
+export type RellenoCarrito = { restantes?: number; modo?: "ticket"; totales?: FilaTotal[]; pie?: string[] };
 
 /**
  * Mete los productos en el bloque `carrito`, o lo appendea si no está declarado.
@@ -28,13 +32,33 @@ import { CARRITO_MUESTRA } from "./render";
  * único que se le pide (mostrar cómo va a quedar). Las automations viejas no
  * declaran el bloque y en las dos puertas se appendea igual.
  */
-export function conCarrito(bloques: Bloque[], items: ProductoEmail[]): Bloque[] {
+export function conCarrito(bloques: Bloque[], items: ProductoEmail[], extra: RellenoCarrito = {}): Bloque[] {
   if (!items.length) return bloques;
+  const relleno = { items, restantes: 0, ...extra };
   // `cadaBloque`/`mapearBloques`: el carrito puede ir adentro de una `banda`.
   if (cadaBloque(bloques).some((b) => b.tipo === "carrito")) {
-    return mapearBloques(bloques, (b) => (b.tipo === "carrito" ? { ...b, items, restantes: 0 } : b));
+    return mapearBloques(bloques, (b) => (b.tipo === "carrito" ? { ...b, ...relleno } : b));
   }
-  return [...bloques, { tipo: "carrito", items, restantes: 0 }];
+  return [...bloques, { tipo: "carrito", ...relleno }];
+}
+
+/**
+ * El bloque del ticket del local, armado con un ticket que ya salió.
+ *
+ * 🔴 Hasta el 12-oct-2026 la prueba de TICKET llegaba **sin el ticket**: sin
+ * prendas, sin totales y sin pie, o sea sin lo único que ese mail tiene. Se
+ * rellena con el `triggerData.ticket` de un run real y por `conCarrito`, el mismo
+ * camino que el procesador. El ticket no trae datos de la clienta (prendas,
+ * montos, número y fecha), así que mostrarlo en una prueba no expone a nadie.
+ *
+ * Devuelve `null` si no hay ticket válido: una prueba sin ticket juzga un mail
+ * que nadie va a recibir.
+ */
+export function conTicketDePrueba(bloques: Bloque[], triggerData: unknown): Bloque[] | null {
+  const leido = leerTicket((triggerData as { ticket?: unknown } | null)?.ticket);
+  if (!leido.ok) return null;
+  const t = bloqueDeTicket(leido.ticket);
+  return conCarrito(bloques, t.items, { modo: "ticket", totales: t.totales, pie: t.pie });
 }
 
 /**
