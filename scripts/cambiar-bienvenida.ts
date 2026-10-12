@@ -15,11 +15,19 @@
 // escalera de Resorty, que vence el 31-oct, y el 5/5 sin código tiene que saltarse.
 import { prisma } from '../lib/prisma.ts';
 import { PREFIJO } from './secuencia-bienvenida-5.ts';
+import { PREFIJO_ZATTIA } from './secuencia-bienvenida-zattia.ts';
 
 const slug = process.argv.find((a) => a.startsWith('--cuenta='))?.split('=')[1] ?? 'bdi';
 const escribir = process.argv.includes('--escribir');
 const volver = process.argv.includes('--volver');
-const VIEJA = 'cms6kpmqg000004l4s4tg6djo';
+// La serie de cada marca (ver `crear-bienvenida-5.ts`). En Zattia la vieja se busca:
+// es la única NUEVO_SUSCRIPTOR que no es de la serie (12-oct-2026).
+const SERIES: Record<string, { vieja: string | null; prefijo: string; n: number }> = {
+  bdi: { vieja: 'cms6kpmqg000004l4s4tg6djo', prefijo: PREFIJO, n: 5 },
+  zattia: { vieja: null, prefijo: PREFIJO_ZATTIA, n: 4 },
+};
+const serie = SERIES[slug];
+if (!serie) throw new Error(`no hay serie de bienvenida para «${slug}»`);
 const PCT_CONTROL = 10;
 
 async function main() {
@@ -29,12 +37,13 @@ async function main() {
     where: { cuentaId: cuenta.id, trigger: { in: ['NUEVO_SUSCRIPTOR', 'NUEVO_CLIENTE'] } },
     orderBy: { esperaHoras: 'asc' },
   });
-  const nuevas = todas.filter((a) => a.nombre.startsWith(PREFIJO));
-  const vieja = todas.filter((a) => a.id === VIEJA);
-  if (nuevas.length !== 5) throw new Error(`hay ${nuevas.length} de «${PREFIJO}», se esperan 5: corré crear-bienvenida-5.ts`);
-  if (vieja.length !== 1) throw new Error(`no está la bienvenida de hoy (${VIEJA})`);
+  const nuevas = todas.filter((a) => a.nombre.startsWith(serie.prefijo));
+  const vieja = todas.filter((a) => (serie.vieja ? a.id === serie.vieja : a.trigger === 'NUEVO_SUSCRIPTOR' && !a.nombre.startsWith(serie.prefijo)));
+  if (nuevas.length !== serie.n) throw new Error(`hay ${nuevas.length} de «${serie.prefijo}», se esperan ${serie.n}: corré crear-bienvenida-5.ts`);
+  if (vieja.length !== 1) throw new Error(`se esperaba UNA bienvenida de hoy y hay ${vieja.length}`);
+  const VIEJA = vieja[0].id;
   // Cualquier OTRA bienvenida activa le sumaría un mail más a cada lead.
-  const otras = todas.filter((a) => a.estado === 'ACTIVO' && a.id !== VIEJA && !a.nombre.startsWith(PREFIJO));
+  const otras = todas.filter((a) => a.estado === 'ACTIVO' && a.id !== VIEJA && !a.nombre.startsWith(serie.prefijo));
   if (otras.length) throw new Error(`hay otra bienvenida ACTIVA: ${otras.map((a) => a.nombre).join(', ')}`);
 
   const [prender, pausar] = volver ? [vieja, nuevas] : [nuevas, vieja];

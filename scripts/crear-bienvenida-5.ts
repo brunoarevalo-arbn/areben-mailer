@@ -9,14 +9,14 @@
 // `--reescribir` (12-oct-2026) pisa el contenido, el asunto y el preheader de las
 // cinco que YA EXISTEN, y sólo si siguen PAUSADAS: una ACTIVA está mandando y se
 // toca desde /automations. Guarda antes una copia del Json en
-// `.mirar/bienvenida5/respaldo-<id>.json` y escribe con `docVersion` en el WHERE
+// `${DIR}/respaldo-<id>.json` y escribe con `docVersion` en el WHERE
 // (como el editor): si alguien la guardó en el medio, no la pisa y lo dice.
 // 🔴 Va DESPUÉS del deploy de las piezas nuevas (`lista`, los cupones `barra` y
 // `grande`, `pegadas`): un panel viejo no conoce `lista` y la tira al guardar.
 //
 // Sin `--escribir` dibuja los cinco con el último lead REAL (su código, su premio) por
 // el mismo camino que el procesador —cupón del trigger, datos de la tienda, merge
-// tags— y los deja en `.mirar/bienvenida5/mail-N.html` para LEERLOS.
+// tags— y los deja en `${DIR}/mail-N.html` para LEERLOS.
 //
 // Idempotente: una automation con el mismo nombre ya creada se saltea — nunca se pisa,
 // porque después de creada se edita en /automations.
@@ -25,7 +25,8 @@
 // la de hoy y las cinco activas, cada lead recibiría DOS mails al instante.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { prisma } from '../lib/prisma.ts';
-import { armarBienvenida5, PREFIJO } from './secuencia-bienvenida-5.ts';
+import { armarBienvenida5, PREFIJO, type MailNuevo } from './secuencia-bienvenida-5.ts';
+import { armarBienvenidaZattia, PREFIJO_ZATTIA } from './secuencia-bienvenida-zattia.ts';
 import { aplicarCuponDelTrigger } from '../lib/email/cupon-trigger.ts';
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags } from '../lib/email/render.ts';
 import { marcaDe } from '../lib/marca.ts';
@@ -37,21 +38,36 @@ import { diaLocal } from '../lib/fechas.ts';
 const slug = process.argv.find((a) => a.startsWith('--cuenta='))?.split('=')[1] ?? 'bdi';
 const escribir = process.argv.includes('--escribir');
 const reescribir = process.argv.includes('--reescribir');
-const VIEJA = 'cms6kpmqg000004l4s4tg6djo';
+// La serie de cada marca: de qué bienvenida vieja clona el encabezado (y de cuyo último
+// lead saca el código para dibujar), con qué prefijo se nombran y quién las arma.
+// Zattia (12-oct-2026): 4 mails, la vieja «Bienvenida a la lista» se busca por trigger.
+const SERIES: Record<string, { vieja: string | null; prefijo: string; armar: (v: { contenido: unknown }) => MailNuevo[] }> = {
+  bdi: { vieja: 'cms6kpmqg000004l4s4tg6djo', prefijo: PREFIJO, armar: armarBienvenida5 },
+  zattia: { vieja: null, prefijo: PREFIJO_ZATTIA, armar: armarBienvenidaZattia },
+};
+const serie = SERIES[slug];
+if (!serie) throw new Error(`no hay serie de bienvenida para «${slug}»`);
+const DIR = slug === 'bdi' ? '.mirar/bienvenida5' : `.mirar/bienvenida-${slug}`; // BDI ya tiene sus respaldos ahí
 
 async function main() {
   const cuenta = await prisma.cuenta.findFirst({ where: { slug } });
   if (!cuenta) throw new Error(`no existe la cuenta "${slug}"`);
-  const vieja = await prisma.automation.findFirst({ where: { id: VIEJA, cuentaId: cuenta.id } });
-  if (!vieja) throw new Error(`no está la bienvenida de hoy (${VIEJA}) en ${slug}`);
+  const vieja = await prisma.automation.findFirst({
+    where: serie.vieja
+      ? { id: serie.vieja, cuentaId: cuenta.id }
+      : { cuentaId: cuenta.id, trigger: 'NUEVO_SUSCRIPTOR', NOT: { nombre: { startsWith: serie.prefijo } } },
+    orderBy: { createdAt: 'asc' },
+  });
+  if (!vieja) throw new Error(`no está la bienvenida de hoy en ${slug}`);
+  const VIEJA = vieja.id;
   const existentes = await prisma.automation.findMany({
-    where: { cuentaId: cuenta.id, trigger: 'NUEVO_SUSCRIPTOR', nombre: { startsWith: PREFIJO } },
+    where: { cuentaId: cuenta.id, trigger: 'NUEVO_SUSCRIPTOR', nombre: { startsWith: serie.prefijo } },
     select: { id: true, nombre: true, estado: true, docVersion: true, contenido: true },
   });
   const ya = new Set(existentes.map((a) => a.nombre));
   console.log(`▶ ${cuenta.nombre}: la de hoy es «${vieja.nombre}» [${vieja.estado}] — no se toca`);
 
-  const mails = armarBienvenida5(vieja);
+  const mails = serie.armar(vieja);
 
   // El último lead real, para dibujarlos con un código de verdad.
   const run = await prisma.automationRun.findFirst({
@@ -59,9 +75,13 @@ async function main() {
     orderBy: { createdAt: 'desc' },
     include: { contacto: true },
   });
-  const td = (run?.triggerData ?? {}) as Record<string, string | null>;
+  const td = { ...((run?.triggerData ?? {}) as Record<string, string | null>) };
+  // `--premio="10% OFF"` dibuja con el premio y las condiciones que manda HOY Resorty
+  // cuando el último lead real es de antes de un cambio (Zattia, 12-oct-2026).
+  const premio = process.argv.find((a) => a.startsWith('--premio='))?.split('=')[1];
+  if (premio) Object.assign(td, { prizeLabel: premio, condiciones: process.argv.find((a) => a.startsWith('--condiciones='))?.split('=')[1] ?? td.condiciones });
   const marca = marcaDe(cuenta, process.env.APP_URL ?? 'https://areben-mailer.vercel.app');
-  mkdirSync('.mirar/bienvenida5', { recursive: true });
+  mkdirSync(DIR, { recursive: true });
 
   for (const [i, m] of mails.entries()) {
     const bloques = aplicarCuponDelTrigger(m.contenido.bloques, { origen: 'popup', ...td });
@@ -73,8 +93,8 @@ async function main() {
     const opts = { ...marca, preheader: m.preheader ?? undefined, unsubscribeUrl: 'https://links.bdiaccesorios.com.ar/baja?c=ENSAYO', productosDinamicos };
     const html = aplicarMergeTags(renderEmailHtml({ ...m.contenido, bloques }, opts), run?.contacto ?? { email: 'ensayo@x.com' } as never);
     const texto = aplicarMergeTags(renderEmailTexto({ ...m.contenido, bloques }, opts), run?.contacto ?? { email: 'ensayo@x.com' } as never);
-    writeFileSync(`.mirar/bienvenida5/mail-${i + 1}.html`, html);
-    writeFileSync(`.mirar/bienvenida5/mail-${i + 1}.txt`, texto);
+    writeFileSync(`${DIR}/mail-${i + 1}.html`, html);
+    writeFileSync(`${DIR}/mail-${i + 1}.txt`, texto);
     // Lo que nunca puede llegar a una casilla.
     const crudo = [/\$\{[a-z]+\.[a-zA-Z]+\}/.exec(html)?.[0], html.includes('TUCUPON') ? 'TUCUPON' : null, /href=""/.test(html) ? 'href vacío' : null].filter(Boolean);
     const conCodigo = td.cupon ? html.includes(td.cupon) : null;
@@ -84,13 +104,13 @@ async function main() {
       + `${m.contenido.saleHasta ? ` · sale hasta el ${m.contenido.saleHasta}${vencido ? ' (🔴 YA VENCIÓ)' : ''}` : ''}`
       + ` · a un lead sin código: ${sinCupon ? 'NO sale' : 'sale (sin el cupón)'}`);
   }
-  console.log(`   (dibujados con el lead ${run?.contacto.email.replace(/^(.).*@/, '$1…@') ?? '—'}, código ${td.cupon ?? '—'} → .mirar/bienvenida5/)`);
+  console.log(`   (dibujados con el lead ${run?.contacto.email.replace(/^(.).*@/, '$1…@') ?? '—'}, código ${td.cupon ?? '—'} → ${DIR}/)`);
 
   if (!escribir) {
     console.log('\n(no se escribió nada: agregá --escribir)\n');
     return;
   }
-  mkdirSync('.mirar/bienvenida5', { recursive: true });
+  mkdirSync(DIR, { recursive: true });
   for (const m of mails) {
     const previa = existentes.find((a) => a.nombre === m.nombre);
     if (previa) {
@@ -99,7 +119,7 @@ async function main() {
         console.log(`   ⛔ ${m.nombre}: está ${previa.estado}, no se pisa (se toca desde /automations)`);
         continue;
       }
-      writeFileSync(`.mirar/bienvenida5/respaldo-${previa.id}.json`, JSON.stringify(previa.contenido, null, 2));
+      writeFileSync(`${DIR}/respaldo-${previa.id}.json`, JSON.stringify(previa.contenido, null, 2));
       const { count } = await prisma.automation.updateMany({
         where: { id: previa.id, estado: 'PAUSADO', docVersion: previa.docVersion },
         data: { contenido: m.contenido as object, asunto: m.asunto, preheader: m.preheader, docVersion: { increment: 1 } },
