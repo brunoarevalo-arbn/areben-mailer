@@ -8,7 +8,7 @@
 //
 // Puro: lo usan el endpoint `POST /api/externo/ticket` (valida al recibir), el
 // procesador de automations (arma el bloque al enviar) y `probar-ticket.ts`.
-import type { FilaTotal, ProductoEmail } from "./bloques";
+import type { CabeceraTicket, FilaTotal, ProductoEmail } from "./bloques";
 
 export interface RenglonTicket {
   nombre: string;
@@ -143,12 +143,29 @@ export function fechaAR(iso: string): string {
   return `${ar.slice(8, 10)}/${ar.slice(5, 7)}/${ar.slice(0, 4)} ${ar.slice(11, 16)}`;
 }
 
+/** «Comprobante #30049 · 04/10/2026 15:30»: el primer renglón del pie en la vista de siempre. */
+export function lineaComprobante(c: CabeceraTicket): string {
+  return `Comprobante ${c.numero != null ? `#${c.numero}` : "en proceso"} · ${c.fecha}`;
+}
+
 /**
- * Lo que dibuja el bloque: las prendas, los renglones de plata y el pie. Mismo
- * orden y mismas palabras que el ticket de papel (🔴 el redondeo que sube es
- * «Recargo por redondeo», como en los tickets de GN — Bruno, 4-oct-2026).
+ * Lo que dibuja el bloque: las prendas, los renglones de plata, el número y la
+ * fecha (`cabecera`) y el pie. Mismo orden y mismas palabras que el ticket de
+ * papel (🔴 el redondeo que sube es «Recargo por redondeo», como en los tickets
+ * de GN — Bruno, 4-oct-2026).
+ *
+ * 🔴 **La forma de pago ⛔ sale en el mail** (Bruno, 12-oct-2026: «el medio de
+ * cobro en los mails no sirve»). Hasta ese día iban, después del TOTAL, «Pagaste
+ * con …», «Entregaste» y «Vuelto». El DESCUENTO por forma de pago sí sigue
+ * («Descuento 15%», sin nombrar el medio), igual que el redondeo. `leerTicket`
+ * sigue validando los pagos igual: el monitor los manda y tienen que cerrar.
+ *
+ * 🔑 El número y la fecha van SUELTOS en `cabecera` (y no pegados en el pie)
+ * porque la vista `tarjeta` los pone en su franja de arriba; la vista de siempre
+ * los vuelve a escribir como primer renglón del pie (`lineaComprobante`), así que
+ * el mail de Zattia dice lo mismo que decía.
  */
-export function bloqueDeTicket(t: TicketLocal): { items: ProductoEmail[]; totales: FilaTotal[]; pie: string[] } {
+export function bloqueDeTicket(t: TicketLocal): { items: ProductoEmail[]; totales: FilaTotal[]; pie: string[]; cabecera: CabeceraTicket } {
   const items: ProductoEmail[] = t.renglones.map((r) => {
     const lista = r.cantidad * r.precio;
     const conRebaja = Math.round(r.importe * 100) < Math.round(lista * 100);
@@ -168,23 +185,15 @@ export function bloqueDeTicket(t: TicketLocal): { items: ProductoEmail[]; totale
   // 🔑 Cascada (Bruno, 4-oct): prenda (tachada arriba) ⇒ venta ⇒ forma de pago, que dice sólo
   // «Descuento 15%»: ⛔ «Descuento Transferencia CG».
   const aVenta = Math.round(t.pagos.reduce((s, p) => s + (p.rebaja || 0), 0) * 100) / 100;
-  if (aVenta > 0) totales.push({ etiqueta: "Descuento en la venta", monto: `−${plata(aVenta)}` });
+  if (aVenta > 0) totales.push({ etiqueta: "Descuento en la venta", monto: `−${plata(aVenta)}`, tipo: "descuento" });
   for (const p of t.pagos) {
-    if (p.descuento > 0) totales.push({ etiqueta: `Descuento ${p.porcentaje}%`, monto: `−${plata(p.descuento)}` });
-    if (p.redondeo > 0) totales.push({ etiqueta: "Recargo por redondeo", monto: `+${plata(p.redondeo)}` });
-    if (p.redondeo < 0) totales.push({ etiqueta: "Redondeo", monto: `−${plata(p.redondeo)}` });
+    if (p.descuento > 0) totales.push({ etiqueta: `Descuento ${p.porcentaje}%`, monto: `−${plata(p.descuento)}`, tipo: "descuento" });
+    if (p.redondeo > 0) totales.push({ etiqueta: "Recargo por redondeo", monto: `+${plata(p.redondeo)}`, tipo: "ajuste" });
+    if (p.redondeo < 0) totales.push({ etiqueta: "Redondeo", monto: `−${plata(p.redondeo)}`, tipo: "ajuste" });
   }
   totales.push({ etiqueta: "TOTAL", monto: plata(t.total), fuerte: true });
-  for (const p of t.pagos) totales.push({ etiqueta: `Pagaste con ${p.cuenta}`, monto: plata(p.monto) });
-  if (t.pagaCon != null && t.vuelto != null) {
-    totales.push({ etiqueta: "Entregaste", monto: plata(t.pagaCon) });
-    totales.push({ etiqueta: "Vuelto", monto: plata(t.vuelto) });
-  }
 
-  const pie = [
-    `Comprobante ${t.numero != null ? `#${t.numero}` : "en proceso"} · ${fechaAR(t.fecha)}`,
-    "Documento no válido como factura",
-  ];
+  const pie = ["Documento no válido como factura"];
   if (t.politica) pie.push(t.politica);
-  return { items, totales, pie };
+  return { items, totales, pie, cabecera: { numero: t.numero, fecha: fechaAR(t.fecha) } };
 }

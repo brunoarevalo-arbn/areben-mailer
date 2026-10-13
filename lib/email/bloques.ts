@@ -37,6 +37,25 @@ export interface FilaTotal {
   etiqueta: string;
   monto: string;
   fuerte?: boolean;
+  /**
+   * Qué clase de renglón es, para que una vista lo pueda pintar distinto
+   * (12-oct-2026, ticket de BDI): `descuento` toma el `colorDescuento` del
+   * bloque, y `ajuste` (el redondeo) sale en el gris de apoyo en la `tarjeta`.
+   * Ausente = un renglón común, como salió siempre. Lo pone `bloqueDeTicket`.
+   */
+  tipo?: "descuento" | "ajuste";
+}
+
+/**
+ * El número y la fecha del comprobante, SUELTOS (12-oct-2026): la vista
+ * `tarjeta` los dibuja en la franja de arriba y la de siempre los arma como el
+ * primer renglón del pie («Comprobante #N · fecha»). Los pone `bloqueDeTicket`.
+ */
+export interface CabeceraTicket {
+  /** El número de la venta en GN; `null` = todavía no lo tiene («en proceso»). */
+  numero: number | null;
+  /** Ya escrita en hora de Argentina («12/10/2026 17:42»). */
+  fecha: string;
 }
 
 export interface ProductoEmail {
@@ -696,8 +715,14 @@ export type Bloque = BloqueBase &
          *  - `galeria`: hasta tres fotos 4:5 en fila con nombre, variante y precio
          *    debajo de cada una, y «+ n productos más».
          * ⛔ Ninguna de las dos se apila en el celular.
+         * Y el 12-oct-2026, con el ticket de BDI (`.mirar/ticket-bdi/`):
+         *  - `tarjeta`: SÓLO en el modo `"ticket"` (en otro modo cae a `lista`). El
+         *    comprobante en una tarjeta con borde: franja oscura «TU TICKET · #N ·
+         *    fecha», prendas con foto de 64 px de ancho y alto según el archivo, el
+         *    nombre como viene (⛔ mayúsculas forzadas), los totales con el TOTAL
+         *    en barra y la letra chica al pie.
          */
-        vista?: "lista" | "por-modelo" | "tira" | "resumen" | "tienda" | "galeria";
+        vista?: "lista" | "por-modelo" | "tira" | "resumen" | "tienda" | "galeria" | "tarjeta";
         /**
          * Sólo en el modo `"ticket"`: los renglones de plata debajo de las
          * prendas —subtotal, descuento de la cuenta, redondeo, TOTAL, con qué
@@ -706,8 +731,20 @@ export type Bloque = BloqueBase &
          * `triggerData.ticket` (ver `lib/email/ticket.ts`).
          */
         totales?: FilaTotal[];
-        /** Sólo en el modo `"ticket"`: los renglones chicos del final (número, fecha, política de cambio). */
+        /**
+         * Sólo en el modo `"ticket"`: los renglones chicos del final («Documento
+         * no válido como factura», la política de cambio). El número y la fecha
+         * van aparte, en `cabecera`.
+         */
         pie?: string[];
+        /** Sólo en el modo `"ticket"`: número y fecha. ⛔ Se cargan a mano: los pone el procesador. */
+        cabecera?: CabeceraTicket;
+        /**
+         * El color de los renglones de DESCUENTO del ticket (el magenta de BDI).
+         * Token (`$acento`) o hex, saneado como cualquier color del motor. Ausente
+         * = el color de los demás renglones, como salió siempre.
+         */
+        colorDescuento?: string;
       }
     /**
      * La fila: de 2 a 4 celdas, cada una con foto o con texto.

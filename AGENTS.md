@@ -1338,8 +1338,18 @@ el header `x-ticket-key` (env `TICKET_KEY`; sin ella, todo 401). ⛔ Tiene event
   existía, **⛔ lo toca** (ni estado ni consentimiento).
 - **Uno por venta**: `triggerData.ticket.ventaId` deduplica (con lock), así que el monitor
   reintenta sin miedo.
-- El mail va en el bloque `carrito` con `modo: "ticket"`: prendas + `totales` + `pie`, que
-  arma `lib/email/ticket.ts` **sin recalcular** (los montos son los del ticket de papel).
+- El mail va en el bloque `carrito` con `modo: "ticket"`: prendas + `totales` + `pie` +
+  `cabecera` (número y fecha sueltos), que arma `lib/email/ticket.ts` **sin recalcular** (los
+  montos son los del ticket de papel). Llegan al bloque por `rellenoDeTicket` (`prueba.ts`),
+  la MISMA función en el procesador y en «Mandar una prueba».
+- 🔴 **La forma de pago ⛔ sale en ningún mail** (Bruno, 12-oct-2026): ni «Pagaste con», ni
+  «Entregaste», ni «Vuelto». El descuento por forma de pago («Descuento 15%») sí, igual que el
+  redondeo. `leerTicket` sigue exigiendo que los pagos cierren.
+- Dos vistas: la de siempre (Zattia: el número va como primer renglón del pie,
+  `lineaComprobante`) y **`vista: "tarjeta"`** (BDI, `scripts/secuencia-ticket-bdi.ts`): franja
+  «TU TICKET · #N · fecha», foto de 64 px de ancho y alto según el archivo (⛔ `object-fit`), el
+  nombre como viene de GN y el TOTAL en barra. `colorDescuento` (token o hex) pinta los
+  descuentos en las dos. Lo fija `probar-ticket.ts`.
 - `areben-popups` ⛔ lee `TriggerTipo` con Prisma ⇒ este valor sólo pide deployar el mailer.
 
 ## Estado del trabajo

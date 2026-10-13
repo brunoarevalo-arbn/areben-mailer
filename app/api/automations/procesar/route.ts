@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { renderEmailHtml, renderEmailTexto, aplicarMergeTags, aplicarMergeTagsAsunto, type ProductoEmail } from "@/lib/email/render";
 import { leerContenido } from "@/lib/email/esquema";
 import { cadaBloque } from "@/lib/email/bloques";
-import { conCarrito } from "@/lib/email/prueba";
+import { conCarrito, rellenoDeTicket } from "@/lib/email/prueba";
 import { resolverProductosDinamicos } from "@/lib/email/productos-dinamicos";
 import { aplicarCuponDelTrigger, resolverCuponEnDoc, type TriggerPopup } from "@/lib/email/cupon-trigger";
 import { pideCupon, fuenteDeCupon, aplicarCuponDeCarrito, type CuponEmitido } from "@/lib/email/cupon-carrito";
@@ -248,7 +248,7 @@ export async function GET(req: Request) {
       // El ticket va SIEMPRE en modo `ticket`, aunque el autor haya dejado el
       // bloque en el modo de carrito: sin los totales, un comprobante no dice
       // cuánto se pagó.
-      const delTicket = ticket ? { modo: "ticket" as const, totales: ticket.totales, pie: ticket.pie } : {};
+      const delTicket = ticket ? rellenoDeTicket(ticket) : {};
       // `conCarrito`: el MISMO relleno que usa «Mandar una prueba».
       bloques = conCarrito(bloques, productos, { restantes: td.restantes ?? 0, ...delTicket });
     }

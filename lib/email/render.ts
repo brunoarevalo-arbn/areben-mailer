@@ -6,7 +6,7 @@
 import { esColorOscuro, resolverPaleta, combinarTema, type Paleta, type Tema } from "./tema";
 import { leerContenido } from "./esquema";
 import {
-  resolverEstilo, extra, px, padCss, padCaja, aireCss, aireElegido, alineacion, tenueSobre, ocultoEnTodas,
+  resolverEstilo, extra, px, padCss, padCaja, aireCss, aireElegido, alineacion, tenueSobre, ocultoEnTodas, sanearColor, resolverColor,
   type CtxEstilo, type EstiloResuelto, type Estilos, type RolEstilo,
 } from "./estilos";
 import { superficieDe } from "./contraste";
@@ -16,7 +16,8 @@ import { redConIcono, urlIcono } from "./redes";
 import { iconoDe, urlIconoCelda } from "./iconos";
 import { resolverCuponEnDoc } from "./cupon-trigger";
 import { trozoCss, textoPlano, tieneTamano, tieneLink, fusionar, sanearUrl, type TextoRico, type Trozo } from "./texto-rico";
-import type { Bloque, Columna, ContenidoCampania, ItemLista, ElementoEncima, FilaTotal, PorFila, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
+import type { Bloque, CabeceraTicket, Columna, ContenidoCampania, ItemLista, ElementoEncima, FilaTotal, PorFila, PorFilaMovil, ProductoEmail, TipoBloque } from "./bloques";
+import { lineaComprobante } from "./ticket";
 import { armarPlano, type CeldaEncima } from "./encima";
 import { armarMosaico, estaCortado, normalizar, type CeldaPlano } from "./mosaico";
 import { etiquetasDe, instante, lineaRegresiva, medidas, tenue, urlRegresiva, FIN_BASE } from "./regresiva";
@@ -675,7 +676,7 @@ function renderCarrito(
   restantes = 0,
   ctx?: Ctx,
   modo?: "resena" | "ticket",
-  ticket?: { totales?: FilaTotal[]; pie?: string[] },
+  ticket?: { totales?: FilaTotal[]; pie?: string[]; cabecera?: CabeceraTicket; colorDescuento?: string },
 ): string {
   if (items.length === 0) return "";
   const filas = items
@@ -691,7 +692,7 @@ function renderCarrito(
     restantes > 0
       ? `<div style="margin:4px 0 0;font-size:14px;color:${pal.medio}"><a href="\${cart.url}" style="color:${pal.link}">y ${restantes} producto${restantes === 1 ? "" : "s"} más</a></div>`
       : "";
-  const cuentas = modo === "ticket" ? renderTotalesTicket(ticket?.totales ?? [], ticket?.pie ?? [], pal, e) : "";
+  const cuentas = modo === "ticket" ? renderTotalesTicket(ticket?.totales ?? [], ticket?.pie ?? [], pal, e, ticket?.cabecera, ticket?.colorDescuento) : "";
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(e.caja, 8, 16)}">${filas}${cuentas}</table>${mas}`;
 }
 
@@ -703,16 +704,28 @@ function renderCarrito(
  * ⛔ Calcula nada: los montos llegan escritos (`lib/email/ticket.ts`), los mismos
  * que imprimió la térmica. Un mail que recalcule puede decir otro total.
  */
-function renderTotalesTicket(totales: FilaTotal[], pie: string[], pal: Paleta, e: EstProducto): string {
+function renderTotalesTicket(
+  totales: FilaTotal[],
+  pie0: string[],
+  pal: Paleta,
+  e: EstProducto,
+  cabecera?: CabeceraTicket,
+  colorDescuento?: string,
+): string {
+  // El número y la fecha llegan sueltos (`cabecera`) y en esta vista vuelven a
+  // ser el primer renglón del pie, como salió siempre el mail de Zattia.
+  const pie = cabecera ? [lineaComprobante(cabecera), ...pie0] : pie0;
   if (totales.length === 0 && pie.length === 0) return "";
   const filas = totales
     .map((t, i) => {
       const tam = t.fuerte ? 18 : 14;
       const peso = t.fuerte ? 700 : 400;
       const arriba = i === 0 ? `border-top:1px solid ${pal.borde};padding-top:12px;` : t.fuerte ? "padding-top:8px;" : "";
+      // Sin `colorDescuento` elegido, el descuento sale como cualquier renglón.
+      const color = t.tipo === "descuento" && colorDescuento ? colorDescuento : e.nombre.color;
       return `<tr>
-    <td colspan="2" style="${arriba}padding-bottom:4px;font-size:${px(tam)};font-weight:${peso};color:${e.nombre.color}">${esc(t.etiqueta)}</td>
-    <td align="right" style="${arriba}padding-bottom:4px;font-size:${px(tam)};font-weight:${peso};color:${e.nombre.color};white-space:nowrap">${esc(t.monto)}</td>
+    <td colspan="2" style="${arriba}padding-bottom:4px;font-size:${px(tam)};font-weight:${peso};color:${color}">${esc(t.etiqueta)}</td>
+    <td align="right" style="${arriba}padding-bottom:4px;font-size:${px(tam)};font-weight:${peso};color:${color};white-space:nowrap">${esc(t.monto)}</td>
   </tr>`;
     })
     .join("");
@@ -720,6 +733,117 @@ function renderTotalesTicket(totales: FilaTotal[], pie: string[], pal: Paleta, e
     .map((l, i) => `<tr><td colspan="3" style="${i === 0 ? `border-top:1px solid ${pal.borde};padding-top:12px;` : ""}padding-bottom:4px;font-size:${px(e.nota.tamano ?? 13)};color:${e.nota.color};white-space:pre-line">${esc(l)}</td></tr>`)
     .join("");
   return filas + notas;
+}
+
+// ── El ticket en TARJETA (12-oct-2026, ticket de BDI) ──────────────────────
+// Diseño aprobado por Bruno: `.mirar/ticket-bdi/propuesta-a.html`.
+
+/** El ancho de la foto de una prenda en la tarjeta. El ALTO lo pone el archivo. */
+const FOTO_TICKET = 64;
+
+/**
+ * Mezcla dos `#rrggbb` (`t` = cuánto de `b`): el gris apagado del número sobre
+ * la franja. Los dos colores salen de la paleta ya resuelta; si alguno no es
+ * `#rrggbb` (no debería), devuelve `a` entero.
+ */
+function mezclaHex(a: string, b: string, t: number): string {
+  const re = /^#([0-9a-f]{6})$/i;
+  const ma = re.exec(a);
+  const mb = re.exec(b);
+  if (!ma || !mb) return a;
+  const ca = parseInt(ma[1], 16);
+  const cb = parseInt(mb[1], 16);
+  const canal = (sh: number) => Math.round(((ca >> sh) & 255) * (1 - t) + ((cb >> sh) & 255) * t);
+  return "#" + [16, 8, 0].map((sh) => canal(sh).toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * El comprobante en una tarjeta con borde: franja oscura «TU TICKET · #N ·
+ * fecha», las prendas, los totales con el TOTAL en barra, y la letra chica.
+ *
+ * - 🔴 **La foto va con ANCHO fijo y alto `auto`**, ⛔ `object-fit`: Gmail lo
+ *   ignora y el 72×72 de la `lista` aplastaba las fundas (4:5) y el cable (2:3).
+ *   Con alto automático cada foto sale en su proporción, que en un ticket es lo
+ *   correcto: no es una fila de vidriera que tenga que quedar pareja.
+ * - 🔴 **El nombre sale como viene de GN**: ⛔ `mayusculas` aunque el estilo lo
+ *   pida («CABLE … 60W - 1m» no puede pasar a «1M»).
+ * - La franja, el borde y la barra del TOTAL son del ACENTO (con su
+ *   `sobreAcento`): en BDI, el casi negro de la tienda.
+ * - Los descuentos en `colorDescuento` (el magenta de BDI); el redondeo
+ *   (`ajuste`) en el gris de apoyo.
+ * - ⛔ Sin `m-col`: foto | nombre | precio entra en los 375 px de un celular.
+ */
+function renderTicketTarjeta(
+  items: ProductoEmail[],
+  totales: FilaTotal[],
+  pie: string[],
+  cabecera: CabeceraTicket | undefined,
+  colorDescuento: string | undefined,
+  pal: Paleta,
+  e: EstProducto,
+): string {
+  const tinta = pal.acento;
+  const sobre = pal.sobreAcento;
+  const datos = cabecera ? [cabecera.numero != null ? `#${cabecera.numero}` : "", cabecera.fecha].filter(Boolean).join(" · ") : "";
+  const franja = `<tr><td bgcolor="${tinta}" style="background:${tinta};padding:12px 20px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="font-size:11px;font-weight:700;letter-spacing:2px;color:${sobre}">TU TICKET</td>${datos ? `
+      <td align="right" style="font-size:11px;letter-spacing:1px;color:${mezclaHex(sobre, tinta, 0.22)};white-space:nowrap">${esc(datos)}</td>` : ""}
+    </tr></table>
+  </td></tr>`;
+
+  const n = e.nombre;
+  const nota = e.nota;
+  // Los valores de la tarjeta son su default; lo ELEGIDO en el rol les gana.
+  const nombreCss = `font-size:${px(n.elegidas.has("tamano") && n.tamano ? n.tamano : 13)};line-height:1.35;letter-spacing:${n.elegidas.has("espaciado") && n.espaciado !== undefined ? px(n.espaciado) : ".6px"};color:${n.color};font-weight:${n.elegidas.has("peso") && n.peso ? n.peso : 400}${extra(n, ["tamano", "interlinea", "espaciado", "color", "peso", "align", "mayusculas"])}`;
+  const notaCss = `margin-top:3px;font-size:${px(nota.elegidas.has("tamano") && nota.tamano ? nota.tamano : 13)};line-height:1.4;color:${nota.elegidas.has("color") ? nota.color : pal.medio}`;
+  const conFotos = items.some((p) => p.imagen);
+  const prendas = items
+    .map((p, i) => {
+      const sep = i ? `border-top:1px solid ${pal.borde};` : "";
+      const detalle = [p.variante, (p.cantidad ?? 1) > 1 ? `${p.cantidad} u.` : null].filter(Boolean).join(" — ");
+      const foto = p.imagen
+        ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="${FOTO_TICKET}" style="width:${px(FOTO_TICKET)};height:auto;display:block;border:1px solid ${pal.bordeSuave};background:#ffffff" />`
+        : "";
+      const celdaFoto = conFotos ? `<td width="${FOTO_TICKET}" valign="top" style="${sep}padding:14px 0;width:${px(FOTO_TICKET)}">${conLinkA(p, foto)}</td>` : "";
+      return `<tr>${celdaFoto}
+    <td valign="top" style="${sep}padding:14px 12px 14px ${conFotos ? 14 : 0}px">${conLinkA(p, `<div style="${nombreCss}">${esc(p.nombre)}</div>${detalle ? `<div style="${notaCss}">${esc(detalle)}</div>` : ""}`)}</td>
+    <td valign="top" align="right" style="${sep}padding:14px 0;font-size:${px(e.precio.tamano ?? 14)};white-space:nowrap">${precioHtml(p, e.precio, e.nota)}</td>
+  </tr>`;
+    })
+    .join("");
+
+  const cuentas = totales
+    .map((t, i) => {
+      if (t.fuerte) {
+        return `<tr><td colspan="2" style="padding:12px 0 14px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td bgcolor="${tinta}" style="background:${tinta};padding:14px 16px;font-size:12px;font-weight:700;letter-spacing:2px;color:${sobre}">${esc(t.etiqueta)}</td>
+      <td bgcolor="${tinta}" align="right" style="background:${tinta};padding:14px 16px;font-size:24px;line-height:1;font-weight:800;font-style:italic;letter-spacing:-.5px;color:${sobre};white-space:nowrap">${esc(t.monto)}</td>
+    </tr></table>
+  </td></tr>`;
+      }
+      const desc = t.tipo === "descuento";
+      const color = desc ? colorDescuento ?? pal.texto : t.tipo === "ajuste" ? pal.medio : pal.texto;
+      const css = `padding:${i === 0 ? 14 : 0}px 0 5px;font-size:14px;color:${color};font-weight:${desc ? 600 : 400}`;
+      return `<tr>
+    <td style="${css}">${esc(t.etiqueta)}</td>
+    <td align="right" style="${css};white-space:nowrap">${esc(t.monto)}</td>
+  </tr>`;
+    })
+    .join("");
+  const letra = pie.length
+    ? `<tr><td colspan="2" style="border-top:1px solid ${pal.borde};padding:12px 0 14px;font-size:11px;line-height:1.5;color:${pal.tenue};white-space:pre-line">${pie.map(esc).join("<br />")}</td></tr>`
+    : "";
+  const abajo = cuentas || letra
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid ${pal.borde}">${cuentas}${letra}</table>`
+    : "";
+
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${tinta};${margen(e.caja, 8, 16)}">${franja}
+  <tr><td style="padding:6px 20px 4px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${prendas}</table>${abajo}
+  </td></tr>
+</table>`;
 }
 
 // ── Las vistas nuevas del carrito, el botón doble y el cupón con filete ─────
@@ -1409,6 +1533,12 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       if (items.length && b.vista === "tira") return pad(renderTira(items, rest, pal, ep), caja());
       if (items.length && b.vista === "tienda") return pad(renderCarritoTienda(items, rest, b.totales ?? [], pal, ep), caja());
       if (items.length && b.vista === "galeria") return pad(renderGaleria(items, rest, pal, ep), caja());
+      // El color de los descuentos se SANEA acá también: `esActual` deja pasar
+      // el documento sin el saneo de `leerContenido` (la frontera es el emisor).
+      const colorDescuento = resolverColor(sanearColor(b.colorDescuento), pal);
+      // La tarjeta es un COMPROBANTE: fuera del modo ticket cae a la `lista`.
+      if (items.length && b.vista === "tarjeta" && b.modo === "ticket")
+        return pad(renderTicketTarjeta(items, b.totales ?? [], b.pie ?? [], b.cabecera, colorDescuento, pal, ep), caja());
       return pad(
         renderCarrito(
           items,
@@ -1417,7 +1547,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
           b.items?.length ? b.restantes ?? 0 : 0,
           ctx,
           b.modo,
-          { totales: b.totales, pie: b.pie },
+          { totales: b.totales, pie: b.pie, cabecera: b.cabecera, colorDescuento },
         ),
         caja(),
       );
@@ -2604,7 +2734,9 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       if (b.modo === "ticket" || b.vista === "tienda") {
         const cuentas = (b.totales ?? []).map((t) => `${t.etiqueta}${t.monto ? `: ${t.monto}` : ""}`);
         if (cuentas.length) lineas.push("", ...cuentas);
-        if (b.pie?.length) lineas.push("", ...b.pie);
+        // El número y la fecha, como primer renglón del pie (en las dos vistas).
+        const pie = [...(b.modo === "ticket" && b.cabecera ? [lineaComprobante(b.cabecera)] : []), ...(b.pie ?? [])];
+        if (pie.length) lineas.push("", ...pie);
       }
       return lineas.join("\n");
     }

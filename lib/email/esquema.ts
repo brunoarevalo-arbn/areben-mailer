@@ -15,7 +15,7 @@ import { TIPOS_BLOQUE, nuevoId, type Bloque, type ClaseEncima, type Columna, typ
 import { MAX_ELEMENTOS } from "./encima";
 import { normalizar } from "./mosaico";
 import { instante, MAX_ETIQUETA, MAX_FIN } from "./regresiva";
-import { sanearEstilos } from "./estilos";
+import { sanearColor, sanearEstilos } from "./estilos";
 import { temaDe } from "./tema";
 import { sanearTrozos, CAMPOS_RICOS, CAMPOS_RICOS_CELDA } from "./texto-rico";
 
@@ -172,6 +172,15 @@ function sanearBloque(v: unknown, usados: Set<string>, adentroDeBanda = false): 
   // No es prolijidad. Una plantilla con productos adentro es la bienvenida de
   // Zattia saludando en nombre de BDI, otra vez y con el catálogo.
   if (b.tipo === "productos-dinamicos") delete b.items;
+
+  // El color de los descuentos del ticket: token o hex, como todo color del
+  // motor. Uno ilegible se BORRA (= heredar), nunca se guarda crudo. ⚠️ No es la
+  // frontera: el renderer lo vuelve a sanear al emitirlo (`esActual` saltea esto).
+  if (b.tipo === "carrito" && "colorDescuento" in b) {
+    const c = sanearColor(b.colorDescuento);
+    if (c) b.colorDescuento = c;
+    else delete b.colorDescuento;
+  }
 
   // Una fila tiene entre 2 y 4 celdas, siempre. Un `columnas` con `izq`/`der`
   // (Json viejo, editado a mano o escrito por un script) se convierte acá; uno

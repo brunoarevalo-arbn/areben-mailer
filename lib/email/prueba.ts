@@ -17,12 +17,12 @@
 // un cliente.
 //
 // ⚠️ Puro: sin prisma, sin red. Lo que sí necesita firma vive afuera.
-import { cadaBloque, mapearBloques, type Bloque, type FilaTotal, type ProductoEmail } from "./bloques";
+import { cadaBloque, mapearBloques, type Bloque, type CabeceraTicket, type FilaTotal, type ProductoEmail } from "./bloques";
 import { CARRITO_MUESTRA } from "./render";
 import { bloqueDeTicket, leerTicket } from "./ticket";
 
 /** Lo que el procesador le pega al bloque `carrito` además de los items. */
-export type RellenoCarrito = { restantes?: number; modo?: "ticket"; totales?: FilaTotal[]; pie?: string[] };
+export type RellenoCarrito = { restantes?: number; modo?: "ticket"; totales?: FilaTotal[]; pie?: string[]; cabecera?: CabeceraTicket };
 
 /**
  * Mete los productos en el bloque `carrito`, o lo appendea si no está declarado.
@@ -58,7 +58,19 @@ export function conTicketDePrueba(bloques: Bloque[], triggerData: unknown): Bloq
   const leido = leerTicket((triggerData as { ticket?: unknown } | null)?.ticket);
   if (!leido.ok) return null;
   const t = bloqueDeTicket(leido.ticket);
-  return conCarrito(bloques, t.items, { modo: "ticket", totales: t.totales, pie: t.pie });
+  return conCarrito(bloques, t.items, rellenoDeTicket(t));
+}
+
+/**
+ * Lo que el ticket le pega al bloque además de las prendas. 🔑 Una sola
+ * definición para el procesador y la prueba (regla 6): el 12-oct-2026 entró
+ * `cabecera`, y un campo enumerado a mano en dos lugares es un campo que se
+ * pierde sólo en uno.
+ */
+export function rellenoDeTicket(t: ReturnType<typeof bloqueDeTicket>): RellenoCarrito {
+  const { items: _items, ...resto } = t;
+  void _items;
+  return { modo: "ticket", ...resto };
 }
 
 /**

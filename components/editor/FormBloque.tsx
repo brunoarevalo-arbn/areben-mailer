@@ -699,9 +699,10 @@ export function FormBloque({
             resumen: "Sin fotos: cantidad, total, envío y cuotas, calculados con su carrito.",
             tienda: "Como la tienda: foto alta, nombre, variante y precio, y abajo cantidad y total.",
             galeria: "Hasta tres fotos altas en fila, con nombre, variante y precio debajo.",
+            tarjeta: "Sólo para el ticket del local: tarjeta con borde, número y fecha arriba, y el TOTAL en barra.",
           }[b.vista ?? "lista"]}
           onChange={(e) => {
-            const v = e.target.value as "lista" | "por-modelo" | "tira" | "resumen" | "tienda" | "galeria";
+            const v = e.target.value as "lista" | "por-modelo" | "tira" | "resumen" | "tienda" | "galeria" | "tarjeta";
             set({ vista: v === "lista" ? undefined : v });
           }}
         >
@@ -711,7 +712,18 @@ export function FormBloque({
           <option value="resumen">Resumen</option>
           <option value="tienda">De tienda</option>
           <option value="galeria">Galería</option>
+          {b.modo === "ticket" && <option value="tarjeta">Tarjeta (ticket)</option>}
         </Select>
+        {b.modo === "ticket" && (
+          <div className="space-y-1">
+            <ColorFijo label="Color de los descuentos" value={b.colorDescuento ?? ""} onChange={(colorDescuento) => set({ colorDescuento })} />
+            {b.colorDescuento && (
+              <button type="button" className="text-xs text-muted underline" onClick={() => set({ colorDescuento: undefined })}>
+                Como los demás renglones
+              </button>
+            )}
+          </div>
+        )}
         <p className="text-sm leading-relaxed text-muted">
           Se completa solo con lo que la persona dejó en el carrito: foto, nombre, variante,
           cantidad y precio. Movelo para elegir en qué parte del mail aparece.
