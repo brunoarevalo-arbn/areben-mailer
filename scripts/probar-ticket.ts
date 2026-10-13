@@ -63,7 +63,8 @@ ok(b.pie[0] === 'Documento no válido como factura' && !b.pie.some((l) => l.star
 ok(b.totales.find((t) => t.etiqueta === 'Descuento 15%')?.tipo === 'descuento' && b.totales.find((t) => t.etiqueta === 'Redondeo')?.tipo === 'ajuste', 'el descuento y el redondeo van marcados');
 
 const sube = bloqueDeTicket({ ...l.ticket, pagos: [{ ...l.ticket.pagos[0], redondeo: 23 }] });
-ok(sube.totales.some((t) => t.etiqueta === 'Recargo por redondeo' && t.monto === '+$23'), 'el redondeo que SUBE es «Recargo por redondeo» (Bruno, 4-oct)');
+ok(sube.totales.some((t) => t.etiqueta === 'Redondeo' && t.monto === '+$23'), 'el redondeo que SUBE es «Redondeo» con «+» (Bruno, 12-oct)');
+ok(!sube.totales.some((t) => /recargo/i.test(t.etiqueta)), '⛔ «Recargo»: siempre «Redondeo» (Bruno, 12-oct)');
 const sinVuelto = bloqueDeTicket({ ...l.ticket, pagaCon: null, vuelto: null });
 ok(!sinVuelto.totales.some((t) => t.etiqueta === 'Vuelto'), 'sin «paga con» no hay vuelto');
 
@@ -127,7 +128,7 @@ ok(!/<img[^>]*(lucky|cable)[^>]*object-fit/.test(th), 'tarjeta: ⛔ object-fit (
 ok(th.includes('iPhone 15') && th.includes('2 u.'), 'tarjeta: el modelo abajo del nombre, y la cantidad');
 ok(/color:#e40044;font-weight:600">Descuento 10%/.test(th), 'tarjeta: el descuento en el color elegido');
 ok(/bgcolor="[^"]+"[^>]*font-style:italic[^>]*>\$14\.427</.test(th), 'tarjeta: el TOTAL en barra, con el monto en bold italic');
-ok(th.includes('Recargo por redondeo') && th.includes('+$27'), 'tarjeta: el redondeo');
+ok(th.includes('Redondeo') && !/Recargo/i.test(th) && th.includes('+$27'), 'tarjeta: el redondeo, sin «Recargo»');
 for (const n of ['Pagaste con', 'Entregaste', 'Vuelto', 'Transferencia']) ok(!th.includes(n), `tarjeta: ⛔ «${n}»`);
 const tt = renderEmailTexto({ bloques: [tarjeta] }, OPTS);
 ok(tt.includes('Comprobante #48217') && tt.includes('TOTAL: $14.427') && tt.includes('Descuento 10%: −$1.600') && !PAGO.test(tt), 'tarjeta, texto plano: número, descuento y total, ⛔ el medio');

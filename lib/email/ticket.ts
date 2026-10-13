@@ -150,9 +150,11 @@ export function lineaComprobante(c: CabeceraTicket): string {
 
 /**
  * Lo que dibuja el bloque: las prendas, los renglones de plata, el número y la
- * fecha (`cabecera`) y el pie. Mismo orden y mismas palabras que el ticket de
- * papel (🔴 el redondeo que sube es «Recargo por redondeo», como en los tickets
- * de GN — Bruno, 4-oct-2026).
+ * fecha (`cabecera`) y el pie. Mismo orden que el ticket de papel.
+ *
+ * 🔴 **El redondeo se llama «Redondeo», suba o baje**, con el signo en el monto
+ * (Bruno, 12-oct-2026: «siempre redondeo, tanto en Zattia como en BDI»). Hasta
+ * ese día el que subía decía «Recargo por redondeo», como en los tickets de GN.
  *
  * 🔴 **La forma de pago ⛔ sale en el mail** (Bruno, 12-oct-2026: «el medio de
  * cobro en los mails no sirve»). Hasta ese día iban, después del TOTAL, «Pagaste
@@ -188,7 +190,7 @@ export function bloqueDeTicket(t: TicketLocal): { items: ProductoEmail[]; totale
   if (aVenta > 0) totales.push({ etiqueta: "Descuento en la venta", monto: `−${plata(aVenta)}`, tipo: "descuento" });
   for (const p of t.pagos) {
     if (p.descuento > 0) totales.push({ etiqueta: `Descuento ${p.porcentaje}%`, monto: `−${plata(p.descuento)}`, tipo: "descuento" });
-    if (p.redondeo > 0) totales.push({ etiqueta: "Recargo por redondeo", monto: `+${plata(p.redondeo)}`, tipo: "ajuste" });
+    if (p.redondeo > 0) totales.push({ etiqueta: "Redondeo", monto: `+${plata(p.redondeo)}`, tipo: "ajuste" });
     if (p.redondeo < 0) totales.push({ etiqueta: "Redondeo", monto: `−${plata(p.redondeo)}`, tipo: "ajuste" });
   }
   totales.push({ etiqueta: "TOTAL", monto: plata(t.total), fuerte: true });
