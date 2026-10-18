@@ -5,6 +5,7 @@
 //   POST /api/externo/aviso   header `x-ticket-key: <TICKET_KEY>`
 //   { para: ["…@arebensrl.com"], asunto, html, texto }   (ver lib/email/aviso-interno.ts)
 //
+// 🔑 Una segunda llave, `TICKET_KEY_ERP`, para el ERP (alertas del motor, 18-oct): sólo vale en esta ruta.
 // 🔑 La llave es la MISMA del ticket: es la llave del monitor, que ya está cargada en
 // los dos lados (`MAILER_TICKET_KEY` allá, `TICKET_KEY` acá). Falla CERRADO: sin
 // `TICKET_KEY`, todo es 401.
@@ -19,12 +20,16 @@ import { leerAviso } from "@/lib/email/aviso-interno";
 /** El remitente de los avisos del monitor: el dominio de BDI está verificado en SES con DKIM. */
 const DE = { email: process.env.AVISO_FROM_EMAIL || "monitor@bdiaccesorios.com.ar", nombre: "Monitor Areben" };
 
+/**
+ * La del monitor (`TICKET_KEY`) o la del ERP (`TICKET_KEY_ERP`, Bruno 18-oct: las alertas del motor). Cada una se revoca
+ * sola; la del ERP sirve SÓLO acá (⛔ en `/ticket`).
+ */
 function llaveValida(recibida: string | null): boolean {
-  const esperada = process.env.TICKET_KEY;
-  if (!esperada || !recibida) return false;
-  const a = createHash("sha256").update(esperada).digest();
+  if (!recibida) return false;
   const b = createHash("sha256").update(recibida).digest();
-  return timingSafeEqual(a, b);
+  return [process.env.TICKET_KEY, process.env.TICKET_KEY_ERP].some(
+    (esperada) => !!esperada && timingSafeEqual(createHash("sha256").update(esperada).digest(), b),
+  );
 }
 
 export async function POST(req: Request) {
