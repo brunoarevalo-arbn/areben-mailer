@@ -721,8 +721,12 @@ export type Bloque = BloqueBase &
          *    fecha», prendas con foto de 64 px de ancho y alto según el archivo, el
          *    nombre como viene (⛔ mayúsculas forzadas), los totales con el TOTAL
          *    en barra y la letra chica al pie.
+         *
+         * Y el 26-oct-2026, con los avisos de retiro en el local (`lib/email/pedido.ts`):
+         *  - `pedido`: lo que se compró, para CONFIRMARLO y no para venderlo — foto
+         *    chica, NOMBRE, la variante y «x1» a la derecha, ⛔ sin precio ni link.
          */
-        vista?: "lista" | "por-modelo" | "tira" | "resumen" | "tienda" | "galeria" | "tarjeta";
+        vista?: "lista" | "por-modelo" | "tira" | "resumen" | "tienda" | "galeria" | "tarjeta" | "pedido";
         /**
          * Sólo en el modo `"ticket"`: los renglones de plata debajo de las
          * prendas —subtotal, descuento de la cuenta, redondeo, TOTAL, con qué

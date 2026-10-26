@@ -951,6 +951,41 @@ function renderCarritoTienda(items: ProductoEmail[], restantes: number, pie: Fil
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${margen(e.caja, 8, 16)}">${filas}${cierre}</table>${masProductos(restantes, pal)}`;
 }
 
+/** El lado de la foto de una prenda en la vista `pedido`. */
+const FOTO_PEDIDO = 56;
+
+/**
+ * La vista `pedido` (26-oct-2026, avisos de retiro en el local): lo que se
+ * compró, para CONFIRMARLO — foto chica, NOMBRE, la variante y «x1». ⛔ Sin
+ * precio y sin link: el mail dice qué te espera en el mostrador, no te vende nada.
+ * Diseño aprobado por Bruno: `.mirar/estado-pedido-zattia/`.
+ */
+function renderCarritoPedido(items: ProductoEmail[], restantes: number, pal: Paleta, e: EstProducto): string {
+  const filas = items
+    .map((p, i) => {
+      const borde = i === 0 ? "" : `border-top:1px solid ${pal.borde};`;
+      const foto = p.imagen
+        ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="${FOTO_PEDIDO}" height="${FOTO_PEDIDO}" style="display:block;width:${px(FOTO_PEDIDO)};height:${px(FOTO_PEDIDO)};object-fit:cover;border-radius:${px(e.img.radio ?? 3)};background:${pal.bordeSuave}" />`
+        : "";
+      const variante = p.variante
+        ? `<div style="padding-top:2px;font-size:${px(e.nota.tamano ?? 12)};line-height:1.35;color:${e.nota.color}">${esc(p.variante)}</div>`
+        : "";
+      return `<tr>
+    <td width="${FOTO_PEDIDO}" valign="middle" style="${borde}padding:10px 0;width:${px(FOTO_PEDIDO)}">${foto}</td>
+    <td valign="middle" style="${borde}padding:10px 0 10px 14px">
+      <div style="font-size:${px(e.nombre.tamano ?? 12)};line-height:1.35;letter-spacing:1px;text-transform:uppercase;color:${e.nombre.color};font-weight:${e.nombre.peso ?? 400}">${esc(p.nombre)}</div>
+      ${variante}
+    </td>
+    <td width="40" valign="middle" align="right" style="${borde}padding:10px 0;width:40px;font-size:${px(e.nota.tamano ?? 12)};color:${e.nota.color};white-space:nowrap">x${esc(String(p.cantidad ?? 1))}</td>
+  </tr>`;
+    })
+    .join("");
+  const mas = restantes > 0
+    ? `<tr><td colspan="3" style="border-top:1px solid ${pal.borde};padding:10px 0;font-size:${px(e.nota.tamano ?? 12)};color:${e.nota.color}">y ${restantes} prenda${restantes === 1 ? "" : "s"} más</td></tr>`
+    : "";
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(e.caja, 8, 16)}">${filas}${mas}</table>`;
+}
+
 /**
  * Hasta tres fotos altas en fila, cada una con su ficha debajo. 100 × 125 (4:5):
  * 3 × 100 + 2 × 12 de aire = 324 px, que entran en los ~343 útiles de un celular
@@ -1533,6 +1568,7 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       if (items.length && b.vista === "tira") return pad(renderTira(items, rest, pal, ep), caja());
       if (items.length && b.vista === "tienda") return pad(renderCarritoTienda(items, rest, b.totales ?? [], pal, ep), caja());
       if (items.length && b.vista === "galeria") return pad(renderGaleria(items, rest, pal, ep), caja());
+      if (items.length && b.vista === "pedido") return pad(renderCarritoPedido(items, rest, pal, ep), caja());
       // El color de los descuentos se SANEA acá también: `esActual` deja pasar
       // el documento sin el saneo de `leerContenido` (la frontera es el emisor).
       const colorDescuento = resolverColor(sanearColor(b.colorDescuento), pal);
@@ -2726,6 +2762,13 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       if (b.vista === "resumen") {
         const filas = (b.totales ?? []).map((t) => `${t.etiqueta}: ${t.monto}`);
         return filas.length ? filas.join("\n") : null;
+      }
+      // La vista `pedido` va sin precio y con la cantidad siempre («x1»), igual que el HTML.
+      if (b.vista === "pedido") {
+        const ls = (b.items ?? []).map((p) => `· ${lineaTexto({ ...p, cantidad: 1 }, true)} x${p.cantidad ?? 1}`);
+        const r = b.restantes ?? 0;
+        if (r > 0) ls.push(`y ${r} prenda${r === 1 ? "" : "s"} más`);
+        return ls.length ? ls.join("\n") : null;
       }
       const lineas = (b.items ?? []).map((p) => link(`· ${lineaTexto(p)}`, p.url));
       if (!lineas.length) return null;

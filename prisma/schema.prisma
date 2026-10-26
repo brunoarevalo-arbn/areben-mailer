@@ -84,6 +84,12 @@ enum TriggerTipo {
   // frenan REBOTADO y SPAM). Lo encola `POST /api/externo/ticket`, ⛔ un evento
   // de TN. Agregado por scripts/add-trigger-ticket.ts (SQL crudo, nunca db push).
   TICKET
+  // Retiro en el LOCAL (26-oct-2026): `order/packed` → listo para retirar (y sus
+  // recordatorios, con la espera); `order/fulfilled` → gracias por pasar. ⛔ Son
+  // marketing: pasan la BAJA como el TICKET. Ver lib/email/pedido.ts y
+  // scripts/add-trigger-retiro.ts (SQL crudo, nunca db push).
+  RETIRO_LISTO
+  RETIRADO
 }
 
 enum EstadoAutomation {

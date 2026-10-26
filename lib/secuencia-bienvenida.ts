@@ -37,7 +37,8 @@ export interface Compra {
 export type MotivoCorte = "canjeo" | "compro";
 
 /** Los motivos por los que un mail de automation NO sale aunque le toque. */
-export type MotivoNoSale = MotivoCorte | "control" | "vencido" | "sin-cupon";
+// `retirado`/`cancelado`: los avisos de retiro en el local (ver `lib/tn/retiro.ts`).
+export type MotivoNoSale = MotivoCorte | "control" | "vencido" | "sin-cupon" | "retirado" | "cancelado";
 
 /**
  * ¿Esta persona ya compró desde que se anotó? Devuelve POR QUÉ, o `null`.

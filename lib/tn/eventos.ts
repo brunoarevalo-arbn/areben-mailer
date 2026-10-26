@@ -34,6 +34,13 @@ export const TRIGGER_EVENT: Record<string, string> = {
   // que los distingue no es el disparador sino la espera y el mail. Ver
   // `scripts/add-trigger-resena.ts`.
   RESENA: "order/paid",
+  // Retiro en el local (26-oct-2026, `lib/email/pedido.ts`): empaquetado = listo
+  // para retirar; retirado = el pedido pasa a entregado. ⚠️ Los dos eventos llegan
+  // por TODO pedido —domicilio, sucursal del correo—: el filtro «es retiro en el
+  // LOCAL» vive en el webhook, y el de «ya retiró» también (lo confirma la orden,
+  // no el nombre del evento).
+  RETIRO_LISTO: "order/packed",
+  RETIRADO: "order/fulfilled",
 };
 
 /**

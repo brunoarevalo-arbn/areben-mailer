@@ -20,6 +20,8 @@ import { bloqueDeTicket, type TicketLocal } from "@/lib/email/ticket";
 import { prepararNacidos, comprasRecientes } from "@/lib/email/secuencia";
 import { esMailQueSigue, yaCompro, mailVencido, faltaCuponObligatorio, type Compra, type MotivoNoSale } from "@/lib/secuencia-bienvenida";
 import { diaLocal } from "@/lib/fechas";
+import { resolverPedidoEnBloques, resolverPedidoEnTexto, type PedidoRetiro } from "@/lib/email/pedido";
+import { corteDeRetiro } from "@/lib/tn/retiro";
 
 export const maxDuration = 60;
 const BATCH = 30;
@@ -73,8 +75,12 @@ export async function GET(req: Request) {
     // consentimiento (`tnAcceptsMkt`) y la BAJA —darse de baja de las promos no
     // es pedir que no te den el ticket—, pero ⛔ un REBOTADO (la casilla no existe:
     // mandarle hunde la reputación de la marca) ni un SPAM (ya se quejó una vez).
+    // Los avisos de retiro (26-oct-2026) son de la misma clase: «tu pedido está
+    // listo» no es una promo, y darse de baja de las promos no es pedir que no te
+    // avisen dónde está tu compra.
     const esTicket = automation.trigger === "TICKET";
-    const puedeRecibir = esTicket
+    const esRetiro = automation.trigger === "RETIRO_LISTO" || automation.trigger === "RETIRADO";
+    const puedeRecibir = esTicket || esRetiro
       ? contacto.estado !== "REBOTADO" && contacto.estado !== "SPAM"
       : contacto.estado === "ACTIVO" && contacto.tnAcceptsMkt;
     if (!puedeRecibir || automation.estado !== "ACTIVO" || !automation.asunto) {
@@ -100,7 +106,7 @@ export async function GET(req: Request) {
     const td = run.triggerData as TriggerPopup & {
       checkoutId?: string; abandonedUrl?: string; productos?: ProductoEmail[]; restantes?: number;
       subtotal?: number | null; cantidad?: number; retiroEnLocal?: boolean;
-      orderId?: string; ticket?: TicketLocal; grupo?: string;
+      orderId?: string; ticket?: TicketLocal; grupo?: string; pedido?: PedidoRetiro;
     };
 
     // Un run que no sale por una regla del MAIL queda SALTADO con su motivo
@@ -145,6 +151,20 @@ export async function GET(req: Request) {
         continue;
       }
     }
+    // «Listo para retirar» y sus recordatorios: si ya lo retiró —o se canceló—
+    // ninguno sale. Va para el PRIMERO también: el cron puede tardar más de una
+    // hora (mediana medida: 75 min) y la clienta pudo pasar en el medio.
+    // ⚠️ Si TN no contesta, el mail SALE: la misma regla que el corte de la
+    // bienvenida (TN caído ⇒ sale). Un recordatorio de más se perdona; un aviso
+    // de «tu pedido está listo» que no llega es justo el problema que esto arregla.
+    if (automation.trigger === "RETIRO_LISTO" && td.orderId) {
+      const corte = await corteDeRetiro(automation.cuenta.tnStoreId, automation.cuenta.tnToken, td.orderId);
+      if (corte) {
+        await saltar(corte);
+        continue;
+      }
+    }
+
     // El ticket del local trae sus prendas, sus renglones de plata y su pie: las
     // prendas entran por el mismo camino que las del carrito (`td.productos`) y
     // lo demás se le pega al bloque más abajo.
@@ -259,6 +279,10 @@ export async function GET(req: Request) {
     // Va antes de resolver los productos dinámicos porque puede SACAR un bloque,
     // y no tiene sentido resolverle una consulta a TN a un bloque que no va a
     // salir. Ver el porqué de cada camino en lib/email/cupon-trigger.ts.
+    // Los `${pedido.…}` del retiro: un bloque con un tag sin dato se cae entero
+    // (la fila «A PAGAR» de quien ya pagó). Ver `resolverPedidoEnBloques`.
+    if (esRetiro) bloques = resolverPedidoEnBloques(bloques, td.pedido);
+
     const antesDelCupon = cadaBloque(bloques);
     bloques = aplicarCuponDelTrigger(bloques, td);
     // «Tu código vence mañana» sin código no es un mail: el bloque `obligatorio`
@@ -332,6 +356,7 @@ export async function GET(req: Request) {
     };
     // `${cupon.vence}` en el preheader, con el vencimiento de ESTE run.
     if (opts.preheader?.includes("${cupon.")) opts.preheader = resolverCuponEnDoc({ t: opts.preheader }, td.vence).t || undefined;
+    if (esRetiro) opts.preheader = resolverPedidoEnTexto(opts.preheader, td.pedido) || undefined;
     // Se pasa el contenido ENTERO con los bloques pisados, no `{ bloques, tema }`.
     //
     // Enumerar los campos a mano hacía que cada cosa nueva del contenido —el tema
@@ -372,7 +397,11 @@ export async function GET(req: Request) {
         to: contacto.email,
         // 🔴 Ídem la cola de campañas: el asunto pasa por los merge tags. Ver
         // `aplicarMergeTagsAsunto` — salía crudo hasta el 29-ago-2026.
-        subject: resolverTagsCarrito(aplicarMergeTagsAsunto(automation.asunto, contacto), carrito, "texto"),
+        subject: resolverTagsCarrito(
+          aplicarMergeTagsAsunto(esRetiro ? resolverPedidoEnTexto(automation.asunto, td.pedido) : automation.asunto, contacto),
+          carrito,
+          "texto",
+        ),
         html,
         text: texto,
         unsubscribeUrl: unsubUrl,

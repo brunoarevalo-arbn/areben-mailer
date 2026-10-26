@@ -57,6 +57,7 @@ node --import tsx scripts/probar-gate.ts       # el gate no se abre solo
 node --import tsx scripts/probar-webhooks.ts   # los webhooks de rebotes fallan CERRADO
 node --import tsx scripts/probar-tn-webhook.ts # la firma de TN es HEX (como la doc), no base64: con base64 rebotaban TODOS con 401
 node --import tsx scripts/probar-ticket.ts      # el ticket de la Caja del local: los números del papel (#30049), ⛔ recalculados
+node --import tsx scripts/probar-retiro.ts     # retiro en el LOCAL: la sucursal del correo ⛔ dispara, «A PAGAR» se cae si ya pagó, ⛔ un `${pedido.…}` crudo, la vista `pedido` sin precios
 node --import tsx scripts/probar-supresion.ts  # una queja no cruza de tienda; un rebote duro sí
 node --env-file=.env --import tsx scripts/probar-rebote-tipo.ts # el rebote deja escrito SI FUE DURO (y el reintento de SNS no lo duplica)
 node --env-file=.env --import tsx scripts/probar-cadena-cola.ts # la posta se confirma por el LEASE, y la invocación ENTERA entra en los 60 s
@@ -1351,6 +1352,30 @@ el header `x-ticket-key` (env `TICKET_KEY`; sin ella, todo 401). ⛔ Tiene event
   nombre como viene de GN y el TOTAL en barra. `colorDescuento` (token o hex) pinta los
   descuentos en las dos. Lo fija `probar-ticket.ts`.
 - `areben-popups` ⛔ lee `TriggerTipo` con Prisma ⇒ este valor sólo pide deployar el mailer.
+
+### Los triggers `RETIRO_LISTO` y `RETIRADO` (avisos de retiro en el local, 26-oct-2026)
+
+Tiendanube tiene su «Listo para retirar» PRENDIDO en Zattia y ⛔ lo manda: 5 de 5 retiros
+empaquetados sin el mail en el historial del pedido (medido en el admin). Estos los manda el
+mailer. Núcleo puro en **`lib/email/pedido.ts`**, test en `probar-retiro.ts`, serie en
+`scripts/secuencia-retiro-zattia.ts` (diseño aprobado: `.mirar/estado-pedido-zattia/`).
+
+- `order/packed` → `RETIRO_LISTO` (listo + recordatorios día 3 y 7 a las 11, `HORA_FIJA`);
+  `order/fulfilled` → `RETIRADO` (gracias por pasar). Los encola el webhook de TN.
+- 🔴 **«Retiro» en TN son DOS cosas** y las dos llegan `shipping_pickup_type: "pickup"`: el
+  local (`shipping: "pickup-point"`) y la sucursal del correo (`api_…`, «Punto de retiro»).
+  Sólo el local dispara (`esRetiroEnLocal`).
+- **Uno por PEDIDO**, no por persona: el webhook deduplica por `triggerData.orderId` y ⛔ usa
+  `capDias` (quien retira dos compras en la semana recibe los dos avisos).
+- «Retirado» lo dice la ORDEN (`shipping_status: delivered` / fulfillment `DELIVERED`), ⛔ el
+  nombre del evento. Antes de cada `RETIRO_LISTO` el procesador relee la orden (`lib/tn/retiro.ts`)
+  y lo saltea si ya retiró o se canceló (TN caído ⇒ sale).
+- **⛔ Son marketing**: pasan la BAJA como el `TICKET`.
+- `${pedido.numero|titular|efectivo|local|direccion|horario}` en cuerpo, asunto y preheader.
+  🔴 **Un bloque con un tag sin dato se cae ENTERO** (la fila «A PAGAR» de quien ya pagó).
+- La vista `pedido` del `carrito`: foto chica, NOMBRE, variante y «x1», ⛔ precio ni link.
+- ⚠️ Sin verificar todavía contra TN real: que `order/fulfilled` llegue al marcar un retiro como
+  retirado. Mirar los runs de `RETIRADO` después del primer retiro.
 
 ## Estado del trabajo
 

@@ -13,7 +13,11 @@ export type Trigger =
   | "CARRITO_ABANDONADO"
   | "NUEVO_SUSCRIPTOR"
   | "RESENA"
-  | "TICKET";
+  | "TICKET"
+  // Retiro en el LOCAL (26-oct-2026): los encola el webhook de TN
+  // (`order/packed` · `order/fulfilled`) y son de UN PEDIDO, no de una persona.
+  | "RETIRO_LISTO"
+  | "RETIRADO";
 
 /**
  * Los valores del enum `TriggerTipo`, como lista.
@@ -29,6 +33,8 @@ export const TRIGGERS = [
   "CARRITO_ABANDONADO",
   "RESENA",
   "TICKET",
+  "RETIRO_LISTO",
+  "RETIRADO",
 ] as const satisfies readonly Trigger[];
 
 export const esTrigger = (x: string): x is Trigger => (TRIGGERS as readonly string[]).includes(x);
@@ -104,6 +110,11 @@ export const MAX_POR_TRIGGER: Record<Trigger, number> = {
   RESENA: 1,
   // Un ticket por venta: una segunda automation sería un segundo comprobante.
   TICKET: 1,
+  // «Listo para retirar» + los dos recordatorios (3 y 7 días), que se cortan si
+  // ya retiró (`lib/tn/retiro.ts`). ⛔ No es «una persona, una vez»: es un pedido.
+  RETIRO_LISTO: 3,
+  // «Gracias por pasar»: uno por pedido retirado.
+  RETIRADO: 1,
 };
 
 /**
@@ -146,6 +157,10 @@ export const ESPERAS_SIGUIENTES: Record<Trigger, readonly number[]> = {
   CARRITO_ABANDONADO: [24, 72],
   RESENA: [],
   TICKET: [],
+  // Listo (al empaquetar) → «te estamos esperando» al 3er día → «seguimos
+  // guardando» al 7º. Con `HORA_FIJA` se leen como DÍAS, a las 11.
+  RETIRO_LISTO: [72, 168],
+  RETIRADO: [],
 };
 
 /**
@@ -174,6 +189,12 @@ export const HORA_FIJA: Record<Trigger, string | null> = {
   CARRITO_ABANDONADO: null,
   RESENA: null,
   TICKET: null,
+  // Los recordatorios de retiro a las 11: el local abre a las 10, y un «te estamos
+  // esperando» a la hora en que se empaquetó (de noche, a veces) se lee tarde.
+  // ⚠️ El 1º (espera 0) sale al instante: `vaAHoraFija` sólo mira esperas ≥ 24 h.
+  // Lo aplica el webhook de TN al crear el run (`app/api/tn/eventos/route.ts`).
+  RETIRO_LISTO: "11:00",
+  RETIRADO: null,
 };
 
 /**

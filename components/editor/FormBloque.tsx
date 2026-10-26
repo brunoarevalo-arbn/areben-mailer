@@ -698,11 +698,12 @@ export function FormBloque({
             tira: "Tres fotos chicas y «X y n productos más». Acompaña sin ocupar.",
             resumen: "Sin fotos: cantidad, total, envío y cuotas, calculados con su carrito.",
             tienda: "Como la tienda: foto alta, nombre, variante y precio, y abajo cantidad y total.",
+            pedido: "Lo que se compró, para confirmarlo: foto chica, nombre, variante y cantidad. Sin precios ni links.",
             galeria: "Hasta tres fotos altas en fila, con nombre, variante y precio debajo.",
             tarjeta: "Sólo para el ticket del local: tarjeta con borde, número y fecha arriba, y el TOTAL en barra.",
           }[b.vista ?? "lista"]}
           onChange={(e) => {
-            const v = e.target.value as "lista" | "por-modelo" | "tira" | "resumen" | "tienda" | "galeria" | "tarjeta";
+            const v = e.target.value as "lista" | "por-modelo" | "tira" | "resumen" | "tienda" | "galeria" | "tarjeta" | "pedido";
             set({ vista: v === "lista" ? undefined : v });
           }}
         >
@@ -712,6 +713,7 @@ export function FormBloque({
           <option value="resumen">Resumen</option>
           <option value="tienda">De tienda</option>
           <option value="galeria">Galería</option>
+          <option value="pedido">Pedido (sin precios)</option>
           {b.modo === "ticket" && <option value="tarjeta">Tarjeta (ticket)</option>}
         </Select>
         {b.modo === "ticket" && (

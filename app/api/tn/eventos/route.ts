@@ -3,6 +3,14 @@ import { readTnWebhook } from "@/lib/tn/webhook";
 import { tnGet } from "@/lib/tn/client";
 import { productosDeOrden, TOPE_CARRITO, type ProductoDeTn } from "@/lib/tn/ordenes";
 import { EVENT_TRIGGER } from "@/lib/tn/eventos";
+import { cuandoSale, vaAHoraFija, type Trigger } from "@/lib/automations";
+import {
+  esRetiroEnLocal, estaCancelada, estaRetirado, lineasDePedido, pedidoDeOrden,
+  type OrdenTnRetiro, type ProductoDeOrden,
+} from "@/lib/email/pedido";
+
+/** Los triggers que son de UN PEDIDO: se deduplican por orden, no por persona. */
+const POR_PEDIDO = new Set(["RETIRO_LISTO", "RETIRADO"]);
 
 interface Persona {
   email?: string | null;
@@ -71,6 +79,27 @@ async function resolver(event: string, recursoId: string, storeId: string, token
           // la primera de las dos redes.)
           restantes: 0,
         },
+      };
+    }
+    // Retiro en el LOCAL: empaquetado (listo para retirar) y entregado (retirado).
+    // ⚠️ Los dos eventos llegan por TODO pedido; acá se filtra. Ver lib/email/pedido.ts.
+    if (event === "order/packed" || event === "order/fulfilled") {
+      const { data } = await tnGet<OrdenTnRetiro & {
+        customer?: Persona; contact_email?: string | null; products?: ProductoDeOrden[];
+      }>(storeId, token, `orders/${recursoId}`);
+      if (!esRetiroEnLocal(data) || estaCancelada(data)) return null;
+      // `order/fulfilled` también llega cuando un pedido pasa a «enviado»: el
+      // «gracias por pasar» sale sólo si la orden YA dice retirado.
+      if (event === "order/fulfilled" && !estaRetirado(data)) return null;
+      const email = (data.contact_email || data.customer?.email || "").toLowerCase();
+      if (!email) return null;
+      const { productos, restantes } = lineasDePedido(data.products);
+      return {
+        email,
+        nombre: data.contact_name || data.customer?.name || null,
+        tnCustomerId: data.customer?.id?.toString() ?? null,
+        acceptsMkt: data.customer?.accepts_marketing === true,
+        triggerData: { orderId: recursoId, pedido: pedidoDeOrden(data), productos, restantes },
       };
     }
     if (event === "checkout/created") {
@@ -156,17 +185,33 @@ export async function POST(req: Request) {
 
   const now = Date.now();
   for (const a of automations) {
-    // Cap: no re-disparar si hubo un run reciente (capDias)
-    const desde = new Date(now - a.capDias * 86400000);
-    const reciente = await prisma.automationRun.findFirst({
-      where: { automationId: a.id, contactoId: contacto.id, createdAt: { gte: desde } },
-    });
-    if (reciente) continue;
+    if (POR_PEDIDO.has(a.trigger)) {
+      // 🔑 Uno por PEDIDO, no por persona: quien retira dos compras en la misma
+      // semana tiene que recibir los dos avisos, y el `capDias` se comía el
+      // segundo. Y TN vuelve a mandar `order/packed` si se desempaqueta y se
+      // empaqueta de nuevo: eso no es un pedido nuevo.
+      const yaEsta = await prisma.automationRun.findFirst({
+        where: { automationId: a.id, triggerData: { path: ["orderId"], equals: recursoId } },
+        select: { id: true },
+      });
+      if (yaEsta) continue;
+    } else {
+      // Cap: no re-disparar si hubo un run reciente (capDias)
+      const desde = new Date(now - a.capDias * 86400000);
+      const reciente = await prisma.automationRun.findFirst({
+        where: { automationId: a.id, contactoId: contacto.id, createdAt: { gte: desde } },
+      });
+      if (reciente) continue;
+    }
     await prisma.automationRun.create({
       data: {
         automationId: a.id,
         contactoId: contacto.id,
-        proximoAt: new Date(now + a.esperaHoras * 3600000),
+        // Con hora fija (los recordatorios de retiro: día 3 y 7 a las 11) sale ese
+        // día a esa hora; si no, a las `esperaHoras` exactas, como siempre.
+        proximoAt: vaAHoraFija(a.trigger as Trigger, a.esperaHoras)
+          ? cuandoSale(a.trigger as Trigger, a.esperaHoras, new Date(now))
+          : new Date(now + a.esperaHoras * 3600000),
         triggerData: persona.triggerData,
       },
     });
