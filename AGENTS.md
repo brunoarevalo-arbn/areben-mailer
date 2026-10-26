@@ -1376,6 +1376,16 @@ mailer. Núcleo puro en **`lib/email/pedido.ts`**, test en `probar-retiro.ts`, s
 - La vista `pedido` del `carrito`: foto chica, NOMBRE, variante y «x1», ⛔ precio ni link.
 - ⚠️ Sin verificar todavía contra TN real: que `order/fulfilled` llegue al marcar un retiro como
   retirado. Mirar los runs de `RETIRADO` después del primer retiro.
+- **BDI** (26-oct): `scripts/secuencia-retiro-bdi.ts` («Retiro BDI 1..4/4») + `crear-retiro-bdi.ts`
+  (dibuja con pedidos reales en `.mirar/retiro-bdi/motor/`; `--escribir` crea PAUSADO). En BDI
+  TN **sí** manda su «Listo para retirar» (5 de 5): los nuestros van **por la estética**, y el de
+  TN se apaga el mismo día que se prenden ⛔ o salen dos. ⛔ Ningún mail de BDI nombra cambios.
+- `horarioEnTexto` agrupa en **tramos** (días corridos con el mismo horario): «Lunes a viernes de
+  10 a 19 y sábados de 10 a 13». Un tramo solo sigue igual que antes (Zattia).
+- La foto de la vista `pedido` lleva sólo el ANCHO (56): el alto lo pone el archivo. ⛔ `object-fit`
+  (Gmail y Outlook lo ignoran y las fotos 4:5 salían aplastadas).
+- La `banda` acepta `borde` (filete de 1 px) y, con borde, `cabecera {izquierda, derecha}`
+  pintada de ese color: el «pase de retiro» de BDI. Su `${pedido.…}` se resuelve como el de los hijos.
 
 ## Estado del trabajo
 

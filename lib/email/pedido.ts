@@ -89,22 +89,34 @@ const hora = (h?: string) => {
   return m[2] === "00" ? String(Number(m[1])) : `${Number(m[1])}:${m[2]}`;
 };
 
+/** «sábado» → «sábados»: un día suelto de un horario con varios TRAMOS se dice en plural. */
+const plural = (dia: string) => (dia.endsWith("s") ? dia : `${dia}s`);
+
 /**
- * El horario de TN («day 1..6, 1000-1900») en una frase: «Lunes a sábado, de 10 a
- * 19». Sólo se resume si los días son CORRIDOS y con el mismo horario; si no, se
- * dice día por día — un resumen que miente manda a alguien a un local cerrado.
+ * El horario de TN («day 1..6, 1000-1900») en una frase. Se agrupa en TRAMOS: días
+ * CORRIDOS con el mismo horario. Un tramo solo: «Lunes a sábado, de 10 a 19» (Zattia).
+ * Varios: «Lunes a viernes de 10 a 19 y sábados de 10 a 13» (BDI cierra a las 13 el
+ * sábado; hasta el 26-oct eso salía día por día, seis veces «de 10 a 19»).
+ * ⛔ Nunca se junta lo que no es corrido ni igual: un resumen que miente manda a
+ * alguien a un local cerrado.
  */
 export function horarioEnTexto(hours: { day?: number; start?: string; end?: string }[] | null | undefined): string {
   const hs = (hours ?? []).filter((h) => typeof h.day === "number" && hora(h.start) && hora(h.end)).sort((a, b) => a.day! - b.day!);
   if (!hs.length) return "";
-  const mismo = hs.every((h) => h.start === hs[0].start && h.end === hs[0].end);
-  const corridos = hs.every((h, i) => i === 0 || h.day === hs[i - 1].day! + 1);
-  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-  if (mismo && corridos) {
-    const dias = hs.length === 1 ? DIAS[hs[0].day!] : `${DIAS[hs[0].day!]} a ${DIAS[hs[hs.length - 1].day!]}`;
-    return `${cap(dias)}, de ${hora(hs[0].start)} a ${hora(hs[0].end)}`;
+  const tramos: (typeof hs)[] = [];
+  for (const h of hs) {
+    const t = tramos[tramos.length - 1];
+    const ult = t?.[t.length - 1];
+    if (ult && h.day === ult.day! + 1 && h.start === ult.start && h.end === ult.end) t.push(h);
+    else tramos.push([h]);
   }
-  return cap(hs.map((h) => `${DIAS[h.day!]} de ${hora(h.start)} a ${hora(h.end)}`).join(" · "));
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const dias = (t: typeof hs, varios: boolean) =>
+    t.length === 1 ? (varios ? plural(DIAS[t[0].day!]) : DIAS[t[0].day!]) : `${DIAS[t[0].day!]} a ${DIAS[t[t.length - 1].day!]}`;
+  const de = (t: typeof hs) => `de ${hora(t[0].start)} a ${hora(t[0].end)}`;
+  if (tramos.length === 1) return `${cap(dias(tramos[0], false))}, ${de(tramos[0])}`;
+  const partes = tramos.map((t) => `${dias(t, true)} ${de(t)}`);
+  return cap(`${partes.slice(0, -1).join(", ")} y ${partes[partes.length - 1]}`);
 }
 
 /**
@@ -216,7 +228,9 @@ export function resolverPedidoEnBloques<B extends { tipo: string }>(bloques: B[]
     .map((b) => {
       if (b.tipo !== "banda") return pedido ? reemplazar(b, pedido) : b;
       const hijos = ((b as unknown as { bloques?: B[] }).bloques ?? []);
-      return { ...b, bloques: resolverPedidoEnBloques(hijos, pedido) };
+      // Lo PROPIO de la banda (la `cabecera` del pase) también lleva tags.
+      const propia = pedido ? reemplazar({ ...b, bloques: [] }, pedido) : b;
+      return { ...propia, bloques: resolverPedidoEnBloques(hijos, pedido) };
     });
 }
 

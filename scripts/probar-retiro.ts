@@ -43,8 +43,15 @@ caso('cancelada se reconoce', () => assert.equal(estaCancelada({ ...local, statu
 
 console.log('\n── los datos del pedido');
 caso('horario corrido y parejo se resume', () => assert.equal(horarioEnTexto(HORAS), 'Lunes a sábado, de 10 a 19'));
-caso('horario salteado se dice día por día (⛔ un resumen que miente)', () =>
-  assert.equal(horarioEnTexto([{ day: 1, start: '1000', end: '1900' }, { day: 3, start: '1000', end: '1300' }]), 'Lunes de 10 a 19 · miércoles de 10 a 13'));
+caso('horario salteado ⛔ se junta (un resumen que miente manda a un local cerrado)', () =>
+  assert.equal(horarioEnTexto([{ day: 1, start: '1000', end: '1900' }, { day: 3, start: '1000', end: '1900' }]), 'Lunes de 10 a 19 y miércoles de 10 a 19'));
+// BDI, medido en la orden real el 26-oct: lunes a viernes 10-19 y el sábado 10-13.
+const BDI = [1, 2, 3, 4, 5].map((day) => ({ day, start: '1000', end: '1900' })).concat({ day: 6, start: '1000', end: '1300' });
+caso('el sábado corto de BDI va en su TRAMO (⛔ seis veces «de 10 a 19»)', () =>
+  assert.equal(horarioEnTexto(BDI), 'Lunes a viernes de 10 a 19 y sábados de 10 a 13'));
+caso('tres tramos: comas y la «y» al final', () =>
+  assert.equal(horarioEnTexto([...BDI.slice(0, 2), { day: 3, start: '1400', end: '1930' }, { day: 6, start: '1000', end: '1300' }]),
+    'Lunes a martes de 10 a 19, miércoles de 14 a 19:30 y sábados de 10 a 13'));
 caso('sin horario: vacío', () => assert.equal(horarioEnTexto(null), ''));
 caso('pagado: sin efectivo', () => assert.equal(efectivoPendiente(local), ''));
 caso('efectivo pendiente: el total', () => assert.equal(efectivoPendiente({ ...local, payment_status: 'pending', gateway_name: 'Efectivo (ROSARIO)', total: '42111.90' }), '$42.111,90'));
@@ -95,6 +102,34 @@ caso('dibuja la prenda y la cantidad', () => { assert.ok(html.includes('SHORT AT
 caso('⛔ precio en el HTML aunque el ítem lo traiga', () => assert.ok(!/25\.990|25990/.test(html)));
 caso('⛔ precio en el texto plano', () => { assert.ok(texto.includes('SHORT ATLAS')); assert.ok(!/25\.990|25990/.test(texto), texto); });
 caso('⛔ link en la línea (no hay a dónde llevar)', () => assert.ok(!/<a [^>]*>\s*<img[^>]*a\.jpg/.test(html)));
+// La foto 4:5 de BDI: el alto lo pone el ARCHIVO. `object-fit` lo ignoran Gmail y Outlook.
+caso('la foto lleva sólo el ancho (⛔ alto fijo ni object-fit: aplasta las 4:5)', () => {
+  const img = /<img[^>]*a\.jpg[^>]*>/.exec(html)?.[0] ?? '';
+  assert.ok(img && !/object-fit|height="/.test(img) && /height:auto/.test(img), img);
+});
+caso('lo que no entra se cuenta como «productos» (⛔ «prendas»: BDI vende fundas)', () => {
+  const muchos = leerContenido({ v: V_ACTUAL, bloques: [{ id: 'c', tipo: 'carrito', vista: 'pedido', items, restantes: 2 }] });
+  const h = renderEmailHtml(muchos, { unsubscribeUrl: 'https://x/baja', nombreCuenta: 'BDI' });
+  assert.ok(!/prenda/.test(h + renderEmailTexto(muchos, { unsubscribeUrl: 'https://x/baja', nombreCuenta: 'BDI' })));
+});
+
+console.log('\n── el pase de BDI: la banda con `borde` y `cabecera`');
+const pase = { id: 'p', tipo: 'banda', fondo: '#ffffff', borde: '#1b1717', cabecera: { izquierda: 'Tu pedido', derecha: '#${pedido.numero}' }, bloques: [{ id: 't', tipo: 'texto', texto: 'hola' }] };
+caso('el `${pedido.numero}` de la cabecera se resuelve (⛔ crudo)', () => {
+  const [b] = resolverPedidoEnBloques([pase] as never[], p) as unknown as { cabecera: { derecha: string } }[];
+  assert.equal(b.cabecera.derecha, '#7396');
+});
+caso('la cabecera se pinta del color del borde, y sale en el texto plano', () => {
+  const d = leerContenido({ v: V_ACTUAL, bloques: resolverPedidoEnBloques([pase] as never[], p) });
+  const h = renderEmailHtml(d, { unsubscribeUrl: 'https://x/baja', nombreCuenta: 'BDI' });
+  assert.ok(/border:1px solid #1b1717/.test(h) && /bgcolor="#1b1717"[^>]*>.*TU PEDIDO.*#7396/s.test(h), 'html');
+  assert.ok(renderEmailTexto(d, { unsubscribeUrl: 'https://x/baja', nombreCuenta: 'BDI' }).includes('TU PEDIDO #7396'));
+});
+caso('sin `borde` no hay cabecera ni filete (⛔ cambia una banda vieja)', () => {
+  const sin = { ...pase, borde: undefined };
+  const h = renderEmailHtml(leerContenido({ v: V_ACTUAL, bloques: [sin] }), { unsubscribeUrl: 'https://x/baja', nombreCuenta: 'BDI' });
+  assert.ok(!/TU PEDIDO|border:1px solid #1b1717/.test(h));
+});
 
 console.log('\n── el cableado');
 caso('RETIRO_LISTO ← order/packed, RETIRADO ← order/fulfilled', () => {

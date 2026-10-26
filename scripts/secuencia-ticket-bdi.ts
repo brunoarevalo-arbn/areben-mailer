@@ -26,30 +26,30 @@ import type { MailNuevo } from './secuencia-bienvenida-5.ts';
 export const FUENTE_TICKET_BDI = 'cms6kpmqg000004l4s4tg6djo';
 export const NOMBRE_TICKET_BDI = 'Ticket del local';
 
-const NEGRO = '#1b1717';
-const MAGENTA = '#e40044';
-const BLANCO = '#ffffff';
+export const NEGRO = '#1b1717';
+export const MAGENTA = '#e40044';
+export const BLANCO = '#ffffff';
 
 /** El de la bienvenida de 5 y el carrito v2 de BDI: Montserrat, el casi negro de la tienda y blanco. */
-const TEMA: Tema = { base: 'claro', fondo: BLANCO, fondoContenido: BLANCO, acento: NEGRO, fuente: 'montserrat' };
+export const TEMA: Tema = { base: 'claro', fondo: BLANCO, fondoContenido: BLANCO, acento: NEGRO, fuente: 'montserrat' };
 
 const TIENDA = 'https://bdiaccesorios.com.ar';
 const INSTAGRAM = 'https://www.instagram.com/bdi_accesorios/';
 /** La ficha de Google del LOCAL de BDI (el link cargado en Resorty, `ModuloConfig('resenas')`). */
-const RESENA_GOOGLE = 'https://g.page/r/CTSlez0IRhw3EAI/review';
+export const RESENA_GOOGLE = 'https://g.page/r/CTSlez0IRhw3EAI/review';
 const utm = (ruta: string, donde: string) =>
   `${TIENDA}/${ruta}?utm_source=mailer&utm_medium=email&utm_campaign=ticket-bdi&utm_content=${donde}`;
 
-const clon = <T extends Bloque>(b: T): T => ({ ...structuredClone(b), id: nuevoId() });
+export const clon = <T extends Bloque>(b: T): T => ({ ...structuredClone(b), id: nuevoId() });
 
 /** Rótulo chico en mayúsculas, separado: «TU COMPRA EN EL LOCAL». */
-const volanta = (texto: string, color = '$medio', arriba = 18): Bloque => ({
+export const volanta = (texto: string, color = '$medio', arriba = 18): Bloque => ({
   id: nuevoId(), tipo: 'titulo', align: 'left', texto,
   estilo: { titulo: { tamano: 11, peso: 700, espaciado: 2, color }, caja: { padArriba: arriba, padAbajo: 0 } },
 } as Bloque);
 
 /** El título de la tienda: bold italic apretado, a la izquierda. */
-const titular = (texto: string | Trozo[], tamano: number, extra: { color?: string; arriba?: number } = {}): Bloque => ({
+export const titular = (texto: string | Trozo[], tamano: number, extra: { color?: string; arriba?: number } = {}): Bloque => ({
   id: nuevoId(), tipo: 'titulo', align: 'left', texto,
   estilo: {
     titulo: { tamano, peso: 800, italica: true, espaciado: -1, interlinea: 1.15, ...(extra.color ? { color: extra.color } : {}) },
@@ -57,7 +57,7 @@ const titular = (texto: string | Trozo[], tamano: number, extra: { color?: strin
   },
 } as Bloque);
 
-const parrafo = (texto: string, extra: { tamano?: number; color?: string; arriba?: number } = {}): Bloque => ({
+export const parrafo = (texto: string, extra: { tamano?: number; color?: string; arriba?: number } = {}): Bloque => ({
   id: nuevoId(), tipo: 'texto', align: 'left', texto,
   estilo: {
     cuerpo: { tamano: extra.tamano ?? 15, interlinea: 1.55, ...(extra.color ? { color: extra.color } : {}) },
@@ -66,7 +66,7 @@ const parrafo = (texto: string, extra: { tamano?: number; color?: string; arriba
 } as Bloque);
 
 /** La pastilla de la tienda. Con `segundo`, el botón doble (el segundo en contorno). */
-const pastilla = (texto: string, url: string, extra: { segundo?: { texto: string; url: string }; arriba?: number; abajo?: number } = {}): Bloque => ({
+export const pastilla = (texto: string, url: string, extra: { segundo?: { texto: string; url: string }; arriba?: number; abajo?: number } = {}): Bloque => ({
   id: nuevoId(), tipo: 'boton', texto, url, align: 'left', full: false,
   ...(extra.segundo ? { segundo: extra.segundo } : {}),
   estilo: {

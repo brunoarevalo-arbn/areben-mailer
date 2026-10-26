@@ -951,7 +951,11 @@ function renderCarritoTienda(items: ProductoEmail[], restantes: number, pie: Fil
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${margen(e.caja, 8, 16)}">${filas}${cierre}</table>${masProductos(restantes, pal)}`;
 }
 
-/** El lado de la foto de una prenda en la vista `pedido`. */
+/**
+ * El ANCHO de la foto de una prenda en la vista `pedido`. El ALTO lo pone el archivo,
+ * como en la `tarjeta` del ticket: hasta el 26-oct era un cuadrado con `object-fit`,
+ * que Gmail y Outlook ignoran ⇒ las fotos 4:5 de BDI salían aplastadas.
+ */
 const FOTO_PEDIDO = 56;
 
 /**
@@ -965,7 +969,7 @@ function renderCarritoPedido(items: ProductoEmail[], restantes: number, pal: Pal
     .map((p, i) => {
       const borde = i === 0 ? "" : `border-top:1px solid ${pal.borde};`;
       const foto = p.imagen
-        ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="${FOTO_PEDIDO}" height="${FOTO_PEDIDO}" style="display:block;width:${px(FOTO_PEDIDO)};height:${px(FOTO_PEDIDO)};object-fit:cover;border-radius:${px(e.img.radio ?? 3)};background:${pal.bordeSuave}" />`
+        ? `<img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" width="${FOTO_PEDIDO}" style="display:block;width:${px(FOTO_PEDIDO)};height:auto;border-radius:${px(e.img.radio ?? 3)};background:${pal.bordeSuave}" />`
         : "";
       const variante = p.variante
         ? `<div style="padding-top:2px;font-size:${px(e.nota.tamano ?? 12)};line-height:1.35;color:${e.nota.color}">${esc(p.variante)}</div>`
@@ -981,7 +985,7 @@ function renderCarritoPedido(items: ProductoEmail[], restantes: number, pal: Pal
     })
     .join("");
   const mas = restantes > 0
-    ? `<tr><td colspan="3" style="border-top:1px solid ${pal.borde};padding:10px 0;font-size:${px(e.nota.tamano ?? 12)};color:${e.nota.color}">y ${restantes} prenda${restantes === 1 ? "" : "s"} más</td></tr>`
+    ? `<tr><td colspan="3" style="border-top:1px solid ${pal.borde};padding:10px 0;font-size:${px(e.nota.tamano ?? 12)};color:${e.nota.color}">y ${restantes} producto${restantes === 1 ? "" : "s"} más</td></tr>`
     : "";
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${margen(e.caja, 8, 16)}">${filas}${mas}</table>`;
 }
@@ -2294,7 +2298,15 @@ function renderBloque(b: Bloque, ctx: Ctx): string {
       const abajo = c.aireY.abajo ?? c.padY ?? 28;
       // `bgcolor` además del `background`: Outlook de escritorio pinta la celda
       // por el atributo.
-      const franja = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${fondo};margin:8px 0 16px"><tr><td bgcolor="${fondo}" style="background:${fondo};padding:${px(arriba)} 0 ${px(abajo)};color:${palB.texto}">${interior}</td></tr></table>`;
+      const borde = colorCss(b.borde, "");
+      // La cabecera va pintada del color del BORDE: es la misma tinta de la tarjeta.
+      const izq = b.cabecera?.izquierda?.trim() ?? "";
+      const der = b.cabecera?.derecha?.trim() ?? "";
+      const sobreBorde = borde && esColorOscuro(borde) ? "#ffffff" : pal.texto;
+      const cabecera = borde && (izq || der)
+        ? `<tr><td bgcolor="${borde}" style="background:${borde};padding:12px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td valign="middle" style="font-size:11px;line-height:24px;font-weight:700;letter-spacing:2px;color:${sobreBorde}">${esc(izq.toUpperCase())}</td><td align="right" valign="middle" style="font-size:20px;line-height:24px;font-weight:800;font-style:italic;letter-spacing:-.5px;color:${sobreBorde};white-space:nowrap">${esc(der)}</td></tr></table></td></tr>`
+        : "";
+      const franja = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${fondo};${borde ? `border:1px solid ${borde};` : ""}margin:8px 0 16px">${cabecera}<tr><td bgcolor="${fondo}" style="background:${fondo};padding:${px(arriba)} 0 ${px(abajo)};color:${palB.texto}">${interior}</td></tr></table>`;
       // Con `margen`, la franja va adentro de un relleno lateral: un `margin` en
       // una tabla al 100% la haría pasarse del ancho.
       const m = Math.min(48, Math.max(0, Math.round(b.margen ?? 0)));
@@ -2727,7 +2739,9 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
     case "banda": {
       const hijos = b.bloques ?? [];
       const partes = sinRotulosHuerfanos(hijos, hijos.map((h) => bloqueATexto(h, opts))).filter((x): x is string => !!x);
-      return partes.length ? partes.join("\n\n") : null;
+      if (!partes.length) return null;
+      const cab = b.borde ? [b.cabecera?.izquierda?.trim().toUpperCase(), b.cabecera?.derecha?.trim()].filter(Boolean).join(" ") : "";
+      return [cab, ...partes].filter(Boolean).join("\n\n");
     }
     // 🔴 Una foto clickeable tiene que dejar su destino en el texto plano, o
     // quien lee el mail así se queda sin el CTA más grande que tiene. Sin `alt`
@@ -2767,7 +2781,7 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
       if (b.vista === "pedido") {
         const ls = (b.items ?? []).map((p) => `· ${lineaTexto({ ...p, cantidad: 1 }, true)} x${p.cantidad ?? 1}`);
         const r = b.restantes ?? 0;
-        if (r > 0) ls.push(`y ${r} prenda${r === 1 ? "" : "s"} más`);
+        if (r > 0) ls.push(`y ${r} producto${r === 1 ? "" : "s"} más`);
         return ls.length ? ls.join("\n") : null;
       }
       const lineas = (b.items ?? []).map((p) => link(`· ${lineaTexto(p)}`, p.url));

@@ -1137,6 +1137,18 @@ export type Bloque = BloqueBase &
          * texto y los hijos llevan su propio relleno de 24 px.
          */
         margen?: number;
+        /**
+         * Hex del filete de 1 px alrededor de la franja (26-oct-2026: el «pase de
+         * retiro» de BDI, una tarjeta blanca con borde negro). Ausente = sin borde,
+         * como siempre. Un valor que no es color se ignora.
+         */
+        borde?: string;
+        /**
+         * La franja de arriba de una banda CON `borde`, pintada del color del borde:
+         * rótulo a la izquierda y dato grande en bold italic a la derecha («TU PEDIDO ·
+         * #22060»). Sin `borde` no se dibuja. Acepta `${pedido.…}`.
+         */
+        cabecera?: { izquierda?: string; derecha?: string };
         base?: "claro" | "oscuro";
         /** El acento de ADENTRO (el botón sobre negro va blanco). Ausente = el del mail. */
         acento?: string;
