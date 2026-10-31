@@ -13,6 +13,7 @@ import {
 // Campaigns" (cobra por contacto, que es justo el modelo que evitamos).
 
 async function enviar(args: SendArgs): Promise<SendResult> {
+  if (args.adjuntos?.length) throw new EmailError('sendgrid no manda adjuntos desde esta app: la factura sale sólo por SES');
   const key = process.env.SENDGRID_API_KEY;
   if (!key) throw new EmailError('falta SENDGRID_API_KEY');
 

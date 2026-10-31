@@ -43,6 +43,17 @@ async function enviar(args: SendArgs): Promise<SendResult> {
           ...(args.text ? { Text: { Data: args.text, Charset: 'UTF-8' } } : {}),
         },
         ...(headers ? { Headers: headers } : {}),
+        ...(args.adjuntos?.length
+          ? {
+              Attachments: args.adjuntos.map((a) => ({
+                FileName: a.nombre,
+                ContentType: a.tipo,
+                RawContent: a.contenido,
+                ContentDisposition: 'ATTACHMENT' as const,
+                ContentTransferEncoding: 'BASE64' as const,
+              })),
+            }
+          : {}),
       },
     },
   });

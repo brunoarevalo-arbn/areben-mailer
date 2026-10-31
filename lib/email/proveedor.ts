@@ -120,6 +120,17 @@ export interface SendArgs {
   /** Remitente de la marca. Sin esto no se manda: no hay fallback global. */
   fromEmail?: string;
   fromName?: string;
+  /**
+   * Archivos adjuntos (hoy sólo la factura del monitor, `/api/externo/factura`). Sólo SES los manda: los otros
+   * proveedores FALLAN con un adjunto, ⛔ lo sueltan callados (un mail «te mandamos la factura» sin la factura).
+   */
+  adjuntos?: Adjunto[];
+}
+
+export interface Adjunto {
+  nombre: string;
+  tipo: string;
+  contenido: Uint8Array;
 }
 
 export interface SendResult {

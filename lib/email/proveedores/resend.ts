@@ -14,6 +14,7 @@ import {
 // dominio en su panel (CNAMEs en Cloudflare, igual que SES).
 
 async function enviar(args: SendArgs): Promise<SendResult> {
+  if (args.adjuntos?.length) throw new EmailError('resend no manda adjuntos desde esta app: la factura sale sólo por SES');
   const key = process.env.RESEND_API_KEY;
   if (!key) throw new EmailError('falta RESEND_API_KEY');
 
