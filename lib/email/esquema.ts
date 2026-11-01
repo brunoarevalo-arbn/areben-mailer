@@ -358,7 +358,8 @@ function esActual(v: unknown): v is ContenidoCampania {
   // Un `formato` que no es uno conocido cae al camino lento, que lo descarta: si
   // no, el tipo diría `FormatoDoc` con cualquier string adentro.
   const formato = (v as Bruto).formato;
-  if (formato !== undefined && formato !== "personal") return false;
+  if (formato !== undefined && formato !== "personal" && formato !== "completo") return false;
+  if (formato === "completo" && typeof (v as Bruto).htmlCompleto !== "string") return false;
   // Ídem `saleHasta`: una fecha ilegible va al camino lento, que la borra.
   const hasta = (v as Bruto).saleHasta;
   if (hasta !== undefined && !(typeof hasta === "string" && /^\d{4}-\d{2}-\d{2}$/.test(hasta))) return false;
@@ -453,6 +454,10 @@ export function leerContenido(json: unknown): ContenidoCampania {
 
   // Sólo el valor conocido: cualquier otra cosa es el mail con diseño.
   if (c.formato === "personal") out.formato = "personal";
+  if (c.formato === "completo" && typeof c.htmlCompleto === "string") {
+    out.formato = "completo";
+    out.htmlCompleto = c.htmlCompleto;
+  }
 
   // Una fecha que no se lee se BORRA (el mail sale siempre): inventarle un
   // vencimiento apagaría un mail que nadie pidió apagar.

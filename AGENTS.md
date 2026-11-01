@@ -77,6 +77,7 @@ node --import tsx scripts/probar-estilos.ts    # la cascada respeta el orden y n
 node --import tsx scripts/probar-espaciado.ts  # el margen se puede llevar a CERO, elegirlo reemplaza el cableado, y cada lado se elige por separado
 node --import tsx scripts/probar-render.ts     # golden: el mail no cambió sin querer
 node --import tsx scripts/probar-html.ts       # VML, media queries, tracking, peso
+node --import tsx scripts/probar-html-completo.ts # un mail que ya es un documento entero: conserva su <style>, sin pie del motor, con baja, tracking y text/plain
 node --import tsx scripts/probar-banda-link.ts # una foto puede ser un link, y NUNCA un <a> dentro de otro
 node --import tsx scripts/probar-foto-encima.ts # una foto lleva VARIOS botones encima, y el condicional de Outlook no se cierra antes de tiempo
 node --import tsx scripts/probar-mosaico.ts   # una foto cortada en pedazos: la fila no desborda, y a medio cortar sale la foto ENTERA

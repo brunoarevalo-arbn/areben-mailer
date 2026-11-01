@@ -4,6 +4,7 @@ import { leerContenido } from "./esquema";
 import { resolverProductosDinamicos } from "./productos-dinamicos";
 import { marcaDe, hostDeEnvio } from "@/lib/marca";
 import { inyectarTracking } from "@/lib/email/tracking";
+import { urlsDeProductoEnHtml } from "@/lib/email/html-completo";
 import { sendEmail, esThrottle } from "@/lib/email/enviar";
 import { destinatarioPermitido, modoEnvio, MSG_SIN_REMITENTE } from "@/lib/email/proveedor";
 import { estadoEnvioMarca, getRemitenteEnvio, motivoEnTexto } from "@/lib/remitentes";
@@ -16,6 +17,21 @@ import {
 } from "./links-productos";
 
 const BATCH = 20;
+
+/**
+ * El chequeo de fichas de un mail `completo`, una vez cada 10 minutos por campaña.
+ * Una pieza diseñada nombra ~25 productos: repetirlo en cada lote de 20 son decenas
+ * de miles de pedidos contra la tienda durante una campaña grande.
+ */
+const FICHAS_CADA_MS = 10 * 60_000;
+const fichasMiradas = new Map<string, { en: number; rotos: string[] }>();
+async function fichasRotasDeCompleto(campaniaId: string, urls: string[]): Promise<string[]> {
+  const previo = fichasMiradas.get(campaniaId);
+  if (previo && previo.rotos.length === 0 && Date.now() - previo.en < FICHAS_CADA_MS) return [];
+  const rotos = await linksRotos(urls);
+  fichasMiradas.set(campaniaId, { en: Date.now(), rotos });
+  return rotos;
+}
 
 export interface ResultadoLote {
   enviados: number;
@@ -88,6 +104,32 @@ export async function procesarLote(campaniaId: string): Promise<ResultadoLote | 
   // ⚠️ Sólo se miran las URLs de la propia tienda: la lista sale de un Json que
   // escribió una persona, y hacer que el servidor visite cualquier URL que
   // alguien escriba es un SSRF con disfraz de chequeo.
+  if (contenido.formato === "completo") {
+    const marca = marcaDe(campania.cuenta, process.env.APP_URL ?? "");
+    const motivo = !marca.permiteHtmlCrudo
+      ? "Este mail es un HTML completo y la cuenta no tiene habilitado el HTML propio."
+      : !contenido.htmlCompleto?.trim()
+        ? "Este mail es un HTML completo y está vacío."
+        : null;
+    const rotos = motivo
+      ? []
+      : await fichasRotasDeCompleto(
+          campaniaId,
+          urlsDeProductoEnHtml(contenido.htmlCompleto ?? "").filter((u) => esDeLaTienda(u, marca.urlCuenta)),
+        );
+    if (motivo || rotos.length) {
+      console.log(JSON.stringify({ ev: "lote-bloqueado", motivo: motivo ?? "producto-sin-publicar", campaniaId, rotos }));
+      const restantes = await prisma.envio.count({ where: { campaniaId, estado: "ENCOLADO" } });
+      return {
+        enviados: 0,
+        fallidos: 0,
+        restantes,
+        throttled: false,
+        bloqueado: motivo ?? motivoLinksRotos(rotos, new Map()),
+      };
+    }
+  }
+
   const urlsProducto = urlsDeProductos(contenido.bloques).filter((u) =>
     esDeLaTienda(u, marcaDe(campania.cuenta, process.env.APP_URL ?? "").urlCuenta),
   );

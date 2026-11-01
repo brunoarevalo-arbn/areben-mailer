@@ -1241,7 +1241,7 @@ export const ETIQUETA_BLOQUE = {
  * HTML y en el text/plain por igual: ver `DIBUJA_PERSONAL` en el renderer. El
  * producto se nombra con `${cart.producto}` adentro del texto.
  */
-export type FormatoDoc = "personal";
+export type FormatoDoc = "personal" | "completo";
 
 export interface ContenidoCampania {
   /**
@@ -1269,6 +1269,11 @@ export interface ContenidoCampania {
   estilos?: Estilos;
   /** Ver `FormatoDoc`. */
   formato?: FormatoDoc;
+  /**
+   * El documento entero de un mail `formato: "completo"`. Ver
+   * `lib/email/html-completo.ts`. Sale sólo si la cuenta tiene `htmlCrudoHabilitado`.
+   */
+  htmlCompleto?: string;
   /**
    * Último día (calendario de Argentina, `AAAA-MM-DD`, inclusive) en que este mail
    * puede SALIR de una automation. Pasado, el run queda `SALTADO` con motivo

@@ -3,6 +3,7 @@
 //
 // El aspecto (colores, ancho, fuente) vive en lib/email/tema.ts y llega acá ya
 // resuelto como `Paleta`. Este archivo no decide de qué color es nada.
+import { armarHtmlCompleto, textoDeHtmlCompleto } from "./html-completo";
 import { esColorOscuro, resolverPaleta, combinarTema, type Paleta, type Tema } from "./tema";
 import { leerContenido } from "./esquema";
 import {
@@ -2570,6 +2571,13 @@ function resolverCuponSobrante(c: ContenidoCampania, opts: RenderOpts): Contenid
 }
 
 export function renderEmailHtml(entrada: ContenidoCampania, opts: RenderOpts): string {
+  // El documento ya viene entero: ni cascada, ni tarjeta, ni pie del motor. Sólo
+  // el link de baja. Sin el permiso de la cuenta ⛔ se dibuja (y `procesarLote`
+  // no manda): acá no hay un mail de bloques al que caer.
+  const leido = leerContenido(entrada);
+  if (leido.formato === "completo") {
+    return opts.permiteHtmlCrudo ? armarHtmlCompleto(leido.htmlCompleto ?? "", opts.unsubscribeUrl) : "";
+  }
   // Cinturón y tiradores: los call sites ya normalizan, pero si alguno se olvida
   // el mail sale igual bien. Es barato — un contenido que ya está en la versión
   // actual se devuelve tal cual, sin recorrer nada.
@@ -2942,6 +2950,10 @@ function bloqueATexto(b: Bloque, opts: RenderOpts): string | null {
  * miden. El costo es que un click desde la versión texto no queda registrado.
  */
 export function renderEmailTexto(entrada: ContenidoCampania, opts: RenderOpts): string {
+  const leido = leerContenido(entrada);
+  if (leido.formato === "completo") {
+    return opts.permiteHtmlCrudo ? textoDeHtmlCompleto(leido.htmlCompleto ?? "", opts.unsubscribeUrl) : "";
+  }
   // Igual que el HTML: si el text/plain no resolviera los tags, el mail saldría
   // con el número en una mitad y con `${tienda.envioGratis}` en la otra — y la
   // que lee el filtro de spam es justamente ésta.
